@@ -336,14 +336,27 @@ ${String(context).slice(0, 13000)}`;
 /* Обогащение карточки из веб-поиска: самая свежая инфа по проекту (срок сдачи, доходность,
    прирост, ход строительства, цена). want — на чём сфокусироваться (опц.). */
 async function enrichProject(searchText, name, want) {
-  const prompt = `Из результатов веб-поиска по проекту недвижимости "${name}" извлеки САМУЮ СВЕЖУЮ достоверную информацию.${want ? ' В ПРИОРИТЕТЕ заполни: ' + want + '.' : ''} Верни СТРОГО JSON:
-{"developer":"застройщик","handover":"срок сдачи","roi":"доходность % (rental yield)","appreciation":"прирост стоимости % к сдаче","priceFrom":число_или_0,"currency":"USD|EUR|THB|AED","constructionProgress":"ход строительства: % готовности или этап (напр. «60% готовности, Q2 2026»)","description":"2-4 живых предложения о проекте (стиль подборки, продающе но по фактам)","districtBlurb":"1-2 предложения про РАЙОН/локацию (чем хорош, атмосфера, инфраструктура)","timings":["«N | место» — минуты до ключевых точек: пляж/аэропорт/школа/ТЦ, по строкам"],"rentalArgs":["аргументы «почему хорошо под аренду» — по строкам: турпоток, загрузка, ставка"],"hookTitle":"цепляющий заголовок вместо названия ЖК (выгода+локация, до 80 симв)","confidence":"high|medium|low"}
-Правила: бери только подтверждённое источниками; чего нет — "" или []. НЕ выдумывай цифры. При противоречиях — самое свежее.
+  const prompt = `Из результатов веб-поиска по проекту недвижимости "${name}" собери МАКСИМАЛЬНО ПОЛНУЮ, подробную и достоверную карточку (не сводку «на коленке» — насыщенную, продающую, по всем открытым источникам).${want ? ' В ПРИОРИТЕТЕ заполни: ' + want + '.' : ''} Верни СТРОГО JSON:
+{"developer":"застройщик","handover":"срок сдачи","roi":"доходность % (rental yield)","appreciation":"прирост стоимости % к сдаче","priceFrom":число_или_0,"currency":"USD|EUR|THB|AED","constructionProgress":"ход строительства: % готовности или этап (напр. «60% готовности, Q2 2026»)","description":"3-5 живых продающих предложений о проекте (по фактам, атмосфера+выгода+уникальность)","districtBlurb":"2-3 предложения про РАЙОН/локацию (чем хорош, атмосфера, инфраструктура, кому подходит)","timings":["«N | место» — минуты до ключевых точек: пляж/аэропорт/школа/ТЦ/госпиталь, по строкам"],"rentalArgs":["аргументы «почему под аренду» — турпоток, загрузка, ставка, УК, окупаемость"],"amenities":["удобства комплекса: бассейн, спа, ко-воркинг, фитнес, охрана 24/7, детская зона… — по строкам"],"investmentHighlights":["инвест-аргументы: рассрочка, гарантированный доход, рост локации, ликвидность — по строкам"],"paymentPlan":"схема оплаты одной строкой (напр. «30% на старте, 40% в ходе, 30% к сдаче; рассрочка 0%»)","hookTitle":"цепляющий заголовок вместо названия ЖК (выгода+локация, до 80 симв)","confidence":"high|medium|low"}
+Правила: собирай ПОДРОБНО и ЁМКО из всех источников; бери только подтверждённое; чего нет — "" или []. НЕ выдумывай цифры. При противоречиях — самое свежее. amenities и investmentHighlights — минимум по 3-5 пунктов, если источники позволяют.
 РЕЗУЛЬТАТЫ ПОИСКА:
-${String(searchText).slice(0, 13000)}`;
-  const j = await callGemini(prompt, 35000, 2200);
+${String(searchText).slice(0, 15000)}`;
+  const j = await callGemini(prompt, 40000, 3200);
   if (!j || typeof j !== 'object') throw new Error('bad enrich');
   return j;
+}
+
+/* Умный поиск проектов в открытых источниках по НАЗВАНИЮ/району (Tier 3 поиска).
+   searchText — выдача веб-поиска; query — что искал пользователь (возможно с опечаткой). */
+async function findProjects(searchText, query) {
+  const prompt = `Пользователь ищет объект недвижимости: "${query}" (возможна опечатка — исправь мысленно). Из результатов веб-поиска найди ПОДХОДЯЩИЕ проекты недвижимости. Верни СТРОГО JSON:
+{"projects":[{"name":"точное название проекта/ЖК","area":"район/локация/город","developer":"застройщик если есть","priceFrom":число_или_0,"currency":"USD|EUR|THB|AED","url":"прямая ссылка на страницу проекта (из результатов)","match":"high|medium|low — насколько совпадает с запросом"}]}
+Правила: только реальные проекты из результатов; сортируй по релевантности запросу (high сверху). url бери из результатов (после названия в скобках). Чего нет — "" или 0. Максимум 8. Если ничего похожего — {"projects":[]}.
+РЕЗУЛЬТАТЫ ПОИСКА:
+${String(searchText).slice(0, 13000)}`;
+  const j = await callGemini(prompt, 30000, 2000);
+  if (!j || !Array.isArray(j.projects)) return [];
+  return j.projects;
 }
 
 /* Извлечь СПИСОК ПРОЕКТОВ из каталога портала (для авто-индекса: имя+локация+ссылка+сводка).
@@ -1299,6 +1312,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractUnits, extractCatalog, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractUnits, extractCatalog, findProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

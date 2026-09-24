@@ -7534,19 +7534,31 @@ async function initPropMap(props) {
     window._prMarkers[p.id] = { mk, lat: p.lat, lng: p.lng };
     const img = (p.images && p.images[0]) || '';
     const price = p.priceFrom ? 'от ' + fmt(p) : '';
+    /* мета-чипы: тип · площадь · сдача — минимализм, но информативно */
+    const areas = (p.units || []).map(u => parseFloat(String(u.area).replace(',', '.'))).filter(a => a > 0);
+    const areaRange = areas.length ? (Math.min(...areas) === Math.max(...areas) ? Math.round(Math.min(...areas)) + ' м²' : Math.round(Math.min(...areas)) + '–' + Math.round(Math.max(...areas)) + ' м²') : '';
+    const chips = [];
+    if (p.type) chips.push(esc(p.type)); else if (p.beds != null) chips.push(p.beds === 0 ? 'студия' : p.beds + ' спальни');
+    if (areaRange) chips.push(areaRange);
+    if (p.handover) chips.push('сдача ' + esc(p.handover));
+    if ((p.units || []).length) chips.push(p.units.length + ' юнитов');
+    const chipsHtml = chips.length ? `<div class="prpop-chips">${chips.map(c => `<span class="prpop-chip">${c}</span>`).join('')}</div>` : '';
+    const roiHtml = p.roi ? `<span class="prpop-roi">${ic(I.flame, 2)}${esc(p.roi)}</span>` : '';
+    const hook = p.hookTitle ? `<div class="prpop-hook">${esc(p.hookTitle)}</div>` : '';
     const stubBtn = p.stub && p.sourceUrl ? `<button class="btn btn-sm btn-accent prpop-hydrate" data-prophydrate="${p.id}" data-src="${esc(p.sourceUrl)}">Подтянуть полную карточку</button>` : '';
-    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}${p.stub ? ' <span class="prpop-stub">каталог</span>' : ''}</div><div class="prpop-l">${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">Открыть карточку</button></div></div>`, { minWidth: 230, closeButton: true, autoPan: true });
-    mk.on('click', () => mk.openPopup());   /* гарантированное открытие попапа по клику (не полагаемся на дефолт Leaflet) */
+    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"><div class="prpop-imgsh"></div>${roiHtml}${p.stub ? '<span class="prpop-stub">каталог</span>' : ''}</div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}</div><div class="prpop-l">${ic(I.pin || I.building, 2)}${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${chipsHtml}${hook}${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}<div class="prpop-acts">${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">${stubBtn ? 'Сводка' : 'Открыть карточку'}</button></div></div></div>`, { minWidth: 252, maxWidth: 296, closeButton: true, autoPan: true, autoPanPadding: [40, 70], className: 'prpop-wrap' });
+    mk.on('click', () => mk.openPopup());   /* гарантированное открытие попапа по клику */
+    mk.on('mouseover', () => mk.openPopup());   /* авто-открытие при наведении */
     bounds.push([p.lat, p.lng]);
   });
   if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
   map.on('popupopen', (e) => {
     const root2 = e.popup.getElement();
-    const b = root2.querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propMap = false; render(); });
+    const b = root2.querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propFrom = 'map'; render(); });   /* propMap оставляем true → «Назад» вернёт на карту */
     const h = root2.querySelector('[data-prophydrate]');
     if (h) h.addEventListener('click', async () => {
       h.disabled = true; h.textContent = 'Тяну карточку…';
-      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true }); if (r.error) { toast('Не вышло', r.error); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propMap = false; render(); }
+      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true }); if (r.error) { toast('Не вышло', r.error); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
       catch (err) { toast('Ошибка', err.message); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; }
     });
   });
@@ -7586,7 +7598,7 @@ PAGES.properties = async (root) => {
           <div class="pd2-shade"></div>
           <div class="pd2-in">
             <div class="pd2-top">
-              <button class="btn btn-sm pd2-ghost" id="prBack">← Все объекты</button>
+              <button class="btn btn-sm pd2-ghost" id="prBack">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Все объекты'}</button>
               <span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>
               <span class="tb-spacer"></span>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
@@ -7696,6 +7708,7 @@ PAGES.properties = async (root) => {
               <span class="chip-add"><input id="amenAddInp" placeholder="+ своё удобство"><button class="chip-plus" id="amenAddBtn">${ic(I.plus)}</button></span>
             </div>
           </div>
+          <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Инвест-аргументы (по строкам)</label><textarea class="gi" data-f="investStr" style="min-height:56px" placeholder="рассрочка 0% · рост локации · гарантированный доход · ликвидность">${esc((pr.investmentHighlights || []).join('\n'))}</textarea></div>
         </div>
 
         <div class="pds grey">
@@ -7716,13 +7729,18 @@ PAGES.properties = async (root) => {
               ${(pr.materials || []).map((m2, ix) => `<div class="lc-contact"><span class="badge">${esc(m2.label)}</span><a class="lc-cv link" href="${esc(m2.url)}" target="_blank">${esc(m2.url.slice(0, 40))}…</a><button class="btn-ghost lc-cx" data-matdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Брошюры, прайсы, видео — ссылками</div>'}
               <div class="lc-note-row" style="margin-top:8px"><input id="pdMatLabel" placeholder="Брошюра" style="width:110px;flex:0 0 110px"><input id="pdMatUrl" placeholder="https://…"><button class="btn btn-sm" id="pdMatAdd">${ic(I.plus)}</button></div>
             </div>
+            <div>
+              <label class="lc-lbl">Видео-рендеры и обзоры</label>
+              ${(pr.videos || []).map((v2, ix) => `<div class="lc-contact"><span class="badge acc">${/youtu/i.test(v2) ? 'YouTube' : /vimeo/i.test(v2) ? 'Vimeo' : 'MP4'}</span><a class="lc-cv link" href="${esc(v2)}" target="_blank">${esc(String(v2).replace(/^https?:\/\/(www\.)?/, '').slice(0, 38))}…</a><button class="btn-ghost lc-cx" data-viddel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Видео-туры/рендеры — ссылками (или «Дополнить из сети»)</div>'}
+              <div class="lc-note-row" style="margin-top:8px"><input id="pdVidUrl" placeholder="https://youtube.com/… или …mp4"><button class="btn btn-sm" id="pdVidAdd">${ic(I.plus)}</button></div>
+            </div>
           </div>
         </div>
           </aside>
         </div>
       </div>`;
 
-    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; render(); });
+    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; if (PAGE_STATE.propFrom === 'map') PAGE_STATE.propMap = true; PAGE_STATE.propFrom = null; render(); });
     $$('.gi', root).forEach(inp => inp.addEventListener('change', async () => {
       const f = inp.dataset.f;
       if (f === 'tagsStr') await upd({ tags: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
@@ -7734,6 +7752,7 @@ PAGES.properties = async (root) => {
       }
       else if (f === 'paymentRowsStr') await upd({ paymentRows: inp.value.split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([p2, l2]) => ({ pct: p2.trim(), label: l2.trim() })) });
       else if (f === 'whyRentStr') await upd({ whyRent: inp.value.split('\n').map(x => x.trim()).filter(Boolean) });
+      else if (f === 'investStr') await upd({ investmentHighlights: inp.value.split('\n').map(x => x.trim()).filter(Boolean) });
       else if (f === 'priceFrom') await upd({ priceFrom: +inp.value });
       else await upd({ [f]: inp.value });
     }));
@@ -7796,6 +7815,8 @@ PAGES.properties = async (root) => {
     $$('[data-laydel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ layouts: pr.layouts.filter((_, ix) => ix !== +b.dataset.laydel) }); render(); }));
     $('#pdMatAdd').addEventListener('click', async () => { const u = $('#pdMatUrl').value.trim(); if (!u) return; await upd({ materials: [...(pr.materials || []), { label: $('#pdMatLabel').value || 'Материал', url: u }] }); render(); });
     $$('[data-matdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ materials: pr.materials.filter((_, ix) => ix !== +b.dataset.matdel) }); render(); }));
+    $('#pdVidAdd')?.addEventListener('click', async () => { const u = $('#pdVidUrl').value.trim(); if (!/^https?:\/\//.test(u)) return; await upd({ videos: [...new Set([...(pr.videos || []), u])] }); render(); });
+    $$('[data-viddel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ videos: (pr.videos || []).filter((_, ix) => ix !== +b.dataset.viddel) }); render(); }));
     $('#uAdd').addEventListener('click', async () => {
       await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: +$('#uPrice').value }] });
       render();
@@ -7832,20 +7853,28 @@ PAGES.properties = async (root) => {
     });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
     $('#pdEnrich').addEventListener('click', async () => {
-      const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание' };
-      const md = modal({ title: 'Дополнить из открытых источников', sub: `Ищу свежую информацию по «${esc(pr.name)}» в вебе — срок сдачи, доходность, ход стройки…`, body: '<div id="enrOut" class="muted" style="font-size:13px;padding:8px 0">Ищу…</div>', actions: [{ label: 'Закрыть' }] });
+      const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание', districtBlurb: 'Описание района', timings: 'Тайминги до мест', rentalArgs: 'Аргументы под аренду', amenities: 'Удобства комплекса', investmentHighlights: 'Инвест-аргументы', paymentPlan: 'План оплаты', hookTitle: 'Крючок-заголовок' };
+      const md = modal({ title: 'Дополнить из открытых источников', sub: `Собираю ПОЛНУЮ карточку по «${esc(pr.name)}» — факты, фото, видео-рендеры, наличие юнитов…`, body: '<div id="enrOut" class="enr-loading" style="font-size:13px;padding:18px 0"><span class="enr-spin"></span>Собираю по всем открытым источникам…</div>', actions: [{ label: 'Закрыть' }] });
       try {
-        const r = await api.post('/properties/' + pr.id + '/enrich', { want: 'срок сдачи, доходность, прирост стоимости, ход строительства' });
-        if (r.error || !r.proposed || !Object.keys(r.proposed).length) { $('#enrOut', md).innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'Ничего не нашлось') + '</span>'; return; }
-        const rows = Object.entries(r.proposed).map(([k, v]) => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${FLD[k] || k}</div><div class="sd">${esc(String(v)).slice(0, 200)}</div></div><input type="checkbox" class="enr-ck" data-k="${k}" checked style="width:20px;height:20px"></label>`).join('');
+        const r = await api.post('/properties/' + pr.id + '/enrich', {});   /* пусто → сервер сам берёт все гэпы карточки (комплексно) */
+        const hasFields = r.proposed && Object.keys(r.proposed).length;
+        const media = r.media || { photos: 0, videos: 0 };
+        if (r.error || (!hasFields && !media.photos && !media.videos)) { $('#enrOut', md).innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'Ничего не нашлось') + '</span>'; return; }
+        const fmtV = (v) => Array.isArray(v) ? v.join(' · ') : String(v);
+        const gap = new Set(r.gapFields || []);
+        const rows = Object.entries(r.proposed || {}).sort((a, b) => (gap.has(b[0]) ? 1 : 0) - (gap.has(a[0]) ? 1 : 0)).map(([k, v]) => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${FLD[k] || k}${gap.has(k) ? ' <span class="enr-gap">пусто в карточке</span>' : ''}</div><div class="sd">${esc(fmtV(v)).slice(0, 240)}</div></div><input type="checkbox" class="enr-ck" data-k="${k}" checked style="width:20px;height:20px"></label>`).join('');
+        const mediaRow = (media.photos || media.videos) ? `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Медиа из сети ${ic(I.image || I.camera || I.eye, 2)}</div><div class="sd">${media.photos ? media.photos + ' фото (хай-рес)' : ''}${media.photos && media.videos ? ' · ' : ''}${media.videos ? media.videos + ' видео-рендеров' : ''}</div></div><input type="checkbox" id="enrMedia" checked style="width:20px;height:20px"></label>` : '';
         const src = (r.sources || []).slice(0, 4).map(s => `<a href="${esc(s.url)}" target="_blank" class="link" style="font-size:11px">${esc((s.title || s.url).slice(0, 40))}</a>`).join(' · ');
-        $('#enrOut', md).innerHTML = `<div style="font-size:12px;margin-bottom:8px">Найдено (уверенность: <b>${esc(r.confidence || 'medium')}</b>). Отметьте, что добавить:</div>${rows}<div class="muted" style="font-size:11px;margin-top:10px">Источники: ${src || '—'}</div><button class="btn btn-accent" id="enrApply" style="width:100%;justify-content:center;margin-top:12px">Добавить выбранное в карточку</button>`;
-        $('#enrApply', md).addEventListener('click', async () => {
+        $('#enrOut', md).innerHTML = `<div style="font-size:12px;margin-bottom:8px">Найдено (уверенность: <b>${esc(r.confidence || 'medium')}</b>). Отметьте, что добавить:</div>${rows}${mediaRow}<div class="muted" style="font-size:11px;margin-top:10px">Источники: ${src || '—'}</div><button class="btn btn-accent" id="enrApply" style="width:100%;justify-content:center;margin-top:12px">Добавить выбранное в карточку</button>`;
+        $('#enrApply', md).addEventListener('click', async (ev) => {
           const fields = $$('.enr-ck', md).filter(c => c.checked).map(c => c.dataset.k);
-          if (!fields.length) return toast('Ничего не выбрано');
-          const rr = await api.post('/properties/' + pr.id + '/enrich', { apply: true, fields, values: r.proposed });
-          if (rr.error) return toast('Не вышло', rr.error);
-          toast('Карточка дополнена', 'Добавлено: ' + rr.applied.join(', '), true); closeModal(); PAGES.properties(root);
+          const withMedia = !!($('#enrMedia', md) && $('#enrMedia', md).checked);
+          if (!fields.length && !withMedia) return toast('Ничего не выбрано');
+          const bt = ev.target; bt.disabled = true; bt.innerHTML = '<span class="enr-spin"></span>Дополняю…';
+          const rr = await api.post('/properties/' + pr.id + '/enrich', { apply: true, fields, values: r.proposed, media: withMedia, units: withMedia });
+          if (rr.error) { bt.disabled = false; bt.textContent = 'Добавить выбранное в карточку'; return toast('Не вышло', rr.error); }
+          const done = [...(rr.applied || [])]; if (rr.photosAdded) done.push(rr.photosAdded + ' фото'); if (rr.videosAdded) done.push(rr.videosAdded + ' видео'); if (rr.unitsAdded) done.push(rr.unitsAdded + ' юнитов');
+          toast('Карточка дополнена', 'Добавлено: ' + (done.join(', ') || '—'), true); closeModal(); PAGES.properties(root);
         });
       } catch (e) { $('#enrOut', md).innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
     });
@@ -7906,7 +7935,7 @@ PAGES.properties = async (root) => {
       ${(q || advCount) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
       <button class="btn btn-sm ${PAGE_STATE.propMap ? 'on-map' : ''}" id="prMapToggle" title="Показать объекты на карте">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? '← Списком' : 'На карте'}</button>
-      <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
+      <button class="btn btn-sm" id="prImport">${ic(I.doc)}Поиск и импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
     <div id="prFiltPanel" class="glass card" style="${F.propFiltersOpen ? '' : 'display:none'};margin:0 0 12px;padding:14px 16px">
@@ -7945,6 +7974,11 @@ PAGES.properties = async (root) => {
       <button class="fold fold-new" id="fNew">${ic(I.plus)}<span>Папка</span></button>
     </div>
     <div class="muted" style="font-size:11px;margin:-6px 0 12px;${PAGE_STATE.propMap ? 'display:none' : ''}">Карточку — на папку · клик по папке — фильтр и подборка</div>
+    ${q && !PAGE_STATE.propMap ? `<div class="pr-tier" id="prTier">
+      <div class="pr-tier-hd">${ic(I.spark, 2)}<span>По запросу «<b>${esc(q)}</b>» в базе: <b>${list.length}</b>. ${list.length ? 'Не то, что нужно?' : 'Ничего не нашлось.'}</span></div>
+      <div class="pr-tier-acts"><button class="btn btn-sm" id="prTierWeb">${ic(I.doc, 2)}Искать в открытых источниках</button></div>
+      <div id="prTierOut"></div>
+    </div>` : ''}
     <div class="prop-grid" style="${PAGE_STATE.propMap ? 'display:none' : ''}">
       ${list.map(pr => `<div class="glass prop-card v2 ${selSet('properties').has(pr.id) ? 'sel' : ''}" data-pr="${pr.id}" data-id="${pr.id}" data-dragprop="${pr.id}">
         <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
@@ -7973,6 +8007,35 @@ PAGES.properties = async (root) => {
   $('#prAUnit')?.addEventListener('click', (e) => { e.preventDefault(); PAGE_STATE.propAreaUnit = (PAGE_STATE.propAreaUnit === 'sqft' ? 'm2' : 'sqft'); render(); });
   $('#prReset')?.addEventListener('click', () => { ['propQ', 'propType', 'propBeds', 'propDistrict', 'propDeveloper', 'propStatus', 'propPriceMin', 'propPriceMax', 'propAreaMin', 'propAreaMax', 'propRoiMin', 'propHandFrom', 'propHandTo'].forEach(k => PAGE_STATE[k] = ''); render(); });
   if (PAGE_STATE._focusQ) { PAGE_STATE._focusQ = false; const qi = $('#prQ'); if (qi) { qi.focus(); const v = qi.value; qi.value = ''; qi.value = v; } }
+  $('#prTierWeb')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button'); const out = $('#prTierOut'); if (!out) return;
+    btn.disabled = true; out.innerHTML = '<div class="pr-tier-load"><span class="enr-spin"></span>Ищу «' + esc(q) + '» в открытых источниках…</div>';
+    try {
+      const r = await api.post('/properties/find-web', { query: q, geo: geoF || PAGE_STATE.propGeo || '' });
+      btn.disabled = false;
+      if (r.error) { out.innerHTML = '<div class="muted" style="font-size:12px;padding:8px 0;color:var(--bad)">' + esc(r.error) + '</div>'; return; }
+      const cs = r.candidates || [];
+      if (!cs.length) { out.innerHTML = '<div class="muted" style="font-size:12px;padding:8px 0">В открытых источниках ничего похожего не нашлось.</div>'; return; }
+      out.innerHTML = cs.map((c, i) => `<div class="pr-tier-cand"><div class="ptc-info"><div class="ptc-nm">${esc(c.name)} <span class="ptc-match ${c.match}">${c.match === 'high' ? 'точно' : c.match === 'low' ? 'похоже' : 'вероятно'}</span></div><div class="ptc-sub">${esc([c.area, c.developer].filter(Boolean).join(' · ') || 'локация уточняется')}${c.priceFrom ? ' · от ' + (c.currency === 'EUR' ? '€' : c.currency === 'THB' ? '฿' : c.currency === 'AED' ? 'AED ' : '$') + c.priceFrom.toLocaleString('ru-RU') : ''}</div></div><button class="btn btn-sm btn-accent ptc-add" data-ptc="${i}">Создать карточку</button></div>`).join('');
+      out._cands = cs;
+      $$('.ptc-add', out).forEach(b => b.addEventListener('click', async () => {
+        const c = out._cands[+b.dataset.ptc]; b.disabled = true; b.innerHTML = '<span class="enr-spin"></span>Собираю…';
+        try {
+          if (c.url) {
+            const rr = await api.post('/properties/from-url', { url: c.url, full: true });
+            if (rr.exists) { toast('Уже есть', rr.existingName || ''); PAGE_STATE.propView = rr.existingId; return render(); }
+            if (rr.error) { b.disabled = false; b.textContent = 'Создать карточку'; return toast('Не вышло', rr.error); }
+            toast('Карточка создана', `${rr.property.name} · фото ${rr.imagesSaved}`, true); PAGE_STATE.propView = rr.property.id; return render();
+          }
+          /* без ссылки — создаём заготовку по имени и сразу дополняем из сети */
+          const cr = await api.post('/properties', { name: c.name, area: c.area, developer: c.developer, priceFrom: c.priceFrom, currency: c.currency, geo: geoF || PAGE_STATE.propGeo || 'phuket' });
+          const pid = (cr.property || cr).id;
+          if (pid) { await api.post('/properties/' + pid + '/enrich', { apply: true, media: true, units: true }).catch(() => {}); toast('Карточка создана и дополнена', c.name, true); PAGE_STATE.propView = pid; render(); }
+          else { b.disabled = false; b.textContent = 'Создать карточку'; toast('Не вышло', 'не удалось создать'); }
+        } catch (err) { b.disabled = false; b.textContent = 'Создать карточку'; toast('Ошибка', err.message); }
+      }));
+    } catch (err) { btn.disabled = false; out.innerHTML = '<div class="muted" style="font-size:12px;color:var(--bad)">' + esc(err.message) + '</div>'; }
+  });
   if (PAGE_STATE.propMap) initPropMap(list);
   $$('.prm-row', root).forEach(r => r.addEventListener('click', () => {
     const id = r.dataset.prrow; const mk = window._prMarkers && window._prMarkers[id];
@@ -8073,9 +8136,18 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
       const url = $('#impUrl', bd).value.trim(); if (!url) return toast('Вставьте ссылку');
       const out = $('#impUrlOut', bd); out.innerHTML = '<span class="muted" style="font-size:12px">Смотрю страницу…</span>';
       try { const r = await api.post('/properties/from-url', { url }); const pv = r.preview || {};
+        if (r.exists) {
+          out.innerHTML = `<div class="lc-hint info" style="font-size:12px"><span>Такой проект уже существует: <b>${esc(r.existingName || '')}</b>${r.existingStub ? ' (пока карточка из каталога — без деталей)' : ''}.</span></div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-sm" id="impOpenEx">Открыть карточку</button>${r.existingStub ? '<button class="btn btn-accent btn-sm" id="impHydEx">Подтянуть детали</button>' : '<button class="btn btn-accent btn-sm" id="impUpdEx">Обновить свежими данными</button>'}<button class="btn btn-sm" id="impDupEx">Всё равно создать копию</button></div>`;
+          $('#impOpenEx', bd)?.addEventListener('click', () => { closeModal(); PAGE_STATE.propView = r.existingId; render(); });
+          $('#impHydEx', bd)?.addEventListener('click', () => doImport(url, out, $('#impUrlPrev', bd), 'update'));
+          $('#impUpdEx', bd)?.addEventListener('click', () => doImport(url, out, $('#impUrlPrev', bd), 'update'));
+          $('#impDupEx', bd)?.addEventListener('click', () => doImport(url, out, $('#impUrlPrev', bd), 'new'));
+          return;
+        }
         out.innerHTML = `<div style="display:flex;gap:12px;align-items:flex-start;border:1px solid var(--stroke);border-radius:12px;padding:12px;background:var(--bg-2)">
           ${pv.image ? `<img src="${esc(pv.image)}" style="width:110px;height:82px;object-fit:cover;border-radius:8px;flex:0 0 auto">` : ''}
-          <div style="min-width:0"><div style="font-weight:600;margin-bottom:4px">${esc(pv.title || '—')}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${esc(pv.desc || '')}</div><div class="muted" style="font-size:11px;margin-top:5px">Фото на странице: ${pv.imageCount || 0}. Нажмите «Подтянуть полностью» — ИИ соберёт карточку.</div></div></div>`;
+          <div style="min-width:0"><div style="font-weight:600;margin-bottom:4px">${esc(pv.title || '—')}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${esc(pv.desc || '')}</div><div class="muted" style="font-size:11px;margin-top:5px">${pv.imageCount ? 'Фото на странице: ' + pv.imageCount + '. ' : 'Это SPA-портал — фото и детали ИИ соберёт при импорте. '}Нажмите «Подтянуть полностью» — ИИ соберёт карточку.</div></div></div>`;
       } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; }
     });
     const doImport = async (url, out, btn, force) => {

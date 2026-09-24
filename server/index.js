@@ -3301,20 +3301,34 @@ async function renderPage(url) {
 
 /* веб-поиск по открытым источникам (Firecrawl /search — тот же ключ RENDER_API_KEY).
    Для обогащения карточек: чего нет на портале (срок сдачи, доходность, ход стройки) — ищем в вебе. */
-async function webSearch(query, limit) {
+async function webSearch(query, limit, opts) {
   const key = process.env.RENDER_API_KEY || ''; if (!key || !query) return null;
+  const wantMedia = !!(opts && opts.media);   /* собрать фото/видео из выдачи (комплексное обогащение) */
   try {
     const r = await fetch('https://api.firecrawl.dev/v1/search', {
       method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, limit: limit || 5, scrapeOptions: { formats: ['markdown'] } }),
+      body: JSON.stringify({ query, limit: limit || 5, scrapeOptions: { formats: wantMedia ? ['markdown', 'html'] : ['markdown'] } }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.success) return null;
     const items = (j.data || []).slice(0, limit || 5);
-    return {
-      text: items.map(x => `## ${x.title || ''} (${x.url || ''})\n${String(x.markdown || x.description || '').slice(0, 3000)}`).join('\n\n').slice(0, 14000),
+    const out = {
+      text: items.map(x => `## ${x.title || ''} (${x.url || ''})\n${String(x.markdown || x.description || '').slice(0, 3200)}`).join('\n\n').slice(0, 16000),
       sources: items.map(x => ({ title: (x.title || '').slice(0, 120), url: x.url || '' })).filter(s => s.url),
     };
+    if (wantMedia) {
+      const imgs = new Set(), vids = new Set();
+      for (const x of items) {
+        const html = x.html || '', md = x.markdown || '', base = x.url || query;
+        if (html) scrapeImagesFromHtml(html, base).forEach(u => { if (imgs.size < 60 && /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !/favicon|logo|icon|sprite|avatar|placeholder|blank|banner|header|footer|\.svg(\?|$)/i.test(u)) imgs.add(u); });
+        /* видео-рендеры: youtube / vimeo / прямые mp4 */
+        const blob = html + '\n' + md;
+        (blob.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|player\.vimeo\.com\/video\/|vimeo\.com\/)[\w-]+/gi) || []).forEach(v => { if (vids.size < 12) vids.add(v); });
+        (blob.match(/https?:\/\/[^\s"'<>]+\.mp4(\?[^\s"'<>]*)?/gi) || []).forEach(v => { if (vids.size < 12) vids.add(v); });
+      }
+      out.images = [...imgs]; out.videos = [...vids];
+    }
+    return out;
   } catch (_) { return null; }
 }
 
