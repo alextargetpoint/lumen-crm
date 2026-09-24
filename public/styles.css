@@ -8464,7 +8464,8 @@ body.client-view [data-team]{ display:none !important; }
 #anaExtra .coll-head{ font-weight:660; font-size:13px; padding:12px 14px; background:color-mix(in srgb,var(--accent) 5%,var(--card)); }
 #anaExtra .coll-head:hover{ background:color-mix(in srgb,var(--accent) 9%,var(--card)); }
 #anaExtra .coll.open .coll-head{ border-bottom:1px solid var(--stroke-soft); }
-#anaExtra .coll-inner{ padding:12px 14px; }
+#anaExtra .coll-inner{ padding-left:14px; padding-right:14px; }
+#anaExtra .coll.open .coll-inner{ padding-top:12px; padding-bottom:12px; }   /* вертикальный отступ только раскрыто — иначе торчит «козырёк» при сворачивании */
 /* группы внутри рейтингов — как отдельные под-карточки с акцент-полосой слева */
 .ana-geo-grp, .ana-q-grp{ margin:0 0 14px; padding:11px 13px; border:1px solid var(--stroke-soft); border-left:3px solid color-mix(in srgb,var(--accent) 50%,var(--stroke)); border-radius:11px; background:color-mix(in srgb,var(--accent) 3.5%,var(--card)); }
 .ana-geo-grp:last-child, .ana-q-grp:last-child{ margin-bottom:0; }
