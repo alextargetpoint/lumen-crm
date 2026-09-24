@@ -10707,8 +10707,9 @@ ${SCR}
       const og = (prop) => { const mm = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']og:' + prop + '["\'][^>]+content=["\']([^"\']+)', 'i')); return mm ? mm[1] : ''; };
       const ogTitle = og('title'), ogImg = og('image'), ogDesc = og('description');
       const ld = []; { const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi; let mm; while ((mm = re.exec(html))) { try { ld.push(JSON.parse(mm[1])); } catch (_) {} } }
-      const imgs = new Set(); if (ogImg) { const a = absUrl(ogImg); if (a) imgs.add(a); }
-      { const re = /<img[^>]+src=["']([^"']+)["']/gi; let mm; while ((mm = re.exec(html)) && imgs.size < 40) { const a = absUrl(mm[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !/logo|icon|sprite|avatar|placeholder|blank/i.test(a)) imgs.add(a); } }
+      const badImg = (s) => /favicon|logo|icon|sprite|avatar|placeholder|blank|banner|header|footer|\.svg(\?|$)/i.test(String(s || ''));
+      const imgs = new Set(); if (ogImg && !badImg(ogImg)) { const a = absUrl(ogImg); if (a) imgs.add(a); }
+      { const re = /<img[^>]+src=["']([^"']+)["']/gi; let mm; while ((mm = re.exec(html)) && imgs.size < 40) { const a = absUrl(mm[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !badImg(a)) imgs.add(a); } }
       let text = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
       /* SPA/JS-сайт → сырой HTML тонкий: рендерим через провайдера (если задан платформенный ключ) */
       let renderMd = '';
@@ -10717,8 +10718,8 @@ ${SCR}
         if (rp) {
           renderMd = rp.markdown || '';
           if (rp.ogImage) { const a = absUrl(rp.ogImage); if (a) imgs.add(a); }
-          if (rp.html) { const re2 = /<img[^>]+src=["']([^"']+)["']/gi; let m3; while ((m3 = re2.exec(rp.html)) && imgs.size < 40) { const a = absUrl(m3[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !/logo|icon|sprite|avatar|placeholder|blank/i.test(a)) imgs.add(a); } }
-          { const rem = /!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:jpe?g|png|webp)[^)\s]*)\)/gi; let m4; while ((m4 = rem.exec(renderMd)) && imgs.size < 40) { if (!/logo|icon|avatar/i.test(m4[1])) imgs.add(m4[1]); } }
+          if (rp.html) { const re2 = /<img[^>]+src=["']([^"']+)["']/gi; let m3; while ((m3 = re2.exec(rp.html)) && imgs.size < 40) { const a = absUrl(m3[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !badImg(a)) imgs.add(a); } }
+          { const rem = /!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:jpe?g|png|webp)[^)\s]*)\)/gi; let m4; while ((m4 = rem.exec(renderMd)) && imgs.size < 40) { if (!badImg(m4[1])) imgs.add(m4[1]); } }
           if (renderMd && renderMd.length > text.length) text = renderMd;
         }
       }
@@ -10728,6 +10729,14 @@ ${SCR}
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY) для разбора карточки' });
       const context = 'OG-TITLE: ' + ogTitle + '\nOG-DESC: ' + ogDesc + '\nJSON-LD: ' + JSON.stringify(ld).slice(0, 3500) + '\nTEXT: ' + text.slice(0, 11000);
       let ext; try { ext = await llm.extractProperty(context, url); } catch (e) { return json(res, 400, { error: 'ИИ не смог разобрать страницу: ' + e.message }); }
+      /* гард качества: не плодим мусорные карточки. Нужны имя + хоть один факт (цена/спальни/район/застройщик). */
+      const nm0 = String(ext.name || '').trim();
+      const meaningful = nm0.length > 2 && !/^(объект|object|listing|home|главная|resale ?center|housebook)/i.test(nm0) && (ext.priceFrom || ext.beds || ext.area || ext.developer);
+      if (!meaningful) {
+        return json(res, 422, { error: renderReady()
+          ? 'Не распознал объект — дайте прямую ссылку на КОНКРЕТНЫЙ объект (не главную/каталог сайта).'
+          : 'Похоже на SPA (данные грузятся скриптом) — сырая страница пустая. Нужен рендер (ключ RENDER_API_KEY) или прямая ссылка на объект, отдающая HTML.' });
+      }
       /* фото: приоритет — из ИИ, иначе из HTML; скачиваем и перезаливаем к нам */
       const srcImgs = ([...(Array.isArray(ext.images) ? ext.images : []), ...imgs].map(absUrl).filter(x => /^https?:/i.test(x)));
       const uniq = [...new Set(srcImgs)].slice(0, 12);
