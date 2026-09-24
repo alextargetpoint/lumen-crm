@@ -121,7 +121,6 @@ input:focus, textarea:focus, select:focus {
 
 /* ---------- Карта объектов (Leaflet, стиль Ателье) ---------- */
 #prMap .leaflet-container { font-family: inherit; background: #eef0ea; }
-.prpin { position: relative; }
 .prpin-hit { position: absolute; inset: 0; z-index: 3; cursor: pointer; }
 .prpin-dot { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; pointer-events: none; border-radius: 50%; background: var(--accent, #b8863c); border: 2.5px solid #fff; box-shadow: 0 2px 6px rgba(70, 55, 25, .45); z-index: 2; }
 .prpin-pulse { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent, #b8863c); opacity: .5; pointer-events: none; animation: prpinp 2.2s ease-out infinite; }
@@ -140,7 +139,6 @@ input:focus, textarea:focus, select:focus {
 .prmap-atelier .leaflet-tile-pane { filter: grayscale(.82) sepia(.14) brightness(1.05) contrast(.9) saturate(.85); }
 .prmap-atelier .leaflet-control-zoom a { background: #fffdf9; color: #6a5a2f; border: 1px solid #e5ddcf; font-weight: 700; }
 .prmap-atelier .leaflet-control-zoom a:hover { background: var(--accent, #b8863c); color: #fff; }
-.prpin { position: relative; }
 .prpin:hover .prpin-dot { transform: translate(-50%,-50%) scale(1.35); }
 .prpin-dot { transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
 /* сегмент-тумблер Список/Карта */
@@ -221,3 +219,7 @@ input[type=number] { -moz-appearance: textfield; }
 .pf-range input { width: 50%; min-width: 0; }
 .pf-unit { font-size: 10px; font-weight: 700; padding: 1px 6px; border: 1px solid var(--stroke, #e5ddcf); border-radius: 6px; background: var(--bg-2, #f6f2ea); color: var(--accent, #b8863c); cursor: pointer; }
 .pf-unit:hover { background: var(--accent, #b8863c); color: #fff; }
+
+/* плавное появление панели фильтров (было дёрганно) */
+@keyframes pfSlide { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+#prFiltPanel { animation: pfSlide .22s cubic-bezier(.22,.61,.36,1); transform-origin: top; }

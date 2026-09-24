@@ -10885,27 +10885,47 @@ ${SCR}
       if (!process.env.RENDER_API_KEY) return json(res, 400, { error: 'нужен RENDER_API_KEY (веб-поиск)' });
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
       const b = await readBody(req).catch(() => ({}));
+      /* маппер поля обогащения → структура карточки (в т.ч. богатые: район/тайминги/аргументы/крючок) */
+      const mergeEnrich = (k, v) => {
+        if (v == null || v === '' || (Array.isArray(v) && !v.length)) return false;
+        if (k === 'priceFrom') { if (+v) pr.priceFrom = +v; else return false; }
+        else if (k === 'districtBlurb') { pr.district = pr.district || {}; pr.district.name = pr.district.name || pr.area || ''; pr.district.blurb = String(v).slice(0, 500); }
+        else if (k === 'timings') { pr.district = pr.district || {}; pr.district.name = pr.district.name || pr.area || ''; pr.district.times = (Array.isArray(v) ? v : String(v).split('\n')).slice(0, 6).map(s => { const mm = String(s).match(/(\d+)\s*[|·:-]\s*(.+)/); return mm ? { min: +mm[1], place: mm[2].trim().slice(0, 60) } : { min: 0, place: String(s).slice(0, 60) }; }); }
+        else if (k === 'rentalArgs') { pr.whyRent = (Array.isArray(v) ? v : String(v).split('\n')).slice(0, 4).map(x => String(x).slice(0, 300)); }
+        else if (k === 'hookTitle') { pr.hookTitle = String(v).slice(0, 160); }
+        else pr[k] = String(v).slice(0, 400);
+        return true;
+      };
       /* быстрый мёрж уже предложенных значений (без повторного веб-поиска) */
       if (b.apply && b.values && typeof b.values === 'object') {
         const fields = Array.isArray(b.fields) && b.fields.length ? b.fields : Object.keys(b.values);
-        const applied = [];
-        for (const k of fields) { const v = b.values[k]; if (v == null || v === '') continue; if (k === 'priceFrom') { if (+v) pr.priceFrom = +v; } else pr[k] = String(v).slice(0, 400); applied.push(k); }
+        const applied = fields.filter(k => mergeEnrich(k, b.values[k]));
         pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + applied.join(', ') });
         if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now(); store.save();
         return json(res, 200, { ok: true, applied, property: pr });
       }
-      const q = [pr.name, pr.developer && pr.developer !== '—' ? pr.developer : '', pr.area, b.want || 'срок сдачи цена доходность ход строительства', 'недвижимость проект'].filter(Boolean).join(' ');
+      /* гэп-aware: если want не задан — строим из ПУСТЫХ полей карточки */
+      const gaps = [];
+      if (!pr.handover) gaps.push('срок сдачи'); if (!pr.roi) gaps.push('доходность (ROI)'); if (!pr.appreciation) gaps.push('прирост стоимости');
+      if (!pr.priceFrom) gaps.push('цена'); if (!pr.constructionProgress) gaps.push('ход строительства');
+      if (!(pr.district && pr.district.blurb)) gaps.push('описание района'); if (!(pr.district && pr.district.times && pr.district.times.length)) gaps.push('тайминги до мест');
+      if (!(pr.whyRent && pr.whyRent.length)) gaps.push('аргументы для аренды'); if (!pr.description) gaps.push('описание');
+      const want = b.want || (gaps.length ? gaps.join(', ') : '');
+      const q = [pr.name, pr.developer && pr.developer !== '—' ? pr.developer : '', pr.area, want, 'недвижимость проект'].filter(Boolean).join(' ');
       const sr = await webSearch(q, 6);
       if (!sr || !sr.text) return json(res, 400, { error: 'по проекту ничего не нашлось в открытых источниках' });
-      let ext; try { ext = await llm.enrichProject(sr.text, pr.name, b.want); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал результаты: ' + e.message }); }
-      const proposed = {};
-      for (const k of ['developer', 'handover', 'roi', 'appreciation', 'priceFrom', 'constructionProgress', 'description']) {
-        const v = ext[k]; if (v && String(v).trim() && !(k === 'priceFrom' && !+v)) proposed[k] = k === 'priceFrom' ? +v : String(v).slice(0, 400);
+      let ext; try { ext = await llm.enrichProject(sr.text, pr.name, want); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал результаты: ' + e.message }); }
+      /* предлагаем ПРИОРИТЕТНО пустые поля карточки (гэпы), потом остальные найденные */
+      const isEmpty = { developer: !pr.developer || pr.developer === '—', handover: !pr.handover, roi: !pr.roi, appreciation: !pr.appreciation, priceFrom: !pr.priceFrom, constructionProgress: !pr.constructionProgress, description: !pr.description, districtBlurb: !(pr.district && pr.district.blurb), timings: !(pr.district && pr.district.times && pr.district.times.length), rentalArgs: !(pr.whyRent && pr.whyRent.length), hookTitle: !pr.hookTitle };
+      const proposed = {}; const gapFields = [];
+      for (const k of ['handover', 'roi', 'appreciation', 'priceFrom', 'constructionProgress', 'districtBlurb', 'timings', 'rentalArgs', 'description', 'developer', 'hookTitle']) {
+        let v = ext[k]; if (v == null || (Array.isArray(v) && !v.length) || (!Array.isArray(v) && !String(v).trim()) || (k === 'priceFrom' && !+v)) continue;
+        proposed[k] = k === 'priceFrom' ? +v : (Array.isArray(v) ? v.slice(0, 6).map(String) : String(v).slice(0, 500));
+        if (isEmpty[k]) gapFields.push(k);
       }
-      if (!b.apply) return json(res, 200, { ok: true, proposed, confidence: ext.confidence || 'medium', sources: sr.sources });
+      if (!b.apply) return json(res, 200, { ok: true, proposed, gapFields, confidence: ext.confidence || 'medium', sources: sr.sources });
       const fields = Array.isArray(b.fields) && b.fields.length ? b.fields : Object.keys(proposed);
-      const applied = [];
-      for (const k of fields) { if (proposed[k] == null) continue; if (k === 'priceFrom') { if (proposed[k]) pr.priceFrom = proposed[k]; } else pr[k] = proposed[k]; applied.push(k); }
+      const applied = fields.filter(k => mergeEnrich(k, proposed[k]));
       pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + applied.join(', '), sources: (sr.sources || []).slice(0, 4) });
       if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now();
       store.save();
@@ -11002,7 +11022,12 @@ ${SCR}
         try {
           const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q), { headers: { 'User-Agent': 'LumenCRM/1.0 (real-estate)', 'Accept-Language': 'en' } });
           const j = await r.json().catch(() => ([]));
-          if (Array.isArray(j) && j[0]) { pr.lat = +j[0].lat; pr.lng = +j[0].lon; pr.geocodedAt = Date.now(); done++; }
+          if (Array.isArray(j) && j[0]) {
+            /* детерминированный джиттер по id (~±250м): проекты одного района не стакаются в 1 точку → кликабельны */
+            let h = 0; for (const ch of String(pr.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+            const jx = ((h % 1000) / 1000 - 0.5) * 0.005, jy = (((h >> 10) % 1000) / 1000 - 0.5) * 0.005;
+            pr.lat = +j[0].lat + jy; pr.lng = +j[0].lon + jx; pr.geocodedAt = Date.now(); done++;
+          }
           else { pr.geoFail = true; }
         } catch (_) { pr.geoFail = true; }
         await new Promise(rs => setTimeout(rs, 1100));   /* уважаем rate-limit OSM */
