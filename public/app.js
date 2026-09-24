@@ -7504,10 +7504,11 @@ async function initPropMap(props) {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', crossOrigin: true }).addTo(map);
   el.classList.add('prmap-atelier');
   if (!pts.length) { if (status) status.innerHTML = 'На карте пусто — <b>импортируйте объекты</b> (кнопка «Импорт» → «По ссылке»), и они появятся тут с превью.'; }
-  const bounds = [];
+  const bounds = []; window._prMarkers = {};
   pts.forEach(p => {
     const icon = L.divIcon({ className: 'prpin', html: '<span class="prpin-dot"></span><span class="prpin-pulse"></span>', iconSize: [20, 20], iconAnchor: [10, 10] });
     const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
+    window._prMarkers[p.id] = { mk, lat: p.lat, lng: p.lng };
     const img = (p.images && p.images[0]) || '';
     const price = p.priceFrom ? 'от ' + fmt(p) : '';
     const stubBtn = p.stub && p.sourceUrl ? `<button class="btn btn-sm btn-accent prpop-hydrate" data-prophydrate="${p.id}" data-src="${esc(p.sourceUrl)}">Подтянуть полную карточку</button>` : '';
@@ -7852,7 +7853,14 @@ PAGES.properties = async (root) => {
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
-    <div id="prMapWrap" style="${PAGE_STATE.propMap ? '' : 'display:none'};margin:0 0 14px"><div id="prMap" style="height:560px;border-radius:16px;overflow:hidden;border:1px solid var(--stroke);background:var(--bg-2)"></div><div id="prMapStatus" class="muted" style="font-size:11.5px;margin-top:6px"></div></div>
+    <div id="prMapWrap" style="${PAGE_STATE.propMap ? '' : 'display:none'};margin:0 0 14px">
+      <div class="pr-split">
+        <div class="pr-split-list">
+          ${list.map(pr2 => `<div class="prm-row" data-prrow="${pr2.id}"><div class="prm-row-th" style="background-image:url('${esc((pr2.images || [])[0] || '')}')"></div><div class="prm-row-b"><div class="prm-row-n">${esc(pr2.name)}${pr2.stub ? ' <span class="prm-stub">каталог</span>' : ''}</div><div class="prm-row-l">${esc(pr2.area || '—')}</div><div class="prm-row-p">${pr2.priceFrom ? 'от ' + fmt(pr2) : '—'}</div></div></div>`).join('') || '<div class="muted" style="font-size:12px;padding:10px">Объектов нет — импортируйте каталог</div>'}
+        </div>
+        <div class="pr-split-map"><div id="prMap"></div><div id="prMapStatus" class="muted" style="font-size:11px;position:absolute;left:10px;bottom:8px;background:rgba(255,253,249,.9);padding:3px 8px;border-radius:8px;z-index:500"></div></div>
+      </div>
+    </div>
     <div class="shelf" style="${PAGE_STATE.propMap ? 'display:none' : ''}">
       <div class="fold ${!folderF ? 'active' : ''}" data-fopen="">
         <span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span><div class="fold-meta"><b>Все объекты</b><i>${props.length}</i></div>
@@ -7888,6 +7896,11 @@ PAGES.properties = async (root) => {
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
   $('#prMapToggle')?.addEventListener('click', () => { PAGE_STATE.propMap = !PAGE_STATE.propMap; render(); });
   if (PAGE_STATE.propMap) initPropMap(props);
+  $$('.prm-row', root).forEach(r => r.addEventListener('click', () => {
+    const id = r.dataset.prrow; const mk = window._prMarkers && window._prMarkers[id];
+    if (mk && window._prMap) { window._prMap.setView([mk.lat, mk.lng], 14, { animate: true }); mk.mk.openPopup(); $$('.prm-row', root).forEach(x => x.classList.toggle('active', x === r)); }
+    else { PAGE_STATE.propView = id; render(); }
+  }));
   PROP_FOLDERS = folders;
   wirePropSelect(root);
   $$('[data-fopen]', root).forEach(f => f.addEventListener('click', (e) => {
