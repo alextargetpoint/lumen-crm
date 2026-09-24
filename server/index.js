@@ -10669,6 +10669,52 @@ ${SCR}
       store.save();
       return json(res, 200, r);
     }
+    /* ⭐ КАРТОЧКА ПО ССЫЛКЕ: у источников нет API → вставляем URL объекта, ИИ извлекает поля,
+       фото перезаливаются к нам. full=false → быстрый превью (OG, без ИИ); full=true → полная карточка. */
+    if (p === '/api/properties/from-url' && req.method === 'POST') {
+      const b = await readBody(req); const url = String(b.url || '').trim();
+      if (!/^https?:\/\//i.test(url)) return json(res, 400, { error: 'нужна ссылка http(s) на объект' });
+      const absUrl = (u2) => { try { return new URL(u2, url).href; } catch (_) { return ''; } };
+      let html = '';
+      try {
+        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
+        html = await r.text();
+      } catch (e) { return json(res, 400, { error: 'не удалось открыть ссылку: ' + e.message }); }
+      const og = (prop) => { const mm = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']og:' + prop + '["\'][^>]+content=["\']([^"\']+)', 'i')); return mm ? mm[1] : ''; };
+      const ogTitle = og('title'), ogImg = og('image'), ogDesc = og('description');
+      const ld = []; { const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi; let mm; while ((mm = re.exec(html))) { try { ld.push(JSON.parse(mm[1])); } catch (_) {} } }
+      const imgs = new Set(); if (ogImg) { const a = absUrl(ogImg); if (a) imgs.add(a); }
+      { const re = /<img[^>]+src=["']([^"']+)["']/gi; let mm; while ((mm = re.exec(html)) && imgs.size < 40) { const a = absUrl(mm[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !/logo|icon|sprite|avatar|placeholder|blank/i.test(a)) imgs.add(a); } }
+      const text = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+      if (!b.full) {
+        return json(res, 200, { ok: true, preview: { title: ogTitle || (text.slice(0, 60)), image: [...imgs][0] || '', desc: (ogDesc || text.slice(0, 300)).slice(0, 300), imageCount: imgs.size } });
+      }
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY) для разбора карточки' });
+      const context = 'OG-TITLE: ' + ogTitle + '\nOG-DESC: ' + ogDesc + '\nJSON-LD: ' + JSON.stringify(ld).slice(0, 3500) + '\nTEXT: ' + text.slice(0, 10000);
+      let ext; try { ext = await llm.extractProperty(context, url); } catch (e) { return json(res, 400, { error: 'ИИ не смог разобрать страницу: ' + e.message }); }
+      /* фото: приоритет — из ИИ, иначе из HTML; скачиваем и перезаливаем к нам */
+      const srcImgs = ([...(Array.isArray(ext.images) ? ext.images : []), ...imgs].map(absUrl).filter(x => /^https?:/i.test(x)));
+      const uniq = [...new Set(srcImgs)].slice(0, 12);
+      const saved = [];
+      for (const iu of uniq) {
+        try {
+          const rr = await fetch(iu, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: url } });
+          if (!rr.ok) continue; const buf = Buffer.from(await rr.arrayBuffer());
+          if (buf.length < 3000 || buf.length > 8e6) continue;
+          const ex2 = ((iu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase();
+          fs.mkdirSync(path.join(PUBLIC, 'assets', 'props'), { recursive: true });
+          const fn = 'prop_' + crypto.randomBytes(6).toString('hex') + ex2;
+          fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf); saved.push('/assets/props/' + fn);
+        } catch (_) {}
+        if (saved.length >= 10) break;
+      }
+      const mapped = inventory.mapItem(Object.assign({}, ext, { image: uniq[0] || '', _src: 'url' }), { geo: b.geo || '', market: b.market || '' });
+      mapped.images = saved.length ? saved : mapped.images;
+      if (Array.isArray(ext.amenities) && ext.amenities.length) mapped.amenities = ext.amenities.slice(0, 20).map(String);
+      const pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now() }, mapped);
+      db.properties = db.properties || []; db.properties.push(pr); store.save();
+      return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length });
+    }
     if (p === '/api/properties/bulk' && req.method === 'POST') {
       const b = await readBody(req);
       const ids = Array.isArray(b.ids) ? b.ids : [];

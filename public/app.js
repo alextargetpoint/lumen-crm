@@ -7765,11 +7765,18 @@ PAGES.properties = async (root) => {
       sub: 'Из Reelly и других баз новостроек, CSV/Excel или JSON-фида. Дубли по «название + застройщик» не создаются — карточки дополняются.',
       body: `
         <div class="imp-tabs">
-          <button class="imp-tab on" data-imptab="reelly">${ic(I.building)}Reelly · новостройки</button>
+          <button class="imp-tab on" data-imptab="url">${ic(I.link || I.spark)}По ссылке · ИИ</button>
+          <button class="imp-tab" data-imptab="reelly">${ic(I.building)}Reelly</button>
           <button class="imp-tab" data-imptab="table">${ic(I.doc)}Таблица · CSV/Excel</button>
           <button class="imp-tab" data-imptab="json">${ic(I.doc)}JSON-фид</button>
         </div>
-        <div data-imppane="reelly">
+        <div data-imppane="url">
+          <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px">Вставьте ссылку на объект/проект с ЛЮБОГО сайта (у источников нет API). ИИ сам разберёт страницу и соберёт карточку — цена, локация, спальни, площадь, план оплаты, описание — а фото перезальёт к нам. Работает без настройки источника.</div>
+          <div class="form-row"><label>Ссылка на объект</label><input id="impUrl" placeholder="https://... страница объекта на сайте застройщика/агрегатора"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="impUrlPrev">${ic(I.search || I.spark)}Проверить</button><button class="btn btn-accent" id="impUrlGo">${ic(I.spark)}Подтянуть полностью карточку</button></div>
+          <div id="impUrlOut" style="margin-top:12px"></div>
+        </div>
+        <div data-imppane="reelly" style="display:none">
           <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px"><b>Reelly.io</b> — база 500+ застройщиков ОАЭ (off-plan проекты: цены, планы оплаты, доступность, брошюры). Основной источник инвентаря новостроек для брокеров. Вставьте партнёрский ключ для живого синка — или загрузите демо-набор, чтобы увидеть, как импорт ложится в карточки.</div>
           <div class="form-row"><label>Reelly API key (партнёрский)</label><input id="impReellyKey" type="password" placeholder="${reellySet ? '•••••• сохранён' : 'ключ Reelly для живого синка'}"></div>
           <button class="btn btn-accent" id="impReellyGo">${ic(I.building)}Загрузить проекты из Reelly</button>
@@ -7806,6 +7813,26 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
     });
     $('#impTableGo', bd).addEventListener('click', async () => { const csv = $('#impTable', bd).value.trim(); if (!csv) return toast('Вставьте таблицу'); done(await api.post('/properties/import', { csv, defaults: defaults() })); });
     $('#impJsonGo', bd).addEventListener('click', async () => { const j = $('#impJson', bd).value.trim(); if (!j) return toast('Вставьте JSON'); done(await api.post('/properties/import', { json: j, defaults: defaults() })); });
+    /* по ссылке · ИИ */
+    $('#impUrlPrev', bd).addEventListener('click', async () => {
+      const url = $('#impUrl', bd).value.trim(); if (!url) return toast('Вставьте ссылку');
+      const out = $('#impUrlOut', bd); out.innerHTML = '<span class="muted" style="font-size:12px">Смотрю страницу…</span>';
+      try { const r = await api.post('/properties/from-url', { url }); const pv = r.preview || {};
+        out.innerHTML = `<div style="display:flex;gap:12px;align-items:flex-start;border:1px solid var(--stroke);border-radius:12px;padding:12px;background:var(--bg-2)">
+          ${pv.image ? `<img src="${esc(pv.image)}" style="width:110px;height:82px;object-fit:cover;border-radius:8px;flex:0 0 auto">` : ''}
+          <div style="min-width:0"><div style="font-weight:600;margin-bottom:4px">${esc(pv.title || '—')}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${esc(pv.desc || '')}</div><div class="muted" style="font-size:11px;margin-top:5px">Фото на странице: ${pv.imageCount || 0}. Нажмите «Подтянуть полностью» — ИИ соберёт карточку.</div></div></div>`;
+      } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; }
+    });
+    $('#impUrlGo', bd).addEventListener('click', async () => {
+      const url = $('#impUrl', bd).value.trim(); if (!url) return toast('Вставьте ссылку');
+      const btn = $('#impUrlGo', bd); const out = $('#impUrlOut', bd);
+      btn.disabled = true; out.innerHTML = '<span class="muted" style="font-size:12px">ИИ разбирает страницу и перезаливает фото… (10-20 сек)</span>';
+      try { const r = await api.post('/properties/from-url', { url, full: true, ...defaults() });
+        if (r.error) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(r.error) + '</span>'; btn.disabled = false; return; }
+        toast('Карточка создана', `${esc(r.property.name || 'Объект')} · фото: ${r.imagesSaved}`, true);
+        closeModal(); PAGE_STATE.propView = r.property.id; render();
+      } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; btn.disabled = false; }
+    });
   });
 };
 

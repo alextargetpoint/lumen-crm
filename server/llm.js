@@ -319,6 +319,20 @@ const REWRITE_MODES = {
   formal: 'Перепиши официально-деловым тоном (для документа/письма). Без эмодзи и разговорных оборотов.',
   friendly: 'Перепиши тёплым дружеским тоном, как пишет живой человек в мессенджере. Коротко, без пафоса.',
 };
+/* Извлечь карточку объекта недвижимости из текста страницы (для импорта «по ссылке»,
+   когда у источника нет API). Возвращает структурированный JSON под mapItem. */
+async function extractProperty(context, url) {
+  const prompt = `Ты извлекаешь данные о ПРОЕКТЕ/ОБЪЕКТЕ недвижимости со страницы листинга. Верни СТРОГО JSON:
+{"name":"название проекта/объекта","developer":"застройщик","area":"район/локация","city":"город","priceFrom":число_без_символов_и_пробелов,"currency":"USD|EUR|AED|THB","beds":"спальни: число или диапазон","size":"площадь напр. 45 m²","type":"Studio|1BR|2BR|Villa и т.п.","handover":"срок сдачи/готовности","payment":"план оплаты","roi":"доходность % если есть","description":"1-3 предложения о проекте","amenities":["удобства"],"images":["абсолютные URL фото ОБЪЕКТА"]}
+Правила: бери ТОЛЬКО то, что есть на странице, ничего не выдумывай; чего нет — пустая строка или пустой массив. В images — только фото объекта/рендеры, НЕ логотипы/иконки/аватары. priceFrom — минимальная цена числом.
+URL страницы: ${url}
+СОДЕРЖИМОЕ СТРАНИЦЫ:
+${String(context).slice(0, 12000)}`;
+  const j = await callGemini(prompt, 20000, 1800);
+  if (!j || typeof j !== 'object') throw new Error('bad extract');
+  return j;
+}
+
 async function rewrite(text, mode, ctx) {
   const task = REWRITE_MODES[mode] || REWRITE_MODES.improve;
   const prompt = `Ты — редактор текстов агентства недвижимости. ${task}
@@ -1246,6 +1260,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
