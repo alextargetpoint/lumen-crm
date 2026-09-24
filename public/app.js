@@ -7528,7 +7528,8 @@ async function initPropMap(props) {
     const img = (p.images && p.images[0]) || '';
     const price = p.priceFrom ? 'от ' + fmt(p) : '';
     const stubBtn = p.stub && p.sourceUrl ? `<button class="btn btn-sm btn-accent prpop-hydrate" data-prophydrate="${p.id}" data-src="${esc(p.sourceUrl)}">Подтянуть полную карточку</button>` : '';
-    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}${p.stub ? ' <span class="prpop-stub">каталог</span>' : ''}</div><div class="prpop-l">${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">Открыть карточку</button></div></div>`, { minWidth: 230, closeButton: true });
+    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}${p.stub ? ' <span class="prpop-stub">каталог</span>' : ''}</div><div class="prpop-l">${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">Открыть карточку</button></div></div>`, { minWidth: 230, closeButton: true, autoPan: true });
+    mk.on('click', () => mk.openPopup());   /* гарантированное открытие попапа по клику (не полагаемся на дефолт Leaflet) */
     bounds.push([p.lat, p.lng]);
   });
   if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
