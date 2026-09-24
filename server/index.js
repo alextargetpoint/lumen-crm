@@ -10789,9 +10789,19 @@ ${SCR}
       const mapped = inventory.mapItem(Object.assign({}, ext, { image: saved[0] || uniq[0] || '', _src: 'url' }), { geo: b.geo || '', market: b.market || '' });
       mapped.images = saved.length ? saved : mapped.images;
       if (Array.isArray(ext.amenities) && ext.amenities.length) mapped.amenities = ext.amenities.slice(0, 20).map(String);
+      if (ext.roi) mapped.roi = String(ext.roi).slice(0, 40);
+      if (ext.appreciation) mapped.appreciation = String(ext.appreciation).slice(0, 40);
+      if (Array.isArray(ext.paymentPlan) && ext.paymentPlan.length) mapped.paymentRows = ext.paymentPlan.slice(0, 6).map(r => ({ pct: String(r.pct || '').slice(0, 10), label: String(r.label || '').slice(0, 80) }));
+      if (Array.isArray(ext.units) && ext.units.length) mapped.units = ext.units.slice(0, 60).map(u => ({ plan: String(u.type || '').slice(0, 30), area: String(u.size || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40), status: 'available' }));
+      /* планировки-чертежи: скачиваем и перезаливаем в pr.layouts (параллельно, с фильтром размера) */
+      const fps = [...new Set((Array.isArray(ext.floorplans) ? ext.floorplans : []).map(absUrl).filter(x => /^https?:/i.test(x) && !badImg(x)))].slice(0, 12);
+      const layImgs = (await Promise.all(fps.map(async (fu) => {
+        try { const rr = await fetch(fu, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: url } }); if (!rr.ok) return null; const buf = Buffer.from(await rr.arrayBuffer()); if (buf.length < 2000 || buf.length > 8e6) return null; const ex3 = ((fu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase(); const fn = 'plan_' + crypto.randomBytes(6).toString('hex') + ex3; fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf); return { label: 'Планировка', url: '/assets/props/' + fn }; } catch (_) { return null; }
+      }))).filter(Boolean);
+      if (layImgs.length) mapped.layouts = layImgs;
       const pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now() }, mapped);
       db.properties = db.properties || []; db.properties.push(pr); store.save();
-      return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length });
+      return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length, units: (mapped.units || []).length, floorplans: (mapped.layouts || []).length });
     }
     /* ⭐ СВЕРКА НАЛИЧИЯ: вставляем свежий файл доступности застройщика → ИИ извлекает юниты →
        diff с текущими: новые добавляются (в наличии), пропавшие → помечаются проданными (не трём —
