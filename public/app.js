@@ -13171,12 +13171,12 @@ PAGES.numbers = async (root) => {
   async function loadNumberOrders() {
     const box = $('#numOrdersBox', root); if (!box) return;
     let d = { orders: [] }; try { d = await api.get('/numbers/orders'); } catch (_) { box.innerHTML = ''; return; }
-    const orders = (d.orders || []).filter(o => (o.status !== 'fulfilled') || (Date.now() - (o.at || 0) < 7 * 864e5));
+    const orders = (d.orders || []).filter(o => (o.stage !== 'done') || (Date.now() - (o.at || 0) < 7 * 864e5));
     if (!orders.length) { box.innerHTML = ''; return; }
-    const st = (o) => (o.status === 'fulfilled' || o.status === 'active') ? '<span class="badge ok">выполнен</span>' : '<span class="badge warn">в обработке</span>';
+    const stepper = (o) => { const steps = o.steps || ['Оплачено', 'Готовим', 'Готово']; const cur = o.step || 1; return `<div style="display:flex;gap:5px;align-items:center;margin-top:7px;flex-wrap:wrap">${steps.map((s, i) => { const done = i < cur - 1, now = i === cur - 1; return `<span style="font-size:10px;padding:2px 8px;border-radius:8px;white-space:nowrap;${done ? 'background:var(--accent);color:#fff' : now ? 'background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700' : 'background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink-3,#8a8a8a)'}">${done ? '✓ ' : now ? '● ' : ''}${esc(s)}</span>`; }).join('<span style="color:var(--ink-3,#bbb);font-size:10px">→</span>')}</div>`; };
     box.innerHTML = `<div style="margin-top:14px;border-top:1px solid var(--stroke);padding-top:12px">
       <div class="lp-sec" style="margin:0 0 8px">Мои заказы номеров</div>
-      ${orders.map(o => `<div class="set-row"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес</div><div class="sd">${new Date(o.at).toLocaleDateString('ru-RU')} · ${st(o)}${o.allocated ? ` · выделено ${o.allocated}` : ''}</div></div></div>`).join('')}
+      ${orders.map(o => `<div class="set-row" style="align-items:flex-start"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес — <b style="color:var(--accent)">${esc(o.stageLabel || 'в обработке')}</b></div><div class="sd">${esc(o.detail || '')}${o.detail ? ' · ' : ''}${new Date(o.at).toLocaleDateString('ru-RU')}</div>${stepper(o)}</div></div>`).join('')}
     </div>`;
   }
   loadNumberOrders();

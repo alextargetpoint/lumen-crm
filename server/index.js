@@ -5657,10 +5657,22 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/numbers/orders' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const bl = db.settings.billing || {};
-      /* подтягиваем актуальный статус managed-заказов из фермы */
+      const readyCount = (() => { try { return (farmSvc.poolReady() || []).length; } catch (_) { return 0; } })();
+      /* детальный статус (без чёрного ящика): оплачено → готовим → готово → назначено/подключить */
       const orders = (bl.numberOrders || []).slice(0, 30).map(o => {
-        if (o.seatOrderId) { try { const so = (farmSvc.listSeatOrders(store.currentTid()) || []).find(x => x.id === o.seatOrderId); if (so) return Object.assign({}, o, { status: so.status === 'active' ? 'fulfilled' : o.status, allocated: (so.allocated || []).length }); } catch (_) {} }
-        return o;
+        const r = Object.assign({}, o);
+        if (o.edition === 'managed') {
+          r.steps = ['Оплачено', 'Готовим', 'Готово', 'Назначено'];
+          let so = null; try { so = (farmSvc.listSeatOrders(store.currentTid()) || []).find(x => x.id === o.seatOrderId); } catch (_) {}
+          if (so && so.status === 'active') { r.stage = 'done'; r.step = 4; r.status = 'fulfilled'; r.stageLabel = 'Готово · номера назначены'; r.detail = `${(so.allocated || []).length} номеров в вашем аккаунте`; r.allocated = (so.allocated || []).length; }
+          else { const have = Math.min(readyCount, o.qty); if (have >= o.qty) { r.stage = 'allocating'; r.step = 3; r.stageLabel = 'Номера готовы · выделяем вам'; r.detail = `готово ${have}/${o.qty}, назначаем`; } else { r.stage = 'provisioning'; r.step = 2; r.stageLabel = 'Готовим номера'; r.detail = `покупка · регистрация WhatsApp+Telegram · прогрев (готово ${have}/${o.qty})`; } }
+        } else {
+          r.steps = ['Оплачено', 'Готовим', 'Подключить', 'Готово'];
+          if (o.status === 'fulfilled') { r.stage = 'done'; r.step = 4; r.stageLabel = 'Подключён'; r.detail = 'номер работает через CRM'; }
+          else if (o.status === 'ready') { r.stage = 'connect'; r.step = 3; r.stageLabel = 'Номер готов · подключите по QR'; r.detail = 'см. инструкцию — WhatsApp и Telegram на этом номере'; }
+          else { r.stage = 'provisioning'; r.step = 2; r.stageLabel = 'Готовим номер'; r.detail = 'покупаем и настраиваем через Yesim, затем подключение по QR'; }
+        }
+        return r;
       });
       return json(res, 200, { orders, balance: bl.balance || 0 });
     }
