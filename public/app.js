@@ -8191,10 +8191,10 @@ PAGES.collections = async (root) => {
         <div class="form-row"><label>Вступление (первая страница)</label><textarea id="clIntro" style="min-height:84px">${selLead ? esc(((active.find(l => l.id === selLead) || {}).name || '').split(' ')[0] + ', добрый день!\nПодготовил для вас подборку самых интересных проектов по выгодным ценам и с рассрочкой.\nЧто заинтересует — я на связи, посчитаю доходность по понравившимся.') : ''}</textarea></div>
         <div class="ds-fold ${PAGE_STATE.collDsOpen ? 'open' : ''}">
           <button type="button" class="ds-fold-h" id="clDsToggle">${ic(I.layers)}Дизайн документа<span class="ds-hint">арт-движок · всё Авто</span><span class="ds-caret">${ic(I.chev)}</span></button>
-          <div class="ds-fold-b">
+          <div class="ds-fold-b"><div class="ds-fold-inner">
             <div class="ds-grid">${dsSelects('clDs', {})}</div>
             <div class="ds-note">Движок сам решит композицию под данные объектов и запрос лида. Точная настройка — на карточке подборки.</div>
-          </div>
+          </div></div>
         </div>
         <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
         <div class="cl-props">

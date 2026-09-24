@@ -223,3 +223,6 @@ input[type=number] { -moz-appearance: textfield; }
 /* плавное появление панели фильтров (было дёрганно) */
 @keyframes pfSlide { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
 #prFiltPanel { animation: pfSlide .22s cubic-bezier(.22,.61,.36,1); transform-origin: top; }
+
+/* фикс «Дизайн документа»: один inner в сворачиваемом гриде (были 2 ребёнка → наложение) */
+.ds-fold-inner { padding: 0 14px 14px; }
