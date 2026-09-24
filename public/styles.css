@@ -8464,10 +8464,15 @@ body.client-view [data-team]{ display:none !important; }
 #anaExtra .coll-head{ font-weight:660; font-size:13px; padding:12px 14px; background:color-mix(in srgb,var(--accent) 5%,var(--card)); }
 #anaExtra .coll-head:hover{ background:color-mix(in srgb,var(--accent) 9%,var(--card)); }
 #anaExtra .coll.open .coll-head{ border-bottom:1px solid var(--stroke-soft); }
-#anaExtra .coll-body-inner{ padding:12px 14px; }
+#anaExtra .coll-inner{ padding:12px 14px; }
 /* группы внутри рейтингов — как отдельные под-карточки с акцент-полосой слева */
 .ana-geo-grp, .ana-q-grp{ margin:0 0 14px; padding:11px 13px; border:1px solid var(--stroke-soft); border-left:3px solid color-mix(in srgb,var(--accent) 50%,var(--stroke)); border-radius:11px; background:color-mix(in srgb,var(--accent) 3.5%,var(--card)); }
 .ana-geo-grp:last-child, .ana-q-grp:last-child{ margin-bottom:0; }
+/* масштаб: топ-N строк по умолчанию + «показать все» (страница остаётся короткой при сотнях строк) */
+.ana-q-grp .qx{ display:none; }
+.ana-q-grp.exp .qx{ display:revert; }
+.q-more{ margin-top:9px; font-size:11.5px; font-weight:600; color:var(--accent); background:none; border:0; cursor:pointer; padding:4px 2px; letter-spacing:.01em; }
+.q-more:hover{ text-decoration:underline; }
 .ana-geo-gh, .ana-q-gh{ font-size:12.5px; font-weight:660; color:var(--ink); margin:0 0 9px; padding:0; border-bottom:0; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
 .ana-geo-gh .muted, .ana-q-gh .muted{ font-weight:500; font-size:10.8px; padding:2px 8px; border-radius:9px; background:var(--bg-2,#eef1f4); color:var(--ink-3); }
 
