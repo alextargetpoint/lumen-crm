@@ -201,8 +201,8 @@ input[type=number] { -moz-appearance: textfield; }
 .pr-split { display: grid; grid-template-columns: 360px minmax(0,1fr); gap: 14px; height: calc(100vh - 240px); min-height: 500px; }
 @media (max-width: 900px) { .pr-split { grid-template-columns: 1fr; height: auto; } .pr-split-map { height: 60vh; } }
 .pr-split-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; scrollbar-width: thin; }
-.pr-split-map { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--stroke, #e5ddcf); background: var(--bg-2, #f6f2ea); }
-.pr-split-map #prMap { height: 100%; width: 100%; }
+.pr-split-map { position: relative; border-radius: 16px; overflow: hidden; min-height: 520px; border: 1px solid var(--stroke, #e5ddcf); background: var(--bg-2, #f6f2ea); }
+.pr-split-map #prMap { height: 100%; width: 100%; min-height: 520px; }
 .prm-row { display: flex; gap: 10px; padding: 8px; border: 1px solid var(--stroke, #e5ddcf); border-radius: 12px; cursor: pointer; background: var(--card, #fffdf9); transition: border-color .12s, box-shadow .12s; align-items: center; }
 .prm-row:hover { border-color: var(--accent, #b8863c); }
 .prm-row.active { border-color: var(--accent, #b8863c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #b8863c) 16%, transparent); }
