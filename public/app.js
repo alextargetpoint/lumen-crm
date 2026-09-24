@@ -12891,13 +12891,13 @@ PAGES.numbers = async (root) => {
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Cloud-API-номеров пока нет — нажмите «Купить Cloud API номер», затем зарегистрируйте его в WhatsApp.</div>`}
 
     <div class="glass card mb" id="waWebhookCard">
-      <div class="card-title">${ic(I.link)}Вебхук официального WhatsApp<span class="sub">входящие ответы · аналитика доставки · клики «Отписаться»</span></div>
+      <div class="card-title" data-fold="1">${ic(I.link)}Вебхук официального WhatsApp<span class="sub">входящие ответы · аналитика доставки · клики «Отписаться»</span><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Без вебхука номер только <b>шлёт</b> — не принимает ответы клиентов, статусы доставки (для аналитики рассылок) и клики «Отписаться». Настраивается один раз: вставь эти значения в <b>Meta → твоё приложение → WhatsApp → Configuration</b> и подпишись на поле <b>messages</b>.</div>
       <div id="waWebhookBody" class="muted" style="font-size:12px">Загрузка…</div>
     </div>
 
     <div class="glass card mb" id="metaCard">
-      <div class="card-title">${ic(I.chat)}Instagram и Facebook — Директ и комментарии<span class="sub">входящие DM + комментарии под рекламой → карточки лидов</span></div>
+      <div class="card-title" data-fold="1">${ic(I.chat)}Instagram и Facebook — Директ и комментарии<span class="sub">входящие DM + комментарии под рекламой → карточки лидов</span><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Тот же вебхук, что у WhatsApp. В <b>Meta → приложение → Webhooks</b> вставьте Callback URL и Verify token ниже и подпишите поля: <b>messages</b> (Директ Instagram), <b>comments</b> (комментарии Instagram), <b>feed</b> (комментарии Facebook-страницы). Пошагово — <a href="/help/meta-inbound" target="_blank" rel="noopener" style="color:var(--accent)">в справочнике →</a></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="muted" style="font-size:11px;width:92px">Callback URL</span><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${(STATE.settings.tunnelUrl || location.origin)}/wa/webhook</code><button class="btn btn-sm tc-copy" data-copy="${(STATE.settings.tunnelUrl || location.origin)}/wa/webhook">${ic(I.copy || I.doc)}</button></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><span class="muted" style="font-size:11px;width:92px">Verify token</span><code class="pill" style="flex:1;padding:8px 10px">${esc((STATE.settings.wa && STATE.settings.wa.webhookVerifyToken) || 'lumen-verify')}</code><button class="btn btn-sm tc-copy" data-copy="${esc((STATE.settings.wa && STATE.settings.wa.webhookVerifyToken) || 'lumen-verify')}">${ic(I.copy || I.doc)}</button></div>

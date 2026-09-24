@@ -204,10 +204,11 @@ function tgQrGuideRich() {
       <div class="wag-path">
         <div class="wag-ptag alt">Путь B · рабочий номер</div>
         <div class="wag-pt">Виртуальный номер + регистрация</div>
-        <div class="wag-pd">Отдельный рабочий номер под брокера. Один раз проходите забор Telegram на телефоне/эмуляторе, потом цепляете по QR.</div>
-        <div class="wag-pmeta">≈ $9/мес аренда номера · нужен телефон/эмулятор на этап регистрации</div>
+        <div class="wag-pd">Отдельный рабочий номер под брокера. Номер покупаем и настраиваем мы (Yesim), регистрацию Telegram проходим сами — вы просто цепляете по QR.</div>
+        <div class="wag-pmeta">$10/мес аренда номера · тот же номер, что и WhatsApp</div>
       </div>
     </div>
+    ${call('info', 'Один номер — оба мессенджера', 'Если вы уже купили номер для WhatsApp — <b>отдельный номер для Telegram не нужен</b>: на этом же номере регистрируется и Telegram. Одна аренда $10/мес = WhatsApp + Telegram.')}
 
     <div class="wag-sec">
       ${secH('A', 'Свой аккаунт по QR', 'Если рабочий Telegram уже на вашем номере — это всё, что нужно.')}
@@ -301,7 +302,7 @@ function telGuideRich() {
       <div class="wag-shoprow"><b>+971 5X XXX 02</b><i>Local · запись, звонки</i><span class="wag-buybtn">Купить</span></div>
       <div class="wag-shoprow"><b>+971 5X XXX 03</b><i>Local · запись, звонки</i><span class="wag-buybtn">Купить</span></div>
     </div>
-    <div class="wag-shopnote">Оплата ≈ $9/мес спишется с баланса расходников. Номер сразу в авто-подборе.</div>`);
+    <div class="wag-shopnote">Оплата $10/мес спишется с баланса расходников. Номер сразу в авто-подборе.</div>`);
 
   /* мокап: настройки своей телефонии */
   const settingsWin = win('Настройки · Телефония', `
