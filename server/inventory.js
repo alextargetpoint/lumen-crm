@@ -90,9 +90,23 @@ function mapItem(raw, defaults) {
 }
 
 /* дедуп по имени+застройщику; существующий — дополняем пустые поля, не затираем */
+/* нормализация имени проекта для дедупа между порталами (убираем застройщика/шумовые слова/пунктуацию) */
+function normName(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[^a-zа-я0-9 ]/gi, ' ')
+    .replace(/\b(by|the|project|residence|residences|tower|towers|apartments?|apartment|villas?|villa|complex|phase|development|jvc|jvt|community)\b/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
 function upsert(db, mapped) {
-  const key = (p) => (String(p.name).toLowerCase().trim() + '|' + String(p.developer || '').toLowerCase().trim());
-  const ex = db.properties.find(p => key(p) === key(mapped));
+  const nm = normName(mapped.name), dev = String(mapped.developer || '').toLowerCase().trim();
+  /* дедуп: точное имя+застройщик ИЛИ подстрочное совпадение нормализованных имён при совпадающем (или пустом) застройщике */
+  const ex = db.properties.find(p => {
+    const pn = normName(p.name), pd = String(p.developer || '').toLowerCase().trim();
+    if (!pn || !nm) return false;
+    const nameMatch = pn === nm || (pn.length > 6 && nm.length > 6 && (pn.includes(nm) || nm.includes(pn)));
+    const devMatch = !dev || !pd || dev === pd || pd.includes(dev) || dev.includes(pd);
+    return nameMatch && devMatch;
+  });
   if (ex) {
     for (const f of ['developer', 'area', 'handover', 'type', 'roi', 'appreciation', 'payment', 'description']) if (!ex[f] && mapped[f]) ex[f] = mapped[f];
     if (!ex.priceFrom && mapped.priceFrom) ex.priceFrom = mapped.priceFrom;

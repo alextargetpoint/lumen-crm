@@ -10751,6 +10751,31 @@ ${SCR}
       db.properties = db.properties || []; db.properties.push(pr); store.save();
       return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length });
     }
+    /* ⭐ СВЕРКА НАЛИЧИЯ: вставляем свежий файл доступности застройщика → ИИ извлекает юниты →
+       diff с текущими: новые добавляются (в наличии), пропавшие → помечаются проданными (не трём —
+       история). apply:false = превью diff, apply:true = применить. */
+    if ((m = p.match(/^\/api\/properties\/([^/]+)\/reconcile-units$/)) && req.method === 'POST') {
+      const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req); const text = String(b.text || '').trim();
+      if (!text) return json(res, 400, { error: 'вставьте содержимое файла доступности застройщика' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY)' });
+      let units; try { units = await llm.extractUnits(text); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал файл: ' + e.message }); }
+      const sig = (u) => [String(u.unitNo || '').toLowerCase().replace(/\s/g, ''), String(u.type || '').toLowerCase(), String(u.floor || ''), String(u.area || u.size || '').replace(/\D/g, '')].filter(Boolean).join('|');
+      pr.units = pr.units || []; const cur = pr.units;
+      const incoming = units.map(u => ({ unitNo: String(u.unitNo || '').slice(0, 20), type: String(u.type || '').slice(0, 20), beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40), status: 'available', updatedAt: Date.now() }));
+      const inSig = new Set(incoming.map(sig)); const curSig = new Map(cur.map(u => [sig(u), u]));
+      const added = incoming.filter(u => !curSig.has(sig(u)));
+      const sold = cur.filter(u => u.status !== 'sold' && !inSig.has(sig(u)));
+      const kept = incoming.filter(u => curSig.has(sig(u)));
+      if (!b.apply) return json(res, 200, { preview: true, added: added.length, sold: sold.length, kept: kept.length, total: incoming.length, sample: { added: added.slice(0, 6), sold: sold.slice(0, 6) } });
+      const merged = [];
+      for (const u of incoming) { const ex = curSig.get(sig(u)); merged.push(Object.assign({}, ex || {}, u, { status: 'available' })); }
+      for (const u of cur) { if (!inSig.has(sig(u))) merged.push(Object.assign({}, u, { status: 'sold', soldAt: u.soldAt || Date.now() })); }
+      pr.units = merged.slice(0, 500); pr.unitsUpdatedAt = Date.now();
+      if (incoming.length && (!pr.priceFrom || Math.min(...incoming.filter(u => u.price).map(u => u.price)) < pr.priceFrom)) { const mn = Math.min(...incoming.filter(u => u.price).map(u => u.price)); if (mn && isFinite(mn)) pr.priceFrom = mn; }
+      store.save();
+      return json(res, 200, { ok: true, added: added.length, sold: sold.length, kept: kept.length, available: merged.filter(u => u.status === 'available').length });
+    }
     if (p === '/api/properties/bulk' && req.method === 'POST') {
       const b = await readBody(req);
       const ids = Array.isArray(b.ids) ? b.ids : [];

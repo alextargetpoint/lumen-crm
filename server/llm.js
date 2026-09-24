@@ -333,6 +333,19 @@ ${String(context).slice(0, 12000)}`;
   return j;
 }
 
+/* Извлечь список ЮНИТОВ из файла доступности застройщика (CSV/текст/выгрузка).
+   Для сверки актуальности: чего нет в новом файле — помечаем проданным. */
+async function extractUnits(text) {
+  const prompt = `Из файла доступности застройщика извлеки список ЮНИТОВ (квартир/вилл). Верни СТРОГО JSON:
+{"units":[{"unitNo":"номер юнита если есть","type":"Studio|1BR|2BR|Villa...","beds":число,"size":"площадь напр. 45 m²","floor":"этаж","price":число_без_символов,"currency":"USD|EUR|AED|THB","view":"вид если есть"}]}
+Правила: одна строка файла = один юнит. Бери ТОЛЬКО данные из файла, не выдумывай. Чего нет — пустая строка/0. Заголовки таблицы и итоги НЕ включай. Максимум 300 юнитов.
+ФАЙЛ:
+${String(text).slice(0, 14000)}`;
+  const j = await callGemini(prompt, 25000, 4000);
+  if (!j || !Array.isArray(j.units)) throw new Error('bad units extract');
+  return j.units;
+}
+
 async function rewrite(text, mode, ctx) {
   const task = REWRITE_MODES[mode] || REWRITE_MODES.improve;
   const prompt = `Ты — редактор текстов агентства недвижимости. ${task}
