@@ -13000,6 +13000,7 @@ PAGES.numbers = async (root) => {
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
           <button class="btn btn-accent btn-sm" id="vbSave">${ic(I.check)}Сохранить и включить Viber</button>
+          <button class="btn btn-sm" id="vbTest">${ic(I.shield || I.check)}Проверить связь</button>
           <span id="vbOut" class="muted" style="font-size:11.5px"></span>
         </div>
         <div class="muted" style="font-size:11px;margin-top:8px">Платно (тарификация BSP за сообщение), нужна бизнес-верификация и согласие клиента на контакт. Стоимость — расходник, пойдёт с баланса.</div>
@@ -13043,6 +13044,23 @@ PAGES.numbers = async (root) => {
     const key = ($('#vbKey', root).value || '').trim(); if (key) patch.channels.viber.apiKey = key;
     try { await api.patch('/settings', patch); toast('Viber подключён', 'Канал включён в каскад', true); if (out) out.textContent = '✓ сохранено'; if (STATE.settings.channels) { STATE.settings.channels.viber = Object.assign(STATE.settings.channels.viber || {}, { provider: patch.channels.viber.provider, sender, baseUrl: patch.channels.viber.baseUrl, keySet: !!key || (STATE.settings.channels.viber || {}).keySet }); } setTimeout(() => PAGES.numbers(root), 400); }
     catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    btn.disabled = false;
+  });
+  $('#vbTest', root)?.addEventListener('click', async () => {
+    const out = $('#vbOut', root); const btn = $('#vbTest', root);
+    btn.disabled = true; if (out) out.textContent = 'Проверяю связь с Infobip…';
+    try {
+      const r = await api.post('/viber/test', {});
+      if (!r.ok) { if (out) out.innerHTML = '<span style="color:var(--bad)">✗ ' + esc(r.error || 'не прошло') + '</span>'; }
+      else {
+        let msg = '✓ связь есть' + (r.balance != null ? ` · баланс ${r.balance} ${esc(r.currency || '')}` : '') + (r.sender ? ` · отправитель «${esc(r.sender)}»` : '');
+        if (r.warn) msg += ' · ⚠ ' + esc(r.warn);
+        if (r.sent) msg += ` · сообщение отправлено (${esc(r.sent.status)})`;
+        if (r.sendError) msg += ' · ⚠ отправка: ' + esc(r.sendError);
+        if (out) out.innerHTML = '<span style="color:var(--good,#6d8a4f)">' + msg + '</span>';
+        toast('Viber', r.sent ? 'Тест-сообщение отправлено' : 'Связь с Infobip есть', true);
+      }
+    } catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
     btn.disabled = false;
   });
   /* авто-обновление статусов Cloud-API номеров из Telnyx (одобрение Meta занимает время) */

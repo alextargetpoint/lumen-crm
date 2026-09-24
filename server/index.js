@@ -3091,6 +3091,40 @@ function runBillingTick() {
 setInterval(runBillingTick, 6 * 60 * 60e3);   /* каждые 6 ч */
 setTimeout(runBillingTick, 15e3);             /* и вскоре после старта — чтобы гейты подтянулись сразу */
 
+/* Проверка связи с Viber BSP (Infobip): валиден ли ключ+baseUrl+доступ.
+   Безопасно — GET баланса (сообщение НЕ шлём и не тратим). Если передан `to` — ещё и
+   реальная тест-отправка на этот номер (проверяет верификацию отправителя). */
+async function viberTestConn(vb, to, agencyName) {
+  vb = vb || {};
+  const base = String(vb.baseUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const key = vb.apiKey || '';
+  if (!key) return { ok: false, error: 'не задан API-ключ BSP (Настройки → Viber)' };
+  if (!base) return { ok: false, error: 'не задан Base URL (вида xxxxx.api.infobip.com)' };
+  const out = { ok: false, base, sender: vb.sender || '', mode: vb.mode || 'pa' };
+  try {
+    const r = await fetch('https://' + base + '/account/1/balance', { headers: { Authorization: 'App ' + key, Accept: 'application/json' } });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 || r.status === 403) return Object.assign(out, { error: 'ключ отклонён Infobip (401/403) — проверьте API-ключ' });
+    if (!r.ok) return Object.assign(out, { error: 'Infobip ' + r.status + ': ' + (j.requestError && j.requestError.serviceException && j.requestError.serviceException.text || 'ошибка') });
+    out.ok = true; out.balance = j.balance; out.currency = j.currency;
+  } catch (e) { return Object.assign(out, { error: 'сеть/Base URL недоступен: ' + e.message }); }
+  if (!vb.sender) out.warn = 'ключ валиден, но не задано имя-отправитель (Viber sender) — исходящие BSP не пойдут';
+  /* опциональная реальная отправка (проверка верификации отправителя) */
+  if (out.ok && to) {
+    const phone = String(to).replace(/\D/g, '');
+    try {
+      const rs = await fetch('https://' + base + '/viber/2/messages', {
+        method: 'POST', headers: { Authorization: 'App ' + key, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ messages: [{ sender: vb.sender, destinations: [{ to: phone }], content: { text: 'Lumen · тест связи Viber (' + (agencyName || 'агентство') + '). Если видите это — канал работает.', type: 'TEXT' } }] }),
+      });
+      const js = await rs.json().catch(() => ({}));
+      if (!rs.ok) out.sendError = 'отправка ' + rs.status + ': ' + (js.requestError && js.requestError.serviceException && js.requestError.serviceException.text || rs.status);
+      else out.sent = { to: phone, messageId: (js.messages && js.messages[0] && js.messages[0].messageId) || null, status: (js.messages && js.messages[0] && js.messages[0].status && js.messages[0].status.name) || 'ACCEPTED' };
+    } catch (e) { out.sendError = 'сеть: ' + e.message; }
+  }
+  return out;
+}
+
 /* ============ ПЕРЕДАЧА ФЕРМОВОГО НОМЕРА АГЕНТСТВУ (handover при покупке места) ============
    Пометки agencyTid в реестре фермы мало: чтобы брокеры РЕАЛЬНО пользовались номером, нужно
    (1) завести номер в каналы тенанта (waGray+tgGray) с привязкой брокера — тогда он виден в CRM
@@ -5687,6 +5721,14 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/farm/topup' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.topUp(b.tid, b.months); adminLog('farm.billing.topup', { tid: b.tid, months: b.months }); runBillingTick(); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/admin/farm/billing-set' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.setBilling(b.tid, b.patch || b); runBillingTick(); return json(res, 200, r); }
       if (p === '/api/admin/farm/alert-ack' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); return json(res, 200, farmSvc.ackAlert(b.id)); }
+
+      /* тест связи Viber BSP агентства (основатель): проверить конфиг Infobip тенанта; ?to= — тест-отправка */
+      if (p === '/api/admin/viber-test' && req.method === 'GET') {
+        const tid = u.searchParams.get('tid') || ''; const to = u.searchParams.get('to') || '';
+        if (!tid || !store.listTenants().includes(tid)) return json(res, 400, { error: 'нужен корректный tid' });
+        const r = await store.runInTenant(tid, async () => { const d = store.get(); return viberTestConn((d.settings.channels || {}).viber, to, (d.settings.agency && d.settings.agency.name) || ''); });
+        return json(res, 200, Object.assign({ ok: true, tid }, r));
+      }
 
       /* Р2 — провижн */
       if (p === '/api/admin/farm/provision-enqueue' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmProv.enqueue(b.deviceId, b.count, b.slot); adminLog('farm.prov.enqueue', { deviceId: b.deviceId, count: b.count }); return json(res, r.error ? 400 : 200, r); }
@@ -8641,6 +8683,13 @@ const server = http.createServer(async (req, res) => {
     /* Viber (BSP/Infobip) входящие + статусы доставки → CRM-инбокс.
        Тенант находим по sender (=channels.viber.sender, уникален на агентство). URL этого
        вебхука вписывается в Infobip (Inbound configuration). Двусторонний Viber-канал. */
+    /* тест связи Viber BSP (владелец): проверяем ключ/base/доступ Infobip; ?to= — реальная тест-отправка */
+    if (p === '/api/viber/test' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role === 'broker') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req).catch(() => ({}));
+      const r = await viberTestConn((db.settings.channels || {}).viber, b.to || '', (db.settings.agency && db.settings.agency.name) || '');
+      return json(res, 200, r);
+    }
     if (p === '/api/viber/inbound' && req.method === 'POST') {
       const b = await readBody(req);
       const results = (b && (b.results || b.messages)) || (Array.isArray(b) ? b : []);
