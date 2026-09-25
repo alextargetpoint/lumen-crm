@@ -11285,8 +11285,8 @@ ${SCR}
         const snap = items.map(p => ({ id: p.id, name: p.name, area: p.area || '', developer: p.developer || '', type: p.type || '', priceFrom: p.priceFrom || 0, currency: p.currency || 'USD', roi: p.roi || '', appreciation: p.appreciation || '', handover: p.handover || '', market: p.market || 'offplan', beds: p.beds || 0, units: (p.units || []).length, image: (p.images || [])[0] || '', description: (p.i18n && p.i18n[b.lang] && p.i18n[b.lang].description) || p.description || '' }));
         const rec = { id: 'cmp_' + crypto.randomBytes(6).toString('hex'), token: crypto.randomBytes(8).toString('hex'), items: snap, analysis: an, lang: b.lang || 'ru', agency: (db.settings.agency && db.settings.agency.name) || 'Lumen', createdAt: Date.now() };
         db.compares.unshift(rec); db.compares = db.compares.slice(0, 200); store.save();
-        const base = (global.LUMEN_BASE || ('https://app.lumen247.com')).replace(/\/$/, '');
-        return json(res, 200, { ok: true, analysis: an, shareUrl: `${base}/cmp/${rec.id}`, id: rec.id });
+        const host = req.headers.host && !/localhost|127\.0\.0\.1|railway/.test(req.headers.host) ? 'https://' + req.headers.host : (global.LUMEN_BASE || 'https://app.lumen247.com');
+        return json(res, 200, { ok: true, analysis: an, shareUrl: `${host.replace(/\/$/, '')}/cmp/${rec.id}`, id: rec.id });
       }
       return json(res, 200, { ok: true, analysis: an });
     }
