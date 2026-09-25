@@ -11078,6 +11078,16 @@ ${SCR}
       let ext; try { ext = await llm.extractPropertyFromPdf(b64); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал PDF: ' + e.message }); }
       const jpegs = extractPdfJpegs(buf);
       const saved = jpegs.map(j => saveImageBuffer(j, 'pdf')).filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 16).map(x => x.url);
+      /* фолбэк фото: у некоторых PDF картинки не DCTDecode-JPEG (Flate/JPEG2000) → сканер их не берёт.
+         Если извлеклось мало — дотягиваем фото проекта из открытых источников (по названию+район). */
+      if (saved.length < 3 && renderReady() && ext.name) {
+        try {
+          const sr = await webSearch([ext.name, ext.area || ext.city || '', ext.developer || '', 'недвижимость проект'].filter(Boolean).join(' '), 6, { media: true });
+          const webImgs = (sr && sr.images || []).slice(0, 14);
+          const dl = await Promise.all(webImgs.map(u => downloadImageToAsset(u).catch(() => null)));
+          dl.filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 12 - saved.length).forEach(g => saved.push(g.url));
+        } catch (_) {}
+      }
       const cur = fixMoneyCurrency(b.geo, ext.priceFrom, ext.currency);
       const pr = {
         id: store.nextId('pr'), name: String(ext.name || b.fileName || 'Объект из PDF').slice(0, 120),
