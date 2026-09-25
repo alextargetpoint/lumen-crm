@@ -3901,6 +3901,28 @@ function extractPdfJpegs(buf, max = 24) {
   }
   return out;
 }
+function _runCmd(cmd, args, timeoutMs) {
+  return new Promise((resolve) => { let done = false; let p; try { p = spawn(cmd, args); } catch (_) { return resolve(false); } const to = setTimeout(() => { if (!done) { try { p.kill('SIGKILL'); } catch (_) {} resolve(false); } }, timeoutMs || 45000); p.on('error', () => { done = true; clearTimeout(to); resolve(false); }); p.on('close', (c) => { done = true; clearTimeout(to); resolve(c === 0); }); });
+}
+/* извлечь фото из PDF через poppler (pdfimages — все кодировки JPEG/PNG/JP2; при нехватке — pdftoppm рендерит страницы).
+   Graceful: если poppler нет (спавн падает) → []; вызывающий откатывается на JPEG-скан + веб. */
+async function pdfExtractImages(buf) {
+  const out = []; let dir;
+  try {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lpdf-'));
+    const pdf = path.join(dir, 'in.pdf'); fs.writeFileSync(pdf, buf);
+    if (await _runCmd('pdfimages', ['-all', '-f', '1', '-l', '25', pdf, path.join(dir, 'img')], 50000)) {
+      const cand = fs.readdirSync(dir).filter(f => /^img-.*\.(jpe?g|png)$/i.test(f)).map(f => { try { return saveImageBuffer(fs.readFileSync(path.join(dir, f)), 'pdf'); } catch (_) { return null; } }).filter(Boolean);
+      cand.sort((a, b) => (b.w * b.h) - (a.w * a.h)).slice(0, 16).forEach(g => out.push(g.url));
+    }
+    if (out.length < 3) {   /* мало встроенных → рендерим страницы (универсально, любая кодировка) */
+      if (await _runCmd('pdftoppm', ['-jpeg', '-r', '110', '-f', '1', '-l', '8', pdf, path.join(dir, 'pg')], 50000)) {
+        for (const f of fs.readdirSync(dir).filter(f2 => /^pg-.*\.jpg$/i.test(f2)).sort()) { try { const g = saveImageBuffer(fs.readFileSync(path.join(dir, f)), 'pdf'); if (g) out.push(g.url); } catch (_) {} if (out.length >= 10) break; }
+      }
+    }
+  } catch (_) {} finally { try { if (dir) fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
+  return out;
+}
 /* открытые источники фото (Openverse — бесплатно, без ключа, CC-лицензия) по ключевым словам */
 async function openverseImages(query, n = 8) {
   try {
@@ -10942,7 +10964,20 @@ ${SCR}
     }
 
     /* ---------------- объекты (библиотека) ---------------- */
-    if (p === '/api/properties' && req.method === 'GET') return json(res, 200, db.properties);
+    if (p === '/api/properties' && req.method === 'GET') {
+      /* авто-нормализация «от»-цены: если есть юниты с ценами → headline = минимальный юнит + его валюта
+         (лечит старые карточки с рассинхроном: хедер 29.4M vs юниты $1.1M). Идемпотентно, чинит только явное. */
+      let ch = false;
+      for (const pr of (db.properties || [])) {
+        const u = (pr.units || []).filter(x => +x.price > 0);
+        if (!u.length) continue;
+        const mn = u.reduce((a, b) => +b.price < +a.price ? b : a);
+        const cur = (mn.currency || pr.currency || 'USD');
+        if ((+mn.price && +pr.priceFrom !== +mn.price) || pr.currency !== cur) { pr.priceFrom = +mn.price; pr.currency = cur; ch = true; }
+      }
+      if (ch) store.save();
+      return json(res, 200, db.properties);
+    }
     /* ---------------- ИМПОРТ ИНВЕНТАРЯ ОБЪЕКТОВ ---------------- */
     if (p === '/api/properties/import' && req.method === 'POST') {
       const b = await readBody(req);
@@ -11076,10 +11111,12 @@ ${SCR}
       let buf; try { buf = Buffer.from(b64, 'base64'); } catch (_) { return json(res, 400, { error: 'битый файл' }); }
       if (buf.length > 100e6) return json(res, 400, { error: 'PDF слишком большой (>100МБ)' });
       let ext; try { ext = await llm.extractPropertyFromPdf(b64); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал PDF: ' + e.message }); }
-      const jpegs = extractPdfJpegs(buf);
-      const saved = jpegs.map(j => saveImageBuffer(j, 'pdf')).filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 16).map(x => x.url);
-      /* фолбэк фото: у некоторых PDF картинки не DCTDecode-JPEG (Flate/JPEG2000) → сканер их не берёт.
-         Если извлеклось мало — дотягиваем фото проекта из открытых источников (по названию+район). */
+      let saved = await pdfExtractImages(buf);   /* poppler: любая кодировка (pdfimages/pdftoppm) */
+      if (saved.length < 3) {   /* нет poppler / мало → скан встроенных DCTDecode-JPEG */
+        const j2 = extractPdfJpegs(buf).map(j => saveImageBuffer(j, 'pdf')).filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 16).map(x => x.url);
+        saved = [...new Set([...saved, ...j2])];
+      }
+      /* фолбэк фото: если и так мало — дотягиваем фото проекта из открытых источников (по названию+район). */
       if (saved.length < 3 && renderReady() && ext.name) {
         try {
           const sr = await webSearch([ext.name, ext.area || ext.city || '', ext.developer || '', 'недвижимость проект'].filter(Boolean).join(' '), 6, { media: true });

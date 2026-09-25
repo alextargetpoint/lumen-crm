@@ -1,4 +1,5 @@
-# Railway/Nixpacks: доустановить ffmpeg — для авто-сжатия видео-креативов при загрузке (mp4/H.264).
+# Railway/Nixpacks: доустановить ffmpeg (сжатие видео-креативов) + poppler-utils
+# (pdfimages/pdftoppm — извлечение фото/рендеров из PDF-брошюр любой кодировки).
 # aptPkgs дополняет базовый setup (node ставится автоматически), не заменяя его.
 [phases.setup]
-aptPkgs = ["ffmpeg"]
+aptPkgs = ["ffmpeg", "poppler-utils"]
