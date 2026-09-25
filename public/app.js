@@ -7746,20 +7746,25 @@ function renderCompareBar() {
 }
 /* модалка сравнения 2-3 объектов бок-о-бок (цена/ROI/площадь/спальни/сдача/район) */
 function openCompareModal(list) {
+  const num = (s) => { const m = String(s || '').match(/(\d+(?:[.,]\d+)?)/); return m ? parseFloat(m[1].replace(',', '.')) : null; };
+  const hoScore = (s) => { const m = String(s || '').match(/(\d)\s*(?:кв|q)?\D*(20\d\d)|(20\d\d)/i); if (!m) return null; const y = +(m[2] || m[3]); const q = +(m[1] || 1); return y * 4 + (q || 1); };   /* меньше = раньше = лучше */
+  const priceUsd = (p) => { const e = effPrice(p); return convTo(e.price, e.currency, 'USD') || e.price || null; };
+  /* row: [label, display(p), value(p)|null, dir 'min'|'max'|null] */
   const rows = [
-    ['Цена от', p => p.priceFrom ? priceHtml(p.priceFrom, p.currency, '') : '—'],
-    ['Район', p => esc(p.area || '—')],
-    ['Застройщик', p => esc(p.developer && p.developer !== '—' ? p.developer : '—')],
-    ['Тип', p => esc(p.type || '—')],
-    ['Доходность', p => esc(p.roi || '—')],
-    ['Прирост', p => esc(p.appreciation || '—')],
-    ['Сдача', p => esc(p.handover || '—')],
-    ['Юнитов', p => (p.units || []).length || '—'],
-    ['Рынок', p => p.market === 'secondary' ? 'Вторичка' : 'Первичка'],
+    ['Цена от', p => { const e = effPrice(p); return e.price ? priceHtml(e.price, e.currency, '') : '—'; }, priceUsd, 'min'],
+    ['Район', p => esc(p.area || '—'), null, null],
+    ['Застройщик', p => esc(p.developer && p.developer !== '—' ? p.developer : '—'), null, null],
+    ['Тип', p => esc(p.type || '—'), null, null],
+    ['Доходность', p => esc(p.roi || '—'), p => num(p.roi), 'max'],
+    ['Прирост', p => esc(p.appreciation || '—'), p => num(p.appreciation), 'max'],
+    ['Сдача', p => esc(p.handover || '—'), p => hoScore(p.handover), 'min'],
+    ['Юнитов', p => (p.units || []).length || '—', p => (p.units || []).length || null, 'max'],
+    ['Рынок', p => p.market === 'secondary' ? 'Вторичка' : 'Первичка', null, null],
   ];
-  const body = `<div class="cmp-tbl" style="grid-template-columns:120px repeat(${list.length},1fr)">
+  const bestIdx = (valFn, dir) => { if (!valFn || !dir || list.length < 2) return -1; const vals = list.map(valFn); const has = vals.filter(v => v != null); if (has.length < 2) return -1; let bi = -1, bv = null; vals.forEach((v, i) => { if (v == null) return; if (bv == null || (dir === 'min' ? v < bv : v > bv)) { bv = v; bi = i; } }); const ties = vals.filter(v => v === bv).length; return ties === list.length ? -1 : bi; };
+  const body = `<div class="cmp-tbl" style="grid-template-columns:130px repeat(${list.length},1fr)">
     <div class="cmp-h"></div>${list.map(p => `<div class="cmp-h cmp-card"><span class="cmp-th" style="background-image:url('${esc((p.images || [])[0] || '')}')"></span><b>${esc(p.name)}</b></div>`).join('')}
-    ${rows.map(([lbl, fn]) => `<div class="cmp-l">${lbl}</div>${list.map(p => `<div class="cmp-v">${fn(p)}</div>`).join('')}`).join('')}
+    ${rows.map(([lbl, fn, vf, dir]) => { const bi = bestIdx(vf, dir); return `<div class="cmp-l">${lbl}</div>${list.map((p, i) => `<div class="cmp-v${i === bi ? ' cmp-win' : ''}">${fn(p)}${i === bi ? '<span class="cmp-star" title="лучшее">★</span>' : ''}</div>`).join('')}`; }).join('')}
   </div>
   <div class="cmp-ai"><button class="btn btn-accent" id="cmpAiGo" style="width:100%;justify-content:center">${ic(I.spark)}ИИ-анализ рынка (аналитик)</button><div id="cmpAiOut"></div>
   <button class="btn" id="cmpShare" style="width:100%;justify-content:center;margin-top:8px">${ic(I.layers || I.doc)}Поделиться с клиентом (страница по ссылке)</button><div id="cmpShareOut"></div></div>`;
