@@ -1385,6 +1385,14 @@ const readBody = (req) => new Promise((resolve) => {
   req.on('data', (c) => { b += c; if (b.length > 2e6) req.destroy(); });
   req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { try { resolve(Object.fromEntries(new URLSearchParams(b))); } catch { resolve({}); } } });   /* JSON, иначе form-urlencoded (вебхуки Twilio) */
 });
+/* большое тело — для загрузки файлов (PDF-брошюры, Excel-прайсы): базовый readBody рвёт на 2МБ.
+   maxBytes по умолчанию ~140МБ (base64 брошюры ~100МБ). */
+const readBodyLarge = (req, maxBytes = 140e6) => new Promise((resolve) => {
+  const chunks = []; let size = 0, killed = false;
+  req.on('data', (c) => { size += c.length; if (size > maxBytes) { killed = true; req.destroy(); return; } chunks.push(c); });
+  req.on('end', () => { if (killed) return resolve({ _tooLarge: true }); const b = Buffer.concat(chunks).toString('utf8'); try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } });
+  req.on('error', () => resolve(killed ? { _tooLarge: true } : {}));
+});
 
 /* подсказка «что делать дальше» — считается по фактам карточки */
 function leadHint(db, l, axesFilled) {
@@ -11054,12 +11062,13 @@ ${SCR}
     /* ⭐ ИМПОРТ ИЗ PDF-БРОШЮРЫ: Gemini читает PDF (текст/таблицы/планы) → структура; встроенные JPEG
        вытаскиваем из байтов PDF → фото. Авто-перевод под язык интерфейса (b.lang). */
     if (p === '/api/properties/from-pdf' && req.method === 'POST') {
-      const b = await readBody(req);
+      const b = await readBodyLarge(req);
+      if (b._tooLarge) return json(res, 413, { error: 'PDF слишком большой (>100МБ) — пришлите факт-лист/этот раздел отдельно' });
       const b64 = String(b.fileB64 || '').replace(/^data:[^,]*,/, '');
       if (!b64) return json(res, 400, { error: 'нужен PDF-файл' });
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY)' });
       let buf; try { buf = Buffer.from(b64, 'base64'); } catch (_) { return json(res, 400, { error: 'битый файл' }); }
-      if (buf.length > 25e6) return json(res, 400, { error: 'PDF слишком большой (>25МБ)' });
+      if (buf.length > 100e6) return json(res, 400, { error: 'PDF слишком большой (>100МБ)' });
       let ext; try { ext = await llm.extractPropertyFromPdf(b64); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал PDF: ' + e.message }); }
       const jpegs = extractPdfJpegs(buf);
       const saved = jpegs.map(j => saveImageBuffer(j, 'pdf')).filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 16).map(x => x.url);
@@ -11188,7 +11197,7 @@ ${SCR}
        история). apply:false = превью diff, apply:true = применить. */
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/reconcile-units$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
-      const b = await readBody(req); let text = String(b.text || '').trim();
+      const b = await readBodyLarge(req, 60e6); if (b._tooLarge) return json(res, 413, { error: 'файл слишком большой (>40МБ)' }); let text = String(b.text || '').trim();
       let units;
       /* ⚡ ПРИ ПОДТВЕРЖДЕНИИ шлём УЖЕ разобранные из превью юниты (b.units) → НЕ гоняем ИИ повторно
          (иначе apply снова уходил в долгую загрузку — заново парсил весь файл). */
