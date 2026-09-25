@@ -11043,9 +11043,11 @@ ${SCR}
       const existing = b.force === 'new' ? null : db.properties.find(x => x.sourceUrl === url);
       let pr;
       if (existing) {
-        const wasStub = existing.stub; const keepGeo = { lat: existing.lat, lng: existing.lng };
+        const wasStub = existing.stub; const keepGeo = { lat: existing.lat, lng: existing.lng, geo: existing.geo };
+        if (!mapped.geo) delete mapped.geo;   /* не затираем гео стаба пустым (иначе THB-детект не сработает) */
         Object.assign(existing, mapped, { stub: false, draft: false, hydratedAt: Date.now() });
         if (existing.lat == null) { existing.lat = keepGeo.lat; existing.lng = keepGeo.lng; }
+        if (!existing.geo) existing.geo = keepGeo.geo;
         existing.history = existing.history || [];
         existing.history.unshift({ at: Date.now(), action: wasStub ? 'Собрана полная карточка из каталога' : 'Обновлена свежими данными по ссылке' });
         if (existing.history.length > 60) existing.history.length = 60;
@@ -11054,6 +11056,9 @@ ${SCR}
         pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now(), history: [{ at: Date.now(), action: 'Импортирована по ссылке' }] }, mapped);
         db.properties.push(pr);
       }
+      /* ФИНАЛЬНЫЙ фикс валюты по итоговому гео (у гидрированного стаба гео = phuket → 15.7M = THB, не $) */
+      pr.currency = fixMoneyCurrency(pr.geo, pr.priceFrom, pr.currency);
+      (pr.units || []).forEach(u => { if (u.price) u.currency = fixMoneyCurrency(pr.geo, u.price, u.currency || pr.currency); });
       /* авто-перевод контента под язык интерфейса (портал часто на англ., а CRM на рус.) */
       if (b.lang && b.lang !== 'auto') { try { const tr = await llm.translateFields({ description: pr.description || '', amenities: pr.amenities || [], tags: pr.tags || [] }, b.lang); pr.i18n = pr.i18n || {}; pr.i18n[b.lang] = Object.assign({}, pr.i18n[b.lang], tr, { _at: Date.now() }); } catch (_) {} }
       store.save();
