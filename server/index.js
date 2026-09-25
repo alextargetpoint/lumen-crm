@@ -958,6 +958,7 @@ function publicTenantFor(p) {
   let m;
   if ((m = p.match(/^\/(?:p|c)\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/collections\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().collections || []).some(c => c.id === id)); }
   if ((m = p.match(/^\/mp\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/mediaplans\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().mediaplans || []).some(x => x.id === id)); }
+  if ((m = p.match(/^\/cmp\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().compares || []).some(x => x.id === id)); }   /* публичная страница сравнения для клиента */
   if ((m = p.match(/^\/learn\/([a-zA-Z0-9]+)/))) { const tok = m[1]; return findTenant(() => { const L = store.get().settings.learn; return !!(L && L.shareToken === tok); }); }
   if ((m = p.match(/^\/cal\/([a-zA-Z0-9_]+)\.ics/))) { const id = m[1]; return findTenant(() => (store.get().collections || []).some(c => c.id === id) || (store.get().meetings || []).some(x => x.id === id)); }
   /* внешняя страница встречи /m/:id (+ /confirm, /reschedule, /ics) — резолвим тенанта-владельца встречи */
@@ -11268,6 +11269,15 @@ ${SCR}
       if (items.length < 2) return json(res, 400, { error: 'нужно минимум 2 объекта' });
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
       let an; try { an = await llm.compareProjects(items, b.lang || 'ru'); } catch (e) { return json(res, 400, { error: 'ИИ не справился: ' + e.message }); }
+      /* share:true → сохраняем снапшот для ПУБЛИЧНОЙ страницы клиента (/cmp/:id) */
+      if (b.share) {
+        db.compares = db.compares || [];
+        const snap = items.map(p => ({ id: p.id, name: p.name, area: p.area || '', developer: p.developer || '', type: p.type || '', priceFrom: p.priceFrom || 0, currency: p.currency || 'USD', roi: p.roi || '', appreciation: p.appreciation || '', handover: p.handover || '', market: p.market || 'offplan', beds: p.beds || 0, units: (p.units || []).length, image: (p.images || [])[0] || '', description: (p.i18n && p.i18n[b.lang] && p.i18n[b.lang].description) || p.description || '' }));
+        const rec = { id: 'cmp_' + crypto.randomBytes(6).toString('hex'), token: crypto.randomBytes(8).toString('hex'), items: snap, analysis: an, lang: b.lang || 'ru', agency: (db.settings.agency && db.settings.agency.name) || 'Lumen', createdAt: Date.now() };
+        db.compares.unshift(rec); db.compares = db.compares.slice(0, 200); store.save();
+        const base = (global.LUMEN_BASE || ('https://app.lumen247.com')).replace(/\/$/, '');
+        return json(res, 200, { ok: true, analysis: an, shareUrl: `${base}/cmp/${rec.id}`, id: rec.id });
+      }
       return json(res, 200, { ok: true, analysis: an });
     }
     if (p === '/api/properties/find-web' && req.method === 'POST') {
@@ -14292,6 +14302,36 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
 
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 
+    /* ---------------- публичная СВОДНАЯ СТРАНИЦА СРАВНЕНИЯ для клиента (/cmp/:id) ---------------- */
+    if (req.method === 'GET' && (m = p.match(/^\/cmp\/(cmp_[a-z0-9]+)$/))) {
+      const rec = (db.compares || []).find(x => x.id === m[1]);
+      if (!rec) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<h2 style="font-family:sans-serif;text-align:center;margin-top:60px">Сравнение не найдено</h2>'); return; }
+      const esc2 = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const sym = (c) => ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£', IDR: 'Rp ' }[String(c || '').toUpperCase()] || '$');
+      const money = (v, c) => v ? sym(c) + Math.round(v).toLocaleString('ru-RU') : '—';
+      const it = rec.items || []; const a = rec.analysis || {};
+      const rows = [['Цена от', p2 => money(p2.priceFrom, p2.currency)], ['Район', p2 => esc2(p2.area) || '—'], ['Застройщик', p2 => esc2(p2.developer) || '—'], ['Тип', p2 => esc2(p2.type) || '—'], ['Доходность', p2 => esc2(p2.roi) || '—'], ['Прирост', p2 => esc2(p2.appreciation) || '—'], ['Сдача', p2 => esc2(p2.handover) || '—'], ['Юнитов', p2 => p2.units || '—'], ['Рынок', p2 => p2.market === 'secondary' ? 'Вторичка' : 'Первичка']];
+      const verd = (a.verdicts || []).map(v => `<div class="v"><b>${esc2(v.name)}</b><div class="fw">${esc2(v.forWhom)}</div><ul class="pros">${(v.pros || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul><ul class="cons">${(v.cons || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul></div>`).join('');
+      const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Сравнение объектов · ${esc2(rec.agency)}</title>
+<style>*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f6f2ea;color:#23201c;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 18px 60px}.hd{text-align:center;margin-bottom:24px}.hd .ag{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#a98748;font-weight:700}.hd h1{font-family:Georgia,serif;font-size:28px;margin:6px 0 2px}.hd .sub{color:#8a8378;font-size:13px}
+.grid{display:grid;grid-template-columns:130px repeat(${it.length},1fr);background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px -12px rgba(40,32,15,.2)}
+.grid>div{padding:11px 13px;border-bottom:1px solid #eee6d8;font-size:13px}.ch{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;border-bottom:2px solid #eee6d8!important}
+.th{width:100%;height:92px;border-radius:10px;background:#eee center/cover}.ch b{font-size:13px}.lbl{font-size:11.5px;color:#8a8378;font-weight:600}.val{font-weight:600}
+.ai{margin-top:26px;background:#fff;border-radius:16px;padding:22px;box-shadow:0 10px 40px -12px rgba(40,32,15,.2)}.ai h2{font-family:Georgia,serif;font-size:19px;margin:0 0 12px;display:flex;align-items:center;gap:8px}.ai .sum{background:#faf5ea;border-radius:10px;padding:13px 15px;font-size:14px;margin-bottom:14px}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.v{border:1px solid #eee6d8;border-radius:12px;padding:13px}.v>b{font-size:14px}.fw{font-size:12px;color:#8a8378;margin:4px 0 8px}.pros,.cons{margin:0;padding-left:17px;font-size:12.5px}.pros li{color:#4a7a4f}.cons li{color:#b4553a}
+.best{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;padding:14px 16px;background:#f7efdd;border-radius:12px;font-size:13px}.note{margin-top:14px;font-style:italic;color:#7c756a;font-size:13px}
+.ft{text-align:center;color:#a89f90;font-size:12px;margin-top:28px}</style></head><body><div class="wrap">
+<div class="hd"><div class="ag">${esc2(rec.agency)}</div><h1>Сравнение объектов</h1><div class="sub">${it.map(x => esc2(x.name)).join(' · ')}</div></div>
+<div class="grid"><div class="ch"></div>${it.map(x => `<div class="ch"><span class="th" style="background-image:url('${esc2(x.image)}')"></span><b>${esc2(x.name)}</b></div>`).join('')}
+${rows.map(([l, fn]) => `<div class="lbl">${l}</div>${it.map(x => `<div class="val">${fn(x)}</div>`).join('')}`).join('')}</div>
+${(a.summary || verd) ? `<div class="ai"><h2>✦ Анализ аналитика рынка</h2>${a.summary ? `<div class="sum">${esc2(a.summary)}</div>` : ''}<div class="vgrid">${verd}</div>
+${a.bestFor ? `<div class="best"><span>💎 Инвестиции: <b>${esc2(a.bestFor.investment)}</b></span><span>🏡 Для жизни: <b>${esc2(a.bestFor.living)}</b></span><span>💰 По бюджету: <b>${esc2(a.bestFor.budget)}</b></span></div>` : ''}
+${a.analystNote ? `<div class="note">${esc2(a.analystNote)}</div>` : ''}</div>` : ''}
+<div class="ft">Подготовлено для вас · ${esc2(rec.agency)}</div></div></body></html>`;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+      res.end(html); return;
+    }
     /* ---------------- медиа объектов из ПЕРСИСТЕНТНОГО хранилища (переживают деплой) ---------------- */
     if (req.method === 'GET' && /^\/media\/[A-Za-z0-9._\/-]+$/.test(p) && !p.includes('..')) {
       const fp = path.join(MEDIA_DIR, p.replace(/^\/media\//, ''));

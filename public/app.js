@@ -7690,12 +7690,14 @@ async function initPropMap(props) {
       catch (err) { toast('Ошибка', err.message); if (body) body.innerHTML = bak; }
     });
     const cm = root2.querySelector('[data-propcmp]');
-    if (cm) cm.addEventListener('click', () => {
+    if (cm) cm.addEventListener('click', (e) => {
+      e.stopPropagation();
       PAGE_STATE.compare = PAGE_STATE.compare || [];
-      const id = cm.dataset.propcmp; const i = PAGE_STATE.compare.indexOf(id);
-      if (i >= 0) PAGE_STATE.compare.splice(i, 1);
-      else { if (PAGE_STATE.compare.length >= 3) return toast('Максимум 3 для сравнения'); PAGE_STATE.compare.push(id); }
-      render();
+      const id = cm.dataset.propcmp; const i = PAGE_STATE.compare.indexOf(id); let on;
+      if (i >= 0) { PAGE_STATE.compare.splice(i, 1); on = false; }
+      else { if (PAGE_STATE.compare.length >= 3) return toast('Максимум 3 для сравнения'); PAGE_STATE.compare.push(id); on = true; }
+      cm.classList.toggle('on', on); cm.innerHTML = ic(I.layers || I.grid, 2) + (on ? 'В сравнении ✓' : 'Сравнить');   /* мгновенный отклик без перерендера карты */
+      renderCompareBar(); toast(on ? 'Добавлено в сравнение' : 'Убрано', PAGE_STATE.compare.length + ' выбрано');
     });
   });
   if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
@@ -7712,20 +7714,23 @@ async function initPropMap(props) {
     el.appendChild(ctl);
     ctl.querySelectorAll('[data-metric]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.mapMetric = b.dataset.metric; render(); }));
   } catch (_) {}
-  /* ⭐ панель СРАВНЕНИЯ: выбранные с карты объекты (до 3) → сравнить бок-о-бок */
-  try {
-    const oldc = el.querySelector('.prcmp'); if (oldc) oldc.remove();
-    const cmp = (PAGE_STATE.compare || []).map(id => items.find(x => x.id === id) || (props.find(x => x.id === id))).filter(Boolean);
-    if (cmp.length) {
-      const bar = document.createElement('div'); bar.className = 'prcmp';
-      bar.innerHTML = `<div class="prcmp-items">${cmp.map(c => `<span class="prcmp-chip" title="${esc(c.name)}"><span class="prcmp-th" style="background-image:url('${esc((c.images || [])[0] || '')}')"></span>${esc(c.name.slice(0, 18))}<b data-cmpdel="${c.id}">×</b></span>`).join('')}</div><div class="prcmp-acts"><button class="btn btn-sm btn-accent" id="prCmpGo"${cmp.length < 2 ? ' disabled' : ''}>Сравнить ${cmp.length}</button><button class="btn btn-sm" id="prCmpClear">Очистить</button></div>`;
-      el.appendChild(bar);
-      bar.querySelectorAll('[data-cmpdel]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = (PAGE_STATE.compare || []).filter(x => x !== b.dataset.cmpdel); render(); }));
-      bar.querySelector('#prCmpClear').addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = []; render(); });
-      const go = bar.querySelector('#prCmpGo'); if (go) go.addEventListener('click', (e) => { e.stopPropagation(); openCompareModal(cmp); });
-    }
-  } catch (_) {}
+  window._prMapEl = el; window._prItems = items;   /* для панели сравнения без полного перерендера */
+  renderCompareBar();
   [120, 350, 800].forEach(t => setTimeout(() => { try { map.invalidateSize(); zoomFit(); } catch (_) {} }, t));
+}
+/* закреплённая панель сравнения на карте (обновляется без перерисовки карты) */
+function renderCompareBar() {
+  const el = window._prMapEl; if (!el) return;
+  const oldc = el.querySelector('.prcmp'); if (oldc) oldc.remove();
+  const src = window._prItems || [];
+  const cmp = (PAGE_STATE.compare || []).map(id => src.find(x => x.id === id)).filter(Boolean);
+  if (!cmp.length) return;
+  const bar = document.createElement('div'); bar.className = 'prcmp';
+  bar.innerHTML = `<div class="prcmp-cnt">${cmp.length} ${plural(cmp.length, 'объект', 'объекта', 'объектов')} для сравнения</div><div class="prcmp-items">${cmp.map(c => `<span class="prcmp-chip" title="${esc(c.name)}"><span class="prcmp-th" style="background-image:url('${esc((c.images || [])[0] || '')}')"></span>${esc(c.name.slice(0, 16))}<b data-cmpdel="${c.id}">×</b></span>`).join('')}</div><div class="prcmp-acts"><button class="btn btn-sm btn-accent" id="prCmpGo"${cmp.length < 2 ? ' disabled title="выберите минимум 2"' : ''}>${ic(I.layers || I.grid, 2)}Показать сравнительные моменты</button><button class="btn btn-sm" id="prCmpClear">Очистить</button></div>`;
+  el.appendChild(bar);
+  bar.querySelectorAll('[data-cmpdel]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = (PAGE_STATE.compare || []).filter(x => x !== b.dataset.cmpdel); renderCompareBar(); }));
+  bar.querySelector('#prCmpClear').addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = []; renderCompareBar(); });
+  const go = bar.querySelector('#prCmpGo'); if (go) go.addEventListener('click', (e) => { e.stopPropagation(); openCompareModal(cmp); });
 }
 /* модалка сравнения 2-3 объектов бок-о-бок (цена/ROI/площадь/спальни/сдача/район) */
 function openCompareModal(list) {
@@ -7744,8 +7749,18 @@ function openCompareModal(list) {
     <div class="cmp-h"></div>${list.map(p => `<div class="cmp-h cmp-card"><span class="cmp-th" style="background-image:url('${esc((p.images || [])[0] || '')}')"></span><b>${esc(p.name)}</b></div>`).join('')}
     ${rows.map(([lbl, fn]) => `<div class="cmp-l">${lbl}</div>${list.map(p => `<div class="cmp-v">${fn(p)}</div>`).join('')}`).join('')}
   </div>
-  <div class="cmp-ai"><button class="btn btn-accent" id="cmpAiGo" style="width:100%;justify-content:center">${ic(I.spark)}ИИ-анализ рынка (аналитик)</button><div id="cmpAiOut"></div></div>`;
+  <div class="cmp-ai"><button class="btn btn-accent" id="cmpAiGo" style="width:100%;justify-content:center">${ic(I.spark)}ИИ-анализ рынка (аналитик)</button><div id="cmpAiOut"></div>
+  <button class="btn" id="cmpShare" style="width:100%;justify-content:center;margin-top:8px">${ic(I.layers || I.doc)}Поделиться с клиентом (страница по ссылке)</button><div id="cmpShareOut"></div></div>`;
   const md = modal({ title: 'Сравнение объектов', sub: list.map(p => p.name).join(' · '), wide: true, body, actions: [{ label: 'Закрыть' }] });
+  $('#cmpShare', md).addEventListener('click', async (e) => {
+    const btn = e.target.closest('button'); btn.disabled = true; const out = $('#cmpShareOut', md);
+    out.innerHTML = motionLoader('Готовлю сводную страницу + ИИ-анализ…', 'web');
+    const r = await api.post('/properties/compare', { ids: list.map(p => p.id), lang: LANG, share: true }).catch(() => ({ error: 'сеть' }));
+    if (r.error || !r.shareUrl) { out.innerHTML = '<div style="color:var(--bad);font-size:13px;padding:8px 0">' + esc(r.error || 'не вышло') + '</div>'; btn.disabled = false; return; }
+    out.innerHTML = `<div class="cmp-share-ok"><span>Ссылка для клиента готова:</span><div class="cmp-share-row"><input readonly value="${esc(r.shareUrl)}" onclick="this.select()"><button class="btn btn-sm btn-accent" id="cmpCopy">Копировать</button><a class="btn btn-sm" href="${esc(r.shareUrl)}" target="_blank">Открыть</a></div></div>`;
+    $('#cmpCopy', md).addEventListener('click', () => { navigator.clipboard.writeText(r.shareUrl).then(() => toast('Скопировано', 'Отправьте клиенту', true)); });
+    btn.style.display = 'none';
+  });
   $('#cmpAiGo', md).addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); btn.disabled = true; const out = $('#cmpAiOut', md);
     out.innerHTML = motionLoader('Аналитик рынка сравнивает проекты…', 'web');
