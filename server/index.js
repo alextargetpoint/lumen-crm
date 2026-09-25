@@ -10971,6 +10971,8 @@ ${SCR}
       for (const pr of (db.properties || [])) {
         const u = (pr.units || []).filter(x => +x.price > 0);
         if (!u.length) continue;
+        /* сначала ЛЕЧИМ валюту каждого юнита (стале: THB-суммы с меткой USD → $3.6M вместо ฿3.6M) */
+        u.forEach(x => { const fc = fixMoneyCurrency(pr.geo, +x.price, x.currency); if (fc !== x.currency) { x.currency = fc; ch = true; } });
         const mn = u.reduce((a, b) => +b.price < +a.price ? b : a);
         const cur = (mn.currency || pr.currency || 'USD');
         if ((+mn.price && +pr.priceFrom !== +mn.price) || pr.currency !== cur) { pr.priceFrom = +mn.price; pr.currency = cur; ch = true; }
