@@ -14399,34 +14399,76 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
 
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 
-    /* ---------------- публичная СВОДНАЯ СТРАНИЦА СРАВНЕНИЯ для клиента (/cmp/:id) ---------------- */
+    /* ---------------- публичная СВОДНАЯ СТРАНИЦА СРАВНЕНИЯ для клиента (/cmp/:id) — премиум + языки ---------------- */
     if (req.method === 'GET' && (m = p.match(/^\/cmp\/(cmp_[a-z0-9]+)$/))) {
       const rec = (db.compares || []).find(x => x.id === m[1]);
       if (!rec) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<h2 style="font-family:sans-serif;text-align:center;margin-top:60px">Сравнение не найдено</h2>'); return; }
       const esc2 = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
       const sym = (c) => ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£', IDR: 'Rp ' }[String(c || '').toUpperCase()] || '$');
       const money = (v, c) => v ? sym(c) + Math.round(v).toLocaleString('ru-RU') : '—';
-      const it = rec.items || []; const a = rec.analysis || {};
-      const rows = [['Цена от', p2 => money(p2.priceFrom, p2.currency)], ['Район', p2 => esc2(p2.area) || '—'], ['Застройщик', p2 => esc2(p2.developer) || '—'], ['Тип', p2 => esc2(p2.type) || '—'], ['Доходность', p2 => esc2(p2.roi) || '—'], ['Прирост', p2 => esc2(p2.appreciation) || '—'], ['Сдача', p2 => esc2(p2.handover) || '—'], ['Юнитов', p2 => p2.units || '—'], ['Рынок', p2 => p2.market === 'secondary' ? 'Вторичка' : 'Первичка']];
+      const baseLang = rec.lang || 'ru';
+      const LANGS = [['ru', 'Рус'], ['en', 'Eng'], ['es', 'Esp'], ['de', 'Deu'], ['fr', 'Fra'], ['it', 'Ita'], ['ar', 'عرب'], ['zh', '中文'], ['th', 'ไทย']];
+      let curLang = (u.searchParams.get('lang') || '').toLowerCase().slice(0, 2) || baseLang;
+      let it = rec.items || [], a = rec.analysis || {};
+      /* перевод контента на выбранный язык (кэш в rec.langs[lang]) */
+      if (curLang !== baseLang && llm.available()) {
+        rec.langs = rec.langs || {};
+        if (!rec.langs[curLang]) {
+          try {
+            const an = await llm.compareProjects(rec.items, curLang);
+            let items2 = rec.items;
+            try { const src = {}; rec.items.forEach((x, i) => { if (x.description) src['d' + i] = x.description; }); if (Object.keys(src).length) { const tr = await llm.translateFields(src, curLang); items2 = rec.items.map((x, i) => Object.assign({}, x, { description: tr['d' + i] || x.description })); } } catch (_) {}
+            rec.langs[curLang] = { items: items2, analysis: an }; store.save();
+          } catch (_) { curLang = baseLang; }
+        }
+        if (rec.langs[curLang]) { it = rec.langs[curLang].items; a = rec.langs[curLang].analysis; }
+      }
+      /* UI-строки (ru/en; иначе en) */
+      const T = { ru: { title: 'Сравнение объектов', sub: 'Персональная подборка для вас', price: 'Цена от', area: 'Район', dev: 'Застройщик', type: 'Тип', roi: 'Доходность', apprec: 'Прирост', ho: 'Сдача', units: 'Юнитов', market: 'Рынок', prim: 'Первичка', sec: 'Вторичка', ai: 'Анализ аналитика рынка', invest: 'Инвестиции', living: 'Для жизни', budget: 'По бюджету', forwhom: '', best: 'лучшее', ft: 'Подготовлено для вас' }, en: { title: 'Property comparison', sub: 'A personal selection for you', price: 'Price from', area: 'Area', dev: 'Developer', type: 'Type', roi: 'Yield', apprec: 'Appreciation', ho: 'Handover', units: 'Units', market: 'Market', prim: 'Off-plan', sec: 'Resale', ai: 'Market analyst review', invest: 'Investment', living: 'Living', budget: 'Best value', best: 'best', ft: 'Prepared for you' } }[curLang === 'ru' ? 'ru' : 'en'];
+      /* лучшие значения */
+      const num = (s) => { const mm = String(s || '').match(/(\d+(?:[.,]\d+)?)/); return mm ? parseFloat(mm[1].replace(',', '.')) : null; };
+      const FX = await getFxRates().catch(() => ({ USD: 1 }));
+      const pxUsd = (x) => { const r = FX[String(x.currency || 'USD').toUpperCase()]; return r ? (+x.priceFrom || 0) / r : +x.priceFrom || 0; };
+      const rows = [[T.price, x => money(x.priceFrom, x.currency), pxUsd, 'min'], [T.area, x => esc2(x.area) || '—'], [T.dev, x => esc2(x.developer) || '—'], [T.type, x => esc2(x.type) || '—'], [T.roi, x => esc2(x.roi) || '—', x => num(x.roi), 'max'], [T.apprec || T.apprec, x => esc2(x.appreciation) || '—', x => num(x.appreciation), 'max'], [T.ho, x => esc2(x.handover) || '—'], [T.units, x => x.units || '—', x => +x.units || null, 'max'], [T.market, x => x.market === 'secondary' ? T.sec : T.prim]];
+      const bestI = (vf, dir) => { if (!vf || !dir || it.length < 2) return -1; const vals = it.map(vf); const has = vals.filter(v => v != null); if (has.length < 2) return -1; let bi = -1, bv = null; vals.forEach((v, i) => { if (v == null) return; if (bv == null || (dir === 'min' ? v < bv : v > bv)) { bv = v; bi = i; } }); return vals.filter(v => v === bv).length === it.length ? -1 : bi; };
       const verd = (a.verdicts || []).map(v => `<div class="v"><b>${esc2(v.name)}</b><div class="fw">${esc2(v.forWhom)}</div><ul class="pros">${(v.pros || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul><ul class="cons">${(v.cons || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul></div>`).join('');
-      const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Сравнение объектов · ${esc2(rec.agency)}</title>
-<style>*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f6f2ea;color:#23201c;line-height:1.5}
-.wrap{max-width:1000px;margin:0 auto;padding:28px 18px 60px}.hd{text-align:center;margin-bottom:24px}.hd .ag{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#a98748;font-weight:700}.hd h1{font-family:Georgia,serif;font-size:28px;margin:6px 0 2px}.hd .sub{color:#8a8378;font-size:13px}
-.grid{display:grid;grid-template-columns:130px repeat(${it.length},1fr);background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px -12px rgba(40,32,15,.2)}
-.grid>div{padding:11px 13px;border-bottom:1px solid #eee6d8;font-size:13px}.ch{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;border-bottom:2px solid #eee6d8!important}
-.th{width:100%;height:92px;border-radius:10px;background:#eee center/cover}.ch b{font-size:13px}.lbl{font-size:11.5px;color:#8a8378;font-weight:600}.val{font-weight:600}
-.ai{margin-top:26px;background:#fff;border-radius:16px;padding:22px;box-shadow:0 10px 40px -12px rgba(40,32,15,.2)}.ai h2{font-family:Georgia,serif;font-size:19px;margin:0 0 12px;display:flex;align-items:center;gap:8px}.ai .sum{background:#faf5ea;border-radius:10px;padding:13px 15px;font-size:14px;margin-bottom:14px}
-.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.v{border:1px solid #eee6d8;border-radius:12px;padding:13px}.v>b{font-size:14px}.fw{font-size:12px;color:#8a8378;margin:4px 0 8px}.pros,.cons{margin:0;padding-left:17px;font-size:12.5px}.pros li{color:#4a7a4f}.cons li{color:#b4553a}
-.best{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;padding:14px 16px;background:#f7efdd;border-radius:12px;font-size:13px}.note{margin-top:14px;font-style:italic;color:#7c756a;font-size:13px}
-.ft{text-align:center;color:#a89f90;font-size:12px;margin-top:28px}</style></head><body><div class="wrap">
-<div class="hd"><div class="ag">${esc2(rec.agency)}</div><h1>Сравнение объектов</h1><div class="sub">${it.map(x => esc2(x.name)).join(' · ')}</div></div>
-<div class="grid"><div class="ch"></div>${it.map(x => `<div class="ch"><span class="th" style="background-image:url('${esc2(x.image)}')"></span><b>${esc2(x.name)}</b></div>`).join('')}
-${rows.map(([l, fn]) => `<div class="lbl">${l}</div>${it.map(x => `<div class="val">${fn(x)}</div>`).join('')}`).join('')}</div>
-${(a.summary || verd) ? `<div class="ai"><h2>✦ Анализ аналитика рынка</h2>${a.summary ? `<div class="sum">${esc2(a.summary)}</div>` : ''}<div class="vgrid">${verd}</div>
-${a.bestFor ? `<div class="best"><span>💎 Инвестиции: <b>${esc2(a.bestFor.investment)}</b></span><span>🏡 Для жизни: <b>${esc2(a.bestFor.living)}</b></span><span>💰 По бюджету: <b>${esc2(a.bestFor.budget)}</b></span></div>` : ''}
+      const html = `<!doctype html><html lang="${curLang}"${curLang === 'ar' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc2(T.title)} · ${esc2(rec.agency)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}:root{--gold:#b8863c;--ink:#221f1a;--mut:#8a8378;--line:#ece2ce;--paper:#f7f3ea}
+body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+.top{position:sticky;top:0;z-index:5;background:rgba(247,243,234,.86);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1040px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);font-weight:800}
+.langs{display:flex;gap:2px;flex-wrap:wrap}.langs a{font-size:12px;font-weight:700;color:var(--mut);text-decoration:none;padding:5px 9px;border-radius:8px}.langs a.on{background:var(--gold);color:#fff}.langs a:hover{background:rgba(184,134,60,.12)}
+.wrap{max-width:1040px;margin:0 auto;padding:34px 20px 70px}
+.hero{text-align:center;margin-bottom:30px}.hero .k{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);font-weight:700}.hero h1{font-family:'Cormorant Garamond',Georgia,serif;font-size:40px;font-weight:700;margin:8px 0 4px;letter-spacing:.3px}.hero .sub{color:var(--mut);font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(${it.length},1fr);gap:14px;margin-bottom:14px}
+.card{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 14px 44px -16px rgba(40,32,15,.28);border:1px solid rgba(255,255,255,.6)}
+.card .ph{height:150px;background:#e9e2d3 center/cover;position:relative}.card .ph::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.35))}
+.card .nm{position:absolute;left:12px;right:12px;bottom:9px;z-index:2;color:#fff;font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;line-height:1.1;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.card .pr{padding:11px 14px;font-size:17px;font-weight:800;color:var(--gold)}
+.grid{display:grid;grid-template-columns:140px repeat(${it.length},1fr);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 14px 44px -16px rgba(40,32,15,.24)}
+.grid>div{padding:12px 14px;border-bottom:1px solid var(--line);font-size:13.5px}.grid>div:nth-last-child(-n+${it.length + 1}){border-bottom:0}
+.lbl{font-size:11.5px;color:var(--mut);font-weight:700}.val{font-weight:600}.win{background:color-mix(in srgb,#6d8a4f 13%,transparent);color:#3f6b2f;font-weight:800}.win .st{color:#cda34a;margin-left:5px}
+.ai{margin-top:28px;background:#fff;border-radius:18px;padding:26px;box-shadow:0 14px 44px -16px rgba(40,32,15,.24)}
+.ai h2{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:9px}.ai h2 .d{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#8a6320);display:grid;place-items:center;color:#fff;font-size:14px}
+.sum{background:linear-gradient(180deg,#fbf6ec,#f7efdd);border-radius:12px;padding:15px 17px;font-size:15px;margin-bottom:16px}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:13px}.v{border:1px solid var(--line);border-radius:14px;padding:15px;background:#fffdf9}.v>b{font-size:15px}.fw{font-size:12px;color:var(--mut);margin:4px 0 9px}.pros,.cons{margin:6px 0 0;padding-left:18px;font-size:13px}.pros li{color:#4a7a4f}.cons li{color:#b4553a}
+.best{display:flex;flex-wrap:wrap;gap:18px;margin-top:18px;padding:16px 18px;background:#f7efdd;border-radius:14px;font-size:13.5px}.best b{color:var(--ink)}
+.note{margin-top:16px;font-style:italic;color:#7c756a;font-size:13.5px;border-left:3px solid var(--gold);padding-left:12px}
+.ft{text-align:center;color:#a89f90;font-size:12px;margin-top:34px}
+@media(max-width:640px){.cards{grid-template-columns:1fr 1fr}.hero h1{font-size:30px}.grid{grid-template-columns:110px repeat(${it.length},1fr);font-size:12px}}</style></head><body>
+<div class="top"><div class="top-in"><div class="brand">${esc2(rec.agency)}</div><div class="langs">${LANGS.map(([c, n]) => `<a href="?lang=${c}" class="${c === curLang ? 'on' : ''}">${n}</a>`).join('')}</div></div></div>
+<div class="wrap">
+<div class="hero"><div class="k">${esc2(rec.agency)}</div><h1>${esc2(T.title)}</h1><div class="sub">${esc2(T.sub)}</div></div>
+<div class="cards">${it.map(x => `<div class="card"><div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}</div></div>`).join('')}</div>
+<div class="grid"><div class="lbl"></div>${it.map(() => '<div class="lbl"></div>').join('')}
+${rows.map(([l, fn, vf, dir]) => { const bi = bestI(vf, dir); return `<div class="lbl">${esc2(l)}</div>${it.map((x, i) => `<div class="val${i === bi ? ' win' : ''}">${fn(x)}${i === bi ? `<span class="st" title="${esc2(T.best)}">★</span>` : ''}</div>`).join('')}`; }).join('')}</div>
+${(a.summary || verd) ? `<div class="ai"><h2><span class="d">✦</span>${esc2(T.ai)}</h2>${a.summary ? `<div class="sum">${esc2(a.summary)}</div>` : ''}<div class="vgrid">${verd}</div>
+${a.bestFor ? `<div class="best"><span>💎 ${esc2(T.invest)}: <b>${esc2(a.bestFor.investment)}</b></span><span>🏡 ${esc2(T.living)}: <b>${esc2(a.bestFor.living)}</b></span><span>💰 ${esc2(T.budget)}: <b>${esc2(a.bestFor.budget)}</b></span></div>` : ''}
 ${a.analystNote ? `<div class="note">${esc2(a.analystNote)}</div>` : ''}</div>` : ''}
-<div class="ft">Подготовлено для вас · ${esc2(rec.agency)}</div></div></body></html>`;
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+<div class="ft">${esc2(T.ft)} · ${esc2(rec.agency)}</div></div></body></html>`;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=120' });
       res.end(html); return;
     }
     /* ---------------- медиа объектов из ПЕРСИСТЕНТНОГО хранилища (переживают деплой) ---------------- */
