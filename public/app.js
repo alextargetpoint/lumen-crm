@@ -7858,7 +7858,7 @@ function openCompareModal(list) {
     out.innerHTML = motionLoader('Готовлю сводную страницу + ИИ-анализ…', 'web');
     const r = await api.post('/properties/compare', { ids: list.map(p => p.id), lang: LANG, share: true }).catch(() => ({ error: 'сеть' }));
     if (r.error || !r.shareUrl) { out.innerHTML = '<div style="color:var(--bad);font-size:13px;padding:8px 0">' + esc(r.error || 'не вышло') + '</div>'; btn.disabled = false; return; }
-    out.innerHTML = `<div class="cmp-share-ok"><span>Ссылка для клиента готова:</span><div class="cmp-share-row"><input readonly value="${esc(r.shareUrl)}" onclick="this.select()"><button class="btn btn-sm btn-accent" id="cmpCopy">Копировать</button><a class="btn btn-sm" href="${esc(r.shareUrl)}" target="_blank">Открыть</a></div></div>`;
+    out.innerHTML = `<div class="cmp-share-ok"><span>Ссылка для клиента готова:</span><div class="cmp-share-row"><input readonly value="${esc(r.shareUrl)}" onclick="this.select()"><button class="btn btn-sm btn-accent" id="cmpCopy">Копировать</button><a class="btn btn-sm" href="${esc(r.shareUrl)}" target="_blank">Открыть</a></div>${r.editUrl ? `<div style="margin-top:7px;font-size:11.5px"><a class="link" href="${esc(r.editUrl)}" target="_blank">✎ Редактировать текст для клиента (рерайт, правки — только вы)</a></div>` : ''}</div>`;
     $('#cmpCopy', md).addEventListener('click', () => { navigator.clipboard.writeText(r.shareUrl).then(() => toast('Скопировано', 'Отправьте клиенту', true)); });
     btn.style.display = 'none';
   });
