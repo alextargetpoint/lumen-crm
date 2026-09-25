@@ -7644,7 +7644,7 @@ function motionLoader(label, variant) {
 }
 /* язык карточки объекта (для просмотра/шеринга); по умолчанию = язык интерфейса */
 let CARD_LANG = (typeof LANG !== 'undefined' ? LANG : 'ru');
-const CARD_LANGS = [['ru', 'Рус'], ['en', 'Eng'], ['es', 'Esp'], ['de', 'Deu'], ['fr', 'Fra'], ['it', 'Ita'], ['ar', 'عرب'], ['zh', '中文'], ['th', 'ไทย']];
+const CARD_LANGS = [['ru', 'Русский', '🇷🇺'], ['en', 'English', '🇬🇧'], ['es', 'Español', '🇪🇸'], ['de', 'Deutsch', '🇩🇪'], ['fr', 'Français', '🇫🇷'], ['it', 'Italiano', '🇮🇹'], ['ar', 'العربية', '🇦🇪'], ['zh', '中文', '🇨🇳'], ['th', 'ไทย', '🇹🇭']];
 /* перевод поля карточки: pr.i18n[CARD_LANG].field с фолбэком на оригинал */
 function trF(pr, f) { const t = pr && pr.i18n && pr.i18n[CARD_LANG]; const v = t && t[f]; return (v != null && (Array.isArray(v) ? v.length : String(v).trim())) ? v : (pr ? pr[f] : ''); }
 /* Юниты минималистично: группируем по типу/планировке → сводные карточки (площадь/цена/наличие),
@@ -7915,8 +7915,8 @@ PAGES.properties = async (root) => {
               <span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>
               <span class="tb-spacer"></span>
               <div class="pd2-langdd" id="pdLangDD">
-                <button class="btn btn-sm pd2-ghost" id="pdLangBtn" type="button" title="Язык карточки (перевод для просмотра и шеринга)">${ic(I.globe || I.eye, 2)}${(CARD_LANGS.find(l => l[0] === CARD_LANG) || ['', 'Рус'])[1]}<span class="pd2-langcv">▾</span></button>
-                <div class="pd2-langmenu" id="pdLangMenu" hidden>${CARD_LANGS.map(([c, n]) => `<button type="button" class="pd2-langopt ${c === CARD_LANG ? 'on' : ''}" data-lang="${c}">${n}</button>`).join('')}</div>
+                <button class="btn btn-sm pd2-ghost" id="pdLangBtn" type="button" title="Язык карточки (перевод для просмотра и шеринга)"><span class="pd2-langflag">${(CARD_LANGS.find(l => l[0] === CARD_LANG) || ['', 'Русский', '🌐'])[2]}</span>${(CARD_LANGS.find(l => l[0] === CARD_LANG) || ['', 'Русский'])[1]}<span class="pd2-langcv">▾</span></button>
+                <div class="pd2-langmenu" id="pdLangMenu" hidden><div class="pd2-langmenu-h">Язык карточки</div>${CARD_LANGS.map(([c, n, fl]) => `<button type="button" class="pd2-langopt ${c === CARD_LANG ? 'on' : ''}" data-lang="${c}"><span class="pd2-langflag">${fl}</span>${n}${c === CARD_LANG ? '<span class="pd2-langok">✓</span>' : ''}</button>`).join('')}</div>
               </div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
@@ -8128,8 +8128,9 @@ PAGES.properties = async (root) => {
     $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
     $('#pdCurate')?.addEventListener('click', async (e) => {
       const btn = e.target.closest('button'); btn.disabled = true; btn.innerHTML = '<span class="enr-spin"></span>ИИ смотрит фото…';
-      const r = await api.post('/properties/' + pr.id + '/curate-photos', {}).catch(() => ({ error: 'сеть' }));
+      const r = await api.post('/properties/' + pr.id + '/curate-photos', {}).catch(e => ({ error: e.message || 'сеть' }));   /* показываем РЕАЛЬНУЮ ошибку сервера */
       if (r.error) { btn.disabled = false; btn.innerHTML = 'Отобрать и подписать'; return toast('Не вышло', r.error); }
+      if (r.noop) { btn.disabled = false; btn.innerHTML = 'Отобрать и подписать'; return toast('Оставил как есть', 'ИИ не уверенно распознал — фото не тронул'); }
       toast('Фото отобраны ИИ', `оставлено ${r.kept}${r.plans ? ' · планировок ' + r.plans : ''}${r.removed ? ' · убрано ' + r.removed : ''}`, true);
       if (r.property) Object.assign(pr, r.property); render();
     });
