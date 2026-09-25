@@ -11201,7 +11201,9 @@ ${SCR}
       /* предлагаем ПРИОРИТЕТНО пустые поля карточки (гэпы), потом остальные найденные */
       const isEmpty = { developer: !pr.developer || pr.developer === '—', handover: !pr.handover, roi: !pr.roi, appreciation: !pr.appreciation, priceFrom: !pr.priceFrom, constructionProgress: !pr.constructionProgress, description: !pr.description, districtBlurb: !(pr.district && pr.district.blurb), timings: !(pr.district && pr.district.times && pr.district.times.length), rentalArgs: !(pr.whyRent && pr.whyRent.length), amenities: !(pr.amenities && pr.amenities.length), investmentHighlights: !(pr.investmentHighlights && pr.investmentHighlights.length), paymentPlan: !pr.payment || pr.payment === '—', hookTitle: !pr.hookTitle };
       const proposed = {}; const gapFields = [];
-      for (const k of ['handover', 'roi', 'appreciation', 'priceFrom', 'constructionProgress', 'districtBlurb', 'timings', 'rentalArgs', 'amenities', 'investmentHighlights', 'paymentPlan', 'description', 'developer', 'hookTitle']) {
+      /* ⚠️ priceFrom НЕ берём из enrich: ИИ находит в вебе суммы без валюты (рупии/бат) → мислейбл валюты →
+         абсурдные цены. Цена только из каталога/PDF/юнитов/сверки (надёжные источники). */
+      for (const k of ['handover', 'roi', 'appreciation', 'constructionProgress', 'districtBlurb', 'timings', 'rentalArgs', 'amenities', 'investmentHighlights', 'paymentPlan', 'description', 'developer', 'hookTitle']) {
         let v = ext[k]; if (v == null || (Array.isArray(v) && !v.length) || (!Array.isArray(v) && !String(v).trim()) || (k === 'priceFrom' && !+v)) continue;
         proposed[k] = k === 'priceFrom' ? +v : (Array.isArray(v) ? v.slice(0, 8).map(String) : String(v).slice(0, 600));
         if (isEmpty[k]) gapFields.push(k);
@@ -11216,10 +11218,12 @@ ${SCR}
       /* скачиваем свежие фото продающего качества (встроенный хи-рес фильтр), добираем карточку до ~16 */
       let photosAdded = 0, videosAdded = 0, unitsAdded = 0;
       if (b.media !== false && webImgs.length) {
-        const need = Math.max(6, 16 - (pr.images || []).length);
-        const dl = await Promise.all(webImgs.slice(0, 18).map(u => downloadImageToAsset(u).catch(() => null)));
-        const good = dl.filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
-        if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)]; photosAdded = good.length; }
+        const need = Math.max(0, 15 - (pr.images || []).length);   /* лимит 15 фото на объект (60 не нужно) */
+        if (need > 0) {
+          const dl = await Promise.all(webImgs.slice(0, 40).map(u => downloadImageToAsset(u).catch(() => null)));   /* пробуем БОЛЬШЕ кандидатов (многие low-res/хотлинк отсеются) */
+          const good = dl.filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
+          if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); photosAdded = good.length; }
+        }
       }
       if (b.media !== false && webVids.length) { pr.videos = [...new Set([...(pr.videos || []), ...webVids])].slice(0, 12); videosAdded = webVids.length; }
       /* юниты из открытых источников — ТОЛЬКО добавляем новые (из веба НЕ помечаем проданными: выдача неполна) */
@@ -11232,11 +11236,9 @@ ${SCR}
           if (fresh.length) { pr.units = [...(pr.units || []), ...fresh.map(u => ({ unitNo: String(u.unitNo || '').slice(0, 20), type: String(u.type || '').slice(0, 20), beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40), status: 'available', source: 'web' }))].slice(0, 400); unitsAdded = fresh.length; pr.unitsUpdatedAt = Date.now(); }
         } catch (_) {}
       }
-      /* синхрон валюты/цены: enrich мог принести цену в др. валюте → чиним и делаем headable «от» = мин. юнит */
+      /* синхрон валюты юнитов (надёжно). priceFrom из enrich НЕ трогаем — только если добавили юниты с ценой. */
       (pr.units || []).forEach(u => { if (u.price) u.currency = fixMoneyCurrency(pr.geo, u.price, u.currency || pr.currency); });
-      const _pu = (pr.units || []).filter(u => u.price > 0);
-      if (_pu.length) { const mn = _pu.reduce((a, b) => b.price < a.price ? b : a); pr.priceFrom = mn.price; pr.currency = mn.currency || fixMoneyCurrency(pr.geo, mn.price, pr.currency); }
-      else if (pr.priceFrom) { pr.currency = fixMoneyCurrency(pr.geo, pr.priceFrom, pr.currency); }
+      if (unitsAdded) { const _pu = (pr.units || []).filter(u => u.price > 0); if (_pu.length) { const mn = _pu.reduce((a, b) => b.price < a.price ? b : a); pr.priceFrom = mn.price; pr.currency = mn.currency || pr.currency; } }
       const parts = [...applied]; if (photosAdded) parts.push(photosAdded + ' фото'); if (videosAdded) parts.push(videosAdded + ' видео'); if (unitsAdded) parts.push(unitsAdded + ' юнитов');
       pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + (parts.length ? parts.join(', ') : '—'), sources: (sr.sources || []).slice(0, 4) });
       if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now();
