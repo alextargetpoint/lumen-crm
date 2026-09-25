@@ -7631,13 +7631,28 @@ async function initPropMap(props) {
   try { const geos = [...new Set(pts.map(p => p.geo).filter(Boolean))]; geos.forEach(g => drawZones(map, L, g)); } catch (_) {}
   if (!pts.length) { if (status) status.innerHTML = 'На карте пусто — <b>импортируйте объекты</b> (кнопка «Импорт» → «По ссылке»), и они появятся тут с превью.'; }
   const bounds = []; window._prMarkers = {};
+  /* ⭐ тепловая раскраска пинов по метрике (цена/ROI/наличие) — PAGE_STATE.mapMetric */
+  const METRIC = PAGE_STATE.mapMetric || 'none';
+  const priceBase = (p) => { const v = convTo(p.priceFrom || 0, p.currency, FX.base); return v || p.priceFrom || 0; };
+  const roiNum = (p) => { const mm = String(p.roi || '').match(/(\d+(?:[.,]\d+)?)/); return mm ? parseFloat(mm[1].replace(',', '.')) : null; };
+  const availOf2 = (p) => { const u = p.units || []; if (!u.length) return null; return u.some(x => x.status !== 'sold'); };
+  const _pr = pts.map(priceBase).filter(v => v > 0); const pMin = _pr.length ? Math.min(..._pr) : 0, pMax = _pr.length ? Math.max(..._pr) : 1;
+  const _ro = pts.map(roiNum).filter(v => v != null); const rMin = _ro.length ? Math.min(..._ro) : 0, rMax = _ro.length ? Math.max(..._ro) : 1;
+  const lerpColor = (t) => { t = Math.max(0, Math.min(1, t)); const s = [[76, 138, 79], [224, 189, 80], [180, 80, 28]]; const sg = t < .5 ? 0 : 1, lt = t < .5 ? t / .5 : (t - .5) / .5; const a = s[sg], b = s[sg + 1]; return `rgb(${Math.round(a[0] + (b[0] - a[0]) * lt)},${Math.round(a[1] + (b[1] - a[1]) * lt)},${Math.round(a[2] + (b[2] - a[2]) * lt)})`; };
+  const pinColor = (p) => {
+    if (METRIC === 'price' && p.priceFrom) return pMax > pMin ? lerpColor((priceBase(p) - pMin) / (pMax - pMin)) : null;
+    if (METRIC === 'roi') { const v = roiNum(p); if (v != null) return rMax > rMin ? lerpColor(1 - (v - rMin) / (rMax - rMin)) : null; }
+    if (METRIC === 'avail') { const a = availOf2(p); if (a === false) return '#9a9488'; if (a === true) return '#6d8a4f'; }
+    return null;
+  };
   /* hover-intent: попап открывается по наведению и закрывается, когда курсор ушёл с пина
      (с задержкой — чтобы успеть перевести курсор В попап к кнопкам, не закрыв его) */
   let _popT = null, _openMk = null;
   const clearPopT = () => { if (_popT) { clearTimeout(_popT); _popT = null; } };
   const schedClose = () => { clearPopT(); _popT = setTimeout(() => { try { if (_openMk) _openMk.closePopup(); Object.values(window._prMarkers || {}).forEach(o => { try { o.mk.closePopup(); } catch (_) {} }); } catch (_) {} }, 280); };   /* mk.closePopup() закрывает (map.closePopup() — НЕТ, Leaflet-квирк); + фолбэк закрыть все */
   pts.forEach(p => {
-    const icon = L.divIcon({ className: 'prpin', html: '<span class="prpin-dot"></span><span class="prpin-pulse"></span>', iconSize: [34, 34], iconAnchor: [17, 17] });
+    const _col = pinColor(p);
+    const icon = L.divIcon({ className: 'prpin' + (_col ? ' prpin-metric' : ''), html: `<span class="prpin-dot"${_col ? ` style="background:${_col}"` : ''}></span><span class="prpin-pulse"${_col ? ` style="background:${_col}"` : ''}></span>`, iconSize: [34, 34], iconAnchor: [17, 17] });
     const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
     window._prMarkers[p.id] = { mk, lat: p.lat, lng: p.lng };
     const img = (p.images && p.images[0]) || '';
@@ -7681,6 +7696,18 @@ async function initPropMap(props) {
     });
   });
   if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
+  /* ⭐ контрол тепловой карты: раскрасить пины по метрике + легенда */
+  try {
+    const old = el.querySelector('.prmetric'); if (old) old.remove();
+    const METS = [['none', 'Обычная'], ['avail', 'Наличие'], ['roi', 'Доходность'], ['price', 'Цена']];
+    const ctl = document.createElement('div'); ctl.className = 'prmetric';
+    const legend = METRIC === 'price' ? `<div class="prmetric-lg"><span>дешевле</span><i class="prmetric-grad"></i><span>дороже</span></div>`
+      : METRIC === 'roi' ? `<div class="prmetric-lg"><span>ниже ROI</span><i class="prmetric-grad rev"></i><span>выше ROI</span></div>`
+      : METRIC === 'avail' ? `<div class="prmetric-lg"><span class="prmetric-sw" style="background:#6d8a4f"></span>в наличии <span class="prmetric-sw" style="background:#9a9488;margin-left:8px"></span>распродан</div>` : '';
+    ctl.innerHTML = `<div class="prmetric-btns">${METS.map(([k, n]) => `<button class="prmetric-b ${METRIC === k ? 'on' : ''}" data-metric="${k}">${n}</button>`).join('')}</div>${legend}`;
+    el.appendChild(ctl);
+    ctl.querySelectorAll('[data-metric]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.mapMetric = b.dataset.metric; render(); }));
+  } catch (_) {}
   [120, 350, 800].forEach(t => setTimeout(() => { try { map.invalidateSize(); zoomFit(); } catch (_) {} }, t));
 }
 
