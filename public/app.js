@@ -7849,10 +7849,18 @@ function openCompareModal(list) {
   const body = `<div class="cmp-tbl" style="grid-template-columns:130px repeat(${list.length},1fr)">
     <div class="cmp-h"></div>${list.map(p => `<div class="cmp-h cmp-card"><span class="cmp-th" style="background-image:url('${esc((p.images || [])[0] || '')}')"></span><b>${esc(p.name)}</b></div>`).join('')}
     ${rows.map(([lbl, fn, vf, dir]) => { const bi = bestIdx(vf, dir); return `<div class="cmp-l">${lbl}</div>${list.map((p, i) => `<div class="cmp-v${i === bi ? ' cmp-win' : ''}">${fn(p)}${i === bi ? '<span class="cmp-star" title="лучшее">★</span>' : ''}</div>`).join('')}`; }).join('')}
-  </div>
-  <div class="cmp-ai"><button class="btn btn-accent" id="cmpAiGo" style="width:100%;justify-content:center">${ic(I.spark)}ИИ-анализ рынка (аналитик)</button><div id="cmpAiOut"></div>
+  </div>`;
+  const incomplete = list.some(p => p.stub || !p.roi || !p.handover || !p.developer || p.developer === '—');
+  const body2 = body + `<div class="cmp-ai">${incomplete ? `<button class="btn" id="cmpEnrich" style="width:100%;justify-content:center;margin-bottom:8px">${ic(I.spark)}Дополнить недостающее из сети (ИИ)</button><div id="cmpEnrOut"></div>` : ''}<button class="btn btn-accent" id="cmpAiGo" style="width:100%;justify-content:center">${ic(I.spark)}ИИ-анализ рынка (аналитик)</button><div id="cmpAiOut"></div>
   <button class="btn" id="cmpShare" style="width:100%;justify-content:center;margin-top:8px">${ic(I.layers || I.doc)}Поделиться с клиентом (страница по ссылке)</button><div id="cmpShareOut"></div></div>`;
-  const md = modal({ title: 'Сравнение объектов', sub: list.map(p => p.name).join(' · '), wide: true, body, actions: [{ label: 'Закрыть' }] });
+  const md = modal({ title: 'Сравнение объектов', sub: list.map(p => p.name).join(' · '), wide: true, body: body2, actions: [{ label: 'Закрыть' }] });
+  $('#cmpEnrich', md)?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button'); btn.disabled = true; const out = $('#cmpEnrOut', md);
+    out.innerHTML = motionLoader('Дополняю недостающее из сети…', 'web');
+    const r = await api.post('/properties/compare/enrich', { ids: list.map(p => p.id) }).catch(er => ({ error: er.message || 'сеть' }));
+    if (r.error || !r.items) { out.innerHTML = '<div style="color:var(--bad);font-size:12px;padding:6px 0">' + esc(r.error || 'не вышло') + '</div>'; btn.disabled = false; return; }
+    closeModal(); openCompareModal(r.items); toast('Данные дополнены', 'из открытых источников', true);
+  });
   $('#cmpShare', md).addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); btn.disabled = true; const out = $('#cmpShareOut', md);
     out.innerHTML = motionLoader('Готовлю сводную страницу + ИИ-анализ…', 'web');

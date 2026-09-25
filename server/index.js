@@ -11339,6 +11339,34 @@ ${SCR}
       }
       return json(res, 200, { ok: true, analysis: an });
     }
+    /* ⭐ ДОПОЛНИТЬ недостающие поля объектов перед сравнением (стабы/пустые roi/handover/developer) —
+       заполняем ПУСТОЕ из сети (не затираем существующее). Возвращаем обновлённые объекты. */
+    if (p === '/api/properties/compare/enrich' && req.method === 'POST') {
+      const b = await readBody(req).catch(() => ({}));
+      const ids = (Array.isArray(b.ids) ? b.ids : []).slice(0, 3);
+      const items = ids.map(id => (db.properties || []).find(x => x.id === id)).filter(Boolean);
+      if (!items.length) return json(res, 400, { error: 'нет объектов' });
+      if (!llm.available() || !process.env.RENDER_API_KEY) return json(res, 400, { error: 'нужен ИИ+RENDER_API_KEY' });
+      await Promise.all(items.map(async (pr) => {
+        const incomplete = pr.stub || (!pr.roi || !pr.handover || !pr.appreciation || !pr.developer || pr.developer === '—');
+        if (!incomplete) return;
+        try {
+          const q = [pr.name, pr.developer && pr.developer !== '—' ? pr.developer : '', pr.area, 'недвижимость проект'].filter(Boolean).join(' ');
+          const sr = await webSearch(q, 5);
+          if (!sr || !sr.text) return;
+          const ext = await llm.enrichProject(sr.text, pr.name, 'срок сдачи, доходность, прирост стоимости, застройщик');
+          if (!ext) return;
+          if (!pr.handover && ext.handover) pr.handover = String(ext.handover).slice(0, 40);
+          if (!pr.roi && ext.roi) pr.roi = String(ext.roi).slice(0, 40);
+          if (!pr.appreciation && ext.appreciation) pr.appreciation = String(ext.appreciation).slice(0, 40);
+          if ((!pr.developer || pr.developer === '—') && ext.developer) pr.developer = String(ext.developer).slice(0, 80);
+          if ((!pr.description) && ext.description) pr.description = String(ext.description).slice(0, 900);
+          pr.enrichedAt = Date.now();
+        } catch (_) {}
+      }));
+      store.save();
+      return json(res, 200, { ok: true, items });
+    }
     /* ⭐ ПРАВКА/РЕРАЙТ текста сравнения брокером (со страницы /cmp?edit=токен, авторизация ?t=токен) */
     if ((m = p.match(/^\/api\/properties\/compare\/(cmp_[a-z0-9]+)\/(edit|rewrite)$/)) && req.method === 'POST') {
       const rec = (db.compares || []).find(x => x.id === m[1]); if (!rec) return json(res, 404, { error: 'not found' });
