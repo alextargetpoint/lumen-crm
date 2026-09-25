@@ -958,7 +958,7 @@ function publicTenantFor(p) {
   let m;
   if ((m = p.match(/^\/(?:p|c)\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/collections\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().collections || []).some(c => c.id === id)); }
   if ((m = p.match(/^\/mp\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/mediaplans\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().mediaplans || []).some(x => x.id === id)); }
-  if ((m = p.match(/^\/cmp\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().compares || []).some(x => x.id === id)); }   /* публичная страница сравнения для клиента */
+  if ((m = p.match(/^\/cmp\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/properties\/compare\/([a-zA-Z0-9_]+)\//))) { const id = m[1]; return findTenant(() => (store.get().compares || []).some(x => x.id === id)); }   /* публичная страница сравнения + правка/рерайт по токену */
   if ((m = p.match(/^\/learn\/([a-zA-Z0-9]+)/))) { const tok = m[1]; return findTenant(() => { const L = store.get().settings.learn; return !!(L && L.shareToken === tok); }); }
   if ((m = p.match(/^\/cal\/([a-zA-Z0-9_]+)\.ics/))) { const id = m[1]; return findTenant(() => (store.get().collections || []).some(c => c.id === id) || (store.get().meetings || []).some(x => x.id === id)); }
   /* внешняя страница встречи /m/:id (+ /confirm, /reschedule, /ics) — резолвим тенанта-владельца встречи */
