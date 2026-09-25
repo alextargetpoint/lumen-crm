@@ -7639,10 +7639,11 @@ async function initPropMap(props) {
   const _pr = pts.map(priceBase).filter(v => v > 0); const pMin = _pr.length ? Math.min(..._pr) : 0, pMax = _pr.length ? Math.max(..._pr) : 1;
   const _ro = pts.map(roiNum).filter(v => v != null); const rMin = _ro.length ? Math.min(..._ro) : 0, rMax = _ro.length ? Math.max(..._ro) : 1;
   const lerpColor = (t) => { t = Math.max(0, Math.min(1, t)); const s = [[76, 138, 79], [224, 189, 80], [180, 80, 28]]; const sg = t < .5 ? 0 : 1, lt = t < .5 ? t / .5 : (t - .5) / .5; const a = s[sg], b = s[sg + 1]; return `rgb(${Math.round(a[0] + (b[0] - a[0]) * lt)},${Math.round(a[1] + (b[1] - a[1]) * lt)},${Math.round(a[2] + (b[2] - a[2]) * lt)})`; };
+  const NODATA = '#c9c3b6';   /* нет данных метрики → нейтрально-серый (видно, что переключилось) */
   const pinColor = (p) => {
-    if (METRIC === 'price' && p.priceFrom) return pMax > pMin ? lerpColor((priceBase(p) - pMin) / (pMax - pMin)) : null;
-    if (METRIC === 'roi') { const v = roiNum(p); if (v != null) return rMax > rMin ? lerpColor(1 - (v - rMin) / (rMax - rMin)) : null; }
-    if (METRIC === 'avail') { const a = availOf2(p); if (a === false) return '#9a9488'; if (a === true) return '#6d8a4f'; }
+    if (METRIC === 'price') return p.priceFrom ? (pMax > pMin ? lerpColor((priceBase(p) - pMin) / (pMax - pMin)) : lerpColor(.5)) : NODATA;
+    if (METRIC === 'roi') { const v = roiNum(p); return v != null ? (rMax > rMin ? lerpColor(1 - (v - rMin) / (rMax - rMin)) : lerpColor(0)) : NODATA; }
+    if (METRIC === 'avail') { const a = availOf2(p); if (a === false) return '#9a9488'; if (a === true) return '#6d8a4f'; return NODATA; }
     return null;
   };
   /* hover-intent: попап открывается по наведению и закрывается, когда курсор ушёл с пина
@@ -7690,9 +7691,10 @@ async function initPropMap(props) {
     const b = root2.querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propFrom = 'map'; render(); });   /* propMap оставляем true → «Назад» вернёт на карту */
     const h = root2.querySelector('[data-prophydrate]');
     if (h) h.addEventListener('click', async () => {
-      h.disabled = true; h.textContent = 'Тяну карточку…';
-      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true, lang: LANG }); if (r.error) { toast('Не вышло', r.error); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
-      catch (err) { toast('Ошибка', err.message); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; }
+      clearPopT(); const body = root2.querySelector('.prpop-b'); const bak = body ? body.innerHTML : '';
+      if (body) body.innerHTML = motionLoader('ИИ собирает карточку — цена, юниты, фото…', 'card');   /* индикатор прямо в попапе */
+      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true, lang: LANG }); if (r.error) { toast('Не вышло', r.error); if (body) body.innerHTML = bak; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
+      catch (err) { toast('Ошибка', err.message); if (body) body.innerHTML = bak; }
     });
   });
   if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
@@ -7701,9 +7703,10 @@ async function initPropMap(props) {
     const old = el.querySelector('.prmetric'); if (old) old.remove();
     const METS = [['none', 'Обычная'], ['avail', 'Наличие'], ['roi', 'Доходность'], ['price', 'Цена']];
     const ctl = document.createElement('div'); ctl.className = 'prmetric';
-    const legend = METRIC === 'price' ? `<div class="prmetric-lg"><span>дешевле</span><i class="prmetric-grad"></i><span>дороже</span></div>`
-      : METRIC === 'roi' ? `<div class="prmetric-lg"><span>ниже ROI</span><i class="prmetric-grad rev"></i><span>выше ROI</span></div>`
-      : METRIC === 'avail' ? `<div class="prmetric-lg"><span class="prmetric-sw" style="background:#6d8a4f"></span>в наличии <span class="prmetric-sw" style="background:#9a9488;margin-left:8px"></span>распродан</div>` : '';
+    const nd = (METRIC !== 'none' && pts.some(p => pinColor(p) === '#c9c3b6')) ? '<span class="prmetric-nd"><span class="prmetric-sw" style="background:#c9c3b6"></span>нет данных</span>' : '';
+    const legend = METRIC === 'price' ? `<div class="prmetric-lg"><span>дешевле</span><i class="prmetric-grad"></i><span>дороже</span>${nd}</div>`
+      : METRIC === 'roi' ? `<div class="prmetric-lg"><span>ниже ROI</span><i class="prmetric-grad rev"></i><span>выше ROI</span>${nd}</div>`
+      : METRIC === 'avail' ? `<div class="prmetric-lg"><span class="prmetric-sw" style="background:#6d8a4f"></span>в наличии <span class="prmetric-sw" style="background:#9a9488;margin-left:8px"></span>распродан${nd}</div>` : '';
     ctl.innerHTML = `<div class="prmetric-btns">${METS.map(([k, n]) => `<button class="prmetric-b ${METRIC === k ? 'on' : ''}" data-metric="${k}">${n}</button>`).join('')}</div>${legend}`;
     el.appendChild(ctl);
     ctl.querySelectorAll('[data-metric]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.mapMetric = b.dataset.metric; render(); }));

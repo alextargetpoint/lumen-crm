@@ -345,6 +345,7 @@ input[type=number] { -moz-appearance: textfield; }
 .prmetric-grad { flex: 1; height: 7px; border-radius: 4px; background: linear-gradient(90deg, #4c8a4f, #e0bd50, #b4501c); min-width: 60px; }
 .prmetric-grad.rev { background: linear-gradient(90deg, #b4501c, #e0bd50, #4c8a4f); }
 .prmetric-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; }
+.prmetric-nd { margin-left: 8px; display: inline-flex; align-items: center; gap: 3px; }
 :root[data-night] .prmetric { background: rgba(20,17,12,.92); border-color: rgba(255,255,255,.1); }
 :root[data-night] .prmetric-b { color: #b8ad99; }
 

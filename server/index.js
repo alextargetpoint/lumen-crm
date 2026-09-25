@@ -112,6 +112,10 @@ const PUBLIC = path.join(__dirname, '..', 'public');
    а DATA_DIR лежит на volume (там же БД тенантов, она переживает деплои). Иначе видео 404 после редеплоя. */
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const CREATIVES_DIR = path.join(DATA_DIR, 'creatives');
+/* ПЕРСИСТЕНТНЫЕ медиа объектов (фото/рендеры/планировки из импорта-обогащения): на volume, переживают деплой.
+   Раздаются через /media/* (см. роут ниже). Иначе фото карточек 404 после редеплоя Railway. */
+const MEDIA_DIR = path.join(DATA_DIR, 'media');
+function saveMedia(sub, filename, buf) { const dir = path.join(MEDIA_DIR, sub); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, filename), buf); return '/media/' + sub + '/' + filename; }
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon',
   /* аудио/видео/документы — нужны для медиа-моста WhatsApp⇄Telegram (голосовые .oga и пр. Cloud API качает по ссылке и проверяет Content-Type) */
   '.oga': 'audio/ogg', '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.amr': 'audio/amr', '.wav': 'audio/wav',
@@ -3858,10 +3862,8 @@ async function downloadImageToAsset(url) {
     if (dim && Math.min(dim.w, dim.h) < 420) return null;           /* узкие/мелкие миниатюры (пикселят на слайде) */
     if (dim && buf.length < (dim.w * dim.h) * 0.12) return null;    /* байт/пиксель мало = сильно пережато/апскейл → каша */
     const ext = /png/i.test(ct) ? 'png' : /webp/i.test(ct) ? 'webp' : /avif/i.test(ct) ? 'avif' : 'jpg';
-    fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
-    const fn = `car/src-${crypto.randomBytes(5).toString('hex')}.${ext}`;
-    fs.writeFileSync(path.join(PUBLIC, 'assets', fn), buf);
-    return { url: '/assets/' + fn, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
+    const url = saveMedia('car', `src-${crypto.randomBytes(5).toString('hex')}.${ext}`, buf);   /* ПЕРСИСТ: /media на volume (переживает деплой) */
+    return { url, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
   } catch (e) { return null; }
 }
 /* сохранить готовый буфер картинки как ассет (хи-рес фильтр как у downloadImageToAsset) */
@@ -3872,10 +3874,8 @@ function saveImageBuffer(buf, tag) {
     if (dim && Math.max(dim.w, dim.h) < 720) return null;
     if (dim && Math.min(dim.w, dim.h) < 420) return null;
     if (dim && buf.length < (dim.w * dim.h) * 0.1) return null;
-    fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
-    const fn = `car/${tag || 'src'}-${crypto.randomBytes(5).toString('hex')}.jpg`;
-    fs.writeFileSync(path.join(PUBLIC, 'assets', fn), buf);
-    return { url: '/assets/' + fn, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
+    const url = saveMedia('car', `${tag || 'src'}-${crypto.randomBytes(5).toString('hex')}.jpg`, buf);   /* ПЕРСИСТ */
+    return { url, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
   } catch (_) { return null; }
 }
 /* вытащить встроенные JPEG-картинки прямо из байтов PDF (без тяжёлых либ: ищем SOI/EOI-маркеры).
@@ -11001,7 +11001,6 @@ ${SCR}
       /* фото: приоритет — из ИИ, иначе из HTML; скачиваем и перезаливаем к нам */
       const srcImgs = ([...(Array.isArray(ext.images) ? ext.images : []), ...imgs].map(absUrl).filter(x => /^https?:/i.test(x)));
       const uniq = [...new Set(srcImgs)].slice(0, 14);
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'props'), { recursive: true });
       /* качаем ПАРАЛЛЕЛЬНО (быстро) + фильтр низкого разрешения + сортировка по разрешению (лучшее фото = обложка) */
       const dl = await Promise.all(uniq.map(async (iu) => {
         try {
@@ -11011,9 +11010,8 @@ ${SCR}
           const dim = imgDimensions(buf);
           if (dim && (Math.max(dim.w, dim.h) < 700 || Math.min(dim.w, dim.h) < 380)) return null;  /* только настоящие превью-миниатюры — мимо */
           const ex2 = ((iu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase();
-          const fn = 'prop_' + crypto.randomBytes(6).toString('hex') + ex2;
-          fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf);
-          return { url: '/assets/props/' + fn, area: dim ? dim.w * dim.h : 0 };
+          const url2 = saveMedia('props', 'prop_' + crypto.randomBytes(6).toString('hex') + ex2, buf);   /* ПЕРСИСТ */
+          return { url: url2, area: dim ? dim.w * dim.h : 0 };
         } catch (_) { return null; }
       }));
       const saved = dl.filter(Boolean).sort((a, b) => b.area - a.area).map(x => x.url).slice(0, 10);
@@ -11029,7 +11027,7 @@ ${SCR}
       /* планировки-чертежи: скачиваем и перезаливаем в pr.layouts (параллельно, с фильтром размера) */
       const fps = [...new Set((Array.isArray(ext.floorplans) ? ext.floorplans : []).map(absUrl).filter(x => /^https?:/i.test(x) && !badImg(x)))].slice(0, 12);
       const layImgs = (await Promise.all(fps.map(async (fu) => {
-        try { const rr = await fetch(fu, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: url } }); if (!rr.ok) return null; const buf = Buffer.from(await rr.arrayBuffer()); if (buf.length < 2000 || buf.length > 8e6) return null; const ex3 = ((fu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase(); const fn = 'plan_' + crypto.randomBytes(6).toString('hex') + ex3; fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf); return { label: 'Планировка', url: '/assets/props/' + fn }; } catch (_) { return null; }
+        try { const rr = await fetch(fu, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: url } }); if (!rr.ok) return null; const buf = Buffer.from(await rr.arrayBuffer()); if (buf.length < 2000 || buf.length > 8e6) return null; const ex3 = ((fu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase(); const url3 = saveMedia('props', 'plan_' + crypto.randomBytes(6).toString('hex') + ex3, buf); return { label: 'Планировка', url: url3 }; } catch (_) { return null; }
       }))).filter(Boolean);
       if (layImgs.length) mapped.layouts = layImgs;
       db.properties = db.properties || [];
@@ -14264,6 +14262,16 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     }
 
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
+
+    /* ---------------- медиа объектов из ПЕРСИСТЕНТНОГО хранилища (переживают деплой) ---------------- */
+    if (req.method === 'GET' && /^\/media\/[A-Za-z0-9._\/-]+$/.test(p) && !p.includes('..')) {
+      const fp = path.join(MEDIA_DIR, p.replace(/^\/media\//, ''));
+      if (!fp.startsWith(MEDIA_DIR) || !fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
+      const type = MIME[path.extname(fp).toLowerCase()] || 'application/octet-stream';
+      const stat = fs.statSync(fp);
+      res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Cache-Control': 'public, max-age=604800' });
+      fs.createReadStream(fp).pipe(res); return;
+    }
 
     /* ---------------- креативы из ПЕРСИСТЕНТНОГО хранилища (переживают деплой) ---------------- */
     /* публично (без сессии): их тянет и браузер в карточке, и серверы WhatsApp по ссылке. Range — для проигрывания видео. */
