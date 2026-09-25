@@ -7512,6 +7512,10 @@ function curSym(c) { return ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RU
 let FX = { base: 'USD', rates: { USD: 1, EUR: 0.92, AED: 3.67, THB: 36, RUB: 92, IDR: 15800, GBP: 0.79 } };
 async function loadFx() { try { const r = await api.get('/fx'); if (r && r.rates) FX = { base: (r.base || 'USD').toUpperCase(), rates: r.rates }; } catch (_) {} }
 function money(v, cur) { return curSym(cur) + Math.round(+v || 0).toLocaleString('ru-RU'); }
+/* коррекция валюты на ОТОБРАЖЕНИИ (не трогаем базу): THB-суммы с меткой USD в Пхукете и т.п. */
+function fixCur(geo, price, cur) { cur = String(cur || '').toUpperCase(); price = +price || 0; if ((geo === 'phuket' || geo === 'thailand') && cur !== 'THB' && price > 1200000) return 'THB'; if (geo === 'bali' && cur !== 'IDR' && price > 200000000) return 'IDR'; return cur || 'USD'; }
+/* «от»-цена для показа: минимальный юнит с ценой (консистентно с таблицей юнитов), иначе priceFrom */
+function effPrice(pr) { const u = (pr.units || []).filter(x => +x.price > 0); if (u.length) { const mn = u.reduce((a, b) => +b.price < +a.price ? b : a); return { price: +mn.price, currency: fixCur(pr.geo, +mn.price, mn.currency || pr.currency) }; } return { price: +pr.priceFrom || 0, currency: fixCur(pr.geo, +pr.priceFrom, pr.currency) }; }
 function convTo(v, from, to) { const r = FX.rates || {}; const rf = r[String(from || 'USD').toUpperCase()], rt = r[String(to || 'USD').toUpperCase()]; return (rf && rt) ? (+v || 0) * (rt / rf) : null; }
 /* HTML цены: нативная валюта + «≈ в базовой» (чтобы было понятно, какая валюта и сколько это в моей) */
 function priceHtml(v, cur, prefix) {
@@ -7587,7 +7591,7 @@ function propUnitsBlock(pr) {
   const cards = [...groups.entries()].map(([label, us]) => {
     const areas = us.flatMap(u => nums(u.area));
     const prices = us.map(u => u.price).filter(x => x > 0);
-    const cur = (us.find(u => u.currency) || {}).currency || pr.currency;
+    const cur = fixCur(pr.geo, prices.length ? Math.min(...prices) : 0, (us.find(u => u.currency) || {}).currency || pr.currency);
     const avail = us.filter(u => u.status !== 'sold').length, sold = us.length - avail;
     const rnd = (v) => Math.round(v);
     const aR = areas.length ? (rnd(Math.min(...areas)) === rnd(Math.max(...areas)) ? rnd(areas[0]) + ' м²' : rnd(Math.min(...areas)) + '–' + rnd(Math.max(...areas)) + ' м²') : '';
@@ -7650,7 +7654,7 @@ async function initPropMap(props) {
     const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
     window._prMarkers[p.id] = { mk, lat: p.lat, lng: p.lng };
     const img = (p.images && p.images[0]) || '';
-    const price = p.priceFrom ? priceHtml(p.priceFrom, p.currency, 'от ') : '';
+    const _ep = effPrice(p); const price = _ep.price ? priceHtml(_ep.price, _ep.currency, 'от ') : '';
     /* мета-чипы: тип · площадь · сдача — минимализм, но информативно */
     const areas = (p.units || []).map(u => parseFloat(String(u.area).replace(',', '.'))).filter(a => a > 0);
     const areaRange = areas.length ? (Math.min(...areas) === Math.max(...areas) ? Math.round(Math.min(...areas)) + ' м²' : Math.round(Math.min(...areas)) + '–' + Math.round(Math.max(...areas)) + ' м²') : '';
@@ -8188,7 +8192,7 @@ PAGES.properties = async (root) => {
     <div id="prMapWrap" style="${PAGE_STATE.propMap ? '' : 'display:none'};margin:0 0 14px">
       <div class="pr-split">
         <div class="pr-split-list">
-          ${list.map(pr2 => `<div class="prm-row" data-prrow="${pr2.id}"><div class="prm-row-th" style="background-image:url('${esc((pr2.images || [])[0] || '')}')"></div><div class="prm-row-b"><div class="prm-row-n">${esc(pr2.name)}${pr2.stub ? ' <span class="prm-stub">каталог</span>' : ''}</div><div class="prm-row-l">${esc(pr2.area || '—')}</div><div class="prm-row-p">${pr2.priceFrom ? priceHtml(pr2.priceFrom, pr2.currency, 'от ') : '—'}</div></div></div>`).join('') || '<div class="muted" style="font-size:12px;padding:10px">Объектов нет — импортируйте каталог</div>'}
+          ${list.map(pr2 => `<div class="prm-row" data-prrow="${pr2.id}"><div class="prm-row-th" style="background-image:url('${esc((pr2.images || [])[0] || '')}')"></div><div class="prm-row-b"><div class="prm-row-n">${esc(pr2.name)}${pr2.stub ? ' <span class="prm-stub">каталог</span>' : ''}</div><div class="prm-row-l">${esc(pr2.area || '—')}</div><div class="prm-row-p">${(() => { const e = effPrice(pr2); return e.price ? priceHtml(e.price, e.currency, 'от ') : '—'; })()}</div></div></div>`).join('') || '<div class="muted" style="font-size:12px;padding:10px">Объектов нет — импортируйте каталог</div>'}
         </div>
         <div class="pr-split-map"><div id="prMap"></div><div id="prMapStatus" class="muted" style="font-size:11px;position:absolute;left:10px;bottom:8px;background:rgba(255,253,249,.9);padding:3px 8px;border-radius:8px;z-index:500"></div></div>
       </div>
@@ -8222,7 +8226,7 @@ PAGES.properties = async (root) => {
           <div class="pc2-name">${esc(pr.name)}</div>
           ${pr.area || (pr.developer && pr.developer !== '—') ? `<div class="pc2-loc">${esc(pr.area || '')}${pr.developer && pr.developer !== '—' ? (pr.area ? ' · ' : '') + esc(pr.developer) : ''}</div>` : ''}
           <div class="pc2-price-row">
-            <span class="pc2-price">${pr.priceFrom ? priceHtml(pr.priceFrom, pr.currency, 'от ') : '—'}</span>
+            <span class="pc2-price">${(() => { const e = effPrice(pr); return e.price ? priceHtml(e.price, e.currency, 'от ') : '—'; })()}</span>
             ${pr.roi ? `<span class="pc2-roi">${esc(pr.roi)}</span>` : ''}
           </div>
           ${[pr.type, pr.handover].filter(x => x && x !== '—').length ? `<div class="pc2-meta">${[pr.type, pr.handover].filter(x => x && x !== '—').map(esc).join('&nbsp;·&nbsp;')}</div>` : ''}

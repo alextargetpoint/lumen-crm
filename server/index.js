@@ -10964,22 +10964,7 @@ ${SCR}
     }
 
     /* ---------------- объекты (библиотека) ---------------- */
-    if (p === '/api/properties' && req.method === 'GET') {
-      /* авто-нормализация «от»-цены: если есть юниты с ценами → headline = минимальный юнит + его валюта
-         (лечит старые карточки с рассинхроном: хедер 29.4M vs юниты $1.1M). Идемпотентно, чинит только явное. */
-      let ch = false;
-      for (const pr of (db.properties || [])) {
-        const u = (pr.units || []).filter(x => +x.price > 0);
-        if (!u.length) continue;
-        /* сначала ЛЕЧИМ валюту каждого юнита (стале: THB-суммы с меткой USD → $3.6M вместо ฿3.6M) */
-        u.forEach(x => { const fc = fixMoneyCurrency(pr.geo, +x.price, x.currency); if (fc !== x.currency) { x.currency = fc; ch = true; } });
-        const mn = u.reduce((a, b) => +b.price < +a.price ? b : a);
-        const cur = (mn.currency || pr.currency || 'USD');
-        if ((+mn.price && +pr.priceFrom !== +mn.price) || pr.currency !== cur) { pr.priceFrom = +mn.price; pr.currency = cur; ch = true; }
-      }
-      if (ch) store.save();
-      return json(res, 200, db.properties);
-    }
+    if (p === '/api/properties' && req.method === 'GET') return json(res, 200, db.properties);   /* READ-ONLY: НЕ мутируем/не затираем карточки (коррекция цены/валюты — на отображении, см. фронт effPrice/fixCur) */
     /* ---------------- ИМПОРТ ИНВЕНТАРЯ ОБЪЕКТОВ ---------------- */
     if (p === '/api/properties/import' && req.method === 'POST') {
       const b = await readBody(req);

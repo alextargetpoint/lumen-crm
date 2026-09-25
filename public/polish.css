@@ -355,13 +355,16 @@ input[type=number] { -moz-appearance: textfield; }
 .prmetric-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; }
 .prmetric-nd { margin-left: 8px; display: inline-flex; align-items: center; gap: 3px; }
 /* панель сравнения на карте */
-.prcmp { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 620; display: flex; align-items: center; gap: 12px; background: rgba(20,17,12,.94); color: #f0e9dc; border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 8px 10px 8px 12px; box-shadow: 0 14px 40px -10px rgba(0,0,0,.55); backdrop-filter: blur(8px); max-width: 92%; }
-.prcmp-cnt { font-size: 11px; font-weight: 700; color: #c9a86a; letter-spacing: .3px; white-space: nowrap; }
+.prcmp { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 3500; display: flex; align-items: center; gap: 16px; background: linear-gradient(180deg, rgba(30,26,18,.97), rgba(18,15,10,.98)); color: #f0e9dc; border: 1px solid rgba(205,168,97,.28); border-radius: 18px; padding: 10px 12px 10px 16px; box-shadow: 0 24px 60px -14px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(14px); max-width: min(94vw, 860px); animation: prcmpIn .3s cubic-bezier(.2,.8,.3,1); }
+@keyframes prcmpIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.prcmp-cnt { font-size: 11px; font-weight: 800; color: #cda861; letter-spacing: .4px; text-transform: uppercase; white-space: nowrap; }
 .prcmp-items { display: flex; gap: 8px; flex-wrap: wrap; }
-.prcmp-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.08); border-radius: 9px; padding: 4px 6px 4px 4px; }
-.prcmp-th { width: 26px; height: 22px; border-radius: 6px; background: #2a2419 center/cover; flex: 0 0 auto; }
-.prcmp-chip b { cursor: pointer; color: #c9a86a; font-size: 15px; padding: 0 2px; }
-.prcmp-acts { display: flex; gap: 6px; flex: 0 0 auto; }
+.prcmp-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 650; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.09); border-radius: 11px; padding: 5px 9px 5px 5px; transition: background .15s; }
+.prcmp-chip:hover { background: rgba(255,255,255,.12); }
+.prcmp-th { width: 34px; height: 28px; border-radius: 7px; background: #2a2419 center/cover; flex: 0 0 auto; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.prcmp-chip b { cursor: pointer; color: #cda861; font-size: 16px; line-height: 1; padding: 0 3px; opacity: .8; transition: opacity .15s; } .prcmp-chip b:hover { opacity: 1; }
+.prcmp-acts { display: flex; gap: 7px; flex: 0 0 auto; }
+.prcmp-acts .btn-accent { box-shadow: 0 6px 18px -6px rgba(205,168,97,.6); }
 /* модалка сравнения */
 .cmp-tbl { display: grid; gap: 0; font-size: 13px; }
 .cmp-tbl > div { padding: 9px 12px; border-bottom: 1px solid var(--line); }
