@@ -8210,6 +8210,7 @@ PAGES.properties = async (root) => {
         </div>
       </div>`).join('')}
       <button class="fold fold-new" id="fNew">${ic(I.plus)}<span>Папка</span></button>
+      <button class="fold fold-auto" id="fAuto" title="Умно разложить объекты по папкам">${ic(I.layers || I.grid)}<span>Навести порядок</span></button>
     </div>
     <div class="muted" style="font-size:11px;margin:-6px 0 12px;${PAGE_STATE.propMap ? 'display:none' : ''}">Карточку — на папку · клик по папке — фильтр и подборка</div>
     ${q && !PAGE_STATE.propMap ? `<div class="pr-tier" id="prTier">
@@ -8292,6 +8293,17 @@ PAGES.properties = async (root) => {
     title: 'Новая папка объектов', body: '<div class="form-row"><label>Название</label><input id="fName" placeholder="Например: Под визу / JVC / Предстарты"></div>',
     actions: [{ label: 'Создать', cls: 'btn-accent', onClick: async (bd) => { await api.post('/folders', { name: $('#fName', bd).value, kind: 'prop' }); render(); } }, { label: 'Отмена' }],
   }));
+  $('#fAuto')?.addEventListener('click', () => {
+    const OPTS = [['district', 'По районам', 'папка на каждый район/локацию'], ['price', 'По ценовым диапазонам', 'до $150k · $150–300k · … · от $3M'], ['type', 'По типу', 'виллы · студии · N-спальные · пентхаусы'], ['geo', 'По направлению', 'Дубай · Пхукет · Бали…'], ['market', 'По рынку', 'первичка · вторичка']];
+    const md = modal({ title: 'Навести порядок в объектах', sub: 'ИИ разложит все объекты по папкам выбранного критерия. Данные объектов не меняются — только раскладка по папкам.', body: `<div class="ao-opts">${OPTS.map(([k, n, d]) => `<button class="ao-opt" data-ao="${k}"><b>${n}</b><span>${d}</span></button>`).join('')}</div><div id="aoOut"></div>`, actions: [{ label: 'Закрыть' }] });
+    $$('.ao-opt', md).forEach(btn => btn.addEventListener('click', async () => {
+      const by = btn.dataset.ao; const out = $('#aoOut', md); $$('.ao-opt', md).forEach(x => x.disabled = true);
+      out.innerHTML = motionLoader('Раскладываю по папкам…', 'card');
+      const r = await api.post('/properties/auto-organize', { by }).catch(() => ({ error: 'сеть' }));
+      if (r.error) { out.innerHTML = '<div style="color:var(--bad);font-size:13px;padding:8px 0">' + esc(r.error) + '</div>'; $$('.ao-opt', md).forEach(x => x.disabled = false); return; }
+      toast('Готово', `Папок: ${r.folders} · разложено: ${r.assigned}`, true); closeModal(); render();
+    }));
+  });
   $$('[data-fdel]', root).forEach(b => b.addEventListener('click', async () => { await fetch('/api/folders/' + b.dataset.fdel, { method: 'DELETE' }); render(); }));
   $$('[data-fcoll]', root).forEach(b => b.addEventListener('click', async () => {
     const f = folders.find(x => x.id === b.dataset.fcoll);
