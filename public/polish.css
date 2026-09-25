@@ -240,6 +240,13 @@ input[type=number] { -moz-appearance: textfield; }
 .lm-load-tx::after { content: ''; display: inline-block; width: 14px; text-align: left; animation: lmDots 1.4s steps(1,end) infinite; }
 @keyframes lmDots { 0% { content: ''; } 25% { content: '·'; } 50% { content: '··'; } 75% { content: '···'; } }
 @media (prefers-reduced-motion: reduce) { .lm-orb i { animation-duration: 2s; } .lm-orb b, .lm-load-tx::after { animation: none; } }
+/* Higgsfield-эмблема лоадера: домик в золотых кольцах + вращающийся световой sweep + дыхание */
+.lm-hf { position: relative; width: 66px; height: 66px; border-radius: 50%; overflow: hidden; box-shadow: 0 10px 30px -8px rgba(184,134,60,.5), inset 0 0 0 1px rgba(255,215,150,.14); animation: hfBreath 3.2s ease-in-out infinite; }
+.lm-hf img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lm-hf-sweep { position: absolute; inset: -20%; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0 62%, rgba(255,224,170,.5) 82%, rgba(255,240,210,.15) 92%, transparent 100%); mix-blend-mode: screen; animation: hfSweep 2.1s linear infinite; }
+@keyframes hfSweep { to { transform: rotate(360deg); } }
+@keyframes hfBreath { 0%, 100% { transform: scale(.97); } 50% { transform: scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { .lm-hf-sweep { animation-duration: 5s; } .lm-hf { animation: none; } }
 /* web (сеть/орбита) — центр + 3 орбитальных спутника */
 .lmw { position: relative; width: 48px; height: 48px; }
 .lmw-c { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--accent, #b8863c); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent); }

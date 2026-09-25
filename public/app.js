@@ -7566,16 +7566,9 @@ function drawZones(map, L, geo) {
 /* премиум моушн-индикаторы под КАЖДЫЙ процесс (чистый CSS, Ателье). variant задаёт анимацию:
    web=орбита(сеть), card=сборка карточки, price=стопка строк(прайс), pdf=скан документа, search=радар, ring=дефолт */
 function motionLoader(label, variant) {
-  const v = variant || 'ring';
-  const art = {
-    web: '<div class="lmw"><span class="lmw-c"></span><i></i><i></i><i></i></div>',
-    card: '<div class="lmc"><span></span><span></span><span></span><span></span></div>',
-    price: '<div class="lmp"><i></i><i></i><i></i><i></i></div>',
-    pdf: '<div class="lmd"><span class="lmd-sheet"></span><span class="lmd-scan"></span></div>',
-    search: '<div class="lms"><span class="lms-sweep"></span><span class="lms-dot"></span><span class="lms-dot d2"></span></div>',
-    ring: '<div class="lm-orb"><i></i><b></b></div>',
-  }[v] || '<div class="lm-orb"><i></i><b></b></div>';
-  return `<div class="lm-load lm-${v}">${art}<div class="lm-load-tx">${esc(label || 'Работаю')}</div></div>`;
+  /* Higgsfield-эмблема (золотые орбитальные кольца + домик): кольца-свет крутятся, домик стоит.
+     Один премиум-визуал на все процессы, различает подпись под ним (variant — для совместимости). */
+  return `<div class="lm-load lm-${variant || 'ring'}"><div class="lm-hf"><img src="/assets/ui/loader-orb.png?v=1" alt="" draggable="false"><span class="lm-hf-sweep"></span></div><div class="lm-load-tx">${esc(label || 'Работаю')}</div></div>`;
 }
 /* язык карточки объекта (для просмотра/шеринга); по умолчанию = язык интерфейса */
 let CARD_LANG = (typeof LANG !== 'undefined' ? LANG : 'ru');
