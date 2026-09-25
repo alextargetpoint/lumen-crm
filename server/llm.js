@@ -333,6 +333,27 @@ ${String(context).slice(0, 13000)}`;
   return j;
 }
 
+/* Извлечь карточку из PDF-брошюры застройщика (Gemini читает PDF инлайн: текст+таблицы+планы). */
+async function extractPropertyFromPdf(b64) {
+  if (!GKEY) throw new Error('нужен GEMINI_API_KEY для PDF');
+  const prompt = `Это PDF-брошюра/прайс проекта недвижимости. Извлеки МАКСИМУМ данных и разложи по структуре. Верни СТРОГО JSON:
+{"name":"название","developer":"застройщик","area":"район/локация","city":"город","priceFrom":число,"currency":"USD|EUR|AED|THB","beds":"спальни","size":"площадь","type":"Studio|1BR|2BR|Villa","handover":"срок сдачи","roi":"доходность %","appreciation":"прирост %","description":"3-5 продающих предложений о проекте","amenities":["удобства"],"investmentHighlights":["инвест-аргументы"],"paymentPlan":[{"pct":"25%","label":"этап оплаты"}],"units":[{"type":"Studio|1BR|2BR","size":"кв.м","floor":"этаж","price":число,"currency":"USD|EUR|AED|THB","view":"вид"}]}
+Правила: бери ТОЛЬКО что реально есть в PDF, не выдумывай; чего нет — "" или []. units — если есть таблица доступности/прайс. priceFrom — минимальная цена числом. Заголовок/название проекта — как в брошюре.`;
+  return await withTimeout(async (signal) => {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GKEY}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'application/pdf', data: b64 } }] }], generationConfig: { temperature: 0, maxOutputTokens: 4000, responseMimeType: 'application/json' } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error('gemini pdf ' + r.status);
+    const txt = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+    const raw = txt.map(p => p.text || '').join('');
+    let obj; try { obj = JSON.parse(raw); } catch (_) { const mm = raw.match(/\{[\s\S]*\}/); obj = mm ? JSON.parse(mm[0]) : null; }
+    if (!obj || typeof obj !== 'object') throw new Error('PDF не разобрался');
+    return obj;
+  }, 60000);
+}
+
 /* Обогащение карточки из веб-поиска: самая свежая инфа по проекту (срок сдачи, доходность,
    прирост, ход строительства, цена). want — на чём сфокусироваться (опц.). */
 async function enrichProject(searchText, name, want) {
@@ -343,6 +364,20 @@ async function enrichProject(searchText, name, want) {
 ${String(searchText).slice(0, 15000)}`;
   const j = await callGemini(prompt, 40000, 3200);
   if (!j || typeof j !== 'object') throw new Error('bad enrich');
+  return j;
+}
+
+/* Качественный перевод текстовых полей карточки объекта на целевой язык (RU/EN/…).
+   fields — {key: строка|массив строк}. Возвращает тот же shape, переведённый. */
+async function translateFields(fields, targetLang) {
+  const LANGN = { ru: 'русский', en: 'English', es: 'español', de: 'Deutsch', fr: 'français', it: 'italiano', ar: 'العربية', zh: '中文', th: 'ไทย' };
+  const target = LANGN[targetLang] || targetLang || 'English';
+  const clean = {}; for (const k of Object.keys(fields || {})) { const v = fields[k]; if (v != null && (Array.isArray(v) ? v.length : String(v).trim())) clean[k] = v; }
+  if (!Object.keys(clean).length) return {};
+  const prompt = `Переведи значения на язык: ${target}. Это карточка объекта недвижимости — перевод ДОЛЖЕН быть качественным, естественным, маркетингово-гладким (не дословным), сохраняя смысл, цифры, единицы и названия брендов/проектов/районов как есть. Массивы переводи поэлементно, сохраняя длину. Верни СТРОГО JSON с ТЕМИ ЖЕ ключами:
+${JSON.stringify(clean).slice(0, 12000)}`;
+  const j = await callGemini(prompt, 40000, 3000);
+  if (!j || typeof j !== 'object') throw new Error('bad translate');
   return j;
 }
 
@@ -1312,6 +1347,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractUnits, extractCatalog, findProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

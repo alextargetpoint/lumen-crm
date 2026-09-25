@@ -7544,6 +7544,11 @@ function drawZones(map, L, geo) {
 }
 /* премиум моушн-лоадер (чистый CSS, Ателье-акцент): вращающееся кольцо + пульс-ядро + бегущие точки */
 function motionLoader(label) { return `<div class="lm-load"><div class="lm-orb"><i></i><b></b></div><div class="lm-load-tx">${esc(label || 'Работаю')}</div></div>`; }
+/* язык карточки объекта (для просмотра/шеринга); по умолчанию = язык интерфейса */
+let CARD_LANG = (typeof LANG !== 'undefined' ? LANG : 'ru');
+const CARD_LANGS = [['ru', 'Рус'], ['en', 'Eng'], ['es', 'Esp'], ['de', 'Deu'], ['fr', 'Fra'], ['it', 'Ita'], ['ar', 'عرب'], ['zh', '中文'], ['th', 'ไทย']];
+/* перевод поля карточки: pr.i18n[CARD_LANG].field с фолбэком на оригинал */
+function trF(pr, f) { const t = pr && pr.i18n && pr.i18n[CARD_LANG]; const v = t && t[f]; return (v != null && (Array.isArray(v) ? v.length : String(v).trim())) ? v : (pr ? pr[f] : ''); }
 /* Юниты минималистично: группируем по типу/планировке → сводные карточки (площадь/цена/наличие),
    полный список — под спойлером. Разгружает «длиннющую таблицу» из сотен строк. */
 function propUnitsBlock(pr) {
@@ -7637,7 +7642,7 @@ async function initPropMap(props) {
     const h = root2.querySelector('[data-prophydrate]');
     if (h) h.addEventListener('click', async () => {
       h.disabled = true; h.textContent = 'Тяну карточку…';
-      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true }); if (r.error) { toast('Не вышло', r.error); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
+      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true, lang: LANG }); if (r.error) { toast('Не вышло', r.error); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
       catch (err) { toast('Ошибка', err.message); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; }
     });
   });
@@ -7680,6 +7685,7 @@ PAGES.properties = async (root) => {
               <button class="btn btn-sm pd2-ghost" id="prBack">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Все объекты'}</button>
               <span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>
               <span class="tb-spacer"></span>
+              <select class="pd2-ghost pd2-lang" id="pdLang" title="Язык карточки (перевод для просмотра и шеринга)">${CARD_LANGS.map(([c, n]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${n}</option>`).join('')}</select>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
@@ -7716,14 +7722,14 @@ PAGES.properties = async (root) => {
             <div class="pd-fact"><label class="lc-lbl">Доходность</label><input class="gi" data-f="roi" value="${esc(pr.roi || '')}" placeholder="от 7% годовых"></div>
             <div class="pd-fact"><label class="lc-lbl">Прирост стоимости</label><input class="gi" data-f="appreciation" value="${esc(pr.appreciation || '')}" placeholder="от 25% к сдаче"></div>
           </div>
-          <div class="pd-fact" style="margin-top:12px"><label class="lc-lbl">Описание проекта (для подборок и PDF)</label><textarea class="gi" data-f="description" style="min-height:90px">${esc(pr.description || '')}</textarea></div>
+          <div class="pd-fact" style="margin-top:12px"><label class="lc-lbl">Описание проекта (для подборок и PDF)</label><textarea class="gi" data-f="description" style="min-height:90px">${esc(trF(pr, 'description') || '')}</textarea></div>
           <div class="pds-grid c3" style="margin-top:12px">
             <div class="pd-fact"><label class="lc-lbl">Район</label><input class="gi" data-f="districtName" value="${esc((pr.district || {}).name || '')}" placeholder="JVC"></div>
-            <div class="pd-fact" style="grid-column:span 2"><label class="lc-lbl">Район: описание</label><textarea class="gi" data-f="districtBlurb" style="min-height:58px">${esc((pr.district || {}).blurb || '')}</textarea></div>
+            <div class="pd-fact" style="grid-column:span 2"><label class="lc-lbl">Район: описание</label><textarea class="gi" data-f="districtBlurb" style="min-height:58px">${esc((pr.i18n && pr.i18n[CARD_LANG] && pr.i18n[CARD_LANG].districtBlurb) || (pr.district || {}).blurb || '')}</textarea></div>
           </div>
           <div class="pds-grid c2" style="margin-top:12px">
             <div class="pd-fact"><label class="lc-lbl">Тайминги до мест (строка = «мин | место»)</label><textarea class="gi" data-f="districtTimes" style="min-height:64px" placeholder="16 | Expo City">${esc(((pr.district || {}).times || []).map(t => t.min + ' | ' + t.place).join('\n'))}</textarea></div>
-            <div class="pd-fact"><label class="lc-lbl">«Рекомендуем для аренды» (аргументы по строкам)</label><textarea class="gi" data-f="whyRentStr" style="min-height:64px">${esc((pr.whyRent || []).join('\n'))}</textarea></div>
+            <div class="pd-fact"><label class="lc-lbl">«Рекомендуем для аренды» (аргументы по строкам)</label><textarea class="gi" data-f="whyRentStr" style="min-height:64px">${esc((trF(pr, 'whyRent') || []).join('\n'))}</textarea></div>
           </div>
         </div>
 
@@ -7785,7 +7791,7 @@ PAGES.properties = async (root) => {
               <span class="chip-add"><input id="amenAddInp" placeholder="+ своё удобство"><button class="chip-plus" id="amenAddBtn">${ic(I.plus)}</button></span>
             </div>
           </div>
-          <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Инвест-аргументы (по строкам)</label><textarea class="gi" data-f="investStr" style="min-height:56px" placeholder="рассрочка 0% · рост локации · гарантированный доход · ликвидность">${esc((pr.investmentHighlights || []).join('\n'))}</textarea></div>
+          <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Инвест-аргументы (по строкам)</label><textarea class="gi" data-f="investStr" style="min-height:56px" placeholder="рассрочка 0% · рост локации · гарантированный доход · ликвидность">${esc((trF(pr, 'investmentHighlights') || []).join('\n'))}</textarea></div>
         </div>
 
         <div class="pds grey">
@@ -7932,6 +7938,15 @@ PAGES.properties = async (root) => {
       $('#recPrev', md).addEventListener('click', () => call(false));
     });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
+    $('#pdLang')?.addEventListener('change', async (e) => {
+      const lang = e.target.value; CARD_LANG = lang;
+      if (lang === LANG || (pr.i18n && pr.i18n[lang])) return render();   /* оригинал/язык интерфейса или уже переведено */
+      e.target.disabled = true;
+      const rr = await api.post('/properties/' + pr.id + '/translate', { lang }).catch(() => ({ error: 'сеть' }));
+      if (rr && rr.property) { Object.assign(pr, rr.property); toast('Карточка переведена', CARD_LANGS.find(l => l[0] === lang)?.[1] || lang, true); }
+      else toast('Не перевёл', (rr && rr.error) || '');
+      render();
+    });
     $('#pdEnrich').addEventListener('click', async () => {
       const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание', districtBlurb: 'Описание района', timings: 'Тайминги до мест', rentalArgs: 'Аргументы под аренду', amenities: 'Удобства комплекса', investmentHighlights: 'Инвест-аргументы', paymentPlan: 'План оплаты', hookTitle: 'Крючок-заголовок' };
       const md = modal({ title: 'Дополнить из открытых источников', sub: `Собираю ПОЛНУЮ карточку по «${esc(pr.name)}» — факты, фото, видео-рендеры, наличие юнитов…`, body: '<div id="enrOut">' + motionLoader('Собираю по всем открытым источникам') + '</div>', actions: [{ label: 'Закрыть' }] });
@@ -8103,7 +8118,7 @@ PAGES.properties = async (root) => {
         const c = out._cands[+b.dataset.ptc]; b.disabled = true; b.innerHTML = '<span class="enr-spin"></span>Собираю…';
         try {
           if (c.url) {
-            const rr = await api.post('/properties/from-url', { url: c.url, full: true });
+            const rr = await api.post('/properties/from-url', { url: c.url, full: true, lang: LANG });
             if (rr.exists) { toast('Уже есть', rr.existingName || ''); PAGE_STATE.propView = rr.existingId; return render(); }
             if (rr.error) { b.disabled = false; b.textContent = 'Создать карточку'; return toast('Не вышло', rr.error); }
             toast('Карточка создана', `${rr.property.name} · фото ${rr.imagesSaved}`, true); PAGE_STATE.propView = rr.property.id; return render();
@@ -8158,6 +8173,7 @@ PAGES.properties = async (root) => {
       body: `
         <div class="imp-tabs">
           <button class="imp-tab on" data-imptab="url">${ic(I.link || I.spark)}По ссылке · ИИ</button>
+          <button class="imp-tab" data-imptab="pdf">${ic(I.doc)}PDF-брошюра</button>
           <button class="imp-tab" data-imptab="reelly">${ic(I.building)}Reelly</button>
           <button class="imp-tab" data-imptab="table">${ic(I.doc)}Таблица · CSV/Excel</button>
           <button class="imp-tab" data-imptab="json">${ic(I.doc)}JSON-фид</button>
@@ -8174,6 +8190,13 @@ PAGES.properties = async (root) => {
             <button class="btn btn-accent" id="impCatGo">${ic(I.building)}Импортировать каталог</button>
           </div>
           <div id="impCatOut" class="muted" style="font-size:12px;margin-top:8px"></div>
+        </div>
+        <div data-imppane="pdf" style="display:none">
+          <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px">Залейте <b>PDF-брошюру или прайс застройщика</b> — ИИ прочитает текст, таблицы и планировки, вытащит фотографии и умно разложит всё по карточке (цена, локация, срок сдачи, юниты, план оплаты, удобства). Контент переведётся под язык интерфейса.</div>
+          <label class="btn" style="display:inline-flex">${ic(I.doc)}Выбрать PDF<input type="file" id="impPdfFile" accept=".pdf,application/pdf" hidden></label>
+          <span id="impPdfName" class="muted" style="font-size:11.5px;margin-left:8px"></span>
+          <div style="margin-top:12px"><button class="btn btn-accent" id="impPdfGo" disabled>${ic(I.spark)}Собрать карточку из PDF</button></div>
+          <div id="impPdfOut" style="margin-top:12px"></div>
         </div>
         <div data-imppane="reelly" style="display:none">
           <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px"><b>Reelly.io</b> — база 500+ застройщиков ОАЭ (off-plan проекты: цены, планы оплаты, доступность, брошюры). Основной источник инвентаря новостроек для брокеров. Вставьте партнёрский ключ для живого синка — или загрузите демо-набор, чтобы увидеть, как импорт ложится в карточки.</div>
@@ -8203,7 +8226,7 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
       $$('.imp-tab', bd).forEach(x => x.classList.toggle('on', x === t));
       $$('[data-imppane]', bd).forEach(p => p.style.display = p.dataset.imppane === t.dataset.imptab ? '' : 'none');
     }));
-    const defaults = () => ({ geo: $('#impPGeo', bd).value, market: $('#impPMarket', bd).value });
+    const defaults = () => ({ geo: $('#impPGeo', bd).value, market: $('#impPMarket', bd).value, lang: LANG });   /* lang → авто-перевод контента под интерфейс */
     const done = (r) => { if (r.error) { toast('Импорт не прошёл', r.error); return; } toast(`Импортировано: ${r.created}`, `дополнено: ${r.merged}${r.skipped ? ' · пропущено: ' + r.skipped : ''}${r.demo ? ' · демо-набор Reelly' : r.live ? ' · живой синк' : ''}`, true); closeModal(); render(); };
     $('#impReellyGo', bd).addEventListener('click', async () => {
       const key = $('#impReellyKey', bd).value.trim();
@@ -8211,6 +8234,19 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
       done(await api.post('/properties/import', { source: 'reelly', defaults: defaults() }));
     });
     $('#impTableGo', bd).addEventListener('click', async () => { const csv = $('#impTable', bd).value.trim(); if (!csv) return toast('Вставьте таблицу'); done(await api.post('/properties/import', { csv, defaults: defaults() })); });
+    /* PDF-брошюра → ИИ (текст+фото) */
+    let pdfB64 = '', pdfName = '';
+    $('#impPdfFile', bd)?.addEventListener('change', (e) => { const f = e.target.files[0]; if (!f) return; pdfName = f.name; $('#impPdfName', bd).textContent = f.name; const rd = new FileReader(); rd.onload = () => { pdfB64 = String(rd.result).replace(/^data:[^,]*,/, ''); $('#impPdfGo', bd).disabled = false; }; rd.readAsDataURL(f); });
+    $('#impPdfGo', bd)?.addEventListener('click', async (e) => {
+      if (!pdfB64) return toast('Выберите PDF'); const out = $('#impPdfOut', bd); const btn = e.target.closest('button'); btn.disabled = true;
+      out.innerHTML = motionLoader('ИИ читает PDF: текст, таблицы, планировки, фото…');
+      try {
+        const r = await api.post('/properties/from-pdf', { fileB64: pdfB64, fileName: pdfName, ...defaults() });
+        if (r.error) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(r.error) + '</span>'; btn.disabled = false; return; }
+        toast('Карточка из PDF собрана', `${esc(r.property.name)} · фото ${r.imagesSaved}${r.units ? ' · юнитов ' + r.units : ''}`, true);
+        closeModal(); PAGE_STATE.propView = r.property.id; render();
+      } catch (err) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(err.message) + '</span>'; btn.disabled = false; }
+    });
     $('#impJsonGo', bd).addEventListener('click', async () => { const j = $('#impJson', bd).value.trim(); if (!j) return toast('Вставьте JSON'); done(await api.post('/properties/import', { json: j, defaults: defaults() })); });
     /* по ссылке · ИИ */
     $('#impUrlPrev', bd).addEventListener('click', async () => {

@@ -269,6 +269,9 @@ input[type=number] { -moz-appearance: textfield; }
 .przone-lbl { pointer-events: none; }
 .przone-lbl span { display: inline-block; transform: translate(-50%, -50%); white-space: nowrap; font-family: var(--serif, Cormorant, Georgia, serif); font-size: 12.5px; font-weight: 700; letter-spacing: .3px; color: #6b5426; text-shadow: 0 1px 0 rgba(255,255,255,.85), 0 0 10px rgba(255,255,255,.7); opacity: .78; }
 :root[data-night] .przone-lbl span { color: #d8c39a; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+/* селектор языка карточки в шапке */
+.pd2-lang { height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.12); color: #fff; font-size: 12px; font-weight: 600; padding: 0 8px; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.pd2-lang option { color: #23201c; }
 /* ── умный поиск (Tier 3): inline-уведомление под поиском ── */
 .pr-tier { border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line)); background: color-mix(in srgb, var(--accent) 5%, var(--bg-2, #fff)); border-radius: 12px; padding: 11px 13px; margin: 0 0 14px; animation: pfSlide .22s ease; }
 .pr-tier-hd { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink, #23201c); }

@@ -3842,6 +3842,34 @@ async function downloadImageToAsset(url) {
     return { url: '/assets/' + fn, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
   } catch (e) { return null; }
 }
+/* сохранить готовый буфер картинки как ассет (хи-рес фильтр как у downloadImageToAsset) */
+function saveImageBuffer(buf, tag) {
+  try {
+    if (!buf || buf.length < 9000 || buf.length > 12e6) return null;
+    const dim = imgDims(buf);
+    if (dim && Math.max(dim.w, dim.h) < 720) return null;
+    if (dim && Math.min(dim.w, dim.h) < 420) return null;
+    if (dim && buf.length < (dim.w * dim.h) * 0.1) return null;
+    fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
+    const fn = `car/${tag || 'src'}-${crypto.randomBytes(5).toString('hex')}.jpg`;
+    fs.writeFileSync(path.join(PUBLIC, 'assets', fn), buf);
+    return { url: '/assets/' + fn, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
+  } catch (_) { return null; }
+}
+/* вытащить встроенные JPEG-картинки прямо из байтов PDF (без тяжёлых либ: ищем SOI/EOI-маркеры).
+   Ловит DCTDecode-фото брошюр (рендеры/интерьеры); Flate/PNG-картинки не берёт — достаточно для обложек/галереи. */
+function extractPdfJpegs(buf, max = 24) {
+  const out = []; let i = 0;
+  while (i < buf.length - 3 && out.length < max) {
+    if (buf[i] === 0xFF && buf[i + 1] === 0xD8 && buf[i + 2] === 0xFF) {
+      let j = i + 2;
+      while (j < buf.length - 1 && !(buf[j] === 0xFF && buf[j + 1] === 0xD9)) j++;
+      if (j < buf.length - 1) { const img = buf.slice(i, j + 2); if (img.length > 12000) out.push(img); i = j + 2; continue; }
+    }
+    i++;
+  }
+  return out;
+}
 /* открытые источники фото (Openverse — бесплатно, без ключа, CC-лицензия) по ключевым словам */
 async function openverseImages(query, n = 8) {
   try {
@@ -10993,8 +11021,42 @@ ${SCR}
         pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now(), history: [{ at: Date.now(), action: 'Импортирована по ссылке' }] }, mapped);
         db.properties.push(pr);
       }
+      /* авто-перевод контента под язык интерфейса (портал часто на англ., а CRM на рус.) */
+      if (b.lang && b.lang !== 'auto') { try { const tr = await llm.translateFields({ description: pr.description || '', amenities: pr.amenities || [], tags: pr.tags || [] }, b.lang); pr.i18n = pr.i18n || {}; pr.i18n[b.lang] = Object.assign({}, pr.i18n[b.lang], tr, { _at: Date.now() }); } catch (_) {} }
       store.save();
       return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length, units: (mapped.units || []).length, floorplans: (mapped.layouts || []).length });
+    }
+    /* ⭐ ИМПОРТ ИЗ PDF-БРОШЮРЫ: Gemini читает PDF (текст/таблицы/планы) → структура; встроенные JPEG
+       вытаскиваем из байтов PDF → фото. Авто-перевод под язык интерфейса (b.lang). */
+    if (p === '/api/properties/from-pdf' && req.method === 'POST') {
+      const b = await readBody(req);
+      const b64 = String(b.fileB64 || '').replace(/^data:[^,]*,/, '');
+      if (!b64) return json(res, 400, { error: 'нужен PDF-файл' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY)' });
+      let buf; try { buf = Buffer.from(b64, 'base64'); } catch (_) { return json(res, 400, { error: 'битый файл' }); }
+      if (buf.length > 25e6) return json(res, 400, { error: 'PDF слишком большой (>25МБ)' });
+      let ext; try { ext = await llm.extractPropertyFromPdf(b64); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал PDF: ' + e.message }); }
+      const jpegs = extractPdfJpegs(buf);
+      const saved = jpegs.map(j => saveImageBuffer(j, 'pdf')).filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 16).map(x => x.url);
+      const cur = (String(ext.currency || '').toUpperCase().match(/USD|EUR|AED|THB/) || [b.geo === 'phuket' ? 'THB' : 'USD'])[0];
+      const pr = {
+        id: store.nextId('pr'), name: String(ext.name || b.fileName || 'Объект из PDF').slice(0, 120),
+        developer: String(ext.developer || '').slice(0, 80), area: String(ext.area || ext.city || '').slice(0, 80),
+        market: b.market === 'secondary' ? 'secondary' : 'offplan', type: String(ext.type || '').slice(0, 20),
+        beds: +ext.beds || 0, priceFrom: +ext.priceFrom || 0, currency: cur,
+        handover: String(ext.handover || '').slice(0, 40), roi: String(ext.roi || '').slice(0, 40), appreciation: String(ext.appreciation || '').slice(0, 40),
+        description: String(ext.description || '').slice(0, 900),
+        amenities: (Array.isArray(ext.amenities) ? ext.amenities : []).slice(0, 24).map(x => String(x).slice(0, 60)),
+        investmentHighlights: (Array.isArray(ext.investmentHighlights) ? ext.investmentHighlights : []).slice(0, 8).map(x => String(x).slice(0, 200)),
+        paymentRows: (Array.isArray(ext.paymentPlan) ? ext.paymentPlan : []).slice(0, 6).map(r => ({ pct: String(r.pct || '').slice(0, 10), label: String(r.label || '').slice(0, 80) })),
+        units: (Array.isArray(ext.units) ? ext.units : []).slice(0, 400).map(u => { const t = String(u.type || '').slice(0, 20); return { unitNo: '', type: t, plan: t, beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, currency: (String(u.currency || cur).toUpperCase().match(/USD|EUR|AED|THB/) || [cur])[0], view: String(u.view || '').slice(0, 40), status: 'available' }; }),
+        images: saved, layouts: [], materials: [], tags: ['из PDF'], geo: b.geo || 'phuket',
+        addedAt: Date.now(), history: [{ at: Date.now(), action: 'Импортирована из PDF' + (saved.length ? ` · фото ${saved.length}` : '') }],
+      };
+      db.properties = db.properties || []; db.properties.push(pr);
+      if (b.lang && b.lang !== 'auto') { try { const tr = await llm.translateFields({ description: pr.description, amenities: pr.amenities, investmentHighlights: pr.investmentHighlights, tags: pr.tags }, b.lang); pr.i18n = { [b.lang]: Object.assign({}, tr, { _at: Date.now() }) }; } catch (_) {} }
+      store.save();
+      return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length, units: pr.units.length });
     }
     /* ⭐ ОБОГАЩЕНИЕ ИЗ ОТКРЫТЫХ ИСТОЧНИКОВ: чего нет на портале (срок сдачи, доходность, прирост,
        ход стройки) — ищем в вебе по названию+застройщику. apply:false = предложение, apply:true = мёрж.
@@ -11077,6 +11139,19 @@ ${SCR}
       if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now();
       store.save();
       return json(res, 200, { ok: true, applied, photosAdded, videosAdded, unitsAdded, property: pr, sources: sr.sources });
+    }
+    /* ⭐ ПЕРЕВОД карточки на язык интерфейса/клиента. Оригинал не трогаем — кладём перевод в pr.i18n[lang].
+       Дисплей (CRM/шеринг) читает pr.i18n[uiLang] с фолбэком на оригинал. */
+    if ((m = p.match(/^\/api\/properties\/([^/]+)\/translate$/)) && req.method === 'POST') {
+      const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
+      const b = await readBody(req).catch(() => ({}));
+      const lang = String(b.lang || '').toLowerCase().slice(0, 5); if (!lang) return json(res, 400, { error: 'нужен lang' });
+      const src = { description: pr.description || '', payment: pr.payment || '', hookTitle: pr.hookTitle || '', districtBlurb: (pr.district && pr.district.blurb) || '', whyRent: pr.whyRent || [], amenities: pr.amenities || [], investmentHighlights: pr.investmentHighlights || [], tags: pr.tags || [] };
+      let tr; try { tr = await llm.translateFields(src, lang); } catch (e) { return json(res, 400, { error: 'перевод не удался: ' + e.message }); }
+      pr.i18n = pr.i18n || {}; pr.i18n[lang] = Object.assign({}, pr.i18n[lang], tr, { _at: Date.now() });
+      store.save();
+      return json(res, 200, { ok: true, lang, i18n: pr.i18n[lang], property: pr });
     }
     /* ⭐ СВЕРКА НАЛИЧИЯ: вставляем свежий файл доступности застройщика → ИИ извлекает юниты →
        diff с текущими: новые добавляются (в наличии), пропавшие → помечаются проданными (не трём —
