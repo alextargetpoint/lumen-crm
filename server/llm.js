@@ -381,6 +381,20 @@ ${JSON.stringify(clean).slice(0, 12000)}`;
   return j;
 }
 
+/* ИИ-аналитик рынка: сравнить 2-3 проекта бок-о-бок для клиента (профессиональный разбор). */
+async function compareProjects(items, lang) {
+  const LANGN = { ru: 'русском', en: 'English', es: 'испанском', de: 'немецком' };
+  const data = items.map((p, i) => `Проект ${i + 1}: ${p.name}. Район: ${p.area || '—'}. Застройщик: ${p.developer || '—'}. Цена от: ${p.priceFrom || '—'} ${p.currency || ''}. Тип: ${p.type || '—'}. Доходность: ${p.roi || '—'}. Прирост: ${p.appreciation || '—'}. Сдача: ${p.handover || '—'}. Рынок: ${p.market === 'secondary' ? 'вторичка' : 'первичка'}. ${p.description ? 'Описание: ' + String(p.description).slice(0, 400) : ''}`).join('\n\n');
+  const prompt = `Ты — профессиональный аналитик рынка недвижимости. Сравни проекты для КЛИЕНТА (на ${LANGN[lang] || 'русском'} языке), честно и по делу. Верни СТРОГО JSON:
+{"summary":"2-3 предложения общего вывода: чем проекты отличаются и как выбирать","verdicts":[{"name":"название","forWhom":"кому подходит (1 фраза)","pros":["2-3 плюса"],"cons":["1-2 минуса/риска"]}],"bestFor":{"investment":"название проекта с лучшим инвест-потенциалом + почему кратко","living":"лучший для жизни + почему","budget":"лучший по цене/входу + почему"},"analystNote":"1-2 предложения экспертного совета аналитика"}
+Правила: опирайся ТОЛЬКО на данные; чего не хватает — не выдумывай, скажи «данных мало». Будь конкретен и полезен, без воды.
+ДАННЫЕ:
+${data}`;
+  const j = await callGemini(prompt, 40000, 2600);
+  if (!j || typeof j !== 'object') throw new Error('bad compare');
+  return j;
+}
+
 /* Умный поиск проектов в открытых источниках по НАЗВАНИЮ/району (Tier 3 поиска).
    searchText — выдача веб-поиска; query — что искал пользователь (возможно с опечаткой). */
 async function findProjects(searchText, query) {
@@ -1347,6 +1361,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

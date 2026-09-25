@@ -11260,6 +11260,16 @@ ${SCR}
        portal: housebook | resale | <любой catalogUrl>. */
     /* Tier 3 поиска: не нашли в базе → ищем проект по названию в ОТКРЫТЫХ источниках.
        Возвращаем кандидатов {name, area, developer, url, match} — юзер жмёт «Создать карточку» → from-url. */
+    /* ИИ-аналитик рынка: сравнение 2-3 объектов для клиента */
+    if (p === '/api/properties/compare' && req.method === 'POST') {
+      const b = await readBody(req).catch(() => ({}));
+      const ids = Array.isArray(b.ids) ? b.ids.slice(0, 3) : [];
+      const items = ids.map(id => (db.properties || []).find(x => x.id === id)).filter(Boolean);
+      if (items.length < 2) return json(res, 400, { error: 'нужно минимум 2 объекта' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
+      let an; try { an = await llm.compareProjects(items, b.lang || 'ru'); } catch (e) { return json(res, 400, { error: 'ИИ не справился: ' + e.message }); }
+      return json(res, 200, { ok: true, analysis: an });
+    }
     if (p === '/api/properties/find-web' && req.method === 'POST') {
       const b = await readBody(req).catch(() => ({}));
       const query = String(b.query || '').trim();

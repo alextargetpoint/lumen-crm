@@ -7663,7 +7663,7 @@ async function initPropMap(props) {
     const roiHtml = p.roi ? `<span class="prpop-roi">${ic(I.flame, 2)}${esc(p.roi)}</span>` : '';
     const hook = p.hookTitle ? `<div class="prpop-hook">${esc(p.hookTitle)}</div>` : '';
     const stubBtn = p.stub && p.sourceUrl ? `<button class="btn btn-sm btn-accent prpop-hydrate" data-prophydrate="${p.id}" data-src="${esc(p.sourceUrl)}">Подтянуть полную карточку</button>` : '';
-    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"><div class="prpop-imgsh"></div>${roiHtml}${p.stub ? '<span class="prpop-stub">каталог</span>' : ''}</div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}</div><div class="prpop-l">${ic(I.pin || I.building, 2)}${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${chipsHtml}${hook}${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}<div class="prpop-acts">${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">${stubBtn ? 'Сводка' : 'Открыть карточку'}</button></div></div></div>`, { minWidth: 252, maxWidth: 296, closeButton: true, autoPan: true, autoPanPadding: [40, 70], className: 'prpop-wrap' });
+    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"><div class="prpop-imgsh"></div>${roiHtml}${p.stub ? '<span class="prpop-stub">каталог</span>' : ''}</div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}</div><div class="prpop-l">${ic(I.pin || I.building, 2)}${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${chipsHtml}${hook}${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}<div class="prpop-acts">${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">${stubBtn ? 'Сводка' : 'Открыть карточку'}</button><button class="btn btn-sm prpop-cmp ${(PAGE_STATE.compare || []).includes(p.id) ? 'on' : ''}" data-propcmp="${p.id}">${ic(I.layers || I.grid, 2)}${(PAGE_STATE.compare || []).includes(p.id) ? 'В сравнении ✓' : 'Сравнить'}</button></div></div></div>`, { minWidth: 252, maxWidth: 296, closeButton: true, autoPan: true, autoPanPadding: [40, 70], className: 'prpop-wrap' });
     mk.on('click', () => { clearPopT(); _openMk = mk; mk.openPopup(); });   /* клик — открыть (и не закрывать) */
     /* нативные mouseenter/mouseleave на иконке: НЕ шумят на границах дочерних span (в отличие от
        Leaflet mouseover/mouseout) → надёжный hover-intent. .prpin-dot/.pulse = pointer-events:none,
@@ -7689,6 +7689,14 @@ async function initPropMap(props) {
       try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true, lang: LANG }); if (r.error) { toast('Не вышло', r.error); if (body) body.innerHTML = bak; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
       catch (err) { toast('Ошибка', err.message); if (body) body.innerHTML = bak; }
     });
+    const cm = root2.querySelector('[data-propcmp]');
+    if (cm) cm.addEventListener('click', () => {
+      PAGE_STATE.compare = PAGE_STATE.compare || [];
+      const id = cm.dataset.propcmp; const i = PAGE_STATE.compare.indexOf(id);
+      if (i >= 0) PAGE_STATE.compare.splice(i, 1);
+      else { if (PAGE_STATE.compare.length >= 3) return toast('Максимум 3 для сравнения'); PAGE_STATE.compare.push(id); }
+      render();
+    });
   });
   if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
   /* ⭐ контрол тепловой карты: раскрасить пины по метрике + легенда */
@@ -7704,7 +7712,54 @@ async function initPropMap(props) {
     el.appendChild(ctl);
     ctl.querySelectorAll('[data-metric]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.mapMetric = b.dataset.metric; render(); }));
   } catch (_) {}
+  /* ⭐ панель СРАВНЕНИЯ: выбранные с карты объекты (до 3) → сравнить бок-о-бок */
+  try {
+    const oldc = el.querySelector('.prcmp'); if (oldc) oldc.remove();
+    const cmp = (PAGE_STATE.compare || []).map(id => items.find(x => x.id === id) || (props.find(x => x.id === id))).filter(Boolean);
+    if (cmp.length) {
+      const bar = document.createElement('div'); bar.className = 'prcmp';
+      bar.innerHTML = `<div class="prcmp-items">${cmp.map(c => `<span class="prcmp-chip" title="${esc(c.name)}"><span class="prcmp-th" style="background-image:url('${esc((c.images || [])[0] || '')}')"></span>${esc(c.name.slice(0, 18))}<b data-cmpdel="${c.id}">×</b></span>`).join('')}</div><div class="prcmp-acts"><button class="btn btn-sm btn-accent" id="prCmpGo"${cmp.length < 2 ? ' disabled' : ''}>Сравнить ${cmp.length}</button><button class="btn btn-sm" id="prCmpClear">Очистить</button></div>`;
+      el.appendChild(bar);
+      bar.querySelectorAll('[data-cmpdel]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = (PAGE_STATE.compare || []).filter(x => x !== b.dataset.cmpdel); render(); }));
+      bar.querySelector('#prCmpClear').addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = []; render(); });
+      const go = bar.querySelector('#prCmpGo'); if (go) go.addEventListener('click', (e) => { e.stopPropagation(); openCompareModal(cmp); });
+    }
+  } catch (_) {}
   [120, 350, 800].forEach(t => setTimeout(() => { try { map.invalidateSize(); zoomFit(); } catch (_) {} }, t));
+}
+/* модалка сравнения 2-3 объектов бок-о-бок (цена/ROI/площадь/спальни/сдача/район) */
+function openCompareModal(list) {
+  const rows = [
+    ['Цена от', p => p.priceFrom ? priceHtml(p.priceFrom, p.currency, '') : '—'],
+    ['Район', p => esc(p.area || '—')],
+    ['Застройщик', p => esc(p.developer && p.developer !== '—' ? p.developer : '—')],
+    ['Тип', p => esc(p.type || '—')],
+    ['Доходность', p => esc(p.roi || '—')],
+    ['Прирост', p => esc(p.appreciation || '—')],
+    ['Сдача', p => esc(p.handover || '—')],
+    ['Юнитов', p => (p.units || []).length || '—'],
+    ['Рынок', p => p.market === 'secondary' ? 'Вторичка' : 'Первичка'],
+  ];
+  const body = `<div class="cmp-tbl" style="grid-template-columns:120px repeat(${list.length},1fr)">
+    <div class="cmp-h"></div>${list.map(p => `<div class="cmp-h cmp-card"><span class="cmp-th" style="background-image:url('${esc((p.images || [])[0] || '')}')"></span><b>${esc(p.name)}</b></div>`).join('')}
+    ${rows.map(([lbl, fn]) => `<div class="cmp-l">${lbl}</div>${list.map(p => `<div class="cmp-v">${fn(p)}</div>`).join('')}`).join('')}
+  </div>
+  <div class="cmp-ai"><button class="btn btn-accent" id="cmpAiGo" style="width:100%;justify-content:center">${ic(I.spark)}ИИ-анализ рынка (аналитик)</button><div id="cmpAiOut"></div></div>`;
+  const md = modal({ title: 'Сравнение объектов', sub: list.map(p => p.name).join(' · '), wide: true, body, actions: [{ label: 'Закрыть' }] });
+  $('#cmpAiGo', md).addEventListener('click', async (e) => {
+    const btn = e.target.closest('button'); btn.disabled = true; const out = $('#cmpAiOut', md);
+    out.innerHTML = motionLoader('Аналитик рынка сравнивает проекты…', 'web');
+    const r = await api.post('/properties/compare', { ids: list.map(p => p.id), lang: LANG }).catch(() => ({ error: 'сеть' }));
+    if (r.error || !r.analysis) { out.innerHTML = '<div style="color:var(--bad);font-size:13px;padding:10px 0">' + esc(r.error || 'не вышло') + '</div>'; btn.disabled = false; return; }
+    const a = r.analysis;
+    out.innerHTML = `<div class="cmp-ai-box">
+      <div class="cmp-ai-sum">${esc(a.summary || '')}</div>
+      <div class="cmp-ai-verd">${(a.verdicts || []).map(v => `<div class="cmp-ai-v"><b>${esc(v.name)}</b><div class="cmp-ai-fw">${esc(v.forWhom || '')}</div><ul class="cmp-ai-pros">${(v.pros || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul><ul class="cmp-ai-cons">${(v.cons || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div>
+      ${a.bestFor ? `<div class="cmp-ai-best"><span>💎 Инвестиции: <b>${esc(a.bestFor.investment || '—')}</b></span><span>🏡 Для жизни: <b>${esc(a.bestFor.living || '—')}</b></span><span>💰 По бюджету: <b>${esc(a.bestFor.budget || '—')}</b></span></div>` : ''}
+      ${a.analystNote ? `<div class="cmp-ai-note">${ic(I.spark, 2)}${esc(a.analystNote)}</div>` : ''}
+    </div>`;
+    btn.style.display = 'none';
+  });
 }
 
 PAGES.properties = async (root) => {
