@@ -4435,6 +4435,18 @@ const SELCFG_PROPS = {
       if (list.length < 2) return toast('Нужно минимум 2 объекта');
       openCompareModal(list);
     } },
+    { id: 'bulkEnrich', label: 'Дополнить из сети', ic: I.spark, run: async () => {
+      const ids = [...selSet('properties')]; if (!ids.length) return;
+      showLoader(`Дополняю из сети… 0/${ids.length}`, 'web'); let ok = 0;
+      for (let i = 0; i < ids.length; i++) { setLoader(`Дополняю из сети… ${i + 1}/${ids.length}`); try { const r = await api.post('/properties/' + ids[i] + '/enrich', { apply: true, media: true, units: true }); if (!r.error) ok++; } catch (_) {} }
+      hideLoader(); selSet('properties').clear(); toast('Готово', `дополнено объектов: ${ok}/${ids.length}`, true); render();
+    } },
+    { id: 'bulkCurate', label: 'Отобрать фото', ic: I.image || I.eye, run: async () => {
+      const ids = [...selSet('properties')]; if (!ids.length) return;
+      showLoader(`ИИ отбирает фото… 0/${ids.length}`, 'card'); let ok = 0;
+      for (let i = 0; i < ids.length; i++) { setLoader(`ИИ отбирает фото… ${i + 1}/${ids.length}`); try { const r = await api.post('/properties/' + ids[i] + '/curate-photos', {}); if (!r.error) ok++; } catch (_) {} }
+      hideLoader(); selSet('properties').clear(); toast('Готово', `обработано: ${ok}/${ids.length}`, true); render();
+    } },
     { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
     { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} объект(ов)?`, sub: 'Карточки объектов удалятся. Подборки, где они были, не тронутся.', ok: 'Удалить', danger: true }) },
   ],
@@ -7642,6 +7654,11 @@ function motionLoader(label, variant) {
      Один премиум-визуал на все процессы, различает подпись под ним (variant — для совместимости). */
   return `<div class="lm-load lm-${variant || 'ring'}"><div class="lm-hf"><img src="/assets/ui/loader-orb.png?v=1" alt="" draggable="false"><span class="lm-hf-sweep"></span></div><div class="lm-load-tx">${esc(label || 'Работаю')}</div></div>`;
 }
+/* глобальный полноэкранный моушн-лоадер ПОВЕРХ всего (z выше карты/модалок) — для долгих операций.
+   Фикс: раньше лоадер в попапе карты закрывался hover-intent'ом / уходил за карту. */
+function showLoader(label, variant) { hideLoader(); const d = document.createElement('div'); d.className = 'lm-overlay'; d.innerHTML = motionLoader(label, variant); document.body.appendChild(d); window._lmOverlay = d; return d; }
+function setLoader(label) { if (window._lmOverlay) { const t = window._lmOverlay.querySelector('.lm-load-tx'); if (t) t.textContent = label; } }
+function hideLoader() { if (window._lmOverlay) { try { window._lmOverlay.remove(); } catch (_) {} window._lmOverlay = null; } }
 /* язык карточки объекта (для просмотра/шеринга); по умолчанию = язык интерфейса */
 let CARD_LANG = (typeof LANG !== 'undefined' ? LANG : 'ru');
 const CARD_LANGS = [['ru', 'Русский', '🇷🇺'], ['en', 'English', '🇬🇧'], ['es', 'Español', '🇪🇸'], ['de', 'Deutsch', '🇩🇪'], ['fr', 'Français', '🇫🇷'], ['it', 'Italiano', '🇮🇹'], ['ar', 'العربية', '🇦🇪'], ['zh', '中文', '🇨🇳'], ['th', 'ไทย', '🇹🇭']];
@@ -7770,10 +7787,9 @@ async function initPropMap(props) {
     const b = root2.querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propFrom = 'map'; render(); });   /* propMap оставляем true → «Назад» вернёт на карту */
     const h = root2.querySelector('[data-prophydrate]');
     if (h) h.addEventListener('click', async () => {
-      clearPopT(); const body = root2.querySelector('.prpop-b'); const bak = body ? body.innerHTML : '';
-      if (body) body.innerHTML = motionLoader('ИИ собирает карточку — цена, юниты, фото…', 'card');   /* индикатор прямо в попапе */
-      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true, lang: LANG }); if (r.error) { toast('Не вышло', r.error); if (body) body.innerHTML = bak; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
-      catch (err) { toast('Ошибка', err.message); if (body) body.innerHTML = bak; }
+      clearPopT(); showLoader('ИИ собирает карточку — цена, юниты, фото…', 'card');   /* глобальный оверлей ПОВЕРХ карты (попап закрывался hover-intent'ом) */
+      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true, lang: LANG }); hideLoader(); if (r.error) { toast('Не вышло', r.error); return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
+      catch (err) { hideLoader(); toast('Ошибка', err.message); }
     });
     const cm = root2.querySelector('[data-propcmp]');
     if (cm) cm.addEventListener('click', (e) => {
@@ -8040,7 +8056,7 @@ PAGES.properties = async (root) => {
           <div class="pds-grid c3 media">
             <div>
               <label class="lc-lbl">Фото и интерьеры · первое — обложка ${(pr.images || []).length ? `<button class="btn btn-xs pd-curate" id="pdCurate" title="ИИ уберёт логотипы/текст-слайды и подпишет каждое фото">${ic(I.spark, 2)}Отобрать и подписать</button>` : ''}</label>
-              <div class="pd-imgs">${(pr.images || []).map((u, ix) => `<div class="pd-img" style="background-image:url('${esc(u)}')"><button class="pd-x" data-imgdel="${ix}">${ic(I.x)}</button>${(pr.imageMeta && pr.imageMeta[u]) ? `<span class="pd-img-cap">${esc(pr.imageMeta[u])}</span>` : ''}</div>`).join('') || '<div class="muted" style="font-size:12px">Фото нет — вставьте ссылки</div>'}</div>
+              <div class="pd-imgs">${(pr.images || []).map((u, ix) => `<div class="pd-img${ix === 0 ? ' is-cover' : ''}" style="background-image:url('${esc(u)}')"><button class="pd-x" data-imgdel="${ix}">${ic(I.x)}</button>${ix === 0 ? '<span class="pd-cover-badge">обложка</span>' : `<button class="pd-cover-set" data-imgcover="${ix}" title="Сделать обложкой">${ic(I.check, 2)}обложка</button>`}${(pr.imageMeta && pr.imageMeta[u]) ? `<span class="pd-img-cap">${esc(pr.imageMeta[u])}</span>` : ''}</div>`).join('') || '<div class="muted" style="font-size:12px">Фото нет — вставьте ссылки</div>'}</div>
               <div class="lc-note-row" style="margin-top:10px"><input id="pdImgUrl" placeholder="https://…jpg"><button class="btn btn-sm" id="pdImgAdd">${ic(I.plus)}</button></div>
             </div>
             <div>
@@ -8134,6 +8150,7 @@ PAGES.properties = async (root) => {
     chipAdder('amenAddInp', 'amenAddBtn', 'amenities');
     $('#pdImgAdd').addEventListener('click', async () => { const u = $('#pdImgUrl').value.trim(); if (!u) return; await upd({ images: [...(pr.images || []), u] }); render(); });
     $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
+    $$('[data-imgcover]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const ix = +b.dataset.imgcover; const u = pr.images[ix]; if (!u) return; await upd({ images: [u, ...pr.images.filter((_, i) => i !== ix)] }); render(); }));   /* сделать фото обложкой (в начало) */
     $('#pdCurate')?.addEventListener('click', async (e) => {
       const btn = e.target.closest('button'); btn.disabled = true; btn.innerHTML = '<span class="enr-spin"></span>ИИ смотрит фото…';
       const r = await api.post('/properties/' + pr.id + '/curate-photos', {}).catch(e => ({ error: e.message || 'сеть' }));   /* показываем РЕАЛЬНУЮ ошибку сервера */

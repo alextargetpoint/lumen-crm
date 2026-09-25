@@ -232,6 +232,10 @@ input[type=number] { -moz-appearance: textfield; }
 .enr-gap { font-size: 9.5px; font-weight: 700; color: #b8501c; background: #fbe9dd; padding: 1px 6px; border-radius: 6px; vertical-align: middle; margin-left: 6px; }
 /* ── премиум моушн-лоадер (вращающееся кольцо + пульс-ядро + бегущие точки) ── */
 .lm-load { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; padding: 26px 0; }
+/* глобальный оверлей-лоадер поверх карты/модалок (z: 4600 > modal 4000 > leaflet) */
+.lm-overlay { position: fixed; inset: 0; z-index: 4600; display: grid; place-items: center; background: rgba(20,17,12,.55); backdrop-filter: blur(4px); animation: prpopIn .18s ease; }
+.lm-overlay .lm-load { background: var(--bg-2, #faf7f0); border-radius: 20px; padding: 30px 44px; box-shadow: 0 30px 70px -18px rgba(0,0,0,.6); }
+:root[data-night] .lm-overlay .lm-load { background: #17130d; }
 .lm-orb { position: relative; width: 44px; height: 44px; }
 .lm-orb i { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 90deg, transparent 0 20%, color-mix(in srgb, var(--accent, #b8863c) 88%, transparent) 90%); -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 3.5px), #000 0); mask: radial-gradient(farthest-side, #0000 calc(100% - 3.5px), #000 0); animation: lmSpin .95s cubic-bezier(.55,.15,.45,.85) infinite; }
 .lm-orb b { position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--accent, #b8863c); animation: lmPulse 1.5s ease-out infinite; }
@@ -429,6 +433,12 @@ input[type=number] { -moz-appearance: textfield; }
 .pd-curate svg { width: 12px; height: 12px; }
 .pd-img { position: relative; }
 .pd-img-cap { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; font-weight: 600; color: #fff; background: linear-gradient(180deg, transparent, rgba(0,0,0,.72)); padding: 12px 8px 5px; border-radius: 0 0 8px 8px; pointer-events: none; }
+.pd-img.is-cover { outline: 2px solid var(--accent, #b8863c); outline-offset: -2px; }
+.pd-cover-badge { position: absolute; left: 6px; top: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: #fff; background: var(--accent, #b8863c); padding: 2px 7px; border-radius: 6px; }
+.pd-cover-set { position: absolute; left: 6px; top: 6px; display: inline-flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 700; color: #fff; background: rgba(0,0,0,.5); border: 0; padding: 3px 7px; border-radius: 6px; cursor: pointer; opacity: 0; transition: opacity .15s; }
+.pd-img:hover .pd-cover-set { opacity: 1; }
+.pd-cover-set svg { width: 10px; height: 10px; }
+.pd-cover-set:hover { background: var(--accent, #b8863c); }
 :root[data-night] .prmetric { background: rgba(20,17,12,.92); border-color: rgba(255,255,255,.1); }
 :root[data-night] .prmetric-b { color: #b8ad99; }
 
