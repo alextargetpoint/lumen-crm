@@ -954,6 +954,35 @@ async function classifyPhotos(urls) {
   return res;
 }
 
+/* ⭐ Отбор+подписи фото для карточки (мягче classifyPhotos): фото с ВОДЯНЫМ ЗНАКОМ/мелким лого — ОСТАВЛЯЕМ
+   (это реальные фото проекта). Убираем только чистый мусор: коллаж логотипов, прайс-таблицы, текст-слайды,
+   инфографику, обрезки. items: {mime,data} или URL. Возвращает [{keep, kind:'photo|plan|junk', caption}]. */
+async function curatePhotos(items) {
+  const list = (items || []).filter(u => (u && typeof u === 'object' && u.data) || /^https?:\/\//.test(String(u))).slice(0, 12);
+  if (!GKEY || !list.length) return list.map(() => ({ keep: true, kind: 'photo', caption: 'Фото' }));
+  const imgs = [];
+  for (const u of list) {
+    if (u && typeof u === 'object' && u.data) { imgs.push({ mime: u.mime || 'image/jpeg', data: u.data }); continue; }
+    try { const res = await withTimeout((s) => fetch(u, { signal: s }), 7000); const ct = (res.headers.get('content-type') || '').split(';')[0]; if (!/^image\/(jpeg|png|webp|gif)$/.test(ct)) { imgs.push(null); continue; } const buf = Buffer.from(await res.arrayBuffer()); if (buf.length < 900 || buf.length > 4 * 1024 * 1024) { imgs.push(null); continue; } imgs.push({ mime: ct, data: buf.toString('base64') }); } catch (e) { imgs.push(null); }
+  }
+  const avail = []; imgs.forEach((im, i) => { if (im) avail.push({ i, im }); });
+  if (!avail.length) return list.map(() => ({ keep: true, kind: 'photo', caption: 'Фото' }));
+  const parts = [{ text: `Ты — фоторедактор карточки недвижимости. Для КАЖДОГО изображения по порядку верни объект {kind, caption}.
+kind:
+- "photo" — ЛЮБОЕ пригодное фото/рендер: экстерьер здания, интерьер, бассейн/удобства, вид, пляж, локация. ВАЖНО: если это нормальное фото, но с ВОДЯНЫМ ЗНАКОМ или мелким логотипом в углу — всё равно "photo" (не выбрасывай!).
+- "plan" — архитектурная планировка/чертёж этажа (комнаты, размеры).
+- "junk" — ТОЛЬКО чистый мусор: коллаж из логотипов брендов, прайс-лист/таблица, слайд где почти один текст, инфографика, титульный слайд с крупным заголовком, сильно обрезанный/битый кадр.
+caption — короткая подпись по-русски (2-4 слова) ЧТО НА ФОТО: напр. «Вид на бассейн», «Гостиная», «Фасад комплекса», «Пляж рядом», «Лобби», «Спальня», «Вид на море». Для plan — «Планировка». Для junk — "".
+Верни СТРОГО JSON: {"items":[{"kind":"photo","caption":"…"}, …]} — РОВНО ${avail.length} в ТОМ ЖЕ порядке.` }];
+  avail.forEach(a => parts.push({ inline_data: { mime_type: a.im.mime, data: a.im.data } }));
+  let arr = [];
+  try { const out = await callGeminiVision(parts, 1200); arr = Array.isArray(out.items) ? out.items : []; }
+  catch (e) { console.error('[llm] curatePhotos: ' + e.message); return list.map(() => ({ keep: true, kind: 'photo', caption: 'Фото' })); }
+  const res = list.map(() => ({ keep: true, kind: 'photo', caption: 'Фото' }));   /* дефолт — оставить (безопасно) */
+  avail.forEach((a, j) => { const it = arr[j] || {}; const kind = ['photo', 'plan', 'junk'].includes(it.kind) ? it.kind : 'photo'; res[a.i] = { keep: kind !== 'junk', kind, caption: String(it.caption || (kind === 'plan' ? 'Планировка' : 'Фото')).slice(0, 40) }; });
+  return res;
+}
+
 /* ИИ-выделение: для каждого заголовка выбрать 1-2 САМЫХ важных слова и обернуть их **…**.
    Сервер потом превратит **…** в цветной <mark>. Одним махом на все слайды. */
 async function highlightHeadings(headings) {
@@ -1362,6 +1391,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

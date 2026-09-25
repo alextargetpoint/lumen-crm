@@ -11358,22 +11358,19 @@ ${SCR}
       };
       const items = imgs.map(toItem);
       if (!items.some(x => x)) return json(res, 400, { error: 'не удалось прочитать фото' });
-      let roles; try { roles = await llm.classifyPhotos(items.map(x => x || 'about:blank')); } catch (e) { return json(res, 400, { error: 'vision: ' + e.message }); }
-      const CAP = { render_ext: 'Вид комплекса', interior: 'Интерьер', amenity: 'Инфраструктура', lifestyle: 'Локация · атмосфера', map: 'Расположение' };
-      const ORDER = { render_ext: 0, interior: 1, amenity: 2, lifestyle: 3, map: 4 };
+      let verd; try { verd = await llm.curatePhotos(items.map(x => x || 'about:blank')); } catch (e) { return json(res, 400, { error: 'vision: ' + e.message }); }
       const kept = [], plans = [], meta = {};
       imgs.forEach((u, i) => {
-        const r = roles[i] || 'other';
-        if (r === 'floorplan') { plans.push({ label: 'Планировка', url: u }); return; }
-        if (r === 'logo' || r === 'other') return;   /* текст-слайды/логотипы/мусор — вон */
-        kept.push({ u, r }); meta[u] = CAP[r] || 'Фото';
+        const v = verd[i] || { keep: true, kind: 'photo', caption: 'Фото' };
+        if (v.kind === 'plan') { plans.push({ label: v.caption || 'Планировка', url: u }); return; }
+        if (!v.keep) return;   /* только чистый мусор (лого-коллаж/прайс/текст-слайд) */
+        kept.push(u); meta[u] = v.caption || 'Фото';
       });
-      kept.sort((a, b) => (ORDER[a.r] ?? 9) - (ORDER[b.r] ?? 9));   /* обложка = лучший рендер */
       const rest = (pr.images || []).slice(12);   /* хвост >12 не трогаем (не классифицировали) */
       const removed = imgs.length - kept.length - plans.length;
       /* ЗАЩИТА: если ИИ забраковал ВСЁ (вероятно сбой распознавания) — НЕ трогаем фото */
       if (!kept.length && !plans.length && !rest.length) return json(res, 200, { ok: true, kept: 0, plans: 0, removed: 0, noop: true, property: pr });
-      pr.images = [...kept.map(x => x.u), ...rest];
+      pr.images = [...kept, ...rest];
       if (plans.length) { pr.layouts = [...(pr.layouts || []), ...plans].slice(0, 20); }
       pr.imageMeta = Object.assign({}, pr.imageMeta, meta);
       pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: `Фото отобраны ИИ: оставлено ${kept.length}, планировок ${plans.length}, убрано ${removed}` });
