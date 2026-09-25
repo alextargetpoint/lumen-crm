@@ -8055,7 +8055,9 @@ const server = http.createServer(async (req, res) => {
         }
       } catch (e) {}
       const fallback = { USD: 1, EUR: 0.92, AED: 3.6725, THB: 36, IDR: 16300, RUB: 92, GBP: 0.79, TRY: 34 };
-      return json(res, 200, global.__FX || { base: 'USD', rates: fallback, at: Date.now(), stale: true });
+      const out = global.__FX || { base: 'USD', rates: fallback, at: Date.now(), stale: true };
+      const acctBase = (db.settings && db.settings.baseCurrency) || (db.settings && db.settings.currency) || 'USD';   /* базовая валюта КАБИНЕТА (курсы всегда от USD) */
+      return json(res, 200, Object.assign({}, out, { base: acctBase, rateBase: 'USD' }));
     }
     /* полный сброс данных, подтянутых из кабинета (объявления из синка) */
     if (p === '/api/metaads/reset' && req.method === 'POST') {
@@ -11913,12 +11915,6 @@ ${SCR}
       return json(res, 200, seatAudit(db));
     }
     if (p === '/api/marketdata' && req.method === 'GET') return json(res, 200, MARKET);
-    /* онлайн-курсы валют + базовая валюта агентства (для показа «нативная цена ≈ в моей валюте») */
-    if (p === '/api/fx' && req.method === 'GET') {
-      const rates = await getFxRates();
-      const base = (db.settings && db.settings.baseCurrency) || (db.settings && db.settings.currency) || 'USD';
-      return json(res, 200, { ok: true, base, rates, at: _fx.at });
-    }
     if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, playbook.PLAYBOOK);
 
     /* ===== Академия продаж (методология Ольги Синенко) ===== */
