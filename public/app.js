@@ -343,6 +343,21 @@ function enhanceControls(root) {
     btns.querySelector('.num-up').addEventListener('click', () => bump(1));
     btns.querySelector('.num-dn').addEventListener('click', () => bump(-1));
   });
+  /* денежные инпуты → разделители разрядов (пробел, как в toLocaleString ru-RU) — длинные цены читаемы; live-формат с сохранением каретки */
+  $$('input[data-money]', root).forEach(inp => {
+    if (inp.dataset.moneyEnh) return; inp.dataset.moneyEnh = '1';
+    const fmt = (s) => String(s).replace(/[^\d]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const reformat = () => {
+      const caret = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+      const dBefore = (inp.value.slice(0, caret).match(/\d/g) || []).length;
+      inp.value = fmt(inp.value);
+      let pos = 0, seen = 0;
+      while (pos < inp.value.length && seen < dBefore) { if (/\d/.test(inp.value[pos])) seen++; pos++; }
+      try { inp.setSelectionRange(pos, pos); } catch (_) {}
+    };
+    if (inp.value) inp.value = fmt(inp.value);
+    inp.addEventListener('input', reformat);
+  });
   /* селекты → стилизованный дропдаун (нативный остаётся хранителем значения) */
   $$('select', root).forEach(sel => {
     if (sel.dataset.enh || sel.closest('.cs')) return;
@@ -2887,6 +2902,7 @@ async function render() {
         wireHeroArt(c0);
         mountHeroVideos(c0);
         applyI18n(c0);  /* авто-перевод контента при LANG='en' (пер-нодовый, по словарю) */
+        try { renderCompareBar(); } catch (_) {}   /* глобальная панель сравнения: появляется/исчезает на каждом переходе */
         /* анти-дубль заголовка: раздел со своим крупным заголовком (.ha-title/.sh-h-t/.plo-h1) не должен
            повторять название ещё и в топбаре («сверху и снизу») — прячем текст топбара, оставляя эмблему/действия.
            Разделы без своего заголовка (Настройки/Профиль/Оплата/Роли/Воронка/Обзор) сохраняют заголовок топбара. */
@@ -7542,6 +7558,7 @@ function curSym(c) { return ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RU
 let FX = { base: 'USD', rates: { USD: 1, EUR: 0.92, AED: 3.67, THB: 36, RUB: 92, IDR: 15800, GBP: 0.79 } };
 async function loadFx() { try { const r = await api.get('/fx'); if (r && r.rates) FX = { base: (r.base || 'USD').toUpperCase(), rates: r.rates }; } catch (_) {} }
 function money(v, cur) { return curSym(cur) + Math.round(+v || 0).toLocaleString('ru-RU'); }
+function numRaw(v) { return +String(v == null ? '' : v).replace(/[^\d.]/g, '') || 0; }   /* «5 090 000» из форматированного денежного инпута → число */
 /* коррекция валюты на ОТОБРАЖЕНИИ (не трогаем базу): THB-суммы с меткой USD в Пхукете и т.п. */
 function fixCur(geo, price, cur) { cur = String(cur || '').toUpperCase(); price = +price || 0; if ((geo === 'phuket' || geo === 'thailand') && cur !== 'THB' && price > 1200000) return 'THB'; if (geo === 'bali' && cur !== 'IDR' && price > 200000000) return 'IDR'; return cur || 'USD'; }
 /* «от»-цена для показа: минимальный юнит с ценой (консистентно с таблицей юнитов), иначе priceFrom */
@@ -7832,16 +7849,18 @@ async function initPropMap(props) {
 }
 /* закреплённая панель сравнения на карте (обновляется без перерисовки карты) */
 function renderCompareBar() {
-  const el = window._prMapEl; if (!el) return;
-  const oldc = el.querySelector('.prcmp'); if (oldc) oldc.remove();
-  const src = window._prItems || [];
+  /* ГЛОБАЛЬНАЯ панель: живёт на body (fixed), видна на ЛЮБОМ виде объектов (список/карта/карточка) —
+     раньше крепилась к карте (_prMapEl) и исчезала при уходе в карточку → «второй объект не добавить». */
+  const old = document.getElementById('prCmpBar'); if (old) old.remove();
+  if (typeof CUR !== 'undefined' && CUR !== 'properties') return;   /* только в разделе объектов */
+  const src = window._prAll || window._prItems || [];
   const cmp = (PAGE_STATE.compare || []).map(id => src.find(x => x.id === id)).filter(Boolean);
   if (!cmp.length) return;
-  const bar = document.createElement('div'); bar.className = 'prcmp';
-  bar.innerHTML = `<div class="prcmp-cnt">${cmp.length} ${plural(cmp.length, 'объект', 'объекта', 'объектов')} для сравнения</div><div class="prcmp-items">${cmp.map(c => `<span class="prcmp-chip" title="${esc(c.name)}"><span class="prcmp-th" style="background-image:url('${esc((c.images || [])[0] || '')}')"></span>${esc(c.name.slice(0, 16))}<b data-cmpdel="${c.id}">×</b></span>`).join('')}</div><div class="prcmp-acts"><button class="btn btn-sm btn-accent" id="prCmpGo"${cmp.length < 2 ? ' disabled title="выберите минимум 2"' : ''}>${ic(I.layers || I.grid, 2)}Показать сравнительные моменты</button><button class="btn btn-sm" id="prCmpClear">Очистить</button></div>`;
-  el.appendChild(bar);
-  bar.querySelectorAll('[data-cmpdel]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = (PAGE_STATE.compare || []).filter(x => x !== b.dataset.cmpdel); renderCompareBar(); }));
-  bar.querySelector('#prCmpClear').addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = []; renderCompareBar(); });
+  const bar = document.createElement('div'); bar.id = 'prCmpBar'; bar.className = 'prcmp';
+  bar.innerHTML = `<div class="prcmp-cnt">${ic(I.layers || I.grid, 2)}<b>${cmp.length}</b> ${plural(cmp.length, 'объект', 'объекта', 'объектов')} для сравнения</div><div class="prcmp-items">${cmp.map(c => `<span class="prcmp-chip" title="${esc(c.name)}"><span class="prcmp-th" style="background-image:url('${esc((c.images || [])[0] || '')}')"></span>${esc(c.name.slice(0, 18))}<b data-cmpdel="${c.id}" title="убрать">×</b></span>`).join('')}</div><div class="prcmp-acts"><button class="btn btn-sm btn-accent" id="prCmpGo"${cmp.length < 2 ? ' disabled title="выберите минимум 2"' : ''}>${ic(I.grid || I.layers, 2)}Сравнить${cmp.length >= 2 ? ' (' + cmp.length + ')' : ''}</button><button class="btn btn-sm prcmp-clear" id="prCmpClear" title="Очистить">${ic(I.x, 2)}</button></div>`;
+  document.body.appendChild(bar);
+  bar.querySelectorAll('[data-cmpdel]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = (PAGE_STATE.compare || []).filter(x => x !== b.dataset.cmpdel); renderCompareBar(); if (typeof render === 'function' && PAGE_STATE.propView) render(); }));
+  bar.querySelector('#prCmpClear').addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.compare = []; renderCompareBar(); if (PAGE_STATE.propView) render(); });
   const go = bar.querySelector('#prCmpGo'); if (go) go.addEventListener('click', (e) => { e.stopPropagation(); openCompareModal(cmp); });
 }
 /* модалка сравнения 2-3 объектов бок-о-бок (цена/ROI/площадь/спальни/сдача/район) */
@@ -7905,6 +7924,7 @@ function openCompareModal(list) {
 PAGES.properties = async (root) => {
   if (!FX._loaded) { FX._loaded = true; await loadFx(); }   /* онлайн-курсы для показа цены в базовой валюте */
   const props = await api.get('/properties');
+  window._prAll = props;   /* для глобальной панели сравнения (имена/фото объектов на любом виде) */
   const st = STATE.settings;
 
   /* -------- детальная страница объекта (inline-редактирование) -------- */
@@ -7940,6 +7960,7 @@ PAGES.properties = async (root) => {
               <span class="tb-spacer"></span>
               <div class="pd2-lang" id="pdLangDD"><select id="pdLang" title="Язык карточки — перевод для просмотра и шеринга клиенту">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
+              <button class="btn btn-sm ${(PAGE_STATE.compare || []).includes(pr.id) ? 'btn-accent' : 'pd2-ghost'}" id="pdCompare" title="Добавить в сравнение (до 3 объектов)">${ic(I.grid || I.layers)}${(PAGE_STATE.compare || []).includes(pr.id) ? 'В сравнении ✓' : 'Сравнить'}</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
             </div>
@@ -7949,7 +7970,7 @@ PAGES.properties = async (root) => {
                 <div class="pd-sub pd2-sub">${combo('area', geoMD.areas, pr.area, 'район')} ${combo('developer', geoMD.developers, pr.developer, 'застройщик')}</div>
               </div>
               <div class="pd2-priceside">
-                <div class="pd2-price">от <input class="gi gi-price pd2-priceinp" data-f="priceFrom" type="number" value="${pr.priceFrom}"><select class="gi pd2-cur" data-f="currency" title="Валюта — поправьте, если распозналась неверно">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'IDR', 'GBP'].map(c => `<option ${(pr.currency || 'USD').toUpperCase() === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+                <div class="pd2-price">от <input class="gi gi-price pd2-priceinp" data-f="priceFrom" type="text" inputmode="numeric" data-money value="${pr.priceFrom}"><select class="gi pd2-cur" data-f="currency" title="Валюта — поправьте, если распозналась неверно">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'IDR', 'GBP'].map(c => `<option ${(pr.currency || 'USD').toUpperCase() === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
                 ${pr.priceFrom && (pr.currency || 'USD').toUpperCase() !== (FX.base || 'USD') ? `<div class="pd2-conv">≈ ${money(convTo(pr.priceFrom, pr.currency, FX.base) || 0, FX.base)} <span class="muted">в базовой (${FX.base})</span></div>` : ''}
                 <div class="pd2-selects">
                   <select id="pdMarket" style="width:128px"><option value="offplan" ${pr.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
@@ -7997,7 +8018,7 @@ PAGES.properties = async (root) => {
           </div>
           <div class="pay-calc">
             <label class="lc-lbl">Цена для расчёта</label>
-            <div class="pay-calc-in">${pr.currency === 'EUR' ? '€' : '$'}<input id="calcPrice" type="number" value="${pr.priceFrom || ''}" placeholder="цена юнита"></div>
+            <div class="pay-calc-in">${pr.currency === 'EUR' ? '€' : '$'}<input id="calcPrice" type="text" inputmode="numeric" data-money value="${pr.priceFrom || ''}" placeholder="цена юнита"></div>
             <span class="pay-total ${Math.round(rowsSum) === 100 ? 'ok' : rowsSum ? 'warn' : ''}">${rowsSum ? 'этапы дают ' + Math.round(rowsSum) + '%' : 'этапов пока нет'}</span>
           </div>
           <div class="prow-list">
@@ -8019,7 +8040,7 @@ PAGES.properties = async (root) => {
           <div class="lc-note-row" style="margin-top:10px;flex-wrap:wrap">
             <input id="uPlan" placeholder="1BR" style="width:80px;flex:0 0 80px"><input id="uArea" placeholder="68 м²" style="width:80px;flex:0 0 80px">
             <input id="uFloor" placeholder="этаж" style="width:70px;flex:0 0 70px"><input id="uView" placeholder="вид" style="width:110px;flex:0 0 110px">
-            <input id="uPrice" type="number" placeholder="цена"><button class="btn btn-sm" id="uAdd">${ic(I.plus)}</button>
+            <input id="uPrice" type="text" inputmode="numeric" data-money placeholder="цена"><button class="btn btn-sm" id="uAdd">${ic(I.plus)}</button>
           </div>
           ${(pr.history && pr.history.length) ? `<details class="pd-hist"><summary>${ic(I.clock || I.doc)}Журнал карточки (${pr.history.length})</summary>
             <div class="pd-hist-list">${pr.history.slice(0, 30).map(h => `<div class="pd-hist-row"><span class="pd-hist-at">${new Date(h.at).toLocaleDateString('ru', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span class="pd-hist-ac">${esc(h.action || '')}</span>${(h.sources && h.sources.length) ? `<span class="pd-hist-src">${h.sources.slice(0, 3).map(s => `<a href="${esc(s.url)}" target="_blank" class="link">источник</a>`).join(' · ')}</span>` : ''}</div>`).join('')}</div></details>` : ''}
@@ -8090,7 +8111,7 @@ PAGES.properties = async (root) => {
       else if (f === 'paymentRowsStr') await upd({ paymentRows: inp.value.split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([p2, l2]) => ({ pct: p2.trim(), label: l2.trim() })) });
       else if (f === 'whyRentStr') await upd({ whyRent: inp.value.split('\n').map(x => x.trim()).filter(Boolean) });
       else if (f === 'investStr') await upd({ investmentHighlights: inp.value.split('\n').map(x => x.trim()).filter(Boolean) });
-      else if (f === 'priceFrom') await upd({ priceFrom: +inp.value });
+      else if (f === 'priceFrom') await upd({ priceFrom: numRaw(inp.value) });
       else await upd({ [f]: inp.value });
     }));
     $$('[data-cf2]', root).forEach(sel => sel.addEventListener('change', async () => {
@@ -8128,7 +8149,7 @@ PAGES.properties = async (root) => {
     if (prowAdd) prowAdd.addEventListener('click', async () => { await upd({ paymentRows: [...(pr.paymentRows || []), { pct: '10%', label: 'Этап' }] }); render(); });
     const calcInp = $('#calcPrice');
     if (calcInp) calcInp.addEventListener('input', () => {
-      const price = +calcInp.value || 0;
+      const price = numRaw(calcInp.value) || 0;
       $$('.prow-amt', root).forEach(sp => {
         const p2 = parseFloat(String(sp.dataset.pct).replace(',', '.')) || 0;
         const v = Math.round(price * p2 / 100);
@@ -8164,7 +8185,7 @@ PAGES.properties = async (root) => {
     $('#pdVidAdd')?.addEventListener('click', async () => { const u = $('#pdVidUrl').value.trim(); if (!/^https?:\/\//.test(u)) return; await upd({ videos: [...new Set([...(pr.videos || []), u])] }); render(); });
     $$('[data-viddel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ videos: (pr.videos || []).filter((_, ix) => ix !== +b.dataset.viddel) }); render(); }));
     $('#uAdd').addEventListener('click', async () => {
-      await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: +$('#uPrice').value }] });
+      await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: numRaw($('#uPrice').value) }] });
       render();
     });
     $$('[data-unitdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ units: pr.units.filter((_, ix) => ix !== +b.dataset.unitdel) }); render(); }));
@@ -8199,6 +8220,14 @@ PAGES.properties = async (root) => {
         } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; }
       };
       $('#recPrev', md).addEventListener('click', () => call(false));
+    });
+    $('#pdCompare')?.addEventListener('click', () => {
+      PAGE_STATE.compare = PAGE_STATE.compare || [];
+      const i = PAGE_STATE.compare.indexOf(pr.id);
+      if (i >= 0) PAGE_STATE.compare.splice(i, 1);
+      else { if (PAGE_STATE.compare.length >= 3) return toast('Максимум 3 для сравнения'); PAGE_STATE.compare.push(pr.id); }
+      toast(i >= 0 ? 'Убрано из сравнения' : 'Добавлено в сравнение', PAGE_STATE.compare.length + ' выбрано');
+      render();   /* обновит подпись кнопки + панель сравнения (глобальная, из render) */
     });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
     $('#pdLang')?.addEventListener('change', async (e) => {   /* штатный select → enhanceControls рисует атольерный дропдаун (openPop: fixed-слой, скролл, поверх всего) */
@@ -8249,7 +8278,7 @@ PAGES.properties = async (root) => {
   const F = PAGE_STATE;
   const geoF = F.propGeo || '', marketF = F.propMarket || '', q = (F.propQ || '').toLowerCase().trim();
   const bedsF = F.propBeds || '', statusF = F.propStatus || '', typeF = F.propType || '', distF = F.propDistrict || '', devF = F.propDeveloper || '';
-  const pMin = +F.propPriceMin || 0, pMax = +F.propPriceMax || 0;
+  const pMin = numRaw(F.propPriceMin) || 0, pMax = numRaw(F.propPriceMax) || 0;
   const aUnit = F.propAreaUnit || 'm2', toM2 = (v) => aUnit === 'sqft' ? v / 10.7639 : v;
   const aMin = +F.propAreaMin ? toM2(+F.propAreaMin) : 0, aMax = +F.propAreaMax ? toM2(+F.propAreaMax) : 0;
   const roiMin = parseFloat(F.propRoiMin) || 0, hFrom = +F.propHandFrom || 0, hTo = +F.propHandTo || 0;
@@ -8315,7 +8344,7 @@ PAGES.properties = async (root) => {
         <label class="pf-f"><span>Район</span><select id="prDist"><option value="">Все</option>${distsAll.map(d => `<option value="${esc(d)}" ${distF === d ? 'selected' : ''}>${esc(d.length > 40 ? d.slice(0, 40) + '…' : d)}</option>`).join('')}</select></label>
         <label class="pf-f"><span>Застройщик</span><select id="prDev"><option value="">Все</option>${devsAll.map(d => `<option value="${esc(d)}" ${devF === d ? 'selected' : ''}>${esc(d.length > 30 ? d.slice(0, 30) + '…' : d)}</option>`).join('')}</select></label>
         <label class="pf-f"><span>Наличие</span><select id="prStatus"><option value="">Всё</option><option value="avail" ${statusF === 'avail' ? 'selected' : ''}>Есть в наличии</option><option value="sold" ${statusF === 'sold' ? 'selected' : ''}>Распродано</option></select></label>
-        <label class="pf-f"><span>Цена, $</span><span class="pf-range"><input id="prPMin" type="number" placeholder="от" value="${F.propPriceMin || ''}"><input id="prPMax" type="number" placeholder="до" value="${F.propPriceMax || ''}"></span></label>
+        <label class="pf-f"><span>Цена, $</span><span class="pf-range"><input id="prPMin" type="text" inputmode="numeric" data-money placeholder="от" value="${F.propPriceMin || ''}"><input id="prPMax" type="text" inputmode="numeric" data-money placeholder="до" value="${F.propPriceMax || ''}"></span></label>
         <label class="pf-f"><span>Площадь <button type="button" id="prAUnit" class="pf-unit">${aUnit === 'sqft' ? 'sqft' : 'm²'}</button></span><span class="pf-range"><input id="prAMin" type="number" placeholder="от" value="${F.propAreaMin || ''}"><input id="prAMax" type="number" placeholder="до" value="${F.propAreaMax || ''}"></span></label>
         <label class="pf-f"><span>Доходность ROI, % от</span><input id="prRoi" type="number" placeholder="напр. 7" value="${F.propRoiMin || ''}"></label>
         <label class="pf-f"><span>Сдача, год</span><span class="pf-range"><input id="prHFrom" type="number" placeholder="от" value="${F.propHandFrom || ''}"><input id="prHTo" type="number" placeholder="до" value="${F.propHandTo || ''}"></span></label>

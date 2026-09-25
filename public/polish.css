@@ -2,6 +2,19 @@
    Только визуальные улучшения, без изменения логики/разметки. Уважает prefers-reduced-motion.
    Цель: поднять уже зрелую CRM до «живого премиума» консистентно на всех экранах. */
 
+/* ГЛОБАЛЬНОЕ ПРАВИЛО ПЕРЕНОСОВ: ни одного «висячего» слова на отдельной строке.
+   balance — заголовки (строки равной длины, слово не вылетает вниз одно);
+   pretty  — абзацы/подписи (браузер не оставляет одинокое слово последней строкой). */
+h1, h2, h3, h4, h5, h6,
+.ha-title, .sh-h-t, .plo-h1, .lc-name, .pc2-name, .pd2-name,
+[class*="-title"], [class*="-name"], [class*="-head"] > b, .modal-hd b {
+  text-wrap: balance;
+}
+p, li, .sub, .muted, .sd, .sl, .lc-hint, .lc-sub, .card-sub, .empty, figcaption,
+.pc2-loc, .prpop-l, .cmp-ai-fw, .cmp-ai-note, .set-row .sd {
+  text-wrap: pretty;
+}
+
 :root {
   --pol-ease: cubic-bezier(.22, .61, .36, 1);
   --pol-sh-1: 0 1px 2px rgba(20, 19, 17, .045), 0 2px 8px rgba(20, 19, 17, .05);
@@ -379,17 +392,20 @@ input[type=number] { -moz-appearance: textfield; }
 .pr-zonechip svg { width: 13px; height: 13px; }
 :root[data-night] .prdraw-b, :root[data-night] .prdraw-clr { background: rgba(30,26,18,.9); color: #c9c0ad; border-color: rgba(255,255,255,.1); }
 :root[data-night] .prdraw-b:hover { color: #fff; }
-/* панель сравнения на карте */
-.prcmp { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 3500; display: flex; align-items: center; gap: 16px; background: linear-gradient(180deg, rgba(30,26,18,.97), rgba(18,15,10,.98)); color: #f0e9dc; border: 1px solid rgba(205,168,97,.28); border-radius: 18px; padding: 10px 12px 10px 16px; box-shadow: 0 24px 60px -14px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(14px); max-width: min(94vw, 860px); animation: prcmpIn .3s cubic-bezier(.2,.8,.3,1); }
+/* панель сравнения — глобальная (body, fixed), светлое стекло в стиле CRM */
+.prcmp { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3500; display: flex; align-items: center; gap: 14px; background: var(--card, rgba(255,255,255,.97)); color: var(--ink, #1a2030); border: 1px solid var(--stroke, #e6e0d3); border-radius: 16px; padding: 9px 11px 9px 15px; box-shadow: 0 24px 60px -16px rgba(20,30,55,.28), 0 4px 14px rgba(20,30,55,.08); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); max-width: min(94vw, 880px); animation: prcmpIn .3s cubic-bezier(.2,.8,.3,1); }
 @keyframes prcmpIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-.prcmp-cnt { font-size: 11px; font-weight: 800; color: #cda861; letter-spacing: .4px; text-transform: uppercase; white-space: nowrap; }
+.prcmp-cnt { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-2, #5a6474); white-space: nowrap; }
+.prcmp-cnt svg { width: 15px; height: 15px; color: var(--accent); }
+.prcmp-cnt b { color: var(--accent); font-weight: 800; }
 .prcmp-items { display: flex; gap: 8px; flex-wrap: wrap; }
-.prcmp-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 650; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.09); border-radius: 11px; padding: 5px 9px 5px 5px; transition: background .15s; }
-.prcmp-chip:hover { background: rgba(255,255,255,.12); }
-.prcmp-th { width: 34px; height: 28px; border-radius: 7px; background: #2a2419 center/cover; flex: 0 0 auto; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
-.prcmp-chip b { cursor: pointer; color: #cda861; font-size: 16px; line-height: 1; padding: 0 3px; opacity: .8; transition: opacity .15s; } .prcmp-chip b:hover { opacity: 1; }
+.prcmp-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink); background: var(--blue-100, #eef2f8); border: 1px solid var(--stroke, #e6e0d3); border-radius: 11px; padding: 4px 8px 4px 4px; transition: background .15s; }
+.prcmp-chip:hover { background: color-mix(in srgb, var(--accent) 10%, var(--blue-100, #eef2f8)); }
+.prcmp-th { width: 34px; height: 28px; border-radius: 7px; background: #dfe5ee center/cover; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(20,30,55,.06); }
+.prcmp-chip b { cursor: pointer; color: var(--ink-3, #97a0af); font-size: 16px; line-height: 1; padding: 0 3px; transition: color .15s; } .prcmp-chip b:hover { color: var(--bad, #e05252); }
 .prcmp-acts { display: flex; gap: 7px; flex: 0 0 auto; }
-.prcmp-acts .btn-accent { box-shadow: 0 6px 18px -6px rgba(205,168,97,.6); }
+.prcmp-clear { padding: 8px 9px; }
+.prcmp-clear svg { width: 14px; height: 14px; }
 /* модалка сравнения */
 .cmp-tbl { display: grid; gap: 0; font-size: 13px; }
 .cmp-tbl > div { padding: 9px 12px; border-bottom: 1px solid var(--line); }
