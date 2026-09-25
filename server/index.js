@@ -3332,6 +3332,15 @@ async function webSearch(query, limit, opts) {
   } catch (_) { return null; }
 }
 
+const _geoCenters = {};   /* кэш центров регионов (Пхукет/Дубай…) для фолбэка геокодинга */
+async function nominatim(q) {
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q), { headers: { 'User-Agent': 'LumenCRM/1.0 (real-estate)', 'Accept-Language': 'en' } });
+    const j = await r.json().catch(() => ([]));
+    return (Array.isArray(j) && j[0]) ? { lat: +j[0].lat, lng: +j[0].lon } : null;
+  } catch (_) { return null; }
+}
+
 setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
 /* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
@@ -11075,44 +11084,55 @@ ${SCR}
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/reconcile-units$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
       const b = await readBody(req); let text = String(b.text || '').trim();
-      /* файл застройщика (Excel/CSV/текст) → в текст: Excel парсим SheetJS (все листы → CSV), ИИ разберёт кросс-таблицу */
-      if (!text && b.fileB64) {
-        try {
-          const buf = Buffer.from(String(b.fileB64).replace(/^data:[^,]*,/, ''), 'base64');
-          const nm = String(b.fileName || '').toLowerCase();
-          if (/\.(xlsx|xls)$/.test(nm) && XLSX) {
-            const wb = XLSX.read(buf, { type: 'buffer' });
-            text = wb.SheetNames.map(sn => '### ' + sn + '\n' + XLSX.utils.sheet_to_csv(wb.Sheets[sn])).join('\n\n').slice(0, 40000);
-          } else { text = buf.toString('utf8').slice(0, 40000); }
-        } catch (e) { return json(res, 400, { error: 'не разобрал файл: ' + e.message }); }
-      }
-      if (!text) return json(res, 400, { error: 'вставьте текст или файл доступности застройщика' });
-      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY)' });
-      /* большие прайсы застройщиков = сотни юнитов → ИИ обрезает JSON. Чанкаем по ~5000 симв,
-         извлекаем параллельно, мёржим (частичный успех лучше полного провала). */
       let units;
-      try {
-        if (text.length <= 5200) { units = await llm.extractUnits(text); }
-        else {
-          const chunks = []; for (let i = 0; i < text.length && chunks.length < 16; i += 5000) chunks.push(text.slice(i, i + 5000));
-          const parts = await Promise.all(chunks.map(c => llm.extractUnits(c).catch(() => [])));
-          units = parts.flat();
+      /* ⚡ ПРИ ПОДТВЕРЖДЕНИИ шлём УЖЕ разобранные из превью юниты (b.units) → НЕ гоняем ИИ повторно
+         (иначе apply снова уходил в долгую загрузку — заново парсил весь файл). */
+      if (Array.isArray(b.units) && b.units.length) {
+        units = b.units.slice(0, 600);
+      } else {
+        /* файл застройщика (Excel/CSV/текст) → в текст: Excel парсим SheetJS (все листы → CSV), ИИ разберёт кросс-таблицу */
+        if (!text && b.fileB64) {
+          try {
+            const buf = Buffer.from(String(b.fileB64).replace(/^data:[^,]*,/, ''), 'base64');
+            const nm = String(b.fileName || '').toLowerCase();
+            if (/\.(xlsx|xls)$/.test(nm) && XLSX) {
+              const wb = XLSX.read(buf, { type: 'buffer' });
+              text = wb.SheetNames.map(sn => '### ' + sn + '\n' + XLSX.utils.sheet_to_csv(wb.Sheets[sn])).join('\n\n').slice(0, 40000);
+            } else { text = buf.toString('utf8').slice(0, 40000); }
+          } catch (e) { return json(res, 400, { error: 'не разобрал файл: ' + e.message }); }
         }
-      } catch (e) { return json(res, 400, { error: 'ИИ не разобрал файл: ' + e.message }); }
-      if (!units.length) return json(res, 400, { error: 'в файле не распознались юниты (проверьте, что это прайс-лист с юнитами)' });
-      const sig = (u) => [String(u.unitNo || '').toLowerCase().replace(/\s/g, ''), String(u.type || '').toLowerCase(), String(u.floor || ''), String(u.area || u.size || '').replace(/\D/g, '')].filter(Boolean).join('|');
+        if (!text) return json(res, 400, { error: 'вставьте текст или файл доступности застройщика' });
+        if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY)' });
+        /* большие прайсы застройщиков = сотни юнитов → ИИ обрезает JSON. Чанкаем по ~5000 симв,
+           извлекаем параллельно, мёржим (частичный успех лучше полного провала). */
+        try {
+          if (text.length <= 5200) { units = await llm.extractUnits(text); }
+          else {
+            const chunks = []; for (let i = 0; i < text.length && chunks.length < 16; i += 5000) chunks.push(text.slice(i, i + 5000));
+            const parts = await Promise.all(chunks.map(c => llm.extractUnits(c).catch(() => [])));
+            units = parts.flat();
+          }
+        } catch (e) { return json(res, 400, { error: 'ИИ не разобрал файл: ' + e.message }); }
+      }
+      if (!units || !units.length) return json(res, 400, { error: 'в файле не распознались юниты (проверьте, что это прайс-лист с юнитами)' });
+      const sig = (u) => [String(u.unitNo || '').toLowerCase().replace(/\s/g, ''), String(u.type || u.plan || '').toLowerCase(), String(u.floor || ''), String(u.area || u.size || '').replace(/\D/g, '')].filter(Boolean).join('|');
       pr.units = pr.units || []; const cur = pr.units;
-      const incoming = units.map(u => ({ unitNo: String(u.unitNo || '').slice(0, 20), type: String(u.type || '').slice(0, 20), beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40), status: 'available', updatedAt: Date.now() }));
+      /* валюта: берём доминирующую из AI; если пусто — эвристика по гео (Пхукет/Таиланд + крупные суммы = THB) */
+      const domCur = (() => { const c = {}; units.forEach(u => { const k = String(u.currency || '').toUpperCase().replace(/[^A-Z]/g, ''); if (/^(USD|EUR|AED|THB|RUB|IDR|GBP)$/.test(k)) c[k] = (c[k] || 0) + 1; }); return Object.keys(c).sort((a, b) => c[b] - c[a])[0] || ''; })();
+      const guessCur = (u) => { let c = String(u.currency || '').toUpperCase().replace(/[^A-Z]/g, ''); if (!/^(USD|EUR|AED|THB|RUB|IDR|GBP)$/.test(c)) c = domCur; if (!c) { const pz = +u.price || 0; if ((pr.geo === 'phuket' || pr.geo === 'thailand') && pz > 500000) c = 'THB'; else c = pr.currency || 'USD'; } return c; };
+      const incoming = units.map(u => { const t = String(u.type || u.plan || '').slice(0, 20); return { unitNo: String(u.unitNo || '').slice(0, 20), type: t, plan: t, beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, currency: guessCur(u), view: String(u.view || '').slice(0, 40), status: 'available', updatedAt: Date.now() }; });
       const inSig = new Set(incoming.map(sig)); const curSig = new Map(cur.map(u => [sig(u), u]));
       const added = incoming.filter(u => !curSig.has(sig(u)));
       const sold = cur.filter(u => u.status !== 'sold' && !inSig.has(sig(u)));
       const kept = incoming.filter(u => curSig.has(sig(u)));
-      if (!b.apply) return json(res, 200, { preview: true, added: added.length, sold: sold.length, kept: kept.length, total: incoming.length, sample: { added: added.slice(0, 6), sold: sold.slice(0, 6) } });
+      /* превью ВОЗВРАЩАЕТ разобранные юниты → apply пришлёт их назад, ИИ повторно НЕ гоняем */
+      if (!b.apply) return json(res, 200, { preview: true, added: added.length, sold: sold.length, kept: kept.length, total: incoming.length, currency: domCur || (incoming[0] && incoming[0].currency) || '', units: incoming, sample: { added: added.slice(0, 6), sold: sold.slice(0, 6) } });
       const merged = [];
       for (const u of incoming) { const ex = curSig.get(sig(u)); merged.push(Object.assign({}, ex || {}, u, { status: 'available' })); }
       for (const u of cur) { if (!inSig.has(sig(u))) merged.push(Object.assign({}, u, { status: 'sold', soldAt: u.soldAt || Date.now() })); }
       pr.units = merged.slice(0, 500); pr.unitsUpdatedAt = Date.now();
-      if (incoming.length && (!pr.priceFrom || Math.min(...incoming.filter(u => u.price).map(u => u.price)) < pr.priceFrom)) { const mn = Math.min(...incoming.filter(u => u.price).map(u => u.price)); if (mn && isFinite(mn)) pr.priceFrom = mn; }
+      const priced = incoming.filter(u => u.price > 0);
+      if (priced.length) { const mn = Math.min(...priced.map(u => u.price)); if (mn && isFinite(mn) && (!pr.priceFrom || mn < pr.priceFrom || (domCur && domCur !== pr.currency))) { pr.priceFrom = mn; if (domCur) pr.currency = domCur; } }   /* синхроним валюту заголовка с валютой юнитов */
       store.save();
       return json(res, 200, { ok: true, added: added.length, sold: sold.length, kept: kept.length, available: merged.filter(u => u.status === 'available').length });
     }
@@ -11149,44 +11169,78 @@ ${SCR}
       let projects; try { projects = await llm.extractCatalog(rp.markdown || rp.html); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал каталог: ' + e.message }); }
       const absU = (u2) => { try { return new URL(u2, catUrl).href; } catch (_) { return ''; } };
       db.properties = db.properties || [];
-      let created = 0, skipped = 0;
+      /* новые (не дубли) проекты + их обложки — скачиваем ПАРАЛЛЕЛЬНО (одна обложка на стаб, чтобы карточки
+         каталога были не пустыми серыми, а с фото — см. просьбу пользователя) */
+      const fresh = [];
       for (const pj of (projects || []).slice(0, 80)) {
-        const nm = String(pj.name || '').trim(); if (nm.length < 3) { skipped++; continue; }
+        const nm = String(pj.name || '').trim(); if (nm.length < 3) continue;
         const src = absU(pj.url || '');
         const dup = db.properties.find(x => (src && x.sourceUrl === src) || (x.name || '').toLowerCase().trim() === nm.toLowerCase());
-        if (dup) { skipped++; continue; }
+        if (dup) continue;
+        fresh.push({ pj, nm, src, image: absU(pj.image || '') });
+      }
+      const covers = await Promise.all(fresh.map(f => (f.image && /^https?:\/\//.test(f.image)) ? downloadImageToAsset(f.image).catch(() => null) : Promise.resolve(null)));
+      let created = 0;
+      fresh.forEach((f, i) => {
+        const cover = covers[i] && covers[i].url;
         db.properties.push({
-          id: store.nextId('pr'), name: nm.slice(0, 120), area: String(pj.area || '').slice(0, 80),
-          developer: '', market: 'offplan', type: String(pj.type || '').slice(0, 20), beds: 0,
-          priceFrom: +pj.priceFrom || 0, currency: (String(pj.currency || '').toUpperCase().match(/USD|EUR|AED|THB/) || ['USD'])[0],
-          geo: b.geo || 'phuket', tags: ['каталог'], materials: [], images: [], units: [], layouts: [], amenities: [],
-          sourceUrl: src || null, stub: true, catalogPortal: b.portal || 'custom', addedAt: Date.now(),
+          id: store.nextId('pr'), name: f.nm.slice(0, 120), area: String(f.pj.area || '').slice(0, 80),
+          developer: '', market: 'offplan', type: String(f.pj.type || '').slice(0, 20), beds: 0,
+          priceFrom: +f.pj.priceFrom || 0, currency: (String(f.pj.currency || '').toUpperCase().match(/USD|EUR|AED|THB/) || ['USD'])[0],
+          geo: b.geo || 'phuket', tags: ['каталог'], materials: [], images: cover ? [cover] : [], units: [], layouts: [], amenities: [],
+          sourceUrl: f.src || null, stub: true, catalogPortal: b.portal || 'custom', addedAt: Date.now(),
         });
         created++;
-      }
+      });
+      const skipped = (projects || []).length - created;
       store.save();
-      return json(res, 200, { ok: true, created, skipped, total: (projects || []).length });
+      return json(res, 200, { ok: true, created, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length });
     }
     /* гео-кодинг объектов для карты: area → координаты (Nominatim/OSM, бесплатно), кэш на объекте.
        До 10 за вызов (rate-limit OSM ~1/сек) — клиент дёргает, пока remaining>0. */
     if (p === '/api/properties/geocode-missing' && req.method === 'POST') {
-      const GEO_LOC = { dubai: 'Dubai, United Arab Emirates', oman: 'Muscat, Oman', phuket: 'Phuket, Thailand', bali: 'Bali, Indonesia', spain: 'Spain', cyprus: 'Cyprus', turkey: 'Turkey', greece: 'Greece', pattaya: 'Pattaya, Thailand' };
-      const need = (db.properties || []).filter(pr => (pr.lat == null || pr.lng == null) && !pr.geoFail && (pr.area || pr.district && pr.district.name));
-      const batch = need.slice(0, 10); let done = 0;
+      const GEO_LOC = { dubai: 'Dubai, United Arab Emirates', oman: 'Muscat, Oman', phuket: 'Phuket, Thailand', bali: 'Bali, Indonesia', spain: 'Spain', cyprus: 'Cyprus', turkey: 'Turkey', greece: 'Greece', pattaya: 'Pattaya, Thailand', thailand: 'Thailand' };
+      const GEO_BBOX = { phuket: [7.6, 98.15, 8.25, 98.5], thailand: [5.5, 97.3, 20.5, 105.7], pattaya: [12.8, 100.8, 13.1, 101.0], dubai: [24.7, 54.8, 25.5, 55.7], oman: [16, 52, 26, 60], bali: [-8.95, 114.4, -8.0, 115.75], spain: [35.9, -9.4, 43.8, 4.4], cyprus: [34.5, 32.2, 35.8, 34.7], turkey: [35.8, 25.6, 42.2, 44.9], greece: [34.8, 19.3, 41.8, 28.3] };
+      const inBox = (geo, lat, lng) => { const b = GEO_BBOX[geo]; return !b || (lat >= b[0] && lat <= b[2] && lng >= b[1] && lng <= b[3]); };
+      /* НЕ фильтруем по geoFail → повторно пробуем ранее «провалившиеся». */
+      const need = (db.properties || []).filter(pr => (pr.lat == null || pr.lng == null) && (pr.name || pr.area || (pr.district && pr.district.name)));
+      const batch = need.slice(0, 8); let done = 0;
+      const sleep = () => new Promise(rs => setTimeout(rs, 1100));   /* rate-limit OSM */
+      const place = (pr, lat, lng, approx) => {
+        let h = 0; for (const ch of String(pr.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+        const amp = approx ? 0.03 : 0.004;   /* приблизительные (центр региона) разносим шире, точные — плотно */
+        const jx = ((h % 1000) / 1000 - 0.5) * amp, jy = (((h >> 10) % 1000) / 1000 - 0.5) * amp;
+        pr.lat = lat + jy; pr.lng = lng + jx; pr.geocodedAt = Date.now(); delete pr.geoFail; if (approx) pr.geoApprox = true; else delete pr.geoApprox;
+      };
       for (const pr of batch) {
-        const q = [pr.area || (pr.district && pr.district.name), GEO_LOC[pr.geo] || pr.geo].filter(Boolean).join(', ');
-        try {
-          const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q), { headers: { 'User-Agent': 'LumenCRM/1.0 (real-estate)', 'Accept-Language': 'en' } });
-          const j = await r.json().catch(() => ([]));
-          if (Array.isArray(j) && j[0]) {
-            /* детерминированный джиттер по id (~±250м): проекты одного района не стакаются в 1 точку → кликабельны */
-            let h = 0; for (const ch of String(pr.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-            const jx = ((h % 1000) / 1000 - 0.5) * 0.005, jy = (((h >> 10) % 1000) / 1000 - 0.5) * 0.005;
-            pr.lat = +j[0].lat + jy; pr.lng = +j[0].lon + jx; pr.geocodedAt = Date.now(); done++;
+        const geoLoc = GEO_LOC[pr.geo] || pr.geo || '';
+        const area = pr.area || (pr.district && pr.district.name) || '';
+        const raw = area.split(',').map(s => s.trim()).filter(Boolean);
+        const drop = /^(thailand|таиланд|indonesia|индонезия|united arab emirates|uae|оаэ|spain|испания|cyprus|turkey|greece|phuket|пхукет|bali|бали)$/i;
+        const bad = /(\broad\b|\bsoi\b|\bstreet\b|\brd\b|\blane\b|\bmoo\b|улиц|переул|^\d|№)/i;
+        const clean = raw.filter(s => !drop.test(s) && !bad.test(s));
+        /* 1) ПО НАЗВАНИЮ проекта (+застройщик) 2) по под-району 3) по последнему сегменту — с валидацией bbox */
+        const cands = [];
+        if (pr.name) cands.push([pr.name, pr.developer && pr.developer !== '—' ? pr.developer : '', geoLoc].filter(Boolean).join(', '));
+        if (clean.length >= 2) cands.push(clean.slice(-2).join(', ') + ', ' + geoLoc);
+        if (clean.length) cands.push(clean[clean.length - 1] + ', ' + geoLoc);
+        if (!cands.length && area) cands.push(area + ', ' + geoLoc);
+        let hit = null;
+        for (const q of cands.slice(0, 3)) { const r = await nominatim(q); await sleep(); if (r && inBox(pr.geo, r.lat, r.lng)) { hit = r; break; } }
+        /* 4) НЕ нашли по справочнику → тянем координаты из ОТКРЫТЫХ источников (веб-поиск) */
+        if (!hit && renderReady()) {
+          const sr = await webSearch([pr.name, area || geoLoc, 'coordinates location latitude longitude'].filter(Boolean).join(' '), 5);
+          if (sr && sr.text) {
+            const pairs = sr.text.match(/(-?\d{1,2}\.\d{3,})[,\s]+(-?\d{1,3}\.\d{3,})/g) || [];
+            for (const pp of pairs) { const mm = pp.match(/(-?\d{1,2}\.\d{3,})[,\s]+(-?\d{1,3}\.\d{3,})/); if (mm) { const la = +mm[1], lo = +mm[2]; if (inBox(pr.geo, la, lo)) { hit = { lat: la, lng: lo }; break; } } }
           }
-          else { pr.geoFail = true; }
-        } catch (_) { pr.geoFail = true; }
-        await new Promise(rs => setTimeout(rs, 1100));   /* уважаем rate-limit OSM */
+        }
+        if (hit) { place(pr, hit.lat, hit.lng, false); done++; }
+        else {   /* последний фолбэк — центр региона (кэш), чтобы объект ВСЁ РАВНО был на карте */
+          if (_geoCenters[pr.geo] === undefined && geoLoc) { _geoCenters[pr.geo] = await nominatim(geoLoc); await sleep(); }
+          const c = _geoCenters[pr.geo];
+          if (c) { place(pr, c.lat, c.lng, true); done++; } else { pr.geoFail = true; }
+        }
       }
       store.save();
       return json(res, 200, { ok: true, done, remaining: Math.max(0, need.length - batch.length) });

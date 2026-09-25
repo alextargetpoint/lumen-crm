@@ -229,6 +229,46 @@ input[type=number] { -moz-appearance: textfield; }
 .enr-spin { display: inline-block; width: 15px; height: 15px; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); border-radius: 50%; animation: enrSpin .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
 @keyframes enrSpin { to { transform: rotate(360deg); } }
 .enr-gap { font-size: 9.5px; font-weight: 700; color: #b8501c; background: #fbe9dd; padding: 1px 6px; border-radius: 6px; vertical-align: middle; margin-left: 6px; }
+/* ── премиум моушн-лоадер (вращающееся кольцо + пульс-ядро + бегущие точки) ── */
+.lm-load { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; padding: 26px 0; }
+.lm-orb { position: relative; width: 44px; height: 44px; }
+.lm-orb i { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 90deg, transparent 0 20%, color-mix(in srgb, var(--accent, #b8863c) 88%, transparent) 90%); -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 3.5px), #000 0); mask: radial-gradient(farthest-side, #0000 calc(100% - 3.5px), #000 0); animation: lmSpin .95s cubic-bezier(.55,.15,.45,.85) infinite; }
+.lm-orb b { position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--accent, #b8863c); animation: lmPulse 1.5s ease-out infinite; }
+@keyframes lmSpin { to { transform: rotate(360deg); } }
+@keyframes lmPulse { 0% { transform: scale(.65); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #b8863c) 45%, transparent); } 70% { transform: scale(1); box-shadow: 0 0 0 11px transparent; } 100% { transform: scale(.65); box-shadow: 0 0 0 0 transparent; } }
+.lm-load-tx { font-size: 12.5px; color: var(--muted); letter-spacing: .2px; }
+.lm-load-tx::after { content: ''; display: inline-block; width: 14px; text-align: left; animation: lmDots 1.4s steps(1,end) infinite; }
+@keyframes lmDots { 0% { content: ''; } 25% { content: '·'; } 50% { content: '··'; } 75% { content: '···'; } }
+@media (prefers-reduced-motion: reduce) { .lm-orb i { animation-duration: 2s; } .lm-orb b, .lm-load-tx::after { animation: none; } }
+/* ── юниты: сводные карточки групп (тип · площадь · цена · наличие) ── */
+.u-empty { font-size: 12px; padding: 8px 0; }
+.ugrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 9px; margin: 4px 0 2px; }
+.ugrp { border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--bg-2, #faf7f0); transition: border-color .15s, transform .15s; }
+.ugrp:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); transform: translateY(-1px); }
+.ugrp-out { opacity: .62; }
+.ugrp-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ugrp-lbl { font-size: 14px; font-weight: 750; color: var(--ink, #23201c); }
+.ugrp-area { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.ugrp-bot { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.ugrp-price { font-size: 13px; font-weight: 700; color: var(--accent, #b8863c); }
+.ugrp-av { font-size: 10.5px; color: var(--good, #6d8a4f); white-space: nowrap; }
+.ugrp-av i { color: var(--muted); font-style: normal; }
+.u-all { margin-top: 12px; }
+.u-all > summary { cursor: pointer; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; padding: 6px 0; list-style: none; }
+.u-all > summary::-webkit-details-marker { display: none; }
+.u-all > summary svg { width: 13px; height: 13px; }
+.u-all[open] > summary { color: var(--ink, #23201c); font-weight: 600; }
+.u-tbl { margin-top: 6px; }
+.u-tbl .u-price { color: var(--accent, #b8863c); font-weight: 700; white-space: nowrap; }
+.u-tbl tr.u-sold { opacity: .5; }
+.u-badge.sold { font-size: 9.5px; font-weight: 700; color: #b23; background: #fde8e8; padding: 2px 7px; border-radius: 6px; }
+:root[data-night] .ugrp { background: #1a160f; }
+/* ── районы локаций на карте: мягкие зоны + подписи ── */
+.przone { pointer-events: none; stroke-dasharray: 3 5; animation: przoneIn .5s ease both; }
+@keyframes przoneIn { from { opacity: 0; } to { opacity: 1; } }
+.przone-lbl { pointer-events: none; }
+.przone-lbl span { display: inline-block; transform: translate(-50%, -50%); white-space: nowrap; font-family: var(--serif, Cormorant, Georgia, serif); font-size: 12.5px; font-weight: 700; letter-spacing: .3px; color: #6b5426; text-shadow: 0 1px 0 rgba(255,255,255,.85), 0 0 10px rgba(255,255,255,.7); opacity: .78; }
+:root[data-night] .przone-lbl span { color: #d8c39a; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
 /* ── умный поиск (Tier 3): inline-уведомление под поиском ── */
 .pr-tier { border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line)); background: color-mix(in srgb, var(--accent) 5%, var(--bg-2, #fff)); border-radius: 12px; padding: 11px 13px; margin: 0 0 14px; animation: pfSlide .22s ease; }
 .pr-tier-hd { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink, #23201c); }

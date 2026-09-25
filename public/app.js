@@ -7507,6 +7507,69 @@ function loadLeaflet() {
   });
   return window._leafletLoading;
 }
+function curSym(c) { return ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£', IDR: 'Rp ' })[String(c || '').toUpperCase()] || (c ? c + ' ' : '$'); }
+/* Районы локаций — мягкие зоны с подписями (r в метрах). Испания = акцент на люкс-побережье Коста-дель-Соль. */
+const MAP_ZONES = {
+  phuket: [
+    { n: 'Банг Тао · Лагуна', lat: 7.996, lng: 98.293, r: 2600 }, { n: 'Лаян', lat: 8.016, lng: 98.298, r: 1600 }, { n: 'Сурин', lat: 7.974, lng: 98.279, r: 1300 },
+    { n: 'Камала', lat: 7.955, lng: 98.281, r: 1700 }, { n: 'Патонг', lat: 7.897, lng: 98.297, r: 1900 }, { n: 'Ката · Карон', lat: 7.82, lng: 98.298, r: 2100 },
+    { n: 'Раваи · Най Харн', lat: 7.777, lng: 98.325, r: 2400 }, { n: 'Чалонг', lat: 7.846, lng: 98.339, r: 2200 }, { n: 'Пхукет-таун', lat: 7.884, lng: 98.388, r: 2600 },
+    { n: 'Най Янг · Май Кхао', lat: 8.10, lng: 98.30, r: 3000 }, { n: 'Тхаланг', lat: 8.03, lng: 98.34, r: 2600 },
+  ],
+  dubai: [
+    { n: 'Dubai Marina · JBR', lat: 25.08, lng: 55.14, r: 2200 }, { n: 'Palm Jumeirah', lat: 25.112, lng: 55.138, r: 2600 }, { n: 'Downtown · Business Bay', lat: 25.188, lng: 55.27, r: 2600 },
+    { n: 'JVC · JVT', lat: 25.06, lng: 55.21, r: 2400 }, { n: 'Dubai Hills', lat: 25.10, lng: 55.24, r: 2400 }, { n: 'Creek Harbour', lat: 25.20, lng: 55.35, r: 2600 },
+    { n: 'DAMAC Hills', lat: 25.02, lng: 55.25, r: 2600 }, { n: 'Jumeirah · Umm Suqeim', lat: 25.20, lng: 55.24, r: 2400 },
+  ],
+  bali: [
+    { n: 'Чангу · Берава', lat: -8.652, lng: 115.13, r: 2600 }, { n: 'Семиньяк', lat: -8.69, lng: 115.16, r: 1800 }, { n: 'Убуд', lat: -8.507, lng: 115.263, r: 3000 },
+    { n: 'Улувату · Букит', lat: -8.82, lng: 115.09, r: 3400 }, { n: 'Санур', lat: -8.68, lng: 115.262, r: 2200 }, { n: 'Нуса-Дуа', lat: -8.80, lng: 115.23, r: 2400 },
+  ],
+  cyprus: [
+    { n: 'Лимассол', lat: 34.707, lng: 33.022, r: 4000 }, { n: 'Пафос', lat: 34.776, lng: 32.424, r: 3600 }, { n: 'Ларнака', lat: 34.916, lng: 33.63, r: 3200 }, { n: 'Айя-Напа · Протарас', lat: 34.988, lng: 33.999, r: 3400 },
+  ],
+  spain: [
+    { n: 'Марбелья', lat: 36.510, lng: -4.885, r: 3200 }, { n: 'Puerto Banús', lat: 36.487, lng: -4.953, r: 1800 }, { n: 'Golden Mile', lat: 36.503, lng: -4.918, r: 1600 },
+    { n: 'Эстепона', lat: 36.427, lng: -5.147, r: 3000 }, { n: 'Benahavís', lat: 36.522, lng: -5.045, r: 2200 }, { n: 'Sotogrande', lat: 36.286, lng: -5.28, r: 2800 },
+    { n: 'Fuengirola · Mijas', lat: 36.54, lng: -4.62, r: 3200 }, { n: 'Málaga', lat: 36.72, lng: -4.42, r: 3600 }, { n: 'Nueva Andalucía', lat: 36.503, lng: -4.96, r: 1700 },
+  ],
+};
+function drawZones(map, L, geo) {
+  const zs = MAP_ZONES[geo]; if (!zs || !window.L) return;
+  const layer = L.layerGroup().addTo(map); (window._prZoneLayers = window._prZoneLayers || []).push(layer);
+  zs.forEach(z => {
+    L.circle([z.lat, z.lng], { radius: z.r, interactive: false, className: 'przone', color: '#b8863c', weight: 1.1, opacity: 0.32, fillColor: '#b8863c', fillOpacity: 0.05 }).addTo(layer);
+    L.marker([z.lat, z.lng], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'przone-lbl', html: `<span>${z.n}</span>`, iconSize: [0, 0] }) }).addTo(layer);
+  });
+}
+/* премиум моушн-лоадер (чистый CSS, Ателье-акцент): вращающееся кольцо + пульс-ядро + бегущие точки */
+function motionLoader(label) { return `<div class="lm-load"><div class="lm-orb"><i></i><b></b></div><div class="lm-load-tx">${esc(label || 'Работаю')}</div></div>`; }
+/* Юниты минималистично: группируем по типу/планировке → сводные карточки (площадь/цена/наличие),
+   полный список — под спойлером. Разгружает «длиннющую таблицу» из сотен строк. */
+function propUnitsBlock(pr) {
+  const units = pr.units || [];
+  if (!units.length) return '<div class="u-empty muted">Юнитов пока нет — добавьте вручную ниже или нажмите «Обновить наличие».</div>';
+  const nums = (s) => (String(s || '').match(/\d+[.,]?\d*/g) || []).map(x => parseFloat(x.replace(',', '.'))).filter(x => x > 0);
+  const money = (v, c) => { if (!v) return '—'; const s = curSym(c); return v >= 1e6 ? s + (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace('.0', '') + 'M' : s + Math.round(v).toLocaleString('ru-RU'); };
+  const groups = new Map();
+  units.forEach((u, ix) => { const k = (u.type || u.plan || '').trim() || (u.beds > 0 ? u.beds + 'BR' : (/stud/i.test(u.type || '') ? 'Studio' : 'Юниты')); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(Object.assign({ _ix: ix }, u)); });
+  const cards = [...groups.entries()].map(([label, us]) => {
+    const areas = us.flatMap(u => nums(u.area));
+    const prices = us.map(u => u.price).filter(x => x > 0);
+    const cur = (us.find(u => u.currency) || {}).currency || pr.currency;
+    const avail = us.filter(u => u.status !== 'sold').length, sold = us.length - avail;
+    const rnd = (v) => Math.round(v);
+    const aR = areas.length ? (rnd(Math.min(...areas)) === rnd(Math.max(...areas)) ? rnd(areas[0]) + ' м²' : rnd(Math.min(...areas)) + '–' + rnd(Math.max(...areas)) + ' м²') : '';
+    const pR = prices.length ? (Math.min(...prices) === Math.max(...prices) ? 'от ' + money(prices[0], cur) : money(Math.min(...prices), cur) + '–' + money(Math.max(...prices), cur)) : '';
+    return `<div class="ugrp ${!avail ? 'ugrp-out' : ''}"><div class="ugrp-top"><b class="ugrp-lbl">${esc(label)}</b>${aR ? `<span class="ugrp-area">${aR}</span>` : ''}</div><div class="ugrp-bot">${pR ? `<span class="ugrp-price">${pR}</span>` : '<span class="muted" style="font-size:11px">цена по запросу</span>'}<span class="ugrp-av">${avail ? avail + ' в наличии' : 'нет в наличии'}${sold ? ` · <i>${sold} продано</i>` : ''}</span></div></div>`;
+  }).join('');
+  const rows = units.map((u2, ix) => `<tr class="${u2.status === 'sold' ? 'u-sold' : ''}"><td><b>${esc(u2.type || u2.plan || '—')}</b></td><td>${esc(u2.area || '')}</td><td>${esc(u2.floor || '')}</td><td>${esc(u2.view || '')}</td><td class="u-price">${u2.price ? money(u2.price, u2.currency || pr.currency) : '—'}</td><td>${u2.status === 'sold' ? '<span class="u-badge sold">продан</span>' : `<button class="btn-ghost" data-unitdel="${ix}">${ic(I.x)}</button>`}</td></tr>`).join('');
+  const totalAvail = units.filter(u => u.status !== 'sold').length;
+  return `<div class="ugrid">${cards}</div>
+    <details class="u-all"><summary>${ic(I.grid, 2)}Все юниты по одному (${units.length}${totalAvail < units.length ? ` · ${totalAvail} в наличии` : ''})</summary>
+      <table class="tbl u-tbl"><thead><tr><th>Тип</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    </details>`;
+}
 async function initPropMap(props) {
   const el = document.getElementById('prMap'); const status = document.getElementById('prMapStatus');
   if (!el) return;
@@ -7526,6 +7589,8 @@ async function initPropMap(props) {
   /* бесплатные OSM-тайлы (без ключа) + CSS-фильтр «Ателье» на пане тайлов (см. polish.css .prmap-atelier) */
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', crossOrigin: true }).addTo(map);
   el.classList.add('prmap-atelier');
+  /* красиво прорисованные районы локаций — мягкие зоны с подписями (interactive:false → не мешают пинам) */
+  try { const geos = [...new Set(pts.map(p => p.geo).filter(Boolean))]; geos.forEach(g => drawZones(map, L, g)); } catch (_) {}
   if (!pts.length) { if (status) status.innerHTML = 'На карте пусто — <b>импортируйте объекты</b> (кнопка «Импорт» → «По ссылке»), и они появятся тут с превью.'; }
   const bounds = []; window._prMarkers = {};
   /* hover-intent: попап открывается по наведению и закрывается, когда курсор ушёл с пина
@@ -7690,9 +7755,7 @@ PAGES.properties = async (root) => {
 
         <div class="pds">
           <div class="pds-hd"><span class="pds-ic">${ic(I.grid)}</span><div><b>Юниты</b><i>попадают таблицей в подборку и PDF</i></div><span class="tb-spacer"></span><button class="btn btn-sm" id="uReconcile" title="Вставьте прайс/сообщение застройщика или файл — ИИ обновит наличие">${ic(I.spark)}Обновить наличие</button></div>
-          <table class="tbl"><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th><th></th></tr></thead><tbody>
-            ${(pr.units || []).map((u2, ix) => `<tr><td><b>${esc(u2.plan)}</b></td><td>${esc(u2.area)}</td><td>${esc(u2.floor)}</td><td>${esc(u2.view)}</td><td style="color:var(--accent);font-weight:700">${(u2.price || 0).toLocaleString('ru-RU')}</td><td><button class="btn-ghost" data-unitdel="${ix}">${ic(I.x)}</button></td></tr>`).join('')}
-          </tbody></table>
+          ${propUnitsBlock(pr)}
           <div class="lc-note-row" style="margin-top:10px;flex-wrap:wrap">
             <input id="uPlan" placeholder="1BR" style="width:80px;flex:0 0 80px"><input id="uArea" placeholder="68 м²" style="width:80px;flex:0 0 80px">
             <input id="uFloor" placeholder="этаж" style="width:70px;flex:0 0 70px"><input id="uView" placeholder="вид" style="width:110px;flex:0 0 110px">
@@ -7846,19 +7909,22 @@ PAGES.properties = async (root) => {
           <button class="btn btn-sm" id="recPrev">${ic(I.search || I.spark)}Проверить</button>
         </div>
         <div id="recOut" style="margin-top:12px"></div>`, actions: [{ label: 'Закрыть' }] });
-      let fileB64 = '', fileName = '';
-      $('#recFile', md).addEventListener('change', (e) => { const f = e.target.files[0]; if (!f) return; fileName = f.name; $('#recFileName', md).textContent = f.name; const rd = new FileReader(); rd.onload = () => { fileB64 = String(rd.result).replace(/^data:[^,]*,/, ''); }; rd.readAsDataURL(f); });
+      let fileB64 = '', fileName = '', parsedUnits = null;
+      $('#recFile', md).addEventListener('change', (e) => { const f = e.target.files[0]; if (!f) return; fileName = f.name; parsedUnits = null; $('#recFileName', md).textContent = f.name; const rd = new FileReader(); rd.onload = () => { fileB64 = String(rd.result).replace(/^data:[^,]*,/, ''); }; rd.readAsDataURL(f); });
       const call = async (apply) => {
         const body = { apply }; const txt = $('#recText', md).value.trim();
-        if (txt) body.text = txt; else if (fileB64) { body.fileB64 = fileB64; body.fileName = fileName; } else return toast('Вставьте текст или файл');
-        const out = $('#recOut', md); out.innerHTML = '<span class="muted" style="font-size:12px">ИИ разбирает…</span>';
+        if (apply && parsedUnits) { body.units = parsedUnits; }   /* ⚡ при подтверждении шлём УЖЕ разобранное — ИИ повторно НЕ гоняем (не уходит снова в долгую загрузку) */
+        else if (txt) body.text = txt; else if (fileB64) { body.fileB64 = fileB64; body.fileName = fileName; } else return toast('Вставьте текст или файл');
+        const out = $('#recOut', md); out.innerHTML = motionLoader(apply ? 'Применяю…' : 'ИИ разбирает прайс застройщика…');
         try {
           const r = await api.post('/properties/' + pr.id + '/reconcile-units', body);
           if (r.error) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(r.error) + '</span>'; return; }
           if (apply) { toast('Наличие обновлено', `+${r.added} доступно · ${r.sold} продано · всего доступно ${r.available}`, true); closeModal(); PAGES.properties(root); return; }
-          const smpA = (r.sample && r.sample.added || []).slice(0, 5).map(u => `${esc(u.type || u.plan || '')} ${esc(u.area || '')} ${u.price ? '· ' + (+u.price).toLocaleString('ru-RU') : ''}`).join('<br>');
+          parsedUnits = r.units || null;   /* кэш для apply */
+          const cs = r.currency ? curSym(r.currency) : '';
+          const smpA = (r.sample && r.sample.added || []).slice(0, 5).map(u => `${esc(u.type || u.plan || '—')} ${esc(u.area || '')}${u.price ? ' · ' + cs + (+u.price).toLocaleString('ru-RU') : ''}`).join('<br>');
           const smpS = (r.sample && r.sample.sold || []).slice(0, 5).map(u => `${esc(u.unitNo || u.type || u.plan || '')} ${esc(u.floor || '')}`).join('<br>');
-          out.innerHTML = `<div class="rec-diff"><div><b style="color:var(--good,#6d8a4f)">+${r.added}</b> новых<br><span class="muted" style="font-size:11px">${smpA || '—'}</span></div><div><b style="color:var(--bad)">${r.sold}</b> продано/снято<br><span class="muted" style="font-size:11px">${smpS || '—'}</span></div><div><b>${r.kept}</b> без изменений</div></div>
+          out.innerHTML = `${r.currency ? `<div class="muted" style="font-size:11px;margin-bottom:8px">Валюта прайса: <b>${esc(r.currency)}</b> · распознано юнитов: <b>${r.total}</b></div>` : ''}<div class="rec-diff"><div><b style="color:var(--good,#6d8a4f)">+${r.added}</b> новых<br><span class="muted" style="font-size:11px">${smpA || '—'}</span></div><div><b style="color:var(--bad)">${r.sold}</b> продано/снято<br><span class="muted" style="font-size:11px">${smpS || '—'}</span></div><div><b>${r.kept}</b> без изменений</div></div>
             <button class="btn btn-accent" id="recApply" style="width:100%;justify-content:center;margin-top:12px">Применить (${r.added} +, ${r.sold} продано)</button>`;
           $('#recApply', md).addEventListener('click', () => call(true));
         } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; }
@@ -7868,7 +7934,7 @@ PAGES.properties = async (root) => {
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
     $('#pdEnrich').addEventListener('click', async () => {
       const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание', districtBlurb: 'Описание района', timings: 'Тайминги до мест', rentalArgs: 'Аргументы под аренду', amenities: 'Удобства комплекса', investmentHighlights: 'Инвест-аргументы', paymentPlan: 'План оплаты', hookTitle: 'Крючок-заголовок' };
-      const md = modal({ title: 'Дополнить из открытых источников', sub: `Собираю ПОЛНУЮ карточку по «${esc(pr.name)}» — факты, фото, видео-рендеры, наличие юнитов…`, body: '<div id="enrOut" class="enr-loading" style="font-size:13px;padding:18px 0"><span class="enr-spin"></span>Собираю по всем открытым источникам…</div>', actions: [{ label: 'Закрыть' }] });
+      const md = modal({ title: 'Дополнить из открытых источников', sub: `Собираю ПОЛНУЮ карточку по «${esc(pr.name)}» — факты, фото, видео-рендеры, наличие юнитов…`, body: '<div id="enrOut">' + motionLoader('Собираю по всем открытым источникам') + '</div>', actions: [{ label: 'Закрыть' }] });
       try {
         const r = await api.post('/properties/' + pr.id + '/enrich', {});   /* пусто → сервер сам берёт все гэпы карточки (комплексно) */
         const hasFields = r.proposed && Object.keys(r.proposed).length;
