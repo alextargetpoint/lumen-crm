@@ -11159,6 +11159,11 @@ ${SCR}
           if (fresh.length) { pr.units = [...(pr.units || []), ...fresh.map(u => ({ unitNo: String(u.unitNo || '').slice(0, 20), type: String(u.type || '').slice(0, 20), beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40), status: 'available', source: 'web' }))].slice(0, 400); unitsAdded = fresh.length; pr.unitsUpdatedAt = Date.now(); }
         } catch (_) {}
       }
+      /* синхрон валюты/цены: enrich мог принести цену в др. валюте → чиним и делаем headable «от» = мин. юнит */
+      (pr.units || []).forEach(u => { if (u.price) u.currency = fixMoneyCurrency(pr.geo, u.price, u.currency || pr.currency); });
+      const _pu = (pr.units || []).filter(u => u.price > 0);
+      if (_pu.length) { const mn = _pu.reduce((a, b) => b.price < a.price ? b : a); pr.priceFrom = mn.price; pr.currency = mn.currency || fixMoneyCurrency(pr.geo, mn.price, pr.currency); }
+      else if (pr.priceFrom) { pr.currency = fixMoneyCurrency(pr.geo, pr.priceFrom, pr.currency); }
       const parts = [...applied]; if (photosAdded) parts.push(photosAdded + ' фото'); if (videosAdded) parts.push(videosAdded + ' видео'); if (unitsAdded) parts.push(unitsAdded + ' юнитов');
       pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + (parts.length ? parts.join(', ') : '—'), sources: (sr.sources || []).slice(0, 4) });
       if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now();
