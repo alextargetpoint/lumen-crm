@@ -7873,7 +7873,7 @@ function openCompareModal(list) {
   $('#cmpEnrich', md)?.addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); btn.disabled = true; const out = $('#cmpEnrOut', md);
     out.innerHTML = motionLoader('Дополняю недостающее из сети…', 'web');
-    const r = await api.post('/properties/compare/enrich', { ids: list.map(p => p.id) }).catch(er => ({ error: er.message || 'сеть' }));
+    const r = await api.post('/properties/compare/fill', { ids: list.map(p => p.id) }).catch(er => ({ error: er.message || 'сеть' }));
     if (r.error || !r.items) { out.innerHTML = '<div style="color:var(--bad);font-size:12px;padding:6px 0">' + esc(r.error || 'не вышло') + '</div>'; btn.disabled = false; return; }
     closeModal(); openCompareModal(r.items); toast('Данные дополнены', 'из открытых источников', true);
   });

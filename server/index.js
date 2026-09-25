@@ -11220,7 +11220,7 @@ ${SCR}
       if (b.media !== false && webImgs.length) {
         const need = Math.max(0, 15 - (pr.images || []).length);   /* лимит 15 фото на объект (60 не нужно) */
         if (need > 0) {
-          const dl = await Promise.all(webImgs.slice(0, 40).map(u => downloadImageToAsset(u).catch(() => null)));   /* пробуем БОЛЬШЕ кандидатов (многие low-res/хотлинк отсеются) */
+          const dl = await Promise.all(webImgs.slice(0, 40).map(u => downloadImageToAsset(upgradeCdnUrl(u)).catch(() => downloadImageToAsset(u).catch(() => null))));   /* поднимаем миниатюры до полноразмера (CDN-параметры), фолбэк на оригинал; многие low-res отсеются */
           const good = dl.filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
           if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); photosAdded = good.length; }
         }
@@ -11343,7 +11343,7 @@ ${SCR}
     }
     /* ⭐ ДОПОЛНИТЬ недостающие поля объектов перед сравнением (стабы/пустые roi/handover/developer) —
        заполняем ПУСТОЕ из сети (не затираем существующее). Возвращаем обновлённые объекты. */
-    if (p === '/api/properties/compare/enrich' && req.method === 'POST') {
+    if (p === '/api/properties/compare/fill' && req.method === 'POST') {   /* НЕ /enrich — иначе перехватит /:id/enrich (id='compare') */
       const b = await readBody(req).catch(() => ({}));
       const ids = (Array.isArray(b.ids) ? b.ids : []).slice(0, 3);
       const items = ids.map(id => (db.properties || []).find(x => x.id === id)).filter(Boolean);
