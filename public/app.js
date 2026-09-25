@@ -4427,6 +4427,14 @@ const SELCFG_PROPS = {
       cols.slice(0, 6).forEach(col => items.push({ ic: I.layers, label: `+ в «${col.title}»`, onClick: async () => { await api.patch('/collections/' + col.id, { addPropertyIds: ids }); selSet('properties').clear(); toast('Добавлено в подборку', `«${col.title}»`, true); go('collections'); } }));
       ctxPopup(c0.x, c0.y, items);
     } },
+    { id: 'compare', label: 'Сравнить', ic: I.grid || I.layers, run: async () => {
+      const ids = [...selSet('properties')].slice(0, 3);
+      if (ids.length < 2) return toast('Выберите 2–3 объекта для сравнения');
+      const all = await api.get('/properties').catch(() => []);
+      const list = ids.map(id => all.find(x => x.id === id)).filter(Boolean);
+      if (list.length < 2) return toast('Нужно минимум 2 объекта');
+      openCompareModal(list);
+    } },
     { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
     { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} объект(ов)?`, sub: 'Карточки объектов удалятся. Подборки, где они были, не тронутся.', ok: 'Удалить', danger: true }) },
   ],
