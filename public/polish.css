@@ -155,9 +155,6 @@ input:focus, textarea:focus, select:focus {
 .prmap-atelier .leaflet-control-zoom a:hover { background: var(--accent, #b8863c); color: #fff; }
 .prpin:hover .prpin-dot { transform: translate(-50%,-50%) scale(1.35); }
 .prpin-dot { transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
-/* сегмент-тумблер Список/Карта */
-#prMapToggle { border: 1px solid var(--stroke, #e5ddcf); font-weight: 600; }
-#prMapToggle.on-map { background: var(--accent, #b8863c); color: #fff; border-color: var(--accent, #b8863c); box-shadow: 0 4px 12px rgba(184,134,60,.28); }
 
 /* ---------- Кастомные стрелки number-инпутов (стиль Ателье, вся CRM) ---------- */
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -313,18 +310,19 @@ input[type=number] { -moz-appearance: textfield; }
 .przone-lbl span { display: inline-block; transform: translate(-50%, -50%); white-space: nowrap; font-family: var(--serif, Cormorant, Georgia, serif); font-size: 13px; font-weight: 800; letter-spacing: .2px; color: #4a3c22; padding: 3px 10px; border-radius: 20px; background: color-mix(in srgb, var(--zc, #d9a5a8) 42%, #fff); border: 1.5px solid color-mix(in srgb, var(--zc, #d9a5a8) 78%, #6b5426); box-shadow: 0 3px 10px -3px rgba(70,55,25,.4), inset 0 1px 0 rgba(255,255,255,.5); text-shadow: 0 1px 0 rgba(255,255,255,.55); }
 .przone-lbl.on span { color: #fff; background: color-mix(in srgb, var(--zc, #d9a5a8) 88%, #000); font-size: 14px; box-shadow: 0 6px 18px -4px rgba(70,55,25,.55); }
 :root[data-night] .przone-lbl span { color: #1a160f; }
-/* кастомный дропдаун языка карточки — крупный, премиум, чёткий выбор */
-.pd2-langdd { position: relative; }
-.pd2-langbtn, #pdLangBtn { display: inline-flex; align-items: center; gap: 6px; }
-.pd2-langflag { font-size: 14px; line-height: 1; }
-.pd2-langcv { margin-left: 5px; font-size: 9px; opacity: .65; }
-.pd2-langmenu { position: absolute; top: calc(100% + 10px); left: 0; z-index: 40; min-width: 208px; background: linear-gradient(180deg, #26201668, #1a1610); background: #1c1710; border: 1px solid rgba(201,162,90,.4); border-radius: 16px; padding: 8px; box-shadow: 0 28px 64px -16px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 2px; animation: prpopIn .18s ease; }
-.pd2-langmenu[hidden] { display: none; }
-.pd2-langmenu-h { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #9a8256; padding: 4px 12px 7px; }
-.pd2-langopt { display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: 0; color: #efe7d7; font-size: 14px; font-weight: 600; padding: 10px 13px; border-radius: 11px; cursor: pointer; transition: background .12s, color .12s; }
-.pd2-langopt:hover { background: rgba(255,255,255,.09); }
-.pd2-langopt.on { color: #14110c; background: linear-gradient(180deg, #d8b56a, #c19a4f); font-weight: 800; }
-.pd2-langok { margin-left: auto; font-size: 13px; }
+/* явный сегментированный тумблер вида «Списком / На карте» — на видном месте, не спрятанная кнопка */
+.prv-seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--blue-100, #eef2f8); border: 1px solid var(--stroke); border-radius: 11px; flex: 0 0 auto; }
+.prv-seg-b { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0; background: none; color: var(--ink-2, #5a6474); font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background var(--dur-fast, .15s), color var(--dur-fast, .15s), box-shadow var(--dur-fast, .15s); white-space: nowrap; }
+.prv-seg-b svg { width: 15px; height: 15px; }
+.prv-seg-b:hover { color: var(--ink); }
+.prv-seg-b.on { background: var(--card, #fff); color: var(--accent); box-shadow: 0 2px 8px rgba(20, 30, 55, .12); }
+
+/* язык карточки = штатный select (enhanceControls → .cs), кнопка под тёмный hero — стекло как pd2-ghost;
+   дропдаун (.cs-list) едет через openPop на body-слое (fixed, скроллируемый, поверх всего, стиль Ателье) */
+.pd2-lang { min-width: 150px; }
+.pd2-lang .cs-btn { background: rgba(6, 17, 38, .72); color: #fff; border: 1px solid rgba(255, 255, 255, .5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); text-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+.pd2-lang .cs-btn:hover { background: rgba(6, 17, 38, .82); border-color: rgba(255, 255, 255, .6); }
+.pd2-lang .cs-chev svg { color: rgba(255, 255, 255, .8); }
 /* конвертация цены в базовую валюту */
 .px-conv { font-size: .82em; font-weight: 600; color: var(--muted, #8a8378); white-space: nowrap; margin-left: 4px; }
 .pd2-conv { font-size: 12px; color: rgba(255,255,255,.72); margin-top: 3px; }

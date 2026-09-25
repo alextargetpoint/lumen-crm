@@ -7938,10 +7938,7 @@ PAGES.properties = async (root) => {
               <button class="btn btn-sm pd2-ghost" id="prBack">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Все объекты'}</button>
               <span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>
               <span class="tb-spacer"></span>
-              <div class="pd2-langdd" id="pdLangDD">
-                <button class="btn btn-sm pd2-ghost" id="pdLangBtn" type="button" title="Язык карточки (перевод для просмотра и шеринга)"><span class="pd2-langflag">${(CARD_LANGS.find(l => l[0] === CARD_LANG) || ['', 'Русский', '🌐'])[2]}</span>${(CARD_LANGS.find(l => l[0] === CARD_LANG) || ['', 'Русский'])[1]}<span class="pd2-langcv">▾</span></button>
-                <div class="pd2-langmenu" id="pdLangMenu" hidden><div class="pd2-langmenu-h">Язык карточки</div>${CARD_LANGS.map(([c, n, fl]) => `<button type="button" class="pd2-langopt ${c === CARD_LANG ? 'on' : ''}" data-lang="${c}"><span class="pd2-langflag">${fl}</span>${n}${c === CARD_LANG ? '<span class="pd2-langok">✓</span>' : ''}</button>`).join('')}</div>
-              </div>
+              <div class="pd2-lang" id="pdLangDD"><select id="pdLang" title="Язык карточки — перевод для просмотра и шеринга клиенту">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
@@ -8204,17 +8201,16 @@ PAGES.properties = async (root) => {
       $('#recPrev', md).addEventListener('click', () => call(false));
     });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
-    $('#pdLangBtn')?.addEventListener('click', (e) => { e.stopPropagation(); const mn = $('#pdLangMenu', root); if (mn) mn.hidden = !mn.hidden; });
-    document.addEventListener('click', () => { const mn = $('#pdLangMenu', root); if (mn && !mn.hidden) mn.hidden = true; }, { once: true });
-    $$('.pd2-langopt', root).forEach(o => o.addEventListener('click', async (e) => {
-      e.stopPropagation(); const lang = o.dataset.lang; CARD_LANG = lang; const mn = $('#pdLangMenu', root); if (mn) mn.hidden = true;
+    $('#pdLang')?.addEventListener('change', async (e) => {   /* штатный select → enhanceControls рисует атольерный дропдаун (openPop: fixed-слой, скролл, поверх всего) */
+      const lang = e.target.value; CARD_LANG = lang;
       if (lang === LANG || (pr.i18n && pr.i18n[lang])) return render();   /* оригинал/язык интерфейса или уже переведено */
-      o.textContent = '…';
+      showLoader('Перевожу карточку…', 'web');
       const rr = await api.post('/properties/' + pr.id + '/translate', { lang }).catch(() => ({ error: 'сеть' }));
+      hideLoader();
       if (rr && rr.property) { Object.assign(pr, rr.property); toast('Карточка переведена', (CARD_LANGS.find(l => l[0] === lang) || [])[1] || lang, true); }
       else toast('Не перевёл', (rr && rr.error) || '');
       render();
-    }));
+    });
     $('#pdEnrich').addEventListener('click', async () => {
       const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание', districtBlurb: 'Описание района', timings: 'Тайминги до мест', rentalArgs: 'Аргументы под аренду', amenities: 'Удобства комплекса', investmentHighlights: 'Инвест-аргументы', paymentPlan: 'План оплаты', hookTitle: 'Крючок-заголовок' };
       const md = modal({ title: 'Дополнить из открытых источников', sub: `Собираю ПОЛНУЮ карточку по «${esc(pr.name)}» — факты, фото, видео-рендеры, наличие юнитов…`, body: '<div id="enrOut">' + motionLoader('Собираю по всем открытым источникам', 'web') + '</div>', actions: [{ label: 'Закрыть' }] });
@@ -8296,6 +8292,10 @@ PAGES.properties = async (root) => {
       ${(() => { const mp = Math.min(...props.map(p2 => p2.priceFrom || Infinity)); return isFinite(mp) ? `<div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Вход в рынок от <b>$${mp.toLocaleString('ru-RU')}</b> · первичка ${props.filter(p2 => p2.market === 'offplan').length} · вторичка ${props.filter(p2 => p2.market === 'secondary').length}</span></div>` : ''; })()}
     `, { v: 'mark', hue: '#C89B4B' })}
     <div class="filters">
+      <div class="prv-seg" role="tablist" aria-label="Вид объектов">
+        <button class="prv-seg-b ${!PAGE_STATE.propMap ? 'on' : ''}" id="prvList" role="tab" aria-selected="${!PAGE_STATE.propMap}">${ic(I.grid || I.layers, 2)}Списком</button>
+        <button class="prv-seg-b ${PAGE_STATE.propMap ? 'on' : ''}" id="prvMap" role="tab" aria-selected="${!!PAGE_STATE.propMap}">${ic(I.pin || I.building, 2)}На карте</button>
+      </div>
       <input id="prQ" placeholder="Поиск: проект / район / застройщик (с опечатками)" value="${esc(PAGE_STATE.propQ || '')}" style="min-width:220px;flex:1 1 220px">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
@@ -8305,7 +8305,6 @@ PAGES.properties = async (root) => {
       ${PAGE_STATE.propLasso ? `<button class="btn btn-sm pr-zonechip" id="prLassoReset" title="Снять обведённую область">${LASSO_SVG}Область · ${list.length} <b>×</b></button>` : ''}
       ${(q || advCount) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
-      <button class="btn btn-sm ${PAGE_STATE.propMap ? 'on-map' : ''}" id="prMapToggle" title="Показать объекты на карте">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? '← Списком' : 'На карте'}</button>
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Поиск и импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
@@ -8369,7 +8368,8 @@ PAGES.properties = async (root) => {
     </div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
-  $('#prMapToggle')?.addEventListener('click', () => { PAGE_STATE.propMap = !PAGE_STATE.propMap; render(); });
+  $('#prvList')?.addEventListener('click', () => { if (PAGE_STATE.propMap) { PAGE_STATE.propMap = false; render(); } });
+  $('#prvMap')?.addEventListener('click', () => { if (!PAGE_STATE.propMap) { PAGE_STATE.propMap = true; render(); } });
   $('#prBaseCur')?.addEventListener('change', async (e) => { FX.base = e.target.value; api.patch('/settings', { baseCurrency: FX.base }).catch(() => {}); render(); });
   $('#prZoneReset')?.addEventListener('click', () => { PAGE_STATE.propZone = null; render(); });
   $('#prLassoReset')?.addEventListener('click', () => { PAGE_STATE.propLasso = null; render(); });
