@@ -11314,6 +11314,31 @@ ${SCR}
       }
       return json(res, 200, { ok: true, analysis: an });
     }
+    /* ⭐ УМНАЯ АВТО-ОРГАНИЗАЦИЯ папок (район/цена/тип/направление/рынок). НЕ трогает данные объектов
+       кроме folderId; переиспользует папки с тем же именем. ДО :id-матчера (иначе :id='auto-organize'→404). */
+    if (p === '/api/properties/auto-organize' && req.method === 'POST') {
+      const b = await readBody(req).catch(() => ({}));
+      const by = b.by || 'district';
+      const rates = await getFxRates().catch(() => ({ USD: 1 }));
+      const toUsd = (v, c) => { const r = rates[String(c || 'USD').toUpperCase()]; return r ? (+v || 0) / r : (+v || 0); };
+      const effUsd = (pr) => { const u = (pr.units || []).filter(x => +x.price > 0); const val = u.length ? Math.min(...u.map(x => +x.price)) : (+pr.priceFrom || 0); const cur = fixMoneyCurrency(pr.geo, val, (u[0] && u[0].currency) || pr.currency); return toUsd(val, cur); };
+      const cleanDistrict = (area) => { const raw = String(area || '').split(',').map(s => s.trim()).filter(Boolean); const drop = /^(thailand|таиланд|indonesia|uae|united arab emirates|оаэ|spain|cyprus|turkey|greece|phuket|пхукет|bali|dubai|дубай)$/i; const bad = /(road|soi|street|\brd\b|lane|moo|улиц|^\d|№)/i; const cl = raw.filter(s => !drop.test(s) && !bad.test(s)); return (cl[cl.length - 1] || raw[0] || 'Прочее').slice(0, 40); };
+      const priceBucket = (usd) => { if (!usd) return 'Цена не указана'; if (usd < 150000) return 'до $150k'; if (usd < 300000) return '$150–300k'; if (usd < 600000) return '$300–600k'; if (usd < 1000000) return '$600k–1M'; if (usd < 3000000) return '$1–3M'; return 'от $3M'; };
+      const typeOf = (pr) => { const t = (pr.type || '').toLowerCase(); if (/villa|вилл/.test(t)) return 'Виллы'; if (/town|таун/.test(t)) return 'Таунхаусы'; if (/penthouse|пентхаус/.test(t)) return 'Пентхаусы'; if (/stud|студ/.test(t)) return 'Студии'; if (/duplex|дуплекс/.test(t)) return 'Дуплексы'; const m2 = t.match(/(\d)\s*br|(\d)\s*bed|(\d)-?\s*к/); if (m2) return (m2[1] || m2[2] || m2[3]) + '-спальные'; return pr.type ? String(pr.type).slice(0, 40) : 'Апартаменты'; };
+      const keyFn = { district: pr => cleanDistrict(pr.area || (pr.district && pr.district.name)), price: pr => priceBucket(effUsd(pr)), type: pr => typeOf(pr), geo: pr => (db.settings.geoNames && db.settings.geoNames[pr.geo]) || pr.geo || 'Без направления', market: pr => pr.market === 'secondary' ? 'Вторичка' : 'Первичка' }[by] || (pr => cleanDistrict(pr.area));
+      const prefix = { district: 'Район', price: 'Цена', type: 'Тип', geo: 'Направление', market: 'Рынок' }[by] || '';
+      db.folders = db.folders || []; let created = 0, assigned = 0;
+      const groups = {};
+      for (const pr of (db.properties || [])) { const k = keyFn(pr) || 'Прочее'; (groups[k] = groups[k] || []).push(pr); }
+      for (const [name, list] of Object.entries(groups)) {
+        const fname = (prefix ? prefix + ': ' : '') + name;
+        let f = db.folders.find(x => x.kind !== 'coll' && x.name === fname);
+        if (!f) { f = { id: store.nextId('fd'), name: fname.slice(0, 60), kind: 'prop', auto: by }; db.folders.push(f); created++; }
+        for (const pr of list) { pr.folderId = f.id; assigned++; }
+      }
+      store.save();
+      return json(res, 200, { ok: true, by, created, assigned, folders: Object.keys(groups).length });
+    }
     if (p === '/api/properties/find-web' && req.method === 'POST') {
       const b = await readBody(req).catch(() => ({}));
       const query = String(b.query || '').trim();
@@ -11534,31 +11559,6 @@ ${SCR}
       const f = { id: store.nextId('fd'), name: String(b.name || 'Папка').slice(0, 60), kind: b.kind === 'coll' ? 'coll' : 'prop' };
       db.folders.push(f); store.save();
       return json(res, 200, f);
-    }
-    /* ⭐ УМНАЯ АВТО-ОРГАНИЗАЦИЯ: разложить объекты по папкам по критерию (район/цена/тип/направление/рынок).
-       НЕ трогает данные объектов кроме folderId; переиспользует папки с тем же именем. */
-    if (p === '/api/properties/auto-organize' && req.method === 'POST') {
-      const b = await readBody(req).catch(() => ({}));
-      const by = b.by || 'district';
-      const rates = await getFxRates().catch(() => ({ USD: 1 }));
-      const toUsd = (v, c) => { const r = rates[String(c || 'USD').toUpperCase()]; return r ? (+v || 0) / r : (+v || 0); };
-      const effUsd = (pr) => { const u = (pr.units || []).filter(x => +x.price > 0); const cur = fixMoneyCurrency(pr.geo, u.length ? Math.min(...u.map(x => +x.price)) : pr.priceFrom, (u[0] && u[0].currency) || pr.currency); const val = u.length ? Math.min(...u.map(x => +x.price)) : (+pr.priceFrom || 0); return toUsd(val, cur); };
-      const cleanDistrict = (area) => { const raw = String(area || '').split(',').map(s => s.trim()).filter(Boolean); const drop = /^(thailand|таиланд|indonesia|uae|united arab emirates|оаэ|spain|cyprus|turkey|greece|phuket|пхукет|bali|dubai|дубай)$/i; const bad = /(road|soi|street|\brd\b|lane|moo|улиц|^\d|№)/i; const cl = raw.filter(s => !drop.test(s) && !bad.test(s)); return (cl[cl.length - 1] || raw[0] || 'Прочее').slice(0, 40); };
-      const priceBucket = (usd) => { if (!usd) return 'Цена не указана'; if (usd < 150000) return 'до $150k'; if (usd < 300000) return '$150–300k'; if (usd < 600000) return '$300–600k'; if (usd < 1000000) return '$600k–1M'; if (usd < 3000000) return '$1–3M'; return 'от $3M'; };
-      const typeOf = (pr) => { const t = (pr.type || '').toLowerCase(); if (/villa|вилл/.test(t)) return 'Виллы'; if (/town|таун/.test(t)) return 'Таунхаусы'; if (/penthouse|пентхаус/.test(t)) return 'Пентхаусы'; if (/stud|студ/.test(t)) return 'Студии'; if (/duplex|дуплекс/.test(t)) return 'Дуплексы'; const m2 = t.match(/(\d)\s*br|(\d)\s*bed|(\d)-?\s*к/); if (m2) return (m2[1] || m2[2] || m2[3]) + '-спальные'; return pr.type ? String(pr.type).slice(0, 40) : 'Апартаменты'; };
-      const keyFn = { district: pr => cleanDistrict(pr.area || (pr.district && pr.district.name)), price: pr => priceBucket(effUsd(pr)), type: pr => typeOf(pr), geo: pr => (db.settings.geoNames && db.settings.geoNames[pr.geo]) || pr.geo || 'Без направления', market: pr => pr.market === 'secondary' ? 'Вторичка' : 'Первичка' }[by] || (pr => cleanDistrict(pr.area));
-      const prefix = { district: 'Район', price: 'Цена', type: 'Тип', geo: 'Направление', market: 'Рынок' }[by] || '';
-      db.folders = db.folders || []; let created = 0, assigned = 0;
-      const groups = {};
-      for (const pr of (db.properties || [])) { const k = keyFn(pr) || 'Прочее'; (groups[k] = groups[k] || []).push(pr); }
-      for (const [name, list] of Object.entries(groups)) {
-        const fname = (prefix ? prefix + ': ' : '') + name;
-        let f = db.folders.find(x => x.kind !== 'coll' && x.name === fname);
-        if (!f) { f = { id: store.nextId('fd'), name: fname.slice(0, 60), kind: 'prop', auto: by }; db.folders.push(f); created++; }
-        for (const pr of list) { pr.folderId = f.id; assigned++; }
-      }
-      store.save();
-      return json(res, 200, { ok: true, by, created, assigned, folders: Object.keys(groups).length });
     }
     if ((m = p.match(/^\/api\/folders\/([^/]+)$/)) && req.method === 'PATCH') {
       const f = db.folders.find(x => x.id === m[1]);
