@@ -354,6 +354,25 @@ input[type=number] { -moz-appearance: textfield; }
 .prmetric-grad.rev { background: linear-gradient(90deg, #b4501c, #e0bd50, #4c8a4f); }
 .prmetric-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; }
 .prmetric-nd { margin-left: 8px; display: inline-flex; align-items: center; gap: 3px; }
+/* кластеры пинов (markercluster) — стилизуем сами под Ателье */
+.prcluster { display: flex; align-items: center; justify-content: center; }
+.prcluster span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; font-size: 13px; font-weight: 750; color: #fff; background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--accent, #b8863c) 82%, #fff), var(--accent, #b8863c)); border: 2.5px solid #fff; box-shadow: 0 4px 14px -3px rgba(70,55,25,.55); transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+.prcluster:hover span { transform: scale(1.08); }
+/* контрол «обвести область» */
+.prdraw { position: absolute; top: 12px; left: 12px; z-index: 620; display: flex; gap: 6px; }
+.prdraw-b { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 650; color: #6b6459; background: rgba(255,255,255,.94); border: 1px solid rgba(70,55,25,.14); border-radius: 12px; padding: 7px 11px; cursor: pointer; box-shadow: 0 8px 24px -8px rgba(40,32,15,.3); backdrop-filter: blur(6px); transition: background .15s, color .15s; }
+.prdraw-b svg { width: 15px; height: 15px; }
+.prdraw-b:hover { background: var(--accent, #b8863c); color: #fff; }
+.prdraw-b.has { background: color-mix(in srgb, var(--accent, #b8863c) 16%, #fff); border-color: color-mix(in srgb, var(--accent, #b8863c) 45%, rgba(70,55,25,.14)); color: var(--ink, #23201c); }
+.prdraw-clr { display: inline-flex; align-items: center; justify-content: center; width: 32px; background: rgba(255,255,255,.94); border: 1px solid rgba(70,55,25,.14); border-radius: 12px; cursor: pointer; color: #8a8378; box-shadow: 0 8px 24px -8px rgba(40,32,15,.3); }
+.prdraw-clr:hover { color: #b4501c; }
+.prdraw-clr svg { width: 14px; height: 14px; }
+.prlasso-drawing, .prlasso-drawing .leaflet-grab, .prlasso-drawing .leaflet-interactive, .prlasso-drawing .leaflet-container { cursor: crosshair !important; }
+.prlasso-hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 650; font-size: 11.5px; font-weight: 600; color: #fff; background: rgba(40,32,15,.86); padding: 6px 12px; border-radius: 20px; box-shadow: 0 6px 18px -6px rgba(0,0,0,.5); pointer-events: none; white-space: nowrap; }
+.prlasso-poly { filter: drop-shadow(0 2px 6px rgba(70,55,25,.25)); }
+.pr-zonechip svg { width: 13px; height: 13px; }
+:root[data-night] .prdraw-b, :root[data-night] .prdraw-clr { background: rgba(30,26,18,.9); color: #c9c0ad; border-color: rgba(255,255,255,.1); }
+:root[data-night] .prdraw-b:hover { color: #fff; }
 /* панель сравнения на карте */
 .prcmp { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 3500; display: flex; align-items: center; gap: 16px; background: linear-gradient(180deg, rgba(30,26,18,.97), rgba(18,15,10,.98)); color: #f0e9dc; border: 1px solid rgba(205,168,97,.28); border-radius: 18px; padding: 10px 12px 10px 16px; box-shadow: 0 24px 60px -14px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(14px); max-width: min(94vw, 860px); animation: prcmpIn .3s cubic-bezier(.2,.8,.3,1); }
 @keyframes prcmpIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }

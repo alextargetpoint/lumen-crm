@@ -7507,11 +7507,21 @@ function fuzzyIncludes(hay, needle) {
   return needle.split(' ').every(tok => hay.includes(tok) || (tok.length >= 4 && words.some(w => _lev(w, tok) <= (tok.length > 6 ? 2 : 1))));
 }
 function loadLeaflet() {
-  if (window.L) return Promise.resolve();
+  if (window.L && window.L.markerClusterGroup) return Promise.resolve();
   if (window._leafletLoading) return window._leafletLoading;
   window._leafletLoading = new Promise((resolve, reject) => {
-    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
-    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload = () => resolve(); s.onerror = () => reject(new Error('leaflet')); document.head.appendChild(s);
+    const addCss = (href) => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l); };
+    addCss('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = () => {
+      /* кластеризация пинов — плагин markercluster (кластеры стилизуем сами, Default.css не грузим) */
+      addCss('https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css');
+      const s2 = document.createElement('script'); s2.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
+      s2.onload = () => resolve(); s2.onerror = () => resolve();   /* кластер — не критичен: без него пины просто без группировки */
+      document.head.appendChild(s2);
+    };
+    s.onerror = () => reject(new Error('leaflet'));
+    document.head.appendChild(s);
   });
   return window._leafletLoading;
 }
@@ -7574,6 +7584,56 @@ function drawZones(map, L, geo) {
     c.on('click', () => { PAGE_STATE.propZone = on ? null : { name: z.n, lat: z.lat, lng: z.lng, r: z.r, geo }; render(); });   /* клик по району → фильтр (повторный клик — снять) */
     L.marker([z.lat, z.lng], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'przone-lbl' + (on ? ' on' : ''), html: `<span style="--zc:${col}">${z.n}</span>`, iconSize: [0, 0] }) }).addTo(layer);
   });
+}
+/* луч-каст «точка в полигоне» (lat=y, lng=x) — для фильтра «обведи-область» */
+function pointInPoly(lat, lng, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const yi = poly[i][0], xi = poly[i][1], yj = poly[j][0], xj = poly[j][1];
+    const inter = ((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi);
+    if (inter) inside = !inside;
+  }
+  return inside;
+}
+const LASSO_SVG = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4c4.4 0 8 2.4 8 5.4 0 2.5-2.5 4.6-6 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="3 3"/><path d="M12 4C7.6 4 4 6.4 4 9.4c0 2 1.6 3.8 4 4.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="3 3"/><path d="M8 14.1c0 1.2 1.8 2.2 4 2.2M8 14.1v3.2a1.7 1.7 0 1 0 1.7 1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+/* «Обвести область»: freehand-рисование полигона по карте → PAGE_STATE.propLasso, потом фильтр pointInPoly */
+function beginLasso(map, L, el) {
+  if (!window.L || !map) return;
+  const cont = map.getContainer();
+  const acc = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim() || '#b8863c';
+  el.classList.add('prlasso-drawing');
+  map.dragging.disable(); map.doubleClickZoom.disable(); map.scrollWheelZoom.disable(); if (map.boxZoom) map.boxZoom.disable();
+  const hint = document.createElement('div'); hint.className = 'prlasso-hint'; hint.textContent = 'Обведите область — отпустите, чтобы применить · Esc — отмена'; el.appendChild(hint);
+  let pts = [], line = null, drawing = false;
+  const ll = (ev) => map.mouseEventToLatLng(ev);
+  const cleanup = (removeLine) => {
+    cont.removeEventListener('pointerdown', down); cont.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up); window.removeEventListener('keydown', key);
+    el.classList.remove('prlasso-drawing'); if (hint.parentNode) hint.remove();
+    map.dragging.enable(); map.doubleClickZoom.enable(); map.scrollWheelZoom.enable(); if (map.boxZoom) map.boxZoom.enable();
+    if (removeLine && line) { try { map.removeLayer(line); } catch (_) {} }
+  };
+  const down = (ev) => {
+    if (ev.button && ev.button !== 0) return;
+    drawing = true; try { cont.setPointerCapture(ev.pointerId); } catch (_) {}
+    pts = [ll(ev)]; if (line) { try { map.removeLayer(line); } catch (_) {} }
+    line = L.polyline(pts, { color: acc, weight: 2.6, opacity: .95, dashArray: '6,6', className: 'prlasso-line' }).addTo(map);
+    ev.preventDefault();
+  };
+  const move = (ev) => {
+    if (!drawing) return; const p = ll(ev); const last = pts[pts.length - 1];
+    if (last && Math.abs(p.lat - last.lat) < 1e-9 && Math.abs(p.lng - last.lng) < 1e-9) return;
+    pts.push(p); line.setLatLngs(pts);
+  };
+  const up = () => {
+    if (!drawing) return; drawing = false;
+    if (pts.length < 3) { cleanup(true); return; }   /* слишком маленький штрих — отмена */
+    const latlngs = pts.map(p => [p.lat, p.lng]); cleanup(true);
+    PAGE_STATE.propLasso = { latlngs }; PAGE_STATE.propZone = null; render();
+  };
+  const key = (ev) => { if (ev.key === 'Escape') { drawing = false; cleanup(true); } };
+  cont.addEventListener('pointerdown', down); cont.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up); window.addEventListener('keydown', key);
 }
 /* премиум моушн-индикаторы под КАЖДЫЙ процесс (чистый CSS, Ателье). variant задаёт анимацию:
    web=орбита(сеть), card=сборка карточки, price=стопка строк(прайс), pdf=скан документа, search=радар, ring=дефолт */
@@ -7656,10 +7716,19 @@ async function initPropMap(props) {
   let _popT = null, _openMk = null;
   const clearPopT = () => { if (_popT) { clearTimeout(_popT); _popT = null; } };
   const schedClose = () => { clearPopT(); _popT = setTimeout(() => { try { if (_openMk) _openMk.closePopup(); Object.values(window._prMarkers || {}).forEach(o => { try { o.mk.closePopup(); } catch (_) {} }); } catch (_) {} }, 280); };   /* mk.closePopup() закрывает (map.closePopup() — НЕТ, Leaflet-квирк); + фолбэк закрыть все */
+  /* ⭐ кластеризация: при скоплении пинов группируем в кластеры (плагин markercluster). Мало пинов → без группировки */
+  const useCluster = !!(L.markerClusterGroup) && pts.length > 8;
+  const clusterGroup = useCluster ? L.markerClusterGroup({
+    showCoverageOnHover: false, spiderfyOnMaxZoom: true, maxClusterRadius: 52, chunkedLoading: true, removeOutsideVisibleBounds: true,
+    iconCreateFunction: (cl) => { const n = cl.getChildCount(); const s = n < 10 ? 38 : n < 50 ? 46 : 54; return L.divIcon({ className: 'prcluster', html: `<span>${n}</span>`, iconSize: [s, s], iconAnchor: [s / 2, s / 2] }); },
+  }) : null;
+  if (clusterGroup) map.addLayer(clusterGroup);
+  window._prCluster = clusterGroup;
   pts.forEach(p => {
     const _col = pinColor(p);
     const icon = L.divIcon({ className: 'prpin' + (_col ? ' prpin-metric' : ''), html: `<span class="prpin-dot"${_col ? ` style="background:${_col}"` : ''}></span><span class="prpin-pulse"${_col ? ` style="background:${_col}"` : ''}></span>`, iconSize: [34, 34], iconAnchor: [17, 17] });
-    const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
+    const mk = L.marker([p.lat, p.lng], { icon });
+    if (clusterGroup) clusterGroup.addLayer(mk); else mk.addTo(map);
     window._prMarkers[p.id] = { mk, lat: p.lat, lng: p.lng };
     const img = (p.images && p.images[0]) || '';
     const _ep = effPrice(p); const price = _ep.price ? priceHtml(_ep.price, _ep.currency, 'от ') : '';
@@ -7687,7 +7756,12 @@ async function initPropMap(props) {
     } else { mk.on('mouseover', () => { clearPopT(); _openMk = mk; mk.openPopup(); }); mk.on('mouseout', schedClose); }
     bounds.push([p.lat, p.lng]);
   });
-  const zoomFit = () => { const Z = PAGE_STATE.propZone; if (Z && window.L) { try { map.fitBounds(L.latLng(Z.lat, Z.lng).toBounds((Z.r || 2000) * 3), { padding: [40, 40], maxZoom: 14 }); return; } catch (_) {} } if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 }); else if (bounds.length === 1) map.setView(bounds[0], 13); };
+  /* обведённая область: рисуем сохранённый полигон (не мешает пинам) */
+  window._prLassoPoly = null;
+  if (PAGE_STATE.propLasso && PAGE_STATE.propLasso.latlngs && PAGE_STATE.propLasso.latlngs.length > 2) {
+    try { const acc = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim() || '#b8863c'; window._prLassoPoly = L.polygon(PAGE_STATE.propLasso.latlngs, { className: 'prlasso-poly', color: acc, weight: 2.4, opacity: .9, fillColor: acc, fillOpacity: .07, interactive: false }).addTo(map); } catch (_) {}
+  }
+  const zoomFit = () => { if (window._prLassoPoly) { try { map.fitBounds(window._prLassoPoly.getBounds(), { padding: [50, 50], maxZoom: 15 }); return; } catch (_) {} } const Z = PAGE_STATE.propZone; if (Z && window.L) { try { map.fitBounds(L.latLng(Z.lat, Z.lng).toBounds((Z.r || 2000) * 3), { padding: [40, 40], maxZoom: 14 }); return; } catch (_) {} } if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 }); else if (bounds.length === 1) map.setView(bounds[0], 13); };
   zoomFit();
   map.on('popupopen', (e) => {
     const root2 = e.popup.getElement();
@@ -7725,6 +7799,16 @@ async function initPropMap(props) {
     ctl.innerHTML = `<div class="prmetric-btns">${METS.map(([k, n]) => `<button class="prmetric-b ${METRIC === k ? 'on' : ''}" data-metric="${k}">${n}</button>`).join('')}</div>${legend}`;
     el.appendChild(ctl);
     ctl.querySelectorAll('[data-metric]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.mapMetric = b.dataset.metric; render(); }));
+  } catch (_) {}
+  /* ⭐ контрол «обвести область»: freehand-полигон → оставить только объекты внутри */
+  try {
+    const oldd = el.querySelector('.prdraw'); if (oldd) oldd.remove();
+    const dc = document.createElement('div'); dc.className = 'prdraw';
+    const on = !!PAGE_STATE.propLasso;
+    dc.innerHTML = `<button class="prdraw-b ${on ? 'has' : ''}" id="prDrawBtn" title="Обвести область — оставить только объекты внутри контура">${LASSO_SVG}<span>${on ? 'Обвести заново' : 'Обвести область'}</span></button>${on ? `<button class="prdraw-clr" id="prDrawClr" title="Снять область">${ic(I.x, 2)}</button>` : ''}`;
+    el.appendChild(dc);
+    dc.querySelector('#prDrawBtn').addEventListener('click', (e) => { e.stopPropagation(); beginLasso(map, L, el); });
+    const clr = dc.querySelector('#prDrawClr'); if (clr) clr.addEventListener('click', (e) => { e.stopPropagation(); PAGE_STATE.propLasso = null; render(); });
   } catch (_) {}
   window._prMapEl = el; window._prItems = items;   /* для панели сравнения без полного перерендера */
   renderCompareBar();
@@ -8176,6 +8260,8 @@ PAGES.properties = async (root) => {
   let list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF) && matchAdv(pr));
   /* клик по району на карте → оставляем только объекты внутри зоны (по координатам) */
   if (PAGE_STATE.propZone) { const Z = PAGE_STATE.propZone; const R = (Z.r || 2000) * 1.5 / 111000; list = list.filter(p => typeof p.lat === 'number' && Math.hypot(p.lat - Z.lat, (p.lng - Z.lng) * Math.cos(Z.lat * Math.PI / 180)) < R); }
+  /* «обведи-область» → только объекты внутри нарисованного контура (по координатам) */
+  if (PAGE_STATE.propLasso && PAGE_STATE.propLasso.latlngs && PAGE_STATE.propLasso.latlngs.length > 2) { const P = PAGE_STATE.propLasso.latlngs; list = list.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number' && pointInPoly(p.lat, p.lng, P)); }
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
     ${heroArt('assets/art/tower.png', `
@@ -8190,6 +8276,7 @@ PAGES.properties = async (root) => {
       <select id="prBaseCur" title="Базовая валюта — цены показываются «нативная ≈ в этой валюте»">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'GBP'].map(c => `<option ${(FX.base || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <button class="btn btn-sm ${F.propFiltersOpen ? 'on-map' : ''}" id="prFiltBtn" title="Расширенный фильтр">${ic(I.gear || I.doc)}Фильтры${advCount ? ' · ' + advCount : ''}</button>
       ${PAGE_STATE.propZone ? `<button class="btn btn-sm pr-zonechip" id="prZoneReset" title="Снять фильтр района">${ic(I.pin || I.building, 2)}${esc(PAGE_STATE.propZone.name)} <b>×</b></button>` : ''}
+      ${PAGE_STATE.propLasso ? `<button class="btn btn-sm pr-zonechip" id="prLassoReset" title="Снять обведённую область">${LASSO_SVG}Область · ${list.length} <b>×</b></button>` : ''}
       ${(q || advCount) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
       <button class="btn btn-sm ${PAGE_STATE.propMap ? 'on-map' : ''}" id="prMapToggle" title="Показать объекты на карте">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? '← Списком' : 'На карте'}</button>
@@ -8259,6 +8346,7 @@ PAGES.properties = async (root) => {
   $('#prMapToggle')?.addEventListener('click', () => { PAGE_STATE.propMap = !PAGE_STATE.propMap; render(); });
   $('#prBaseCur')?.addEventListener('change', async (e) => { FX.base = e.target.value; api.patch('/settings', { baseCurrency: FX.base }).catch(() => {}); render(); });
   $('#prZoneReset')?.addEventListener('click', () => { PAGE_STATE.propZone = null; render(); });
+  $('#prLassoReset')?.addEventListener('click', () => { PAGE_STATE.propLasso = null; render(); });
   /* расширенный фильтр (карта синхронизируется — initPropMap(list), а не всех props) */
   $('#prQ')?.addEventListener('input', (e) => { PAGE_STATE.propQ = e.target.value; clearTimeout(window._prQT); window._prQT = setTimeout(() => { PAGE_STATE._focusQ = true; render(); }, 400); });
   $('#prFiltBtn')?.addEventListener('click', () => { PAGE_STATE.propFiltersOpen = !PAGE_STATE.propFiltersOpen; render(); });
@@ -8300,7 +8388,12 @@ PAGES.properties = async (root) => {
   if (PAGE_STATE.propMap) initPropMap(list);
   $$('.prm-row', root).forEach(r => r.addEventListener('click', () => {
     const id = r.dataset.prrow; const mk = window._prMarkers && window._prMarkers[id];
-    if (mk && window._prMap) { window._prMap.setView([mk.lat, mk.lng], 14, { animate: true }); mk.mk.openPopup(); $$('.prm-row', root).forEach(x => x.classList.toggle('active', x === r)); }
+    if (mk && window._prMap) {
+      const focus = () => { window._prMap.setView([mk.lat, mk.lng], 14, { animate: true }); mk.mk.openPopup(); };
+      if (window._prCluster && window._prCluster.hasLayer(mk.mk)) window._prCluster.zoomToShowLayer(mk.mk, focus);   /* пин в кластере — сперва раскрыть */
+      else focus();
+      $$('.prm-row', root).forEach(x => x.classList.toggle('active', x === r));
+    }
     else { PAGE_STATE.propView = id; render(); }
   }));
   PROP_FOLDERS = folders;
