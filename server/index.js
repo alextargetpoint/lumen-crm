@@ -3923,6 +3923,19 @@ async function pdfExtractImages(buf) {
   } catch (_) {} finally { try { if (dir) fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
   return out;
 }
+/* быстрый текст из PDF через pdftotext (poppler) — для БОЛЬШИХ файлов, чтобы не слать 50МБ инлайном в Gemini. */
+async function pdfExtractText(buf) {
+  let dir;
+  try {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lpdft-'));
+    const pdf = path.join(dir, 'in.pdf'); fs.writeFileSync(pdf, buf);
+    const outTxt = path.join(dir, 'out.txt');
+    if (await _runCmd('pdftotext', ['-f', '1', '-l', '30', '-enc', 'UTF-8', pdf, outTxt], 40000)) {
+      if (fs.existsSync(outTxt)) return fs.readFileSync(outTxt, 'utf8').replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').slice(0, 16000);
+    }
+  } catch (_) {} finally { try { if (dir) fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
+  return '';
+}
 /* открытые источники фото (Openverse — бесплатно, без ключа, CC-лицензия) по ключевым словам */
 async function openverseImages(query, n = 8) {
   try {
@@ -11097,7 +11110,16 @@ ${SCR}
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY)' });
       let buf; try { buf = Buffer.from(b64, 'base64'); } catch (_) { return json(res, 400, { error: 'битый файл' }); }
       if (buf.length > 100e6) return json(res, 400, { error: 'PDF слишком большой (>100МБ)' });
-      let ext; try { ext = await llm.extractPropertyFromPdf(b64); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал PDF: ' + e.message }); }
+      /* БОЛЬШОЙ PDF (>12МБ) → не шлём инлайном в Gemini (медленно/лимиты): вытаскиваем текст pdftotext и
+         разбираем как страницу (быстро). Малый → инлайн (лучше видит таблицы/планы). */
+      let ext;
+      try {
+        if (buf.length > 12e6) {
+          const txt = await pdfExtractText(buf);
+          if (txt && txt.length > 200) { ext = await llm.extractProperty(txt, 'PDF: ' + (b.fileName || '')); }
+          else { ext = await llm.extractPropertyFromPdf(b64); }   /* нет текста (скан-картинки) → фолбэк на инлайн */
+        } else { ext = await llm.extractPropertyFromPdf(b64); }
+      } catch (e) { return json(res, 400, { error: 'ИИ не разобрал PDF: ' + e.message }); }
       let saved = await pdfExtractImages(buf);   /* poppler: любая кодировка (pdfimages/pdftoppm) */
       if (saved.length < 3) {   /* нет poppler / мало → скан встроенных DCTDecode-JPEG */
         const j2 = extractPdfJpegs(buf).map(j => saveImageBuffer(j, 'pdf')).filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 16).map(x => x.url);
