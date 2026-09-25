@@ -924,11 +924,12 @@ async function callGeminiVision(parts, maxTokens = 700) {
   }, 22000);
 }
 async function classifyPhotos(urls) {
-  const list = (urls || []).filter(u => /^https?:\/\//.test(String(u))).slice(0, 12);
+  const list = (urls || []).filter(u => (u && typeof u === 'object' && u.data) || /^https?:\/\//.test(String(u))).slice(0, 12);
   if (!GKEY || !list.length) return list.map(() => 'other');
-  /* тянем байты каждого изображения (кап 4МБ, только растр) */
+  /* тянем байты каждого изображения (кап 4МБ, только растр). {mime,data} — уже готовые (локальные файлы, без фетча) */
   const imgs = [];
   for (const u of list) {
+    if (u && typeof u === 'object' && u.data) { imgs.push({ mime: u.mime || 'image/jpeg', data: u.data }); continue; }
     try {
       const res = await withTimeout((s) => fetch(u, { signal: s }), 7000);
       const ct = (res.headers.get('content-type') || '').split(';')[0];

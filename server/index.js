@@ -11346,9 +11346,19 @@ ${SCR}
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
       const imgs = (pr.images || []).slice(0, 12);
       if (!imgs.length) return json(res, 400, { error: 'у объекта нет фото' });
-      const host = req.headers.host && !/localhost|127\.0\.0\.1/.test(req.headers.host) ? 'https://' + req.headers.host : (global.LUMEN_BASE || 'https://app.lumen247.com');
-      const abs = (u) => /^https?:/i.test(u) ? u : host.replace(/\/$/, '') + u;
-      let roles; try { roles = await llm.classifyPhotos(imgs.map(abs)); } catch (e) { return json(res, 400, { error: 'vision: ' + e.message }); }
+      /* читаем локальные файлы НАПРЯМУЮ (без server→self HTTP, который на Railway падает); http — как URL */
+      const toItem = (u) => {
+        try {
+          let fp = null;
+          if (u.startsWith('/media/')) fp = path.join(MEDIA_DIR, u.replace(/^\/media\//, ''));
+          else if (u.startsWith('/assets/')) fp = path.join(PUBLIC, u.replace(/^\//, ''));
+          if (fp && fs.existsSync(fp)) { const buf = fs.readFileSync(fp); if (buf.length > 900 && buf.length < 5e6) { const ext = path.extname(fp).toLowerCase(); const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'; return { mime, data: buf.toString('base64') }; } }
+        } catch (_) {}
+        return /^https?:/i.test(u) ? u : null;
+      };
+      const items = imgs.map(toItem);
+      if (!items.some(x => x)) return json(res, 400, { error: 'не удалось прочитать фото' });
+      let roles; try { roles = await llm.classifyPhotos(items.map(x => x || 'about:blank')); } catch (e) { return json(res, 400, { error: 'vision: ' + e.message }); }
       const CAP = { render_ext: 'Вид комплекса', interior: 'Интерьер', amenity: 'Инфраструктура', lifestyle: 'Локация · атмосфера', map: 'Расположение' };
       const ORDER = { render_ext: 0, interior: 1, amenity: 2, lifestyle: 3, map: 4 };
       const kept = [], plans = [], meta = {};
@@ -11361,6 +11371,8 @@ ${SCR}
       kept.sort((a, b) => (ORDER[a.r] ?? 9) - (ORDER[b.r] ?? 9));   /* обложка = лучший рендер */
       const rest = (pr.images || []).slice(12);   /* хвост >12 не трогаем (не классифицировали) */
       const removed = imgs.length - kept.length - plans.length;
+      /* ЗАЩИТА: если ИИ забраковал ВСЁ (вероятно сбой распознавания) — НЕ трогаем фото */
+      if (!kept.length && !plans.length && !rest.length) return json(res, 200, { ok: true, kept: 0, plans: 0, removed: 0, noop: true, property: pr });
       pr.images = [...kept.map(x => x.u), ...rest];
       if (plans.length) { pr.layouts = [...(pr.layouts || []), ...plans].slice(0, 20); }
       pr.imageMeta = Object.assign({}, pr.imageMeta, meta);
