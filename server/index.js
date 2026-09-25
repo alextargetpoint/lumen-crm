@@ -3332,6 +3332,28 @@ async function webSearch(query, limit, opts) {
   } catch (_) { return null; }
 }
 
+/* Правдоподобная валюта цены: порталы часто отдают число без символа, ИИ ставит USD по умолчанию.
+   Абсурдные суммы для гео чиним (напр. 5 090 000 в Камале = THB, а не $5M). */
+function fixMoneyCurrency(geo, price, cur) {
+  cur = String(cur || '').toUpperCase().replace(/[^A-Z]/g, ''); price = +price || 0;
+  if (!/^(USD|EUR|AED|THB|RUB|IDR|GBP)$/.test(cur)) cur = '';
+  if (!price) return cur || 'USD';
+  if ((geo === 'phuket' || geo === 'thailand') && cur !== 'THB' && price > 1200000) return 'THB';
+  if (geo === 'bali' && cur !== 'IDR' && price > 200000000) return 'IDR';
+  return cur || (geo === 'phuket' || geo === 'thailand' ? 'THB' : 'USD');
+}
+/* онлайн-курсы валют (free, без ключа: open.er-api.com база USD), кэш на сутки */
+let _fx = { at: 0, rates: null };
+async function getFxRates() {
+  if (_fx.rates && Date.now() - _fx.at < 24 * 3600e3) return _fx.rates;
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD');
+    const j = await r.json().catch(() => ({}));
+    if (j && j.result === 'success' && j.rates && j.rates.THB) { _fx = { at: Date.now(), rates: j.rates }; return j.rates; }
+  } catch (_) {}
+  /* фолбэк-курсы (приблизительные), если API недоступен — лучше, чем ничего */
+  return _fx.rates || { USD: 1, EUR: 0.92, AED: 3.67, THB: 36, RUB: 92, IDR: 15800, GBP: 0.79 };
+}
 const _geoCenters = {};   /* кэш центров регионов (Пхукет/Дубай…) для фолбэка геокодинга */
 async function nominatim(q) {
   try {
@@ -7616,6 +7638,7 @@ const server = http.createServer(async (req, res) => {
       /* SEC: «Все разделы · разработка» может включать только аккаунт основателя/демо, не клиент */
       if (b.agency && ('betaAll' in b.agency) && !isDevTenant(db)) delete b.agency.betaAll;
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      if (b.baseCurrency) db.settings.baseCurrency = String(b.baseCurrency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);   /* базовая валюта кабинета для показа «≈ в моей валюте» */
       /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */
       if (b.geoNames && typeof b.geoNames === 'object') { db.settings.geoNames = db.settings.geoNames || {}; for (const [gk, gv] of Object.entries(b.geoNames)) { const key = String(gk).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24); const nm = String(gv || '').trim().slice(0, 60); if (key && nm) db.settings.geoNames[key] = nm; } }
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
@@ -10994,6 +11017,8 @@ ${SCR}
       const saved = dl.filter(Boolean).sort((a, b) => b.area - a.area).map(x => x.url).slice(0, 10);
       const mapped = inventory.mapItem(Object.assign({}, ext, { image: saved[0] || uniq[0] || '', _src: 'url' }), { geo: b.geo || '', market: b.market || '' });
       mapped.images = saved.length ? saved : mapped.images;
+      mapped.currency = fixMoneyCurrency(mapped.geo || b.geo, mapped.priceFrom, mapped.currency);   /* чиним абсурдную валюту (5.09M в Камале = THB, не $) */
+      if (Array.isArray(mapped.units)) mapped.units.forEach(u => { if (u.price) u.currency = fixMoneyCurrency(mapped.geo || b.geo, u.price, u.currency || mapped.currency); });
       if (Array.isArray(ext.amenities) && ext.amenities.length) mapped.amenities = ext.amenities.slice(0, 20).map(String);
       if (ext.roi) mapped.roi = String(ext.roi).slice(0, 40);
       if (ext.appreciation) mapped.appreciation = String(ext.appreciation).slice(0, 40);
@@ -11038,7 +11063,7 @@ ${SCR}
       let ext; try { ext = await llm.extractPropertyFromPdf(b64); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал PDF: ' + e.message }); }
       const jpegs = extractPdfJpegs(buf);
       const saved = jpegs.map(j => saveImageBuffer(j, 'pdf')).filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 16).map(x => x.url);
-      const cur = (String(ext.currency || '').toUpperCase().match(/USD|EUR|AED|THB/) || [b.geo === 'phuket' ? 'THB' : 'USD'])[0];
+      const cur = fixMoneyCurrency(b.geo, ext.priceFrom, ext.currency);
       const pr = {
         id: store.nextId('pr'), name: String(ext.name || b.fileName || 'Объект из PDF').slice(0, 120),
         developer: String(ext.developer || '').slice(0, 80), area: String(ext.area || ext.city || '').slice(0, 80),
@@ -11261,7 +11286,7 @@ ${SCR}
         db.properties.push({
           id: store.nextId('pr'), name: f.nm.slice(0, 120), area: String(f.pj.area || '').slice(0, 80),
           developer: '', market: 'offplan', type: String(f.pj.type || '').slice(0, 20), beds: 0,
-          priceFrom: +f.pj.priceFrom || 0, currency: (String(f.pj.currency || '').toUpperCase().match(/USD|EUR|AED|THB/) || ['USD'])[0],
+          priceFrom: +f.pj.priceFrom || 0, currency: fixMoneyCurrency(b.geo, f.pj.priceFrom, f.pj.currency),
           geo: b.geo || 'phuket', tags: ['каталог'], materials: [], images: cover ? [cover] : [], units: [], layouts: [], amenities: [],
           sourceUrl: f.src || null, stub: true, catalogPortal: b.portal || 'custom', addedAt: Date.now(),
         });
@@ -11888,6 +11913,12 @@ ${SCR}
       return json(res, 200, seatAudit(db));
     }
     if (p === '/api/marketdata' && req.method === 'GET') return json(res, 200, MARKET);
+    /* онлайн-курсы валют + базовая валюта агентства (для показа «нативная цена ≈ в моей валюте») */
+    if (p === '/api/fx' && req.method === 'GET') {
+      const rates = await getFxRates();
+      const base = (db.settings && db.settings.baseCurrency) || (db.settings && db.settings.currency) || 'USD';
+      return json(res, 200, { ok: true, base, rates, at: _fx.at });
+    }
     if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, playbook.PLAYBOOK);
 
     /* ===== Академия продаж (методология Ольги Синенко) ===== */

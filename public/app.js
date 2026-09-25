@@ -7508,6 +7508,19 @@ function loadLeaflet() {
   return window._leafletLoading;
 }
 function curSym(c) { return ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£', IDR: 'Rp ' })[String(c || '').toUpperCase()] || (c ? c + ' ' : '$'); }
+/* валюты + онлайн-конвертация в базовую валюту кабинета */
+let FX = { base: 'USD', rates: { USD: 1, EUR: 0.92, AED: 3.67, THB: 36, RUB: 92, IDR: 15800, GBP: 0.79 } };
+async function loadFx() { try { const r = await api.get('/fx'); if (r && r.rates) FX = { base: (r.base || 'USD').toUpperCase(), rates: r.rates }; } catch (_) {} }
+function money(v, cur) { return curSym(cur) + Math.round(+v || 0).toLocaleString('ru-RU'); }
+function convTo(v, from, to) { const r = FX.rates || {}; const rf = r[String(from || 'USD').toUpperCase()], rt = r[String(to || 'USD').toUpperCase()]; return (rf && rt) ? (+v || 0) * (rt / rf) : null; }
+/* HTML цены: нативная валюта + «≈ в базовой» (чтобы было понятно, какая валюта и сколько это в моей) */
+function priceHtml(v, cur, prefix) {
+  v = +v || 0; if (!v) return '—'; cur = String(cur || 'USD').toUpperCase();
+  const nat = (prefix || '') + money(v, cur); const base = (FX.base || 'USD').toUpperCase();
+  if (cur === base) return nat;
+  const c = convTo(v, cur, base);
+  return c ? `${nat} <span class="px-conv">≈ ${money(Math.round(c), base)}</span>` : nat;
+}
 /* Районы локаций — мягкие зоны с подписями (r в метрах). Испания = акцент на люкс-побережье Коста-дель-Соль. */
 const MAP_ZONES = {
   phuket: [
@@ -7534,16 +7547,36 @@ const MAP_ZONES = {
     { n: 'Fuengirola · Mijas', lat: 36.54, lng: -4.62, r: 3200 }, { n: 'Málaga', lat: 36.72, lng: -4.42, r: 3600 }, { n: 'Nueva Andalucía', lat: 36.503, lng: -4.96, r: 1700 },
   ],
 };
+const ZONE_PALETTE = ['#d9a5a8', '#a7c4bc', '#c9b79c', '#b5c99a', '#e0bd8f', '#a8b8d8', '#cf9c9c', '#8fc0cb', '#c3aede', '#cbb58c', '#a9cdb4'];
 function drawZones(map, L, geo) {
   const zs = MAP_ZONES[geo]; if (!zs || !window.L) return;
   const layer = L.layerGroup().addTo(map); (window._prZoneLayers = window._prZoneLayers || []).push(layer);
-  zs.forEach(z => {
-    L.circle([z.lat, z.lng], { radius: z.r, interactive: false, className: 'przone', color: '#b8863c', weight: 1.1, opacity: 0.32, fillColor: '#b8863c', fillOpacity: 0.05 }).addTo(layer);
-    L.marker([z.lat, z.lng], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'przone-lbl', html: `<span>${z.n}</span>`, iconSize: [0, 0] }) }).addTo(layer);
+  const active = PAGE_STATE.propZone;
+  zs.forEach((z, i) => {
+    const col = ZONE_PALETTE[i % ZONE_PALETTE.length];
+    const on = active && active.name === z.n;
+    const c = L.circle([z.lat, z.lng], { radius: z.r, interactive: true, className: 'przone', color: col, weight: on ? 2.6 : 1.5, opacity: on ? .85 : .5, fillColor: col, fillOpacity: on ? .26 : .13 });
+    c.addTo(layer);
+    c.on('mouseover', () => c.setStyle({ fillOpacity: .28, weight: 2.4 }));
+    c.on('mouseout', () => c.setStyle({ fillOpacity: on ? .26 : .13, weight: on ? 2.6 : 1.5 }));
+    c.on('click', () => { PAGE_STATE.propZone = on ? null : { name: z.n, lat: z.lat, lng: z.lng, r: z.r, geo }; render(); });   /* клик по району → фильтр (повторный клик — снять) */
+    L.marker([z.lat, z.lng], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'przone-lbl' + (on ? ' on' : ''), html: `<span style="--zc:${col}">${z.n}</span>`, iconSize: [0, 0] }) }).addTo(layer);
   });
 }
-/* премиум моушн-лоадер (чистый CSS, Ателье-акцент): вращающееся кольцо + пульс-ядро + бегущие точки */
-function motionLoader(label) { return `<div class="lm-load"><div class="lm-orb"><i></i><b></b></div><div class="lm-load-tx">${esc(label || 'Работаю')}</div></div>`; }
+/* премиум моушн-индикаторы под КАЖДЫЙ процесс (чистый CSS, Ателье). variant задаёт анимацию:
+   web=орбита(сеть), card=сборка карточки, price=стопка строк(прайс), pdf=скан документа, search=радар, ring=дефолт */
+function motionLoader(label, variant) {
+  const v = variant || 'ring';
+  const art = {
+    web: '<div class="lmw"><span class="lmw-c"></span><i></i><i></i><i></i></div>',
+    card: '<div class="lmc"><span></span><span></span><span></span><span></span></div>',
+    price: '<div class="lmp"><i></i><i></i><i></i><i></i></div>',
+    pdf: '<div class="lmd"><span class="lmd-sheet"></span><span class="lmd-scan"></span></div>',
+    search: '<div class="lms"><span class="lms-sweep"></span><span class="lms-dot"></span><span class="lms-dot d2"></span></div>',
+    ring: '<div class="lm-orb"><i></i><b></b></div>',
+  }[v] || '<div class="lm-orb"><i></i><b></b></div>';
+  return `<div class="lm-load lm-${v}">${art}<div class="lm-load-tx">${esc(label || 'Работаю')}</div></div>`;
+}
 /* язык карточки объекта (для просмотра/шеринга); по умолчанию = язык интерфейса */
 let CARD_LANG = (typeof LANG !== 'undefined' ? LANG : 'ru');
 const CARD_LANGS = [['ru', 'Рус'], ['en', 'Eng'], ['es', 'Esp'], ['de', 'Deu'], ['fr', 'Fra'], ['it', 'Ita'], ['ar', 'عرب'], ['zh', '中文'], ['th', 'ไทย']];
@@ -7608,7 +7641,7 @@ async function initPropMap(props) {
     const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
     window._prMarkers[p.id] = { mk, lat: p.lat, lng: p.lng };
     const img = (p.images && p.images[0]) || '';
-    const price = p.priceFrom ? 'от ' + fmt(p) : '';
+    const price = p.priceFrom ? priceHtml(p.priceFrom, p.currency, 'от ') : '';
     /* мета-чипы: тип · площадь · сдача — минимализм, но информативно */
     const areas = (p.units || []).map(u => parseFloat(String(u.area).replace(',', '.'))).filter(a => a > 0);
     const areaRange = areas.length ? (Math.min(...areas) === Math.max(...areas) ? Math.round(Math.min(...areas)) + ' м²' : Math.round(Math.min(...areas)) + '–' + Math.round(Math.max(...areas)) + ' м²') : '';
@@ -7633,7 +7666,8 @@ async function initPropMap(props) {
     } else { mk.on('mouseover', () => { clearPopT(); _openMk = mk; mk.openPopup(); }); mk.on('mouseout', schedClose); }
     bounds.push([p.lat, p.lng]);
   });
-  if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+  const zoomFit = () => { const Z = PAGE_STATE.propZone; if (Z && window.L) { try { map.fitBounds(L.latLng(Z.lat, Z.lng).toBounds((Z.r || 2000) * 3), { padding: [40, 40], maxZoom: 14 }); return; } catch (_) {} } if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 }); else if (bounds.length === 1) map.setView(bounds[0], 13); };
+  zoomFit();
   map.on('popupopen', (e) => {
     const root2 = e.popup.getElement();
     root2.addEventListener('mouseenter', clearPopT);   /* курсор в попапе — не закрываем */
@@ -7647,10 +7681,11 @@ async function initPropMap(props) {
     });
   });
   if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
-  [120, 350, 800].forEach(t => setTimeout(() => { try { map.invalidateSize(); if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 }); else if (bounds.length === 1) map.setView(bounds[0], 13); } catch (_) {} }, t));
+  [120, 350, 800].forEach(t => setTimeout(() => { try { map.invalidateSize(); zoomFit(); } catch (_) {} }, t));
 }
 
 PAGES.properties = async (root) => {
+  if (!FX._loaded) { FX._loaded = true; await loadFx(); }   /* онлайн-курсы для показа цены в базовой валюте */
   const props = await api.get('/properties');
   const st = STATE.settings;
 
@@ -7685,7 +7720,10 @@ PAGES.properties = async (root) => {
               <button class="btn btn-sm pd2-ghost" id="prBack">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Все объекты'}</button>
               <span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>
               <span class="tb-spacer"></span>
-              <select class="pd2-ghost pd2-lang" id="pdLang" title="Язык карточки (перевод для просмотра и шеринга)">${CARD_LANGS.map(([c, n]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${n}</option>`).join('')}</select>
+              <div class="pd2-langdd" id="pdLangDD">
+                <button class="btn btn-sm pd2-ghost" id="pdLangBtn" type="button" title="Язык карточки (перевод для просмотра и шеринга)">${ic(I.globe || I.eye, 2)}${(CARD_LANGS.find(l => l[0] === CARD_LANG) || ['', 'Рус'])[1]}<span class="pd2-langcv">▾</span></button>
+                <div class="pd2-langmenu" id="pdLangMenu" hidden>${CARD_LANGS.map(([c, n]) => `<button type="button" class="pd2-langopt ${c === CARD_LANG ? 'on' : ''}" data-lang="${c}">${n}</button>`).join('')}</div>
+              </div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
@@ -7696,7 +7734,8 @@ PAGES.properties = async (root) => {
                 <div class="pd-sub pd2-sub">${combo('area', geoMD.areas, pr.area, 'район')} ${combo('developer', geoMD.developers, pr.developer, 'застройщик')}</div>
               </div>
               <div class="pd2-priceside">
-                <div class="pd2-price">от <input class="gi gi-price pd2-priceinp" data-f="priceFrom" type="number" value="${pr.priceFrom}"><b>${pr.currency}</b></div>
+                <div class="pd2-price">от <input class="gi gi-price pd2-priceinp" data-f="priceFrom" type="number" value="${pr.priceFrom}"><select class="gi pd2-cur" data-f="currency" title="Валюта — поправьте, если распозналась неверно">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'IDR', 'GBP'].map(c => `<option ${(pr.currency || 'USD').toUpperCase() === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+                ${pr.priceFrom && (pr.currency || 'USD').toUpperCase() !== (FX.base || 'USD') ? `<div class="pd2-conv">≈ ${money(convTo(pr.priceFrom, pr.currency, FX.base) || 0, FX.base)} <span class="muted">в базовой (${FX.base})</span></div>` : ''}
                 <div class="pd2-selects">
                   <select id="pdMarket" style="width:128px"><option value="offplan" ${pr.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
                   <select id="pdGeo" style="width:118px">${st.agency.geos.map(g => `<option value="${g}" ${pr.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
@@ -7921,7 +7960,7 @@ PAGES.properties = async (root) => {
         const body = { apply }; const txt = $('#recText', md).value.trim();
         if (apply && parsedUnits) { body.units = parsedUnits; }   /* ⚡ при подтверждении шлём УЖЕ разобранное — ИИ повторно НЕ гоняем (не уходит снова в долгую загрузку) */
         else if (txt) body.text = txt; else if (fileB64) { body.fileB64 = fileB64; body.fileName = fileName; } else return toast('Вставьте текст или файл');
-        const out = $('#recOut', md); out.innerHTML = motionLoader(apply ? 'Применяю…' : 'ИИ разбирает прайс застройщика…');
+        const out = $('#recOut', md); out.innerHTML = motionLoader(apply ? 'Применяю…' : 'ИИ разбирает прайс застройщика…', 'price');
         try {
           const r = await api.post('/properties/' + pr.id + '/reconcile-units', body);
           if (r.error) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(r.error) + '</span>'; return; }
@@ -7938,18 +7977,20 @@ PAGES.properties = async (root) => {
       $('#recPrev', md).addEventListener('click', () => call(false));
     });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
-    $('#pdLang')?.addEventListener('change', async (e) => {
-      const lang = e.target.value; CARD_LANG = lang;
+    $('#pdLangBtn')?.addEventListener('click', (e) => { e.stopPropagation(); const mn = $('#pdLangMenu', root); if (mn) mn.hidden = !mn.hidden; });
+    document.addEventListener('click', () => { const mn = $('#pdLangMenu', root); if (mn && !mn.hidden) mn.hidden = true; }, { once: true });
+    $$('.pd2-langopt', root).forEach(o => o.addEventListener('click', async (e) => {
+      e.stopPropagation(); const lang = o.dataset.lang; CARD_LANG = lang; const mn = $('#pdLangMenu', root); if (mn) mn.hidden = true;
       if (lang === LANG || (pr.i18n && pr.i18n[lang])) return render();   /* оригинал/язык интерфейса или уже переведено */
-      e.target.disabled = true;
+      o.textContent = '…';
       const rr = await api.post('/properties/' + pr.id + '/translate', { lang }).catch(() => ({ error: 'сеть' }));
-      if (rr && rr.property) { Object.assign(pr, rr.property); toast('Карточка переведена', CARD_LANGS.find(l => l[0] === lang)?.[1] || lang, true); }
+      if (rr && rr.property) { Object.assign(pr, rr.property); toast('Карточка переведена', (CARD_LANGS.find(l => l[0] === lang) || [])[1] || lang, true); }
       else toast('Не перевёл', (rr && rr.error) || '');
       render();
-    });
+    }));
     $('#pdEnrich').addEventListener('click', async () => {
       const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание', districtBlurb: 'Описание района', timings: 'Тайминги до мест', rentalArgs: 'Аргументы под аренду', amenities: 'Удобства комплекса', investmentHighlights: 'Инвест-аргументы', paymentPlan: 'План оплаты', hookTitle: 'Крючок-заголовок' };
-      const md = modal({ title: 'Дополнить из открытых источников', sub: `Собираю ПОЛНУЮ карточку по «${esc(pr.name)}» — факты, фото, видео-рендеры, наличие юнитов…`, body: '<div id="enrOut">' + motionLoader('Собираю по всем открытым источникам') + '</div>', actions: [{ label: 'Закрыть' }] });
+      const md = modal({ title: 'Дополнить из открытых источников', sub: `Собираю ПОЛНУЮ карточку по «${esc(pr.name)}» — факты, фото, видео-рендеры, наличие юнитов…`, body: '<div id="enrOut">' + motionLoader('Собираю по всем открытым источникам', 'web') + '</div>', actions: [{ label: 'Закрыть' }] });
       try {
         const r = await api.post('/properties/' + pr.id + '/enrich', {});   /* пусто → сервер сам берёт все гэпы карточки (комплексно) */
         const hasFields = r.proposed && Object.keys(r.proposed).length;
@@ -8015,7 +8056,9 @@ PAGES.properties = async (root) => {
   const advCount = [typeF, distF, devF, bedsF, statusF, F.propPriceMin, F.propPriceMax, F.propAreaMin, F.propAreaMax, F.propRoiMin, F.propHandFrom, F.propHandTo].filter(Boolean).length;
   const folders = (await api.get('/folders')).filter(f => f.kind === 'prop');
   const folderF = PAGE_STATE.propFolder || '';
-  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF) && matchAdv(pr));
+  let list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF) && matchAdv(pr));
+  /* клик по району на карте → оставляем только объекты внутри зоны (по координатам) */
+  if (PAGE_STATE.propZone) { const Z = PAGE_STATE.propZone; const R = (Z.r || 2000) * 1.5 / 111000; list = list.filter(p => typeof p.lat === 'number' && Math.hypot(p.lat - Z.lat, (p.lng - Z.lng) * Math.cos(Z.lat * Math.PI / 180)) < R); }
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
     ${heroArt('assets/art/tower.png', `
@@ -8027,7 +8070,9 @@ PAGES.properties = async (root) => {
       <input id="prQ" placeholder="Поиск: проект / район / застройщик (с опечатками)" value="${esc(PAGE_STATE.propQ || '')}" style="min-width:220px;flex:1 1 220px">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
+      <select id="prBaseCur" title="Базовая валюта — цены показываются «нативная ≈ в этой валюте»">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'GBP'].map(c => `<option ${(FX.base || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <button class="btn btn-sm ${F.propFiltersOpen ? 'on-map' : ''}" id="prFiltBtn" title="Расширенный фильтр">${ic(I.gear || I.doc)}Фильтры${advCount ? ' · ' + advCount : ''}</button>
+      ${PAGE_STATE.propZone ? `<button class="btn btn-sm pr-zonechip" id="prZoneReset" title="Снять фильтр района">${ic(I.pin || I.building, 2)}${esc(PAGE_STATE.propZone.name)} <b>×</b></button>` : ''}
       ${(q || advCount) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
       <button class="btn btn-sm ${PAGE_STATE.propMap ? 'on-map' : ''}" id="prMapToggle" title="Показать объекты на карте">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? '← Списком' : 'На карте'}</button>
@@ -8050,7 +8095,7 @@ PAGES.properties = async (root) => {
     <div id="prMapWrap" style="${PAGE_STATE.propMap ? '' : 'display:none'};margin:0 0 14px">
       <div class="pr-split">
         <div class="pr-split-list">
-          ${list.map(pr2 => `<div class="prm-row" data-prrow="${pr2.id}"><div class="prm-row-th" style="background-image:url('${esc((pr2.images || [])[0] || '')}')"></div><div class="prm-row-b"><div class="prm-row-n">${esc(pr2.name)}${pr2.stub ? ' <span class="prm-stub">каталог</span>' : ''}</div><div class="prm-row-l">${esc(pr2.area || '—')}</div><div class="prm-row-p">${pr2.priceFrom ? 'от ' + fmt(pr2) : '—'}</div></div></div>`).join('') || '<div class="muted" style="font-size:12px;padding:10px">Объектов нет — импортируйте каталог</div>'}
+          ${list.map(pr2 => `<div class="prm-row" data-prrow="${pr2.id}"><div class="prm-row-th" style="background-image:url('${esc((pr2.images || [])[0] || '')}')"></div><div class="prm-row-b"><div class="prm-row-n">${esc(pr2.name)}${pr2.stub ? ' <span class="prm-stub">каталог</span>' : ''}</div><div class="prm-row-l">${esc(pr2.area || '—')}</div><div class="prm-row-p">${pr2.priceFrom ? priceHtml(pr2.priceFrom, pr2.currency, 'от ') : '—'}</div></div></div>`).join('') || '<div class="muted" style="font-size:12px;padding:10px">Объектов нет — импортируйте каталог</div>'}
         </div>
         <div class="pr-split-map"><div id="prMap"></div><div id="prMapStatus" class="muted" style="font-size:11px;position:absolute;left:10px;bottom:8px;background:rgba(255,253,249,.9);padding:3px 8px;border-radius:8px;z-index:500"></div></div>
       </div>
@@ -8084,7 +8129,7 @@ PAGES.properties = async (root) => {
           <div class="pc2-name">${esc(pr.name)}</div>
           ${pr.area || (pr.developer && pr.developer !== '—') ? `<div class="pc2-loc">${esc(pr.area || '')}${pr.developer && pr.developer !== '—' ? (pr.area ? ' · ' : '') + esc(pr.developer) : ''}</div>` : ''}
           <div class="pc2-price-row">
-            <span class="pc2-price">${pr.priceFrom ? 'от ' + fmt(pr) : '—'}</span>
+            <span class="pc2-price">${pr.priceFrom ? priceHtml(pr.priceFrom, pr.currency, 'от ') : '—'}</span>
             ${pr.roi ? `<span class="pc2-roi">${esc(pr.roi)}</span>` : ''}
           </div>
           ${[pr.type, pr.handover].filter(x => x && x !== '—').length ? `<div class="pc2-meta">${[pr.type, pr.handover].filter(x => x && x !== '—').map(esc).join('&nbsp;·&nbsp;')}</div>` : ''}
@@ -8094,6 +8139,8 @@ PAGES.properties = async (root) => {
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
   $('#prMapToggle')?.addEventListener('click', () => { PAGE_STATE.propMap = !PAGE_STATE.propMap; render(); });
+  $('#prBaseCur')?.addEventListener('change', async (e) => { FX.base = e.target.value; api.patch('/settings', { baseCurrency: FX.base }).catch(() => {}); render(); });
+  $('#prZoneReset')?.addEventListener('click', () => { PAGE_STATE.propZone = null; render(); });
   /* расширенный фильтр (карта синхронизируется — initPropMap(list), а не всех props) */
   $('#prQ')?.addEventListener('input', (e) => { PAGE_STATE.propQ = e.target.value; clearTimeout(window._prQT); window._prQT = setTimeout(() => { PAGE_STATE._focusQ = true; render(); }, 400); });
   $('#prFiltBtn')?.addEventListener('click', () => { PAGE_STATE.propFiltersOpen = !PAGE_STATE.propFiltersOpen; render(); });
@@ -8105,7 +8152,7 @@ PAGES.properties = async (root) => {
   if (PAGE_STATE._focusQ) { PAGE_STATE._focusQ = false; const qi = $('#prQ'); if (qi) { qi.focus(); const v = qi.value; qi.value = ''; qi.value = v; } }
   $('#prTierWeb')?.addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); const out = $('#prTierOut'); if (!out) return;
-    btn.disabled = true; out.innerHTML = '<div class="pr-tier-load"><span class="enr-spin"></span>Ищу «' + esc(q) + '» в открытых источниках…</div>';
+    btn.disabled = true; out.innerHTML = motionLoader('Ищу «' + q + '» в открытых источниках…', 'search');
     try {
       const r = await api.post('/properties/find-web', { query: q, geo: geoF || PAGE_STATE.propGeo || '' });
       btn.disabled = false;
@@ -8239,7 +8286,7 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
     $('#impPdfFile', bd)?.addEventListener('change', (e) => { const f = e.target.files[0]; if (!f) return; pdfName = f.name; $('#impPdfName', bd).textContent = f.name; const rd = new FileReader(); rd.onload = () => { pdfB64 = String(rd.result).replace(/^data:[^,]*,/, ''); $('#impPdfGo', bd).disabled = false; }; rd.readAsDataURL(f); });
     $('#impPdfGo', bd)?.addEventListener('click', async (e) => {
       if (!pdfB64) return toast('Выберите PDF'); const out = $('#impPdfOut', bd); const btn = e.target.closest('button'); btn.disabled = true;
-      out.innerHTML = motionLoader('ИИ читает PDF: текст, таблицы, планировки, фото…');
+      out.innerHTML = motionLoader('ИИ читает PDF: текст, таблицы, планировки, фото…', 'pdf');
       try {
         const r = await api.post('/properties/from-pdf', { fileB64: pdfB64, fileName: pdfName, ...defaults() });
         if (r.error) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(r.error) + '</span>'; btn.disabled = false; return; }
@@ -8268,7 +8315,7 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
       } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; }
     });
     const doImport = async (url, out, btn, force) => {
-      btn.disabled = true; out.innerHTML = '<span class="muted" style="font-size:12px">ИИ разбирает страницу и перезаливает фото… (10-20 сек)</span>';
+      btn.disabled = true; out.innerHTML = motionLoader('ИИ собирает карточку — цена, юниты, план оплаты, фото…', 'card');
       try {
         const r = await api.post('/properties/from-url', Object.assign({ url, full: true }, force ? { force } : {}, defaults()));
         if (r.exists) {
