@@ -399,6 +399,11 @@ input[type=number] { -moz-appearance: textfield; }
 .ao-opt b { font-size: 14px; color: var(--ink, #23201c); }
 .ao-opt span { font-size: 12px; color: var(--muted); }
 .ao-opt:disabled { opacity: .5; cursor: default; }
+/* отбор+подписи фото */
+.btn-xs { font-size: 10.5px; padding: 3px 8px; height: auto; margin-left: 8px; vertical-align: middle; }
+.pd-curate svg { width: 12px; height: 12px; }
+.pd-img { position: relative; }
+.pd-img-cap { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; font-weight: 600; color: #fff; background: linear-gradient(180deg, transparent, rgba(0,0,0,.72)); padding: 12px 8px 5px; border-radius: 0 0 8px 8px; pointer-events: none; }
 :root[data-night] .prmetric { background: rgba(20,17,12,.92); border-color: rgba(255,255,255,.1); }
 :root[data-night] .prmetric-b { color: #b8ad99; }
 

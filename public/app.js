@@ -7934,8 +7934,8 @@ PAGES.properties = async (root) => {
           <div class="pds-hd"><span class="pds-ic m">${ic(I.eye)}</span><div><b>Медиа и материалы</b><i>фото, планировки, брошюры — уходят в подборки</i></div></div>
           <div class="pds-grid c3 media">
             <div>
-              <label class="lc-lbl">Фото и интерьеры · первое — обложка</label>
-              <div class="pd-imgs">${(pr.images || []).map((u, ix) => `<div class="pd-img" style="background-image:url('${esc(u)}')"><button class="pd-x" data-imgdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px">Фото нет — вставьте ссылки</div>'}</div>
+              <label class="lc-lbl">Фото и интерьеры · первое — обложка ${(pr.images || []).length ? `<button class="btn btn-xs pd-curate" id="pdCurate" title="ИИ уберёт логотипы/текст-слайды и подпишет каждое фото">${ic(I.spark, 2)}Отобрать и подписать</button>` : ''}</label>
+              <div class="pd-imgs">${(pr.images || []).map((u, ix) => `<div class="pd-img" style="background-image:url('${esc(u)}')"><button class="pd-x" data-imgdel="${ix}">${ic(I.x)}</button>${(pr.imageMeta && pr.imageMeta[u]) ? `<span class="pd-img-cap">${esc(pr.imageMeta[u])}</span>` : ''}</div>`).join('') || '<div class="muted" style="font-size:12px">Фото нет — вставьте ссылки</div>'}</div>
               <div class="lc-note-row" style="margin-top:10px"><input id="pdImgUrl" placeholder="https://…jpg"><button class="btn btn-sm" id="pdImgAdd">${ic(I.plus)}</button></div>
             </div>
             <div>
@@ -8029,6 +8029,13 @@ PAGES.properties = async (root) => {
     chipAdder('amenAddInp', 'amenAddBtn', 'amenities');
     $('#pdImgAdd').addEventListener('click', async () => { const u = $('#pdImgUrl').value.trim(); if (!u) return; await upd({ images: [...(pr.images || []), u] }); render(); });
     $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
+    $('#pdCurate')?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button'); btn.disabled = true; btn.innerHTML = '<span class="enr-spin"></span>ИИ смотрит фото…';
+      const r = await api.post('/properties/' + pr.id + '/curate-photos', {}).catch(() => ({ error: 'сеть' }));
+      if (r.error) { btn.disabled = false; btn.innerHTML = 'Отобрать и подписать'; return toast('Не вышло', r.error); }
+      toast('Фото отобраны ИИ', `оставлено ${r.kept}${r.plans ? ' · планировок ' + r.plans : ''}${r.removed ? ' · убрано ' + r.removed : ''}`, true);
+      if (r.property) Object.assign(pr, r.property); render();
+    });
     $$('.pd-img', root).forEach((d, ix) => { d.style.cursor = 'zoom-in'; d.addEventListener('click', (e) => { if (e.target.closest('.pd-x')) return; lumenGallery(pr.images || [], ix); }); });
     $('#pdLayAdd').addEventListener('click', async () => { const u = $('#pdLayUrl').value.trim(); if (!u) return; await upd({ layouts: [...(pr.layouts || []), { label: $('#pdLayLabel').value || 'Планировка', url: u }] }); render(); });
     $$('[data-laydel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ layouts: pr.layouts.filter((_, ix) => ix !== +b.dataset.laydel) }); render(); }));

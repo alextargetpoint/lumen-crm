@@ -11339,6 +11339,35 @@ ${SCR}
       store.save();
       return json(res, 200, { ok: true, by, created, assigned, folders: Object.keys(groups).length });
     }
+    /* ⭐ ОТБОР И ПОДПИСИ ФОТО (vision): классифицируем фото карточки → оставляем качественные,
+       планировки → в layouts, логотипы/мусор/текст-слайды убираем, каждому фото — автоподпись по роли. */
+    if ((m = p.match(/^\/api\/properties\/([^/]+)\/curate-photos$/)) && req.method === 'POST') {
+      const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
+      const imgs = (pr.images || []).slice(0, 12);
+      if (!imgs.length) return json(res, 400, { error: 'у объекта нет фото' });
+      const host = req.headers.host && !/localhost|127\.0\.0\.1/.test(req.headers.host) ? 'https://' + req.headers.host : (global.LUMEN_BASE || 'https://app.lumen247.com');
+      const abs = (u) => /^https?:/i.test(u) ? u : host.replace(/\/$/, '') + u;
+      let roles; try { roles = await llm.classifyPhotos(imgs.map(abs)); } catch (e) { return json(res, 400, { error: 'vision: ' + e.message }); }
+      const CAP = { render_ext: 'Вид комплекса', interior: 'Интерьер', amenity: 'Инфраструктура', lifestyle: 'Локация · атмосфера', map: 'Расположение' };
+      const ORDER = { render_ext: 0, interior: 1, amenity: 2, lifestyle: 3, map: 4 };
+      const kept = [], plans = [], meta = {};
+      imgs.forEach((u, i) => {
+        const r = roles[i] || 'other';
+        if (r === 'floorplan') { plans.push({ label: 'Планировка', url: u }); return; }
+        if (r === 'logo' || r === 'other') return;   /* текст-слайды/логотипы/мусор — вон */
+        kept.push({ u, r }); meta[u] = CAP[r] || 'Фото';
+      });
+      kept.sort((a, b) => (ORDER[a.r] ?? 9) - (ORDER[b.r] ?? 9));   /* обложка = лучший рендер */
+      const rest = (pr.images || []).slice(12);   /* хвост >12 не трогаем (не классифицировали) */
+      const removed = imgs.length - kept.length - plans.length;
+      pr.images = [...kept.map(x => x.u), ...rest];
+      if (plans.length) { pr.layouts = [...(pr.layouts || []), ...plans].slice(0, 20); }
+      pr.imageMeta = Object.assign({}, pr.imageMeta, meta);
+      pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: `Фото отобраны ИИ: оставлено ${kept.length}, планировок ${plans.length}, убрано ${removed}` });
+      store.save();
+      return json(res, 200, { ok: true, kept: kept.length, plans: plans.length, removed, property: pr });
+    }
     if (p === '/api/properties/find-web' && req.method === 'POST') {
       const b = await readBody(req).catch(() => ({}));
       const query = String(b.query || '').trim();
