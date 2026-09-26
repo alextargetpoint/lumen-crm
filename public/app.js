@@ -4327,9 +4327,9 @@ function selBulkBar(cfg) {
   if (!sel.size || CUR !== cfg.kind) { if (bar) bar.remove(); return; }
   if (!bar) { bar = el('<div id="bulkBar" class="bulk-bar"></div>'); document.body.appendChild(bar); }
   const acts = cfg.actions(sel.size);
-  bar.innerHTML = `<span class="bb-count">${sel.size}</span><span class="bb-lbl">${cfg.entityPlural || 'выбрано'}</span>`
-    + acts.map((a, i) => `<button class="btn btn-sm ${a.danger ? 'btn-danger' : ''}" data-bb="${i}">${a.ic ? ic(a.ic) : ''}${esc(a.label)}</button>`).join('')
-    + `<span class="bb-sp"></span><button class="btn-ghost bb-clear" data-bb="clear" title="Снять (Esc)">${ic(I.x)}</button>`;
+  /* шапка (счётчик + ×) отдельной строкой, действия — РОВНОЙ СЕТКОЙ равных колонок (не «одна кнопка на строке») */
+  bar.innerHTML = `<div class="bb-head"><span class="bb-count">${sel.size}</span><span class="bb-lbl">${cfg.entityPlural || 'выбрано'}</span><button class="btn-ghost bb-clear" data-bb="clear" title="Снять (Esc)">${ic(I.x)}</button></div>`
+    + `<div class="bb-acts">` + acts.map((a, i) => `<button class="btn btn-sm ${a.danger ? 'btn-danger' : ''}" data-bb="${i}">${a.ic ? ic(a.ic) : ''}${esc(a.label)}</button>`).join('') + `</div>`;
   bar.onclick = (e) => {
     const b = e.target.closest('[data-bb]'); if (!b) return;
     if (b.dataset.bb === 'clear') { sel.clear(); selRefresh(cfg); return; }
@@ -4453,9 +4453,34 @@ const SELCFG_PROPS = {
     } },
     { id: 'bulkEnrich', label: 'Дополнить из сети', ic: I.spark, run: async () => {
       const ids = [...selSet('properties')]; if (!ids.length) return;
-      showLoader(`Дополняю из сети… 0/${ids.length}`, 'web'); let ok = 0;
-      for (let i = 0; i < ids.length; i++) { setLoader(`Дополняю из сети… ${i + 1}/${ids.length}`); try { const r = await api.post('/properties/' + ids[i] + '/enrich', { apply: true, media: true, units: true }); if (!r.error) ok++; } catch (_) {} }
-      hideLoader(); selSet('properties').clear(); toast('Готово', `дополнено объектов: ${ok}/${ids.length}`, true); render();
+      const GROUPS = [
+        { label: 'Факты: срок сдачи, ROI, прирост, ход стройки', fields: ['handover', 'roi', 'appreciation', 'constructionProgress'] },
+        { label: 'Описание проекта', fields: ['description'] },
+        { label: 'Район и тайминги до мест', fields: ['districtBlurb', 'timings'] },
+        { label: 'Удобства комплекса', fields: ['amenities'] },
+        { label: 'Инвест-аргументы и аренда', fields: ['investmentHighlights', 'rentalArgs'] },
+        { label: 'План оплаты', fields: ['paymentPlan'] },
+        { label: 'Крючок-заголовок', fields: ['hookTitle'] },
+      ];
+      const grpRows = GROUPS.map(g => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${g.label}</div></div><input type="checkbox" class="be-grp" data-fields="${g.fields.join(',')}" checked style="width:20px;height:20px"></label>`).join('');
+      const mediaRow = `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Фото и видео из сети</div><div class="sd">только добавит новые (существующие не тронет)</div></div><input type="checkbox" id="beMedia" checked style="width:20px;height:20px"></label>`;
+      const unitsRow = `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Юниты</div><div class="sd">только добавит новые</div></div><input type="checkbox" id="beUnits" checked style="width:20px;height:20px"></label>`;
+      const gapRow = `<label class="set-row be-gaprow" style="cursor:pointer"><div class="sp"><div class="sl">${ic(I.check, 2)}Не затирать заполненное</div><div class="sd">дополнять ТОЛЬКО пустые поля — данные, что внесла команда, в безопасности</div></div><input type="checkbox" id="beGap" checked style="width:20px;height:20px"></label>`;
+      modal({ title: `Дополнить из сети · ${ids.length} ${plural(ids.length, 'объект', 'объекта', 'объектов')}`, sub: 'Выберите, что искать и заполнять. Цена никогда не затирается автоматически.',
+        body: `<div style="display:flex;flex-direction:column;gap:7px">${gapRow}<div class="muted" style="font-size:11px;margin:8px 0 0">Что заполнять:</div>${grpRows}${mediaRow}${unitsRow}</div>`,
+        actions: [
+          { label: `Дополнить ${ids.length}`, cls: 'btn-accent', onClick: async (bd) => {
+            const fields = [...new Set($$('.be-grp', bd).filter(c => c.checked).flatMap(c => c.dataset.fields.split(',')))];
+            const media = $('#beMedia', bd).checked, units = $('#beUnits', bd).checked, gapOnly = $('#beGap', bd).checked;
+            if (!fields.length && !media && !units) { toast('Ничего не выбрано'); return false; }
+            closeModal();
+            showLoader(`Дополняю из сети… 0/${ids.length}`, 'web'); let ok = 0;
+            for (let i = 0; i < ids.length; i++) { setLoader(`Дополняю из сети… ${i + 1}/${ids.length}`); try { const r = await api.post('/properties/' + ids[i] + '/enrich', { apply: true, fields, media, units, gapOnly }); if (!r.error) ok++; } catch (_) {} }
+            hideLoader(); selSet('properties').clear(); toast('Готово', `дополнено объектов: ${ok}/${ids.length}`, true); render();
+            return false;
+          } },
+          { label: 'Отмена' },
+        ] });
     } },
     { id: 'bulkCurate', label: 'Отобрать фото', ic: I.image || I.eye, run: async () => {
       const ids = [...selSet('properties')]; if (!ids.length) return;
@@ -7559,6 +7584,8 @@ let FX = { base: 'USD', rates: { USD: 1, EUR: 0.92, AED: 3.67, THB: 36, RUB: 92,
 async function loadFx() { try { const r = await api.get('/fx'); if (r && r.rates) FX = { base: (r.base || 'USD').toUpperCase(), rates: r.rates }; } catch (_) {} }
 function money(v, cur) { return curSym(cur) + Math.round(+v || 0).toLocaleString('ru-RU'); }
 function numRaw(v) { return +String(v == null ? '' : v).replace(/[^\d.]/g, '') || 0; }   /* «5 090 000» из форматированного денежного инпута → число */
+function myUid() { const me = STATE && STATE.me; return (me && me.role === 'broker') ? me.brokerId : 'owner'; }   /* мой идентификатор владельца карточек: brokerId или 'owner' */
+function propCanSetVis(pr) { const me = STATE && STATE.me; if (!me || me.role !== 'broker') return true; return pr.ownerId === me.brokerId || !pr.ownerId; }   /* менять видимость: владелец агентства всегда; брокер — только свои карточки */
 /* коррекция валюты на ОТОБРАЖЕНИИ (не трогаем базу): THB-суммы с меткой USD в Пхукете и т.п. */
 function fixCur(geo, price, cur) { cur = String(cur || '').toUpperCase(); price = +price || 0; if ((geo === 'phuket' || geo === 'thailand') && cur !== 'THB' && price > 1200000) return 'THB'; if (geo === 'bali' && cur !== 'IDR' && price > 200000000) return 'IDR'; return cur || 'USD'; }
 /* «от»-цена для показа: минимальный юнит с ценой (консистентно с таблицей юнитов), иначе priceFrom */
@@ -7975,6 +8002,7 @@ PAGES.properties = async (root) => {
                 <div class="pd2-selects">
                   <select id="pdMarket" style="width:128px"><option value="offplan" ${pr.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
                   <select id="pdGeo" style="width:118px">${st.agency.geos.map(g => `<option value="${g}" ${pr.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
+                  ${propCanSetVis(pr) ? `<select id="pdVis" style="width:150px" title="Видимость: командная (весь агентство) или личная (только вы)"><option value="team" ${pr.visibility !== 'private' ? 'selected' : ''}>👥 Команде</option><option value="private" ${pr.visibility === 'private' ? 'selected' : ''}>🔒 Только я</option></select>` : (pr.visibility === 'private' ? `<span class="pd2-vis-badge">🔒 Личная</span>` : '')}
                 </div>
               </div>
             </div>
@@ -8221,6 +8249,10 @@ PAGES.properties = async (root) => {
       };
       $('#recPrev', md).addEventListener('click', () => call(false));
     });
+    $('#pdVis')?.addEventListener('change', async (e) => {
+      const v = e.target.value; await upd({ visibility: v }); pr.visibility = v;
+      toast(v === 'private' ? 'Карточка стала личной' : 'Карточка видна команде', v === 'private' ? 'её видите только вы' : 'весь агентство', true);
+    });
     $('#pdCompare')?.addEventListener('click', () => {
       PAGE_STATE.compare = PAGE_STATE.compare || [];
       const i = PAGE_STATE.compare.indexOf(pr.id);
@@ -8308,7 +8340,10 @@ PAGES.properties = async (root) => {
   const advCount = [typeF, distF, devF, bedsF, statusF, F.propPriceMin, F.propPriceMax, F.propAreaMin, F.propAreaMax, F.propRoiMin, F.propHandFrom, F.propHandTo].filter(Boolean).length;
   const folders = (await api.get('/folders')).filter(f => f.kind === 'prop');
   const folderF = PAGE_STATE.propFolder || '';
-  let list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF) && matchAdv(pr));
+  const ownF = PAGE_STATE.propOwn || '';   /* чьи: '' все · mine мои · team командные · private личные */
+  const meUid = myUid();
+  const matchOwn = (pr) => !ownF || (ownF === 'mine' ? pr.ownerId === meUid : ownF === 'team' ? pr.visibility !== 'private' : ownF === 'private' ? pr.visibility === 'private' : true);
+  let list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF) && matchOwn(pr) && matchAdv(pr));
   /* клик по району на карте → оставляем только объекты внутри зоны (по координатам) */
   if (PAGE_STATE.propZone) { const Z = PAGE_STATE.propZone; const R = (Z.r || 2000) * 1.5 / 111000; list = list.filter(p => typeof p.lat === 'number' && Math.hypot(p.lat - Z.lat, (p.lng - Z.lng) * Math.cos(Z.lat * Math.PI / 180)) < R); }
   /* «обведи-область» → только объекты внутри нарисованного контура (по координатам) */
@@ -8328,6 +8363,7 @@ PAGES.properties = async (root) => {
       <input id="prQ" placeholder="Поиск: проект / район / застройщик (с опечатками)" value="${esc(PAGE_STATE.propQ || '')}" style="min-width:220px;flex:1 1 220px">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
+      ${((STATE.brokers || []).some(b => b.active !== false) || (STATE.me && STATE.me.role === 'broker')) ? `<select id="prOwn" title="Чьи объекты: общий пул агентства или ваши личные"><option value="">Все объекты</option><option value="mine" ${ownF === 'mine' ? 'selected' : ''}>Мои</option><option value="team" ${ownF === 'team' ? 'selected' : ''}>Командные</option><option value="private" ${ownF === 'private' ? 'selected' : ''}>Личные</option></select>` : ''}
       <select id="prBaseCur" title="Базовая валюта — цены показываются «нативная ≈ в этой валюте»">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'GBP'].map(c => `<option ${(FX.base || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <button class="btn btn-sm ${F.propFiltersOpen ? 'on-map' : ''}" id="prFiltBtn" title="Расширенный фильтр">${ic(I.gear || I.doc)}Фильтры${advCount ? ' · ' + advCount : ''}</button>
       ${PAGE_STATE.propZone ? `<button class="btn btn-sm pr-zonechip" id="prZoneReset" title="Снять фильтр района">${ic(I.pin || I.building, 2)}${esc(PAGE_STATE.propZone.name)} <b>×</b></button>` : ''}
@@ -8384,6 +8420,7 @@ PAGES.properties = async (root) => {
         <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
         ${propCover(pr)}
         <span class="pc2-market ${pr.market === 'offplan' ? 'off' : 'sec'}">${pr.market === 'offplan' ? 'Первичка' : 'Вторичка'}</span>
+        ${pr.visibility === 'private' ? `<span class="pc2-priv" title="Личная карточка — видите только вы">🔒 Личная</span>` : ''}
         <div class="pc2-body">
           <div class="pc2-name">${esc(pr.name)}</div>
           ${pr.area || (pr.developer && pr.developer !== '—') ? `<div class="pc2-loc">${esc(pr.area || '')}${pr.developer && pr.developer !== '—' ? (pr.area ? ' · ' : '') + esc(pr.developer) : ''}</div>` : ''}
@@ -8397,6 +8434,7 @@ PAGES.properties = async (root) => {
     </div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
+  $('#prOwn')?.addEventListener('change', (e) => { PAGE_STATE.propOwn = e.target.value; render(); });
   $('#prvList')?.addEventListener('click', () => { if (PAGE_STATE.propMap) { PAGE_STATE.propMap = false; render(); } });
   $('#prvMap')?.addEventListener('click', () => { if (!PAGE_STATE.propMap) { PAGE_STATE.propMap = true; render(); } });
   $('#prBaseCur')?.addEventListener('change', async (e) => { FX.base = e.target.value; api.patch('/settings', { baseCurrency: FX.base }).catch(() => {}); render(); });

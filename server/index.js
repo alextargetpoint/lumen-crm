@@ -1032,6 +1032,8 @@ function sessionRole(req) {
   }
   return { sid, role: realRole, brokerId: s.brokerId || null };
 }
+/* владелец создаваемой карточки объекта: брокер → его id, иначе агентство ('owner') */
+function propOwnerId(req) { const r = sessionRole(req); return (r && r.role === 'broker' && r.brokerId) ? r.brokerId : 'owner'; }
 /* СТИЛЬ ПЕРВЫХ КАСАНИЙ ПОД БРОКЕРА (few-shot «дообучение под брокера»):
    копим последние отправленные/утверждённые касания брокера → ИИ подражает его манере.
    Ключ — brokerId пишущего (или 'owner'); хранится per-tenant в db.brokerStyles. */
@@ -10979,7 +10981,15 @@ ${SCR}
     }
 
     /* ---------------- объекты (библиотека) ---------------- */
-    if (p === '/api/properties' && req.method === 'GET') return json(res, 200, db.properties);   /* READ-ONLY: НЕ мутируем/не затираем карточки (коррекция цены/валюты — на отображении, см. фронт effPrice/fixCur) */
+    if (p === '/api/properties' && req.method === 'GET') {   /* READ-ONLY: НЕ мутируем/не затираем карточки (коррекция цены/валюты — на отображении, см. фронт effPrice/fixCur) */
+      /* ВИДИМОСТЬ: владелец видит весь пул агентства; брокер — командные (team/legacy) + СВОИ личные (private). */
+      const R = sessionRole(req);
+      if (R && R.role === 'broker' && R.brokerId) {
+        const me = R.brokerId;
+        return json(res, 200, db.properties.filter(x => x.visibility !== 'private' || x.ownerId === me));
+      }
+      return json(res, 200, db.properties);
+    }
     /* ---------------- ИМПОРТ ИНВЕНТАРЯ ОБЪЕКТОВ ---------------- */
     if (p === '/api/properties/import' && req.method === 'POST') {
       const b = await readBody(req);
@@ -11091,7 +11101,7 @@ ${SCR}
         if (existing.history.length > 60) existing.history.length = 60;
         pr = existing;
       } else {
-        pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now(), history: [{ at: Date.now(), action: 'Импортирована по ссылке' }] }, mapped);
+        pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now(), ownerId: propOwnerId(req), visibility: b.visibility === 'private' ? 'private' : 'team', history: [{ at: Date.now(), action: 'Импортирована по ссылке' }] }, mapped);
         db.properties.push(pr);
       }
       /* ФИНАЛЬНЫЙ фикс валюты по итоговому гео (у гидрированного стаба гео = phuket → 15.7M = THB, не $) */
@@ -11149,6 +11159,7 @@ ${SCR}
         paymentRows: (Array.isArray(ext.paymentPlan) ? ext.paymentPlan : []).slice(0, 6).map(r => ({ pct: String(r.pct || '').slice(0, 10), label: String(r.label || '').slice(0, 80) })),
         units: (Array.isArray(ext.units) ? ext.units : []).slice(0, 400).map(u => { const t = String(u.type || '').slice(0, 20); return { unitNo: '', type: t, plan: t, beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, currency: (String(u.currency || cur).toUpperCase().match(/USD|EUR|AED|THB/) || [cur])[0], view: String(u.view || '').slice(0, 40), status: 'available' }; }),
         images: saved, layouts: [], materials: [], tags: ['из PDF'], geo: b.geo || 'phuket',
+        ownerId: propOwnerId(req), visibility: b.visibility === 'private' ? 'private' : 'team',
         addedAt: Date.now(), history: [{ at: Date.now(), action: 'Импортирована из PDF' + (saved.length ? ` · фото ${saved.length}` : '') }],
       };
       db.properties = db.properties || []; db.properties.push(pr);
@@ -11164,9 +11175,24 @@ ${SCR}
       if (!process.env.RENDER_API_KEY) return json(res, 400, { error: 'нужен RENDER_API_KEY (веб-поиск)' });
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
       const b = await readBody(req).catch(() => ({}));
+      /* «только пустые поля» — не затирать уже сохранённое командой (по умолчанию ВКЛ для массового дополнения) */
+      const isFieldEmpty = (k) => {
+        if (k === 'priceFrom') return !pr.priceFrom;
+        if (k === 'districtBlurb') return !(pr.district && pr.district.blurb);
+        if (k === 'timings') return !(pr.district && pr.district.times && pr.district.times.length);
+        if (k === 'rentalArgs') return !(pr.whyRent && pr.whyRent.length);
+        if (k === 'amenities') return !(pr.amenities && pr.amenities.length);
+        if (k === 'investmentHighlights') return !(pr.investmentHighlights && pr.investmentHighlights.length);
+        if (k === 'paymentPlan') return !pr.payment || pr.payment === '—';
+        if (k === 'hookTitle') return !pr.hookTitle;
+        if (k === 'developer') return !pr.developer || pr.developer === '—';
+        return !pr[k];
+      };
+      const gapOnly = !!b.gapOnly;
       /* маппер поля обогащения → структура карточки (в т.ч. богатые: район/тайминги/аргументы/крючок) */
       const mergeEnrich = (k, v) => {
         if (v == null || v === '' || (Array.isArray(v) && !v.length)) return false;
+        if (gapOnly && !isFieldEmpty(k)) return false;   /* режим «не затирать»: пишем ТОЛЬКО в пустые поля */
         if (k === 'priceFrom') { if (+v) pr.priceFrom = +v; else return false; }
         else if (k === 'districtBlurb') { pr.district = pr.district || {}; pr.district.name = pr.district.name || pr.area || ''; pr.district.blurb = String(v).slice(0, 500); }
         else if (k === 'timings') { pr.district = pr.district || {}; pr.district.name = pr.district.name || pr.area || ''; pr.district.times = (Array.isArray(v) ? v : String(v).split('\n')).slice(0, 6).map(s => { const mm = String(s).match(/(\d+)\s*[|·:-]\s*(.+)/); return mm ? { min: +mm[1], place: mm[2].trim().slice(0, 60) } : { min: 0, place: String(s).slice(0, 60) }; }); }
@@ -11504,6 +11530,7 @@ ${SCR}
           priceFrom: +f.pj.priceFrom || 0, currency: fixMoneyCurrency(b.geo, f.pj.priceFrom, f.pj.currency),
           geo: b.geo || 'phuket', tags: ['каталог'], materials: [], images: cover ? [cover] : [], units: [], layouts: [], amenities: [],
           sourceUrl: f.src || null, stub: true, catalogPortal: b.portal || 'custom', addedAt: Date.now(),
+          ownerId: propOwnerId(req), visibility: b.visibility === 'private' ? 'private' : 'team',
         });
         created++;
       });
@@ -11578,13 +11605,15 @@ ${SCR}
     }
     if (p === '/api/properties' && req.method === 'POST') {
       const b = await readBody(req);
-      const pr = { id: store.nextId('pr'), name: b.name || 'Объект', area: b.area || '', developer: b.developer || '', market: b.market === 'secondary' ? 'secondary' : 'offplan', type: b.type || '', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD', handover: b.handover || '', payment: b.payment || '', geo: b.geo || 'dubai', tags: b.tags || [], materials: [], note: b.note || '' };
+      const pr = { id: store.nextId('pr'), name: b.name || 'Объект', area: b.area || '', developer: b.developer || '', market: b.market === 'secondary' ? 'secondary' : 'offplan', type: b.type || '', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD', handover: b.handover || '', payment: b.payment || '', geo: b.geo || 'dubai', tags: b.tags || [], materials: [], note: b.note || '', ownerId: propOwnerId(req), visibility: b.visibility === 'private' ? 'private' : 'team' };
       db.properties.push(pr); store.save();
       return json(res, 200, pr);
     }
     if ((m = p.match(/^\/api\/properties\/([^/]+)$/))) {
       const pr = db.properties.find(x => x.id === m[1]);
       if (!pr) return json(res, 404, { error: 'not found' });
+      /* ВИДИМОСТЬ: брокер не может открыть/править/удалить ЧУЖУЮ личную карточку (как будто её нет) */
+      { const R = sessionRole(req); if (R && R.role === 'broker' && R.brokerId && pr.visibility === 'private' && pr.ownerId !== R.brokerId) return json(res, 404, { error: 'not found' }); }
       if (req.method === 'PATCH') {
         const b = await readBody(req);
         for (const k of ['name', 'area', 'developer', 'market', 'type', 'handover', 'payment', 'geo', 'note', 'currency']) if (b[k] !== undefined) pr[k] = b[k];
@@ -11602,6 +11631,7 @@ ${SCR}
         if (b.paymentRows) pr.paymentRows = (b.paymentRows || []).slice(0, 4).map(r2 => ({ pct: String(r2.pct || '').slice(0, 8), label: String(r2.label || '').slice(0, 60) }));
         if (b.whyRent) pr.whyRent = (b.whyRent || []).slice(0, 4).map(x => String(x).slice(0, 300));
         if (b.folderId !== undefined) pr.folderId = b.folderId || null;
+        if (b.visibility !== undefined) { const R = sessionRole(req); if (!R || R.role === 'owner' || pr.ownerId === R.brokerId || !pr.ownerId) pr.visibility = b.visibility === 'private' ? 'private' : 'team'; }   /* сменить видимость может владелец агентства или брокер-автор карточки */
         if (b.layouts) pr.layouts = b.layouts.slice(0, 20).map(x => ({ label: String(x.label || '').slice(0, 60), url: String(x.url || '').slice(0, 500) })).filter(x => x.url);
         store.save();
         return json(res, 200, pr);

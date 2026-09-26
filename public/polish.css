@@ -392,6 +392,23 @@ input[type=number] { -moz-appearance: textfield; }
 .pr-zonechip svg { width: 13px; height: 13px; }
 :root[data-night] .prdraw-b, :root[data-night] .prdraw-clr { background: rgba(30,26,18,.9); color: #c9c0ad; border-color: rgba(255,255,255,.1); }
 :root[data-night] .prdraw-b:hover { color: #fff; }
+/* видимость карточки объекта: бейдж «Личная» на списке + read-only бейдж на карточке */
+.pc2-priv { position: absolute; top: 10px; left: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 700; color: #fff; background: rgba(20, 30, 55, .72); backdrop-filter: blur(6px); border-radius: 7px; padding: 3px 7px; letter-spacing: .2px; }
+.pd2-vis-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #fff; background: rgba(6, 17, 38, .55); border: 1px solid rgba(255, 255, 255, .28); border-radius: 9px; padding: 6px 11px; }
+
+/* тумблер «не затирать заполненное» в массовом дополнении — выделен акцентной плашкой */
+.be-gaprow { background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent); border-radius: 11px; }
+.be-gaprow .sl { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.be-gaprow .sl svg { width: 14px; height: 14px; color: var(--accent); }
+
+/* панель массовых действий — ровная СЕТКА кнопок (не flex-wrap с «висячей» кнопкой на строке) */
+.bulk-bar { flex-direction: column !important; align-items: stretch !important; flex-wrap: nowrap !important; gap: 9px !important; min-width: 320px; max-width: min(94vw, 640px); padding: 11px 13px !important; }
+.bb-head { display: flex; align-items: center; gap: 8px; }
+.bb-head .bb-clear { margin-left: auto; }
+.bb-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 7px; }
+.bb-acts .btn { width: 100%; justify-content: center; white-space: nowrap; }
+@media (max-width: 520px) { .bb-acts { grid-template-columns: repeat(2, 1fr); } }
+
 /* панель сравнения — глобальная (body, fixed), светлое стекло в стиле CRM */
 .prcmp { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3500; display: flex; align-items: center; gap: 14px; background: var(--card, rgba(255,255,255,.97)); color: var(--ink, #1a2030); border: 1px solid var(--stroke, #e6e0d3); border-radius: 16px; padding: 9px 11px 9px 15px; box-shadow: 0 24px 60px -16px rgba(20,30,55,.28), 0 4px 14px rgba(20,30,55,.08); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); max-width: min(94vw, 880px); animation: prcmpIn .3s cubic-bezier(.2,.8,.3,1); }
 @keyframes prcmpIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
