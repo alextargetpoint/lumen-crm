@@ -4330,6 +4330,8 @@ function selBulkBar(cfg) {
   /* шапка (счётчик + ×) отдельной строкой, действия — РОВНОЙ СЕТКОЙ равных колонок (не «одна кнопка на строке») */
   bar.innerHTML = `<div class="bb-head"><span class="bb-count">${sel.size}</span><span class="bb-lbl">${cfg.entityPlural || 'выбрано'}</span><button class="btn-ghost bb-clear" data-bb="clear" title="Снять (Esc)">${ic(I.x)}</button></div>`
     + `<div class="bb-acts">` + acts.map((a, i) => `<button class="btn btn-sm ${a.danger ? 'btn-danger' : ''}" data-bb="${i}">${a.ic ? ic(a.ic) : ''}${esc(a.label)}</button>`).join('') + `</div>`;
+  /* число колонок так, чтобы в последнем ряду НЕ осталась одна кнопка (главная жалоба) + под ширину экрана */
+  { const box = bar.querySelector('.bb-acts'); const n = acts.length; const maxByW = Math.max(2, Math.floor(Math.min(window.innerWidth - 40, 620) / 128)); let cols = Math.min(4, maxByW, n); while (cols > 2 && n % cols === 1) cols--; box.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`; bar.style.width = Math.min(window.innerWidth - 24, cols * 150 + 26) + 'px'; }
   bar.onclick = (e) => {
     const b = e.target.closest('[data-bb]'); if (!b) return;
     if (b.dataset.bb === 'clear') { sel.clear(); selRefresh(cfg); return; }
@@ -8363,7 +8365,7 @@ PAGES.properties = async (root) => {
       <input id="prQ" placeholder="Поиск: проект / район / застройщик (с опечатками)" value="${esc(PAGE_STATE.propQ || '')}" style="min-width:220px;flex:1 1 220px">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
-      ${((STATE.brokers || []).some(b => b.active !== false) || (STATE.me && STATE.me.role === 'broker')) ? `<select id="prOwn" title="Чьи объекты: общий пул агентства или ваши личные"><option value="">Все объекты</option><option value="mine" ${ownF === 'mine' ? 'selected' : ''}>Мои</option><option value="team" ${ownF === 'team' ? 'selected' : ''}>Командные</option><option value="private" ${ownF === 'private' ? 'selected' : ''}>Личные</option></select>` : ''}
+      ${((STATE.brokers || []).some(b => b.active !== false) || (STATE.me && STATE.me.role === 'broker') || props.some(p => p.visibility === 'private')) ? `<select id="prOwn" title="Чьи объекты: общий пул агентства или ваши личные"><option value="">Все объекты</option><option value="mine" ${ownF === 'mine' ? 'selected' : ''}>Мои</option><option value="team" ${ownF === 'team' ? 'selected' : ''}>Командные</option><option value="private" ${ownF === 'private' ? 'selected' : ''}>Личные</option></select>` : ''}
       <select id="prBaseCur" title="Базовая валюта — цены показываются «нативная ≈ в этой валюте»">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'GBP'].map(c => `<option ${(FX.base || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <button class="btn btn-sm ${F.propFiltersOpen ? 'on-map' : ''}" id="prFiltBtn" title="Расширенный фильтр">${ic(I.gear || I.doc)}Фильтры${advCount ? ' · ' + advCount : ''}</button>
       ${PAGE_STATE.propZone ? `<button class="btn btn-sm pr-zonechip" id="prZoneReset" title="Снять фильтр района">${ic(I.pin || I.building, 2)}${esc(PAGE_STATE.propZone.name)} <b>×</b></button>` : ''}
