@@ -11556,7 +11556,15 @@ ${SCR}
       });
       const skipped = (projects || []).length - created;
       store.save();
-      return json(res, 200, { ok: true, created, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length });
+      const _dbg = {
+        mdLen: (rp.markdown || '').length, htmlLen: (rp.html || '').length,
+        mdImgCount: ((rp.markdown || '').match(/!\[[^\]]*\]\([^)]+\)/g) || []).length,
+        htmlImgCount: ((rp.html || '').match(/<img[^>]+src=/gi) || []).length,
+        projWithImg: (projects || []).filter(p => p.image).length,
+        sampleProjImg: (projects || []).slice(0, 3).map(p => p.image || ''),
+        sampleHtmlImg: (((rp.html || '').match(/<img[^>]+src=["']([^"']+)["']/i) || [])[1]) || '',
+      };
+      return json(res, 200, { ok: true, created, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length, _dbg });
     }
     /* гео-кодинг объектов для карты: area → координаты (Nominatim/OSM, бесплатно), кэш на объекте.
        До 10 за вызов (rate-limit OSM ~1/сек) — клиент дёргает, пока remaining>0. */
