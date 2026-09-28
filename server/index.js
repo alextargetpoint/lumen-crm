@@ -3877,6 +3877,26 @@ async function downloadImageToAsset(url) {
     return { url, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
   } catch (e) { return null; }
 }
+/* МЯГКАЯ загрузка ОБЛОЖКИ каталога: превью листинга обычно мелкие (300-500px) — строгий хи-рес фильтр
+   downloadImageToAsset их все резал (0 обложек). Обложке галерейное качество не нужно — принимаем от ~200px. */
+async function downloadCover(url) {
+  try {
+    let _u; try { _u = new URL(url); } catch (_) { return null; }
+    if (!/^https?:$/.test(_u.protocol) || ssrfBlocked(_u.hostname)) return null;
+    const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
+    let r; try { r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } }); } finally { clearTimeout(to); }
+    if (!r.ok) return null;
+    const ct = r.headers.get('content-type') || '';
+    if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 2500 || buf.length > 12e6) return null;      /* <2.5КБ = иконка/1px-плейсхолдер */
+    const dim = imgDims(buf);
+    if (dim && Math.max(dim.w, dim.h) < 200) return null;          /* совсем мелкие иконки мимо, но превью листинга берём */
+    const ext = /png/i.test(ct) ? 'png' : /webp/i.test(ct) ? 'webp' : /avif/i.test(ct) ? 'avif' : 'jpg';
+    const u2 = saveMedia('car', `cov-${crypto.randomBytes(5).toString('hex')}.${ext}`, buf);
+    return { url: u2, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
+  } catch (e) { return null; }
+}
 /* сохранить готовый буфер картинки как ассет (хи-рес фильтр как у downloadImageToAsset) */
 function saveImageBuffer(buf, tag) {
   try {
@@ -11520,7 +11540,7 @@ ${SCR}
         if (dup) continue;
         fresh.push({ pj, nm, src, image: absU(pj.image || '') });
       }
-      const covers = await Promise.all(fresh.map(f => (f.image && /^https?:\/\//.test(f.image)) ? downloadImageToAsset(f.image).catch(() => null) : Promise.resolve(null)));
+      const covers = await Promise.all(fresh.map(f => (f.image && /^https?:\/\//.test(f.image)) ? downloadCover(f.image).catch(() => null) : Promise.resolve(null)));   /* мягкий фильтр: превью листинга мелкие, строгий хи-рес их резал → 0 обложек */
       let created = 0;
       fresh.forEach((f, i) => {
         const cover = covers[i] && covers[i].url;
