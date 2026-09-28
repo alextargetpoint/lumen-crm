@@ -11532,15 +11532,17 @@ ${SCR}
       db.properties = db.properties || [];
       /* новые (не дубли) проекты + их обложки — скачиваем ПАРАЛЛЕЛЬНО (одна обложка на стаб, чтобы карточки
          каталога были не пустыми серыми, а с фото — см. просьбу пользователя) */
-      const fresh = [];
+      const fresh = []; const backfill = [];   /* backfill: уже существующие стабы БЕЗ обложки — доставим им фото при реимпорте */
       for (const pj of (projects || []).slice(0, 80)) {
         const nm = String(pj.name || '').trim(); if (nm.length < 3) continue;
         const src = absU(pj.url || '');
+        const image = absU(pj.image || '');
         const dup = db.properties.find(x => (src && x.sourceUrl === src) || (x.name || '').toLowerCase().trim() === nm.toLowerCase());
-        if (dup) continue;
-        fresh.push({ pj, nm, src, image: absU(pj.image || '') });
+        if (dup) { if (image && !((dup.images || []).length)) backfill.push({ dup, image }); continue; }
+        fresh.push({ pj, nm, src, image });
       }
-      const covers = await Promise.all(fresh.map(f => (f.image && /^https?:\/\//.test(f.image)) ? downloadCover(f.image).catch(() => null) : Promise.resolve(null)));   /* мягкий фильтр: превью листинга мелкие, строгий хи-рес их резал → 0 обложек */
+      const covers = await Promise.all(fresh.map(f => (f.image && /^https?:\/\//.test(f.image)) ? downloadCover(f.image).catch(() => null) : Promise.resolve(null)));   /* мягкий фильтр: превью листинга мелкие/webp, строгий хи-рес их резал → 0 обложек */
+      const bfCovers = await Promise.all(backfill.map(f => downloadCover(f.image).catch(() => null)));
       let created = 0;
       fresh.forEach((f, i) => {
         const cover = covers[i] && covers[i].url;
@@ -11554,17 +11556,11 @@ ${SCR}
         });
         created++;
       });
-      const skipped = (projects || []).length - created;
+      let backfilled = 0;
+      backfill.forEach((f, i) => { const cov = bfCovers[i] && bfCovers[i].url; if (cov && !((f.dup.images || []).length)) { f.dup.images = [cov]; backfilled++; } });
+      const skipped = (projects || []).length - created - backfilled;
       store.save();
-      const _dbg = {
-        mdLen: (rp.markdown || '').length, htmlLen: (rp.html || '').length,
-        mdImgCount: ((rp.markdown || '').match(/!\[[^\]]*\]\([^)]+\)/g) || []).length,
-        htmlImgCount: ((rp.html || '').match(/<img[^>]+src=/gi) || []).length,
-        projWithImg: (projects || []).filter(p => p.image).length,
-        sampleProjImg: (projects || []).slice(0, 3).map(p => p.image || ''),
-        sampleHtmlImg: (((rp.html || '').match(/<img[^>]+src=["']([^"']+)["']/i) || [])[1]) || '',
-      };
-      return json(res, 200, { ok: true, created, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length, _dbg });
+      return json(res, 200, { ok: true, created, backfilled, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length });
     }
     /* гео-кодинг объектов для карты: area → координаты (Nominatim/OSM, бесплатно), кэш на объекте.
        До 10 за вызов (rate-limit OSM ~1/сек) — клиент дёргает, пока remaining>0. */
