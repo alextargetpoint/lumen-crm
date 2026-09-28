@@ -17337,11 +17337,36 @@ window.addEventListener('hashchange', () => {
   }
   await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
   mountFab();
+  watchVersion();   /* SPA-вкладка живёт долго → мягко сообщаем о новом деплое (частая путаница «вижу старую версию») */
   applyI18n(document.body);  /* перевод статичного chrome (топбар: «Новый лид», поиск) при LANG='en' */
   /* прелоадеру — минимум 900мс жизни (вихрь «дышит»), затем reveal после гарантированного paint (двойной rAF) */
   const reveal = () => requestAnimationFrame(() => requestAnimationFrame(hidePreloader));
   setTimeout(reveal, Math.max(0, 900 - (Date.now() - t0)));
 })();
+
+/* мягкая проверка нового деплоя: SPA-вкладка не перезагружает index сама (переход = смена #hash),
+   поэтому долго открытая вкладка держит старый app.js. Раз в 3 мин сверяем app.js?v= из свежего index
+   с загруженной версией → ненавязчивый баннер «Обновить» (без принудительной перезагрузки — не рвём работу). */
+function watchVersion() {
+  const cur = (document.querySelector('script[src*="app.js"]')?.src.match(/[?&]v=(\d+)/) || [])[1];
+  if (!cur) return;
+  let shown = false;
+  const check = async () => {
+    if (shown || document.hidden) return;
+    try {
+      const html = await fetch('/?vcheck=1', { cache: 'no-store' }).then(r => r.text());
+      const live = (html.match(/app\.js\?v=(\d+)/) || [])[1];
+      if (live && +live > +cur) {
+        shown = true;
+        const b = el(`<div class="ver-nudge">${ic(I.spark, 2)}<span>Вышла новая версия Lumen</span><button class="btn btn-sm btn-accent" id="verReload">Обновить</button><button class="ver-x" id="verX" title="Позже">${ic(I.x, 2)}</button></div>`);
+        document.body.appendChild(b);
+        b.querySelector('#verReload').addEventListener('click', () => location.reload());
+        b.querySelector('#verX').addEventListener('click', () => b.remove());
+      }
+    } catch (_) {}
+  };
+  setInterval(check, 180000);
+}
 
 /* ---------- плавающая кнопка быстрых действий (правый нижний угол) ---------- */
 function mountFab() {
