@@ -2978,6 +2978,19 @@ engine.setGraySender(async (db, lead, m) => {
 /* --- Серый прогрев: подключённые номера тенанта периодически переписываются между собой --- */
 const WARMUP_MSGS = ['Привет! Как дела?', 'Ты на созвоне сегодня?', 'Скинь потом отчёт', 'Ок, договорились 👍', 'Спасибо!', 'Доброе утро ☀️', 'Обедаем в час?', 'Готово, посмотри', 'Хорошего дня', 'Наберу чуть позже', 'Всё в силе?', 'Принял, спасибо'];
 let warmupBusy = false;
+/* СКОРИНГ СОЗРЕВАНИЯ номера прогревом (0-100, честно растёт): возраст + объём переписки + дни активности.
+   Раньше «готовность» была бинарной (≥3 дней) и ничего не росло — отсюда вопрос «почему скоринг стоит». */
+function grayWarmScore(n) {
+  const day = 864e5;
+  const ageDays = n.addedAt ? (Date.now() - n.addedAt) / day : 0;
+  const cnt = (n.warmSent || 0) + (n.warmRecv || 0);
+  const activeDays = (n.warmDays || []).length;
+  const ageF = Math.min(1, ageDays / 10);          /* созревает ~10 дней */
+  const volF = Math.min(1, cnt / 120);             /* ~12 сообщений/день × 10 дней */
+  const dayF = Math.min(1, activeDays / 7);        /* ≥7 активных дней = полноценно */
+  const score = Math.round(100 * (0.4 * ageF + 0.35 * volF + 0.25 * dayF));
+  return { score, ageDays: Math.floor(ageDays), warmCount: cnt, activeDays, ready: score >= 70 };
+}
 async function warmupTick() {
   if (warmupBusy) return; warmupBusy = true;
   try {
@@ -3007,6 +3020,13 @@ async function warmupTick() {
           g.warmup._sent = (g.warmup._sent || 0) + 1;
           g.warmup.total = (g.warmup.total || 0) + 1;
           g.warmup.lastAt = Date.now();
+          /* per-номер счётчики прогрева → на них растёт скоринг созревания (было: ничего не росло) */
+          from.n.warmSent = (from.n.warmSent || 0) + 1; from.n.warmLastAt = Date.now(); if (!from.n.warmFirstAt) from.n.warmFirstAt = Date.now();
+          to.n.warmRecv = (to.n.warmRecv || 0) + 1; to.n.warmLastAt = Date.now(); if (!to.n.warmFirstAt) to.n.warmFirstAt = Date.now();
+          /* дни с активностью прогрева (уникальные) — консистентность важнее объёма за один день */
+          const d = new Date().toISOString().slice(0, 10);
+          from.n.warmDays = [...new Set([...(from.n.warmDays || []), d])].slice(-30);
+          to.n.warmDays = [...new Set([...(to.n.warmDays || []), d])].slice(-30);
           g.warmup.log = [{ from: from.n.label || from.real, to: to.n.label || to.real, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
           store.save();
         } catch (e) {}
@@ -8183,7 +8203,7 @@ const server = http.createServer(async (req, res) => {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const g = db.settings.waGray || { numbers: [] };
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
-      const numbers = (g.numbers || []).map(n => { const lv = live[waGraySid(n.phone)] || { status: 'none' }; return Object.assign({}, n, { live: lv, realPhone: lv.phone || null, newToday: grayNewToday(n), newCap: grayNewLeadCap(db) }); });
+      const numbers = (g.numbers || []).map(n => { const lv = live[waGraySid(n.phone)] || { status: 'none' }; return Object.assign({}, n, { live: lv, realPhone: lv.phone || null, newToday: grayNewToday(n), newCap: grayNewLeadCap(db), warm: grayWarmScore(n) }); });
       const platform = waWorkerPlatform();
       const R2 = sessionRole(req);
       const _beta = !!(db.settings.agency && db.settings.agency.betaAll);

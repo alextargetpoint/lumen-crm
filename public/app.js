@@ -1532,10 +1532,10 @@ window.openGrayManager = async function (jumpPhone) {
   /* готовность номера к рассылке: свежий номер сначала прогреть (≥3 дней активности), иначе риск бана */
   const readyPill = (n) => {
     if (!n.live || n.live.status !== 'connected') return '';
-    const ageDays = n.addedAt ? Math.floor((Date.now() - n.addedAt) / 864e5) : 0;
-    if (ageDays >= 3) return ` <span class="badge ok" style="font-size:10px">готов к рассылке</span>`;
+    const w = n.warm || {}; const sc = w.score || 0;
+    if (w.ready) return ` <span class="badge ok" style="font-size:10px">готов · прогрет ${sc}%</span>`;
     const warming = data.warmup && data.warmup.running;
-    return ` <span class="badge ${warming ? 'warn' : ''}" style="font-size:10px">${warming ? `на прогреве · ${ageDays}/3 дн` : 'на прогрев не поставлен'}</span>`;
+    return ` <span class="badge ${warming ? 'warn' : ''}" style="font-size:10px">${warming ? `прогрев ${sc}% · ${w.activeDays || 0} дн` : `не прогрет (${sc}%) — включите прогрев`}</span>`;
   };
   async function refresh() { try { data = await api.get('/wa/gray/list'); } catch (e) {} renderMgr(); }
   function renderMgr() {
@@ -13750,12 +13750,12 @@ PAGES.numbers = async (root) => {
     ${grayNums.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
       <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div></div>
     <div class="num-grid" style="margin-bottom:18px">
-      ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const risk = conn ? 82 : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
+      ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const w = n.warm || {}; const risk = conn ? (w.score || 0) : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
         <div class="num-head">
           <div><div class="ph">${esc(n.realPhone ? '+' + n.realPhone : n.phone)}</div><div class="lb">${esc(n.label || 'личный номер')}${n.realPhone && n.realPhone !== n.phone ? ' · подключён' : ''} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
           ${ring(risk)}
         </div>
-        <div style="margin:10px 0 6px">${grayStatusBadge(n.live)}</div>
+        <div style="margin:10px 0 6px">${grayStatusBadge(n.live)}${conn ? ` <span class="badge ${w.ready ? 'ok' : 'warn'}" style="font-size:10px" title="Созревание прогревом: возраст + объём переписки + дни активности. Растёт по мере прогрева.">${w.ready ? `прогрет ${w.score}% · готов` : `прогрев ${w.score}% · ${w.activeDays || 0} дн · ${w.warmCount || 0} сообщ.`}</span>` : ''}</div>
         ${n.live && n.live.status === 'connected' ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых лидов сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5}${(n.newToday || 0) >= (n.newCap || 5) ? ' ⚠️' : ''} · <span title="Массовые рассылки с личных номеров запрещены (риск бана) — только Cloud API">рассылки запрещены ⛔</span></div>` : ''}
         <div class="form-row" style="margin:2px 0 8px"><label style="font-size:11px">Закреп за брокером</label>
           <select class="gn-broker2" data-p="${esc(n.phone)}"><option value="">— общий пул</option>${(STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${n.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
