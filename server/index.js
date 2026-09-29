@@ -7991,7 +7991,8 @@ const server = http.createServer(async (req, res) => {
                 const d = pn.data && pn.data[0];
                 if (d && d.status === 'active') {
                   if (profileId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id + '/messaging', { messaging_profile_id: profileId });
-                  if (t.connId && !d.connection_id) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { connection_id: t.connId }); } catch (_) {} }
+                  /* Cloud API/OTP-номер — ТОЛЬКО SMS (messaging profile), голос НЕ вешаем: рассылочное направление
+                     отделено от телефонии, чтобы блокировка одного не задевала другое. */
                   break;
                 }
               } catch (_) {}
@@ -8102,9 +8103,13 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/telephony/numbers' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const t = db.settings.telephony || {};
+      /* РАЗДЕЛЕНИЕ: Cloud API / OTP-номера (t.otpNumbers) — ТОЛЬКО для официальных рассылок, НЕ в телефонии.
+         Блокировка/модерация голосового направления не должна пересекаться с рассылочным. */
+      const otpDigits = new Set(Object.keys(t.otpNumbers || {}));
+      const isCloudNum = (num) => otpDigits.has(String(num).replace(/[^0-9]/g, ''));
       if (t.provider === 'telnyx') {
-        try { const j = await telnyxApi(db, 'GET', '/phone_numbers?page[size]=50'); return json(res, 200, { list: (j.data || []).map(n => ({ number: n.phone_number, friendly: n.phone_number, sid: n.id, status: n.status })), provider: 'telnyx' }); }
-        catch (e) { return json(res, 200, { list: fromNumberList(t).map(n => ({ number: n })), error: e.message, provider: 'telnyx' }); }
+        try { const j = await telnyxApi(db, 'GET', '/phone_numbers?page[size]=50'); return json(res, 200, { list: (j.data || []).filter(n => !isCloudNum(n.phone_number)).map(n => ({ number: n.phone_number, friendly: n.phone_number, sid: n.id, status: n.status })), provider: 'telnyx' }); }
+        catch (e) { return json(res, 200, { list: fromNumberList(t).filter(n => !isCloudNum(n)).map(n => ({ number: n })), error: e.message, provider: 'telnyx' }); }
       }
       if (t.provider !== 'twilio') return json(res, 200, { list: fromNumberList(t).map(n => ({ number: n })) });
       try { const j = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=50'); return json(res, 200, { list: (j.incoming_phone_numbers || []).map(n => ({ number: n.phone_number, friendly: n.friendly_name, sid: n.sid })) }); }
