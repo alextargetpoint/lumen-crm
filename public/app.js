@@ -1829,7 +1829,8 @@ window.openTelnyxOtp = async function (preselect) {
     try {
       const r = await api.get('/telephony/otp/sms?number=' + encodeURIComponent(current));
       const arr = (r.sms || []).filter(m => (m.text || '').trim());
-      box.innerHTML = arr.length ? arr.slice(0, 12).map(m => `<div class="warm-msg"><b>${esc(m.from || 'SMS')}</b><span class="warm-txt">${esc(m.text)}</span>${m.code ? `<b style="color:var(--accent);font-size:16px;letter-spacing:2px">${esc(m.code)}</b>` : ''}<i>${esc(new Date(m.at).toLocaleTimeString('ru-RU').slice(0, 5))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт, как Meta отправит код на +' + esc(current) + '.</div>';
+      /* код — КРУПНО (это главное), «от кого» — мелко и как «отправитель WhatsApp», чтобы не путали с номером получателя */
+      box.innerHTML = arr.length ? arr.slice(0, 12).map(m => `<div class="warm-msg otp-msg">${m.code ? `<div class="otp-code-big" title="Код для +${esc(current)}">${esc(m.code)}</div>` : ''}<div class="otp-msg-body"><span class="warm-txt">${esc(m.text)}</span><i>${m.from ? 'отправитель ' + esc(m.from) + ' · ' : ''}${esc(new Date(m.at).toLocaleTimeString('ru-RU').slice(0, 5))}</i></div></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт, как Meta отправит код на +' + esc(current) + '.</div>';
     } catch (e) {}
   };
   /* подтянуть купленные OTP-номера (+ cloud-статус) — статус, пред-заполнение формы; дефолт: преселект или новейший */
