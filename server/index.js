@@ -6617,6 +6617,12 @@ const server = http.createServer(async (req, res) => {
       if (!targets.length) return json(res, 400, { error: 'нет доступных лидов' });
       if (IS_BROKER && ['delete', 'broker', 'vendor'].includes(action)) return json(res, 403, { error: 'недоступно для брокера' });
       let done = 0;
+      /* АНТИ-БАН при массовом РУЧНОМ запуске цепочки: не бластим первые касания разом — раскладываем во времени
+         с рандомными паузами. Чем больше пачка, тем крупнее интервалы. (Номера и так ротируются least-loaded в pickGrayNumber.)
+         Реал-тайм с рекламы (по 1-3 лида) идёт почти сразу; ручная пачка на 10-30 растягивается на часы. */
+      let chainOffset = 15e3;
+      const chainBulk = action === 'chain' ? targets.length : 0;
+      const chainGap = () => chainBulk <= 3 ? (30e3 + Math.random() * 60e3) : (120e3 + Math.random() * 180e3);   /* ≤3: 0.5–1.5 мин · пачка: 2–5 мин между лидами */
       for (const l of targets) {
         if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); markPeakQual(db, l); capi.onStageChange(db, l, l.stage); } done++; }
         else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
@@ -6636,7 +6642,8 @@ const server = http.createServer(async (req, res) => {
           const seqId = b.value ? String(b.value) : null;
           if (seqId && !db.sequences.some(s => s.id === seqId && s.active)) continue;
           l.ai.enabled = true; l.ai.forced = true; l.ai.forceSeq = seqId || null;
-          l.ai.chainStep = 0; l.ai.secondRound = false; l.ai.nextTouchAt = Date.now() + 15e3;
+          l.ai.chainStep = 0; l.ai.secondRound = false;
+          l.ai.nextTouchAt = Date.now() + Math.round(chainOffset); chainOffset += chainGap();   /* разброс первых касаний (анти-бан) */
           if (l.stage === 'sleeping' || l.stage === 'lost') l.stage = 'touch';
           l.tags = (l.tags || []).filter(t => t !== 'нужен человек');
           done++;
@@ -6647,7 +6654,8 @@ const server = http.createServer(async (req, res) => {
       const labels = { stage: 'перемещено', archive: 'в архив', broker: 'передано', tag: 'помечено', untag: 'снят тег', ai: b.value ? 'ИИ включён' : 'ИИ выключен', chain: 'запущена цепочка', delete: 'удалено' };
       ai.pushEvent(db, { type: 'stage', text: `Массовое действие: ${labels[action] || action} — ${done} лид(ов)` });
       store.save();
-      return json(res, 200, { ok: true, done });
+      const spreadMin = action === 'chain' ? Math.round(chainOffset / 60000) : 0;   /* за сколько минут разложатся первые касания */
+      return json(res, 200, { ok: true, done, spreadMin });
     }
 
     if ((m = p.match(/^\/api\/leads\/([^/]+)/))) {
