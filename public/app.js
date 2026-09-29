@@ -14348,23 +14348,25 @@ PAGES.numbers = async (root) => {
     btn.disabled = false; btn.innerHTML = o;
   });
   $('#numAdd')?.addEventListener('click', () => {
-    const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
     modal({
-      title: 'Добавить официальный Cloud-API номер',
-      body: `<div class="lc-hint info" style="margin-bottom:12px">${ic(I.shield)}<span>Официальный «белый» канал Meta. Номер должен быть подключён к WhatsApp Business Platform (Настройки → WhatsApp Cloud API). Серые номера по QR добавляются кнопкой «Подключить по QR».</span></div>
-        <div class="form-row"><label>Номер телефона</label><input id="nnPhone" placeholder="+971 58 000 00 00"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="form-row"><label>Направление</label><select id="nnGeo">${geoOpts}</select></div>
-          <div class="form-row"><label>Название (необязательно)</label><input id="nnLabel" placeholder="напр. Дубай · основной"></div>
-        </div>
-        <div class="form-row"><label>Стартовое состояние</label><select id="nnState"><option value="warming">На прогрев (рекомендуется для нового)</option><option value="active">Сразу активен</option></select></div>
-        <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:2px">Новый номер лучше 2–3 недели держать на прогреве: 10–20 контактов/день, рост ~20% в неделю.</div>`,
-      actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
-        const phone = $('#nnPhone', bd).value.trim();
-        if (!phone) { toast('Укажите номер'); return false; }
-        await api.post('/numbers', { phone, geo: $('#nnGeo', bd).value, channel: 'cloud_api', label: $('#nnLabel', bd).value, state: $('#nnState', bd).value });
-        toast('Cloud-API номер добавлен', 'В пуле — можно вести к активации', true);
-        render();
+      title: 'Добавить Cloud API номер вручную',
+      body: `<div class="lc-hint info" style="margin-bottom:12px">${ic(I.shield)}<span>Для номера, который <b>уже зарегистрирован в WhatsApp Cloud API</b> (куплен вне нашего шопа). Возьми в Meta → WhatsApp → <b>API Setup</b> его <b>Phone Number ID</b> и <b>постоянный токен</b> (System User). Это официальный канал — НЕ прогрев по QR (серые номера добавляются кнопкой «Подключить по QR»).</span></div>
+        <div class="form-row"><label>Номер телефона</label><input id="nnPhone" placeholder="+14695771994"></div>
+        <div class="form-row"><label>Phone Number ID</label><input id="nnPnid" placeholder="напр. 1688131649572759"></div>
+        <div class="form-row"><label>Access Token (постоянный, System User)</label><input id="nnToken" placeholder="EAA..."></div>
+        <div class="form-row"><label>WABA ID (необязательно)</label><input id="nnWaba" placeholder="ID вашего WhatsApp Business account"></div>
+        <div id="nnOut" style="font-size:12px;margin-top:6px"></div>`,
+      actions: [{ label: 'Добавить и проверить', cls: 'btn-accent', onClick: async (bd) => {
+        const phone = $('#nnPhone', bd).value.trim().replace(/[^0-9]/g, '');
+        const pnid = $('#nnPnid', bd).value.trim();
+        const token = $('#nnToken', bd).value.trim();
+        const wabaId = $('#nnWaba', bd).value.trim();
+        const out = $('#nnOut', bd);
+        if (!phone || !pnid || !token) { out.innerHTML = '<span style="color:var(--bad)">Нужны номер, Phone Number ID и токен.</span>'; return false; }
+        out.innerHTML = 'Проверяю у Meta…';
+        const r = await api.post('/whatsapp/cloud-save', { phoneNumberId: pnid, token, wabaId, otpKey: phone }).catch(e => ({ error: e.message }));
+        if (r.ok) { toast('Cloud API номер добавлен', (r.verify && r.verify.verified_name) || 'проверен у Meta', true); render(); return true; }
+        out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'не удалось') + '</span>'; return false;
       } }, { label: 'Отмена' }],
     });
   });

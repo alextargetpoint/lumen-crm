@@ -8059,7 +8059,29 @@ const server = http.createServer(async (req, res) => {
       /* один запрос к Telnyx — статус номеров как WhatsApp-отправителей */
       const waMap = {};
       try { const w = await telnyxApi(db, 'GET', '/whatsapp/phone_numbers?page[size]=50'); (w.data || []).forEach(n => { waMap[String(n.phone_number).replace(/[^0-9]/g, '')] = { status: n.status, name: n.name_status, quality: n.quality_rating, id: n.phone_number_id }; }); } catch (_) {}
-      const list = Object.keys(nums).map(k => { const r = nums[k]; const sms = r.sms || []; const lastCode = (sms.find(m => m.code) || {}).code || ''; const cloud = r.cloud || null; return { number: r.number || ('+' + k), key: k, at: r.at || null, smsCount: sms.length, lastCode, lastAt: (sms[0] || {}).at || null, wa: waMap[k] || null, cloud: cloud ? { phoneId: cloud.phoneId || '', wabaId: cloud.wabaId || '', hasToken: !!cloud.hasToken, connectedAt: cloud.connectedAt || null, verifiedName: cloud.verifiedName || '' } : null, connected: !!((waMap[k] && waMap[k].status === 'CONNECTED') || (cloud && cloud.connectedAt)) }; }).sort((a, b) => (b.at || 0) - (a.at || 0));
+      /* ЖИВОЙ статус от Meta по Phone Number ID (реальность, а не устаревший локальный connectedAt).
+         Удалил номер из WABA в Meta → Graph отдаёт ошибку → снимаем «активен» и чистим флаг. */
+      const tok = db.settings.wa && db.settings.wa.token;
+      const metaMap = {};
+      if (tok) {
+        await Promise.all(Object.keys(nums).map(async (k) => {
+          const pid = nums[k].cloud && nums[k].cloud.phoneId; if (!pid) return;
+          try {
+            const rr = await fetch('https://graph.facebook.com/v21.0/' + pid + '?fields=status,code_verification_status,display_phone_number&access_token=' + encodeURIComponent(tok), { signal: AbortSignal.timeout(6000) });
+            const jj = await rr.json().catch(() => ({}));
+            if (jj && jj.error) { metaMap[k] = { ok: false, err: jj.error.message || 'Meta error' }; if (nums[k].cloud) { nums[k].cloud.connectedAt = null; nums[k].cloud.metaError = jj.error.message || 'нет доступа/удалён'; } }
+            else { metaMap[k] = { ok: true, status: jj.status || '', verified: jj.code_verification_status || '' }; if (nums[k].cloud) { nums[k].cloud.metaError = null; if (jj.status === 'CONNECTED') nums[k].cloud.connectedAt = nums[k].cloud.connectedAt || Date.now(); else nums[k].cloud.connectedAt = null; } }
+          } catch (_) { metaMap[k] = null; }   /* сеть/таймаут — статус не меняем, фолбэк ниже */
+        }));
+        store.save();
+      }
+      const list = Object.keys(nums).map(k => {
+        const r = nums[k]; const sms = r.sms || []; const lastCode = (sms.find(m => m.code) || {}).code || ''; const cloud = r.cloud || null;
+        const mm = metaMap[k];
+        /* приоритет — живой статус Meta; если Meta недоступна (mm null) — фолбэк на Telnyx/локальный флаг */
+        const connected = mm ? (mm.ok && mm.status === 'CONNECTED') : !!((waMap[k] && waMap[k].status === 'CONNECTED') || (cloud && cloud.connectedAt));
+        return { number: r.number || ('+' + k), key: k, at: r.at || null, smsCount: sms.length, lastCode, lastAt: (sms[0] || {}).at || null, wa: waMap[k] || null, meta: mm || null, cloud: cloud ? { phoneId: cloud.phoneId || '', wabaId: cloud.wabaId || '', hasToken: !!cloud.hasToken, connectedAt: cloud.connectedAt || null, verifiedName: cloud.verifiedName || '', metaError: cloud.metaError || null } : null, connected };
+      }).sort((a, b) => (b.at || 0) - (a.at || 0));
       return json(res, 200, { ok: true, list, provider: t.provider, msgProfileSet: !!t.msgProfileId });
     }
     /* очистить ленту OTP по номеру (убрать старые/тестовые коды) */
