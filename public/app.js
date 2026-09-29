@@ -13809,20 +13809,31 @@ PAGES.numbers = async (root) => {
       <div class="lp-sec" style="margin:0">Купленные Cloud API номера · ${otpNums.length}</div>
     </div>
     ${otpNums.length ? `<div class="num-grid" style="margin-bottom:18px">
-      ${otpNums.map(n => { const conn = n.connected; const cn = n.cloud; const badge = conn ? ('<span class="badge ok"><i></i>подключён' + (cn && cn.verifiedName ? ' · ' + esc(cn.verifiedName) : ' к WhatsApp') + '</span>') : (n.wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>'); const hint = conn ? '' : (n.wa ? 'Meta проверяет номер — полное одобрение занимает обычно до <b>1–2 часов</b>. Статус обновляется сам.' : 'Номер куплен и ловит OTP. Чтобы стал отправителем — зарегистрируй его (кнопка «Коды / OTP + активация»).'); return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
+      ${otpNums.map(n => {
+        const cn = n.cloud || {}; const meta = n.meta;   /* meta: {ok,status,verified} | {ok:false,err} | null */
+        /* ЧЕСТНЫЕ СОСТОЯНИЯ по приоритету: живой статус Meta > локальные флаги */
+        let cls = '', label = '', hintTx = '', metaCell = '—';
+        if (meta && meta.ok && meta.status === 'CONNECTED') { cls = 'ok'; label = 'Подключён · шлёт' + (cn.verifiedName ? ' · ' + esc(cn.verifiedName) : ''); metaCell = '✓'; }
+        else if (meta && meta.ok && meta.status) { cls = 'warn'; label = 'Регистрируется · ' + esc(String(meta.status).toLowerCase()); hintTx = 'Meta проверяет номер — обычно до <b>1–2 часов</b>. Статус обновится сам.'; metaCell = esc(String(meta.status).toLowerCase()); }
+        else if (meta && !meta.ok) { cls = 'bad'; label = 'Не подтверждён у Meta'; hintTx = 'Meta не видит этот номер: проверь, что он <b>в WABA</b> и что <b>токен (System User) имеет доступ к этой WABA</b>. ' + (cn.metaError ? '<span class="muted">(' + esc(cn.metaError) + ')</span>' : ''); metaCell = 'ошибка'; }
+        else if (cn.phoneId) { cls = 'warn'; label = 'Токен сохранён'; hintTx = 'Нажми «Проверить статус» — подтянем актуальный статус от Meta.'; metaCell = 'проверить'; }
+        else if (n.wa) { cls = 'warn'; label = 'Регистрируется в Meta'; hintTx = 'Meta проверяет номер (до 1–2 ч). Статус обновляется сам.'; metaCell = esc((n.wa.status || '—').toLowerCase()); }
+        else { cls = ''; label = 'Куплен · ловит OTP · не зарегистрирован'; hintTx = 'Номер ловит OTP. Чтобы стал <b>отправителем</b> — «Коды / OTP + активация» → введи Phone Number ID и постоянный токен.'; }
+        const qr = n.wa && n.wa.quality && !['NA', 'UNKNOWN'].includes(n.wa.quality) ? n.wa.quality : '';
+        return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
         <div class="num-head">
           <div><div class="ph">${esc(n.number)}</div><div class="lb">Cloud API · <b style="color:var(--accent-2)">WhatsApp (SMS)</b></div></div>
         </div>
-        <div class="otp-badge" style="margin:10px 0 6px">${badge}</div>
-        ${hint ? `<div class="otp-hint muted" style="font-size:11px;line-height:1.45;margin:0 0 8px;display:flex;gap:6px"><span>⏳</span><span>${hint}</span></div>` : ''}
+        <div class="otp-badge" style="margin:10px 0 6px;display:flex;gap:6px;flex-wrap:wrap"><span class="badge ${cls}"><i></i>${label}</span>${qr ? ` <span class="badge" title="Качество номера в Meta">качество ${esc(qr)}</span>` : ''}</div>
+        ${hintTx ? `<div class="otp-hint muted" style="font-size:11px;line-height:1.45;margin:0 0 8px;display:flex;gap:6px"><span>${cls === 'bad' ? '⚠️' : cls === 'ok' ? '✅' : 'ⓘ'}</span><span>${hintTx}</span></div>` : ''}
         <div class="num-meta">
           <div class="m"><div class="v">${n.smsCount}</div><div class="k">OTP-кодов</div></div>
           <div class="m"><div class="v" style="letter-spacing:1px">${n.lastCode ? esc(n.lastCode) : '—'}</div><div class="k">послед. код</div></div>
-          <div class="m otp-wa"><div class="v">${conn ? '✓' : (n.wa ? esc((n.wa.status || '—').toLowerCase()) : '—')}</div><div class="k">WhatsApp</div></div>
+          <div class="m otp-wa"><div class="v" style="font-size:${metaCell.length > 4 ? '12px' : ''}">${metaCell}</div><div class="k">статус Meta</div></div>
         </div>
         <div class="num-actions" style="margin-top:12px">
           <button class="btn btn-sm btn-accent" data-otpfeed="${esc(n.key)}">${ic(I.spark)}Коды / OTP + активация</button>
-          <button class="btn btn-sm" data-otprepair="${esc(n.key)}">${ic(I.refresh)}Проверить привязку</button>
+          <button class="btn btn-sm" data-otprepair="${esc(n.key)}">${ic(I.refresh)}Проверить статус</button>
         </div>
       </div>`; }).join('')}
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Cloud-API-номеров пока нет — нажмите «Купить Cloud API номер», затем зарегистрируйте его в WhatsApp.</div>`}
@@ -13966,7 +13977,7 @@ PAGES.numbers = async (root) => {
   }));
   /* Cloud API карточки: лента/активация, проверка привязки, покупка */
   $$('[data-otpfeed]', root).forEach(b => b.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp('+' + b.dataset.otpfeed)));
-  $$('[data-otprepair]', root).forEach(b => b.addEventListener('click', async () => { b.disabled = true; try { const r = await api.post('/telephony/otp/repair', { number: '+' + b.dataset.otprepair }); toast(r.ok ? 'Привязка проверена' : 'Не вышло', r.ok ? (r.assigned ? 'Профиль привязан' : 'Уже привязан') : (r.error || ''), r.ok); } catch (e) { toast('Ошибка', e.message); } b.disabled = false; }));
+  $$('[data-otprepair]', root).forEach(b => b.addEventListener('click', async () => { b.disabled = true; const o = b.innerHTML; b.textContent = 'Проверяю…'; try { await api.post('/telephony/otp/repair', { number: '+' + b.dataset.otprepair }); toast('Статус обновлён', 'подтянул актуальный статус от Meta и привязку Telnyx', true); if (CUR === 'numbers') render(); } catch (e) { toast('Ошибка', e.message); b.disabled = false; b.innerHTML = o; } }));
   $('#cloudBuyBtn', root)?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
   $('#telBuyBtn', root)?.addEventListener('click', () => window.openTelBuy && window.openTelBuy());
   /* Viber: копирование адреса вебхука + сохранение BSP-настроек */
