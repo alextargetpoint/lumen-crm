@@ -392,6 +392,13 @@ input[type=number] { -moz-appearance: textfield; }
 .pr-zonechip svg { width: 13px; height: 13px; }
 :root[data-night] .prdraw-b, :root[data-night] .prdraw-clr { background: rgba(30,26,18,.9); color: #c9c0ad; border-color: rgba(255,255,255,.1); }
 :root[data-night] .prdraw-b:hover { color: #fff; }
+/* ×-удаление на карточке цепочки (в списке «Мои цепочки») — появляется на ховере, не мешает клику по карточке */
+.seq-card-top { position: relative; }
+.seq-card-del { margin-left: auto; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: var(--ink-3, #97a0af); opacity: 0; transition: opacity .15s, background .15s, color .15s; flex: 0 0 auto; }
+.seq-card:hover .seq-card-del { opacity: .8; }
+.seq-card-del:hover { opacity: 1; background: color-mix(in srgb, var(--bad, #e05252) 15%, transparent); color: var(--bad, #e05252); }
+.seq-card-del svg { width: 13px; height: 13px; }
+
 /* баннер «вышла новая версия» — мягкий нудж сверху по центру, не рвёт работу */
 .ver-nudge { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 4700; display: flex; align-items: center; gap: 10px; background: var(--card, #fff); color: var(--ink, #1a2030); border: 1px solid var(--stroke, #e6e0d3); border-radius: 13px; padding: 8px 10px 8px 14px; box-shadow: 0 18px 44px -14px rgba(20,30,55,.32), 0 3px 10px rgba(20,30,55,.08); font-size: 13px; font-weight: 600; animation: prcmpIn .3s cubic-bezier(.2,.8,.3,1); }
 .ver-nudge svg { width: 15px; height: 15px; color: var(--accent); }

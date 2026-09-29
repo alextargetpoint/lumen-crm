@@ -7075,7 +7075,7 @@ PAGES.sequences = async (root) => {
         ['Переменные под лида', '{creative} · {district} · {budget} · {timeline} · {type} · {name} · {price} · {countryQEn}']])}</div>
       <div class="seq-cards">
         ${seqs.map(sq => { const n = (sq.steps || []).filter(s => s.active).length; const md = Math.max(0, ...(sq.steps || []).filter(s => s.active).map(s => +s.day || 0)); return `<button class="seq-card ${sq.id === seq.id ? 'active' : ''} ${sq.active ? '' : 'off'}" data-seq="${sq.id}">
-          <div class="seq-card-top"><i class="seq-dot ${sq.active ? 'on' : ''}"></i><b>${esc(sq.name.length > 34 ? sq.name.slice(0, 32) + '…' : sq.name)}</b></div>
+          <div class="seq-card-top"><i class="seq-dot ${sq.active ? 'on' : ''}"></i><b>${esc(sq.name.length > 34 ? sq.name.slice(0, 32) + '…' : sq.name)}</b>${canEdit(sq) ? `<span class="seq-card-del" data-seqdel="${sq.id}" title="Удалить цепочку" role="button">${ic(I.x, 2)}</span>` : ''}</div>
           <div class="seq-card-meta">${ic(I.target)}<span>${esc(targetingShort(sq))}</span></div>
           <div class="seq-card-foot"><span>${n} касаний · ${md < 1 ? 'первые сутки' : fmtDay(md) + ' дн'}</span>${ownTag(sq)}</div>
         </button>`; }).join('')}
@@ -7239,6 +7239,14 @@ PAGES.sequences = async (root) => {
 
   /* табы и шапка */
   $$('.seq-card[data-seq]', root).forEach(t => t.addEventListener('click', () => { PAGE_STATE.seqSel = t.dataset.seq; PAGE_STATE.seqEdit = null; render(); }));
+  $$('[data-seqdel]', root).forEach(x => x.addEventListener('click', (e) => {   /* удаление прямо с карточки списка (× в углу) */
+    e.stopPropagation(); e.preventDefault();
+    const id = x.dataset.seqdel; const sq = (STATE.sequences || []).find(s => s.id === id);
+    modal({ title: 'Удалить цепочку?', sub: sq && sq.name, actions: [
+      { label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/sequences/' + id, { method: 'DELETE' }); await loadState(); if (PAGE_STATE.seqSel === id) PAGE_STATE.seqSel = null; render(); } },
+      { label: 'Отмена' },
+    ] });
+  }));
   /* ---- БИБЛИОТЕКА КАРТОЧЕК: добавление по клику ＋ и drag-and-drop в цепочку ---- */
   const recalcDays = () => { let cum = 0; seq.steps.forEach(s => { if (s.delayVal == null || !s.delayUnit) { s.delayUnit = 'day'; s.delayVal = 0; } const n = Math.max(0, +s.delayVal || 0), u = s.delayUnit; const d = u === 'min' ? n / 1440 : u === 'hour' ? n / 24 : n; cum += d; s.day = +cum.toFixed(4); }); };
   const tagAsset = (clones, card) => { if (card.needsAsset) clones.forEach(s => { if (s.mode === 'creative') { s._need = card.needsAsset; s._needType = card.asset || 'image'; } }); return clones; };
