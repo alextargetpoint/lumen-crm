@@ -7266,6 +7266,17 @@ const server = http.createServer(async (req, res) => {
       const pb = await readBody(req); if (pb.status) rec.status = String(pb.status).slice(0, 20); store.save();
       return json(res, 200, { ok: true, report: rec });
     }
+    /* ТЕСТ-ПРОМОТКА цепочки: тянет следующее касание лида на ближайший тик движка (сжать ожидания при прогоне каскада).
+       Не шлёт сам — только двигает nextTouchAt; движок на следующем тике учтёт caps/opt-out/тихие часы как обычно. */
+    if (p === '/api/debug/fast-forward' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const l = db.leads.find(x => x.id === b.leadId);
+      if (!l) return json(res, 404, { error: 'not found' });
+      if (l.ai) { l.ai.nextTouchAt = 1; if (l.ai.chainBaseAt) l.ai.chainBaseAt = 1; }
+      store.save();
+      return json(res, 200, { ok: true, step: l.ai && l.ai.chainStep, ch: l.activeChannel || 'wa', stage: l.stage });
+    }
     if (p === '/api/campaigns' && req.method === 'GET') {
       /* воронка доставки по каждой кампании (из статусов сообщений: delivered/read приходят вебхуком Cloud API) */
       const out = db.campaigns.map(c => {
