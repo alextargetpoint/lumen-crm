@@ -15172,6 +15172,9 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 .note{margin-top:16px;font-style:italic;color:#7c756a;font-size:13.5px;border-left:3px solid var(--gold);padding-left:12px}
 .ft{text-align:center;color:#a89f90;font-size:12px;margin-top:34px}
 [contenteditable]{outline:none;border-radius:8px;transition:box-shadow .15s}[contenteditable]:hover{box-shadow:0 0 0 2px rgba(184,134,60,.2)}[contenteditable]:focus{box-shadow:0 0 0 2px var(--gold);background:#fffdf7}
+.v,.sum,.note,.best,.ai{position:relative}
+.delx{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(180,85,58,.92);color:#fff;font-size:15px;line-height:20px;text-align:center;cursor:pointer;z-index:3;padding:0}.delx:hover{background:#b4553a}
+.is-hid{opacity:.42;outline:1.5px dashed #b4553a;outline-offset:2px}
 .edbar{position:sticky;bottom:0;margin-top:22px;background:#1c1710;color:#efe7d7;border:1px solid rgba(201,162,90,.4);border-radius:16px;padding:14px 18px;box-shadow:0 -10px 40px -14px rgba(0,0,0,.5)}
 .edbar-h{font-size:12.5px;color:#c9a25a;font-weight:700;margin-bottom:10px}
 .edbar-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:12px}
