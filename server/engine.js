@@ -18,7 +18,7 @@ function resolveChannel(db, lead) {
     if (ch === 'wa') return (lead.channels?.wa || 'unknown') !== 'no';
     if (ch === 'email') return (lead.contacts || []).some(c => c.kind === 'email');
     if (ch === 'tg') return (lead.channels?.tg === 'yes') || (lead.contacts || []).some(c => c.kind === 'telegram');
-    if (ch === 'viber') return lead.channels?.viber === 'yes';
+    if (ch === 'viber') { const vb = cfg.viber || {}; return lead.channels?.viber === 'yes' || (vb.mode === 'bsp' && !!lead.phone && lead.channels?.viber !== 'no'); }   /* BSP шлёт по номеру → фолбэк-касание можно и без прежнего контакта */
     return false;
   };
   const pr = cfg.priority.filter(ch => cfg.enabled[ch] && has(ch));
@@ -41,6 +41,11 @@ function nextChannel(db, lead) {
 }
 
 const CH_NAMES = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' };
+
+/* Политика касаний по каналам. Мессенджеры (wa/tg) — полная цепочка касаний.
+   Viber/email — фолбэк-каналы с ОДНИМ касанием: в Viber цепочка выглядит навязчиво и бьёт по consent
+   (BSP платный, по согласию), а email — иной формат (деловое письмо, не чат-касание). */
+const CHANNEL_TOUCH_CAP = { viber: 1, email: 1 };
 
 /* ---------- выбор номера и отправка ---------- */
 /* Серый транспорт (Baileys-воркер) внедряется из index.js, где есть tenant-контекст и waGrayApi.
@@ -389,6 +394,21 @@ function tickChains(db) {
         ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `${lead.name}: ${cascadeAfter} касаний без ответа в ${CH_NAMES[prevCh] || prevCh} — перехожу на ${CH_NAMES[nx]}` });
         continue;
       }
+    }
+    /* фолбэк-каналы с лимитом касаний (Viber/email): отправили cap сообщений → сразу следующий канал/сон.
+       Так в Viber/email не крутится вся мессенджер-цепочка — только одно уместное касание. */
+    const chCap = CHANNEL_TOUCH_CAP[lead.activeChannel];
+    if (chCap && lead.ai.chainStep >= chCap) {
+      const prevCh = lead.activeChannel;
+      const nx = (db.settings.channels?.secondRound || cascadeAfter > 0) ? nextChannel(db, lead) : null;
+      if (nx && nx !== prevCh) {
+        lead.activeChannel = nx; lead.ai.chainStep = 0; lead.ai.nextTouchAt = nowT + 0.5 * dayMs(db); lead.ai.chainBaseAt = lead.ai.nextTouchAt;
+        ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `${lead.name}: ${CH_NAMES[prevCh]} — одно касание отправлено, перехожу на ${CH_NAMES[nx]}` });
+        continue;
+      }
+      lead.stage = 'sleeping';
+      ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: каналы исчерпаны (${CH_NAMES[prevCh]} — одно касание) → «Спящие»` });
+      continue;
     }
     const step = seq.steps.filter(s => s.active)[lead.ai.chainStep];
     if (!step) {
