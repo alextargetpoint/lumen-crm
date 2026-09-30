@@ -892,6 +892,18 @@ function agencyEmailFrom(db) {
   if (e.domain && e.verified) { const local = (e.senderLocal || 'noreply').replace(/[^a-z0-9._-]/gi, '') || 'noreply'; return `${agency} <${local}@${e.domain}>`; }
   return null;
 }
+/* логотип агентства для письма: отдаём URL ТОЛЬКО если картинка реально существует (иначе в письме битый <img>).
+   data:-URI и внешний CDN — доверяем; локальный путь на нашем хосте — проверяем fs.existsSync; нет файла → '' → текстовый вордмарк. */
+function agencyLogoForEmail(db) {
+  const ag = (db.settings && db.settings.agency) || {};
+  const raw = String(ag.logo || ag.logoUrl || '').trim();
+  if (!raw) return '';
+  if (/^data:/i.test(raw)) return raw;
+  const base = callBase(db);
+  const localExists = (p) => { try { const clean = decodeURIComponent(String(p).split('?')[0]).replace(/^\/+/, ''); if (clean.startsWith('creatives/')) return fs.existsSync(path.join(CREATIVES_DIR, clean.slice(10))); return fs.existsSync(path.join(PUBLIC, clean)); } catch (_) { return false; } };
+  if (/^https?:\/\//i.test(raw)) { try { const u = new URL(raw); const ours = base && new URL(base).host === u.host; return ours ? (localExists(u.pathname) ? raw : '') : raw; } catch (_) { return ''; } }
+  return localExists(raw) ? (base + (raw[0] === '/' ? '' : '/') + raw) : '';
+}
 /* opt-out для email/рассылок: токен на лида → ссылка отписки → страница /u/:token помечает marketingOptOut */
 function ensureUnsubToken(db, lead) {
   if (!lead.unsubToken) { lead.unsubToken = crypto.randomBytes(9).toString('hex'); }
@@ -954,7 +966,7 @@ engine.onEmailSend = async (db, lead, msg) => {
   const rich = mailer.renderCascadeEmail({
     name: lead.name, lang: lead.lang, text: msg.text, subject: msg.subject, preset, mediaCard,
     agency: _ag.name || '',
-    agencyLogo: (raw => raw ? (/^https?:\/\//i.test(raw) ? raw : (callBase(db) + (raw[0] === '/' ? '' : '/') + raw)) : '')(_ag.logo || _ag.logoUrl || ''),   /* относительный путь → абсолютный (в письме иначе битая картинка) */
+    agencyLogo: agencyLogoForEmail(db),   /* относительный путь → абсолютный (в письме иначе битая картинка) */
     agencyAddr: _ag.address || _ag.addr || '',
     agencySite: _ag.site || _ag.website || '',
     brokerName: broker ? broker.name : ((_ag.manager && _ag.manager.name) || ''),
@@ -7993,7 +8005,7 @@ const server = http.createServer(async (req, res) => {
           : _isAi ? 'Благодарю за интерес к Evgenia Laya Resort — сильный проект для жизни и инвестиций на Пхукете. Закрытая территория, до пляжа ~10 минут, первая очередь уже приносит владельцам доход.\n\nГотов прислать актуальные планировки и расчёт по рассрочке под ваш бюджет. Подобрать?'
           : 'Появились новые проекты у моря и готовые виллы под ваш запрос. Подобрал несколько вариантов — посмотрите, и подскажу детали по любому.',
         agency: _ag.name || 'Ваше агентство',
-        agencyLogo: (raw => raw ? (/^https?:\/\//i.test(raw) ? raw : (callBase(db) + (raw[0] === '/' ? '' : '/') + raw)) : '')(_ag.logo || _ag.logoUrl || ''),   /* относительный путь → абсолютный (в письме иначе битая картинка) */ agencyAddr: _ag.address || _ag.addr || '', agencySite: _ag.site || _ag.website || '',
+        agencyLogo: agencyLogoForEmail(db),   /* относительный путь → абсолютный (в письме иначе битая картинка) */ agencyAddr: _ag.address || _ag.addr || '', agencySite: _ag.site || _ag.website || '',
         brokerName: (db.brokers && db.brokers[0] && db.brokers[0].name) || ((_ag.manager && _ag.manager.name) || 'Менеджер'),
         heroImg: propImg ? (/^https?:\/\//i.test(propImg) ? propImg : callBase(db) + propImg) : '',
         mediaCard: mailer.emailMediaCard({ type: 'voice', url: '#', en: false }, preset === 'dark' ? mailer.D : mailer.C),
