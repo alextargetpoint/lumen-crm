@@ -4172,6 +4172,7 @@ async function genCarouselPhotos(need, opts = {}) {
   return out.filter(Boolean);
 }
 
+/* healthz-ready: zero-downtime активен 2026-09-30 */
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
@@ -11963,6 +11964,13 @@ ${SCR}
         if (typeof b.summary === 'string') rec.analysis.summary = b.summary.slice(0, 1600);
         if (typeof b.analystNote === 'string') rec.analysis.analystNote = b.analystNote.slice(0, 1200);
         if (Array.isArray(b.verdicts)) rec.analysis.verdicts = b.verdicts.slice(0, 3).map((v, i) => Object.assign({}, (rec.analysis.verdicts || [])[i], { forWhom: String(v.forWhom || '').slice(0, 300) }));
+        /* СКРЫТИЕ конкретных блоков перед отправкой клиенту (удаление «момента»): ai/summary/note/best + verdicts[i]/rows[key] */
+        if (b.hidden && typeof b.hidden === 'object') {
+          rec.hidden = rec.hidden || {};
+          for (const k of ['ai', 'summary', 'note', 'best']) if (typeof b.hidden[k] === 'boolean') rec.hidden[k] = b.hidden[k];
+          if (Array.isArray(b.hidden.verdicts)) rec.hidden.verdicts = b.hidden.verdicts.map(Number).filter(n => n >= 0).slice(0, 3);
+          if (Array.isArray(b.hidden.rows)) rec.hidden.rows = b.hidden.rows.map(String).slice(0, 20);
+        }
         rec.langs = {};   /* сброс кэша переводов — переведётся заново с правками */
         store.save();
         return json(res, 200, { ok: true });
@@ -15134,8 +15142,9 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
       const pxUsd = (x) => { const r = FX[String(x.currency || 'USD').toUpperCase()]; return r ? (+x.priceFrom || 0) / r : +x.priceFrom || 0; };
       const rows = [[T.price, x => money(x.priceFrom, x.currency), pxUsd, 'min'], [T.area, x => esc2(x.area) || '—'], [T.dev, x => esc2(x.developer) || '—'], [T.type, x => esc2(x.type) || '—'], [T.roi, x => esc2(x.roi) || '—', x => num(x.roi), 'max'], [T.apprec || T.apprec, x => esc2(x.appreciation) || '—', x => num(x.appreciation), 'max'], [T.ho, x => esc2(x.handover) || '—'], [T.units, x => x.units || '—', x => +x.units || null, 'max'], [T.market, x => x.market === 'secondary' ? T.sec : T.prim]];
       const bestI = (vf, dir) => { if (!vf || !dir || it.length < 2) return -1; const vals = it.map(vf); const has = vals.filter(v => v != null); if (has.length < 2) return -1; let bi = -1, bv = null; vals.forEach((v, i) => { if (v == null) return; if (bv == null || (dir === 'min' ? v < bv : v > bv)) { bv = v; bi = i; } }); return vals.filter(v => v === bv).length === it.length ? -1 : bi; };
-      const verd = (a.verdicts || []).map(v => `<div class="v"><b>${esc2(v.name)}</b><div class="fw">${esc2(v.forWhom)}</div><ul class="pros">${(v.pros || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul><ul class="cons">${(v.cons || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul></div>`).join('');
       const editMode = u.searchParams.get('edit') === rec.token;   /* брокер редактирует текст клиенту */
+      const H = rec.hidden || {};   /* блоки, скрытые брокером перед отправкой */
+      const verd = (a.verdicts || []).map((v, i) => (H.verdicts && H.verdicts.includes(i) && !editMode) ? '' : `<div class="v${(H.verdicts && H.verdicts.includes(i)) ? ' is-hid' : ''}" data-vcard="${i}">${editMode ? `<button class="delx" data-del="verdict:${i}" title="Убрать у клиента">×</button>` : ''}<b>${esc2(v.name)}</b><div class="fw">${esc2(v.forWhom)}</div><ul class="pros">${(v.pros || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul><ul class="cons">${(v.cons || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul></div>`).join('');
       const ed = (f) => editMode ? ` contenteditable="true" data-ef="${f}" spellcheck="false"` : '';
       const html = `<!doctype html><html lang="${curLang}"${curLang === 'ar' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc2(T.title)} · ${esc2(rec.agency)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -15176,13 +15185,16 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 <div class="cards">${it.map(x => `<div class="card"><div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}</div></div>`).join('')}</div>
 <div class="grid"><div class="lbl"></div>${it.map(() => '<div class="lbl"></div>').join('')}
 ${rows.map(([l, fn, vf, dir]) => { const bi = bestI(vf, dir); return `<div class="lbl">${esc2(l)}</div>${it.map((x, i) => `<div class="val${i === bi ? ' win' : ''}">${fn(x)}${i === bi ? `<span class="st" title="${esc2(T.best)}">★</span>` : ''}</div>`).join('')}`; }).join('')}</div>
-${(a.summary || verd || editMode) ? `<div class="ai"><h2><span class="d">✦</span>${esc2(T.ai)}</h2>${(a.summary || editMode) ? `<div class="sum"${ed('summary')}>${esc2(a.summary)}</div>` : ''}<div class="vgrid">${verd}</div>
-${a.bestFor ? `<div class="best"><span>💎 ${esc2(T.invest)}: <b>${esc2(a.bestFor.investment)}</b></span><span>🏡 ${esc2(T.living)}: <b>${esc2(a.bestFor.living)}</b></span><span>💰 ${esc2(T.budget)}: <b>${esc2(a.bestFor.budget)}</b></span></div>` : ''}
-${(a.analystNote || editMode) ? `<div class="note"${ed('analystNote')}>${esc2(a.analystNote)}</div>` : ''}</div>` : ''}
+${((a.summary || verd || editMode) && (!H.ai || editMode)) ? `<div class="ai${H.ai ? ' is-hid' : ''}" data-blk="ai"><h2><span class="d">✦</span>${esc2(T.ai)}${editMode ? '<button class="delx" data-del="ai" title="Убрать весь блок у клиента">×</button>' : ''}</h2>${((a.summary || editMode) && (!H.summary || editMode)) ? `<div class="sum${H.summary ? ' is-hid' : ''}" data-blk="summary">${editMode ? '<button class="delx" data-del="summary" title="Убрать у клиента">×</button>' : ''}<span${ed('summary')}>${esc2(a.summary)}</span></div>` : ''}<div class="vgrid">${verd}</div>
+${(a.bestFor && (!H.best || editMode)) ? `<div class="best${H.best ? ' is-hid' : ''}" data-blk="best">${editMode ? '<button class="delx" data-del="best" title="Убрать у клиента">×</button>' : ''}<span>💎 ${esc2(T.invest)}: <b>${esc2(a.bestFor.investment)}</b></span><span>🏡 ${esc2(T.living)}: <b>${esc2(a.bestFor.living)}</b></span><span>💰 ${esc2(T.budget)}: <b>${esc2(a.bestFor.budget)}</b></span></div>` : ''}
+${((a.analystNote || editMode) && (!H.note || editMode)) ? `<div class="note${H.note ? ' is-hid' : ''}" data-blk="note">${editMode ? '<button class="delx" data-del="note" title="Убрать у клиента">×</button>' : ''}<span${ed('analystNote')}>${esc2(a.analystNote)}</span></div>` : ''}</div>` : ''}
 ${editMode ? `<div class="edbar"><div class="edbar-h">✎ Режим редактирования (видите только вы). Текст меняйте прямо на странице.</div><div class="edbar-row"><span>Рерайт вступления:</span><button data-rw="premium">Премиум</button><button data-rw="short">Короче</button><button data-rw="long">Подробнее</button><button data-rw="warm">Теплее</button></div><button class="edsave" id="edSave">Сохранить изменения</button><span id="edStatus"></span></div>
 <script>(function(){var id=${JSON.stringify(rec.id)},tok=${JSON.stringify(rec.token)};var S=document.getElementById('edStatus');
+var hidden=${JSON.stringify(rec.hidden || {})};hidden.verdicts=hidden.verdicts||[];
 function g(f){var e=document.querySelector('[data-ef="'+f+'"]');return e?e.innerText.trim():'';}
-document.getElementById('edSave').onclick=function(){S.textContent='Сохраняю…';fetch('/api/properties/compare/'+id+'/edit?t='+tok,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({summary:g('summary'),analystNote:g('analystNote')})}).then(function(r){return r.json()}).then(function(j){S.textContent=j.ok?'Сохранено ✓':(j.error||'ошибка')}).catch(function(){S.textContent='ошибка сети'})};
+/* «×» — убрать конкретный момент у клиента (скрыть блок/вердикт), сохраняется вместе с правками */
+document.querySelectorAll('.delx').forEach(function(b){b.onclick=function(){var d=b.dataset.del;if(d.indexOf('verdict:')===0){var i=+d.split(':')[1];if(hidden.verdicts.indexOf(i)<0)hidden.verdicts.push(i);var c=document.querySelector('[data-vcard="'+i+'"]');if(c)c.classList.add('is-hid');}else{hidden[d]=true;var el2=document.querySelector('[data-blk="'+d+'"]');if(el2)el2.classList.add('is-hid');}S.textContent='Убрано (нажмите «Сохранить»)';}});
+document.getElementById('edSave').onclick=function(){S.textContent='Сохраняю…';fetch('/api/properties/compare/'+id+'/edit?t='+tok,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({summary:g('summary'),analystNote:g('analystNote'),hidden:hidden})}).then(function(r){return r.json()}).then(function(j){S.textContent=j.ok?'Сохранено ✓':(j.error||'ошибка')}).catch(function(){S.textContent='ошибка сети'})};
 document.querySelectorAll('[data-rw]').forEach(function(b){b.onclick=function(){var sum=document.querySelector('[data-ef="summary"]');if(!sum)return;S.textContent='ИИ переписывает…';b.disabled=true;fetch('/api/properties/compare/'+id+'/rewrite?t='+tok,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({style:b.dataset.rw,field:'summary'})}).then(function(r){return r.json()}).then(function(j){b.disabled=false;if(j.text){sum.innerText=j.text;S.textContent='Готово — не забудьте «Сохранить»'}else{S.textContent=j.error||'ошибка'}}).catch(function(){b.disabled=false;S.textContent='ошибка сети'})}});
 })();</script>` : ''}
 <div class="ft">${esc2(T.ft)} · ${esc2(rec.agency)}</div></div></body></html>`;
