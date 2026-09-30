@@ -4175,6 +4175,9 @@ async function genCarouselPhotos(need, opts = {}) {
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
+  /* HEALTHCHECK для zero-downtime деплоя Railway: сверх-лёгкий публичный ответ ДО резолва тенанта/БД/гейтов.
+     Railway держит старый контейнер, пока новый не отдаст 200 здесь → окна со страницей ошибки при деплое нет. */
+  if (p === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); res.end('ok'); return; }
   /* SaaS: резолв тенанта из глобального реестра (sid→tid), ДО загрузки БД тенанта.
      Нет сессии/маппинга → PRIMARY (обратная совместимость с текущим агентством). */
   const _sidM = (req.headers.cookie || '').match(/lumen_sid=([a-f0-9]{32})/);
