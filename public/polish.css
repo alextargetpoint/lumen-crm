@@ -392,6 +392,26 @@ input[type=number] { -moz-appearance: textfield; }
 .pr-zonechip svg { width: 13px; height: 13px; }
 :root[data-night] .prdraw-b, :root[data-night] .prdraw-clr { background: rgba(30,26,18,.9); color: #c9c0ad; border-color: rgba(255,255,255,.1); }
 :root[data-night] .prdraw-b:hover { color: #fff; }
+/* ─── Карточка объекта: режим ПРОСМОТРА (.pd2.is-read) — красивый read-view, правки по кнопке «Редактировать» ─── */
+/* поля/селекты → чистый текст (без рамок/фона), не редактируются */
+.pd2.is-read input.gi, .pd2.is-read textarea, .pd2.is-read input[data-f], .pd2.is-read input[data-cf], .pd2.is-read .cs-btn {
+  border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; pointer-events: none; resize: none; cursor: default;
+}
+.pd2.is-read .cs-chev, .pd2.is-read .num-step-btns { display: none !important; }
+.pd2.is-read .cs, .pd2.is-read .cs-btn { min-width: 0 !important; width: auto !important; }
+/* скрыть весь edit-хром в просмотре: добавление, удаление, обложка-сеттер, курирование, «этап оплаты» */
+.pd2.is-read .lc-note-row,
+.pd2.is-read .pd-x, .pd2.is-read .pd-cover-set, .pd2.is-read .pd-curate,
+.pd2.is-read .lc-cx, .pd2.is-read [data-imgdel], .pd2.is-read [data-laydel], .pd2.is-read [data-matdel],
+.pd2.is-read .pd-editonly, .pd2.is-read #prowAdd, .pd2.is-read #uAdd { display: none !important; }
+/* чипы тегов/удобств: в просмотре только выбранные, как статичные метки */
+.pd2.is-read .chip-t:not(.on) { display: none !important; }
+.pd2.is-read .chip-t.on { pointer-events: none; cursor: default; }
+/* пустые поля-инпуты в просмотре не занимают лишнего (плейсхолдер не показываем) */
+.pd2.is-read input::placeholder, .pd2.is-read textarea::placeholder { color: transparent !important; }
+/* заголовок-имя в просмотре — крупнее и как текст */
+.pd2.is-read .pd2-name { font-weight: 700 !important; }
+
 /* ×-удаление на карточке цепочки (в списке «Мои цепочки») — появляется на ховере, не мешает клику по карточке */
 .seq-card-top { position: relative; }
 .seq-card-del { margin-left: auto; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: var(--ink-3, #97a0af); opacity: 0; transition: opacity .15s, background .15s, color .15s; flex: 0 0 auto; }

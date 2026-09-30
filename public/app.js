@@ -7987,15 +7987,17 @@ PAGES.properties = async (root) => {
     const amt = (pct, price) => { const v = Math.round((price || 0) * pctInt(pct) / 100); return v ? (pr.currency === 'EUR' ? '€' : '$') + v.toLocaleString('ru-RU') : '—'; };
     const tagList = [...new Set([...MD.common.tags, ...(pr.tags || [])])];
     const amenList = [...new Set([...MD.common.amenities, ...(pr.amenities || [])])];
+    const editMode = !!PAGE_STATE.propEditMode;   /* по умолчанию — красивый просмотр; форма правок — по кнопке «Редактировать» */
     root.innerHTML = `
-      <div class="pd2">
+      <div class="pd2 ${editMode ? 'is-edit' : 'is-read'}">
         <div class="pd2-hero" ${heroImg ? `style="background-image:url('${esc(heroImg)}')"` : ''}>
           <div class="pd2-shade"></div>
           <div class="pd2-in">
             <div class="pd2-top">
               <button class="btn btn-sm pd2-ghost" id="prBack">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Все объекты'}</button>
-              <span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>
+              ${editMode ? `<span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>` : ''}
               <span class="tb-spacer"></span>
+              <button class="btn btn-sm ${editMode ? 'btn-accent' : 'pd2-ghost'}" id="pdEditToggle" title="${editMode ? 'Вернуться к просмотру' : 'Открыть поля для правок'}">${ic(editMode ? I.check : I.edit || I.gear)}${editMode ? 'Готово' : 'Редактировать'}</button>
               <div class="pd2-lang" id="pdLangDD"><select id="pdLang" title="Язык карточки — перевод для просмотра и шеринга клиенту">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm ${(PAGE_STATE.compare || []).includes(pr.id) ? 'btn-accent' : 'pd2-ghost'}" id="pdCompare" title="Добавить в сравнение (до 3 объектов)">${ic(I.grid || I.layers)}${(PAGE_STATE.compare || []).includes(pr.id) ? 'В сравнении ✓' : 'Сравнить'}</button>
@@ -8137,7 +8139,8 @@ PAGES.properties = async (root) => {
         </div>
       </div>`;
 
-    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; if (PAGE_STATE.propFrom === 'map') PAGE_STATE.propMap = true; PAGE_STATE.propFrom = null; render(); });
+    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; PAGE_STATE.propEditMode = false; if (PAGE_STATE.propFrom === 'map') PAGE_STATE.propMap = true; PAGE_STATE.propFrom = null; render(); });
+    $('#pdEditToggle')?.addEventListener('click', () => { PAGE_STATE.propEditMode = !PAGE_STATE.propEditMode; render(); });
     $$('.gi', root).forEach(inp => inp.addEventListener('change', async () => {
       const f = inp.dataset.f;
       if (f === 'tagsStr') await upd({ tags: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
