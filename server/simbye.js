@@ -304,9 +304,11 @@ async function tick(db, store, deps) {
       f.health = { loggedIn: !!h.loggedIn, email: h.email || '', numbers: h.numbers || 0, checkedAt: now, ok: !!h.ok };
       if (!h.ok || !h.loggedIn) {
         pushAlert(db, 'error', creds(db) ? 'Не удалось войти в Simbye по сохранённым данным — проверьте логин/пароль (возможно, сменился) в «Подключить Simbye».' : 'Simbye не подключён — подключите свой аккаунт (email+пароль) в разделе «Номера».', 'session');
-        if (deps && deps.notifyOwner) deps.notifyOwner(db, '⚠️ Simbye: нет доступа к аккаунту. Ферма номеров на паузе — переподключите в CRM.');
+        /* ТРОТТЛИНГ: уведомляем владельца НЕ чаще раза в 6ч (раньше спамило каждый тик ~пару минут) */
+        if (deps && deps.notifyOwner && (now - (f._sessionAlertAt || 0) > 6 * 3600e3)) { f._sessionAlertAt = now; deps.notifyOwner(db, '⚠️ Simbye: нет доступа к аккаунту. Ферма номеров на паузе — переподключите в CRM.'); }
       } else {
         resolveAlerts(db, a => a.ctx === 'session');
+        f._sessionAlertAt = 0;
       }
     } catch (e) {
       f.health = { loggedIn: false, error: e.message, checkedAt: now, ok: false };
