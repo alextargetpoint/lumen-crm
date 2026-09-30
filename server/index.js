@@ -890,15 +890,16 @@ function cloudPhoneIds(db) {
 async function applyCloudProfile(db, phoneId) {
   const pf = db.settings.wa && db.settings.wa.profile;
   if (!pf || !phoneId || !(db.settings.wa && db.settings.wa.token)) return;
+  /* Meta Cloud API /whatsapp_business_profile принимает: description, address, email, websites, profile_picture_handle, vertical.
+     Поле «about» этот эндпоинт НЕ принимает → один неверный параметр валит ВЕСЬ POST (#100). Шлём его ОТДЕЛЬНО best-effort. */
   const fields = {};
-  if (pf.about) fields.about = pf.about;
   if (pf.description) fields.description = pf.description;
   if (pf.address) fields.address = pf.address;
   if (pf.email) fields.email = pf.email;
   if (pf.website) fields.websites = [pf.website];
   if (pf.avatarHandle) fields.profile_picture_handle = pf.avatarHandle;
-  if (!Object.keys(fields).length) return;
-  await wa.setBusinessProfile(db, phoneId, fields);
+  if (Object.keys(fields).length) await wa.setBusinessProfile(db, phoneId, fields);
+  if (pf.about) { try { await wa.setBusinessProfile(db, phoneId, { about: pf.about }); } catch (_) {} }   /* about — отдельно: если Meta не примет, основной профиль всё равно применится */
 }
 /* каскадное письмо лиду → rich-рендер (email.js) + отправка с домена агентства (платформенный Resend-ключ) */
 engine.onEmailSend = async (db, lead, msg) => {
