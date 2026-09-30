@@ -857,20 +857,71 @@ async function sendViaResend(cfg, to, subject, html, attachments) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+/* ---------- Пресеты оформления писем (SaaS: агентство выбирает вид) ---------- */
+const EMAIL_PRESETS = {
+  classic: { label: 'Классика', theme: 'light', hero: true },
+  minimal: { label: 'Минимал', theme: 'light', plain: true },
+  warm: { label: 'Тёплый', theme: 'light', hero: true, accent: 'warm' },
+  dark: { label: 'Тёмный', theme: 'dark', hero: true },
+};
+function emailPresetList() { return Object.keys(EMAIL_PRESETS).map(k => ({ key: k, label: EMAIL_PRESETS[k].label, theme: EMAIL_PRESETS[k].theme })); }
+
+/* ---------- Карточка медиа в письме: постер + ▶, кликом → хостовая страница воспроизведения ----------
+   (inline audio/video в Gmail/Outlook не играют → показываем красивый постер-ссылку) */
+function emailMediaCard(opts, T) {
+  const o = opts || {}; T = T || C; const en = o.en;
+  const isVoice = o.type === 'voice' || o.type === 'audio';
+  const label = isVoice ? (en ? 'Voice message' : 'Голосовое сообщение') : (en ? 'Video message' : 'Видео-сообщение');
+  const hint = en ? 'Tap to play' : 'Нажмите, чтобы воспроизвести';
+  const grad = `linear-gradient(135deg,${T.goldDeep || '#c9a86a'},${T.dark ? '#2a2620' : '#8a6d3b'})`;
+  if (isVoice) {
+    return `<a href="${esc(o.url)}" style="text-decoration:none;display:block;margin:18px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${T.line};border-radius:16px;background:${T.card};"><tr>
+        <td width="60" style="padding:14px 0 14px 14px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="46" height="46" align="center" valign="middle" style="width:46px;height:46px;background:${grad};border-radius:50%;color:#fff;font-size:18px;">&#9654;</td></tr></table></td>
+        <td style="padding:14px 14px 14px 12px;"><div style="font-family:${SERIF};font-size:16px;color:${T.ink};font-weight:600;">${esc(label)}</div><div style="font-size:12px;color:${T.ink3};margin-top:2px;">&#127908; ${esc(hint)}</div></td>
+      </tr></table></a>`;
+  }
+  // видео-кружок: круглый постер + play
+  const posterBg = o.poster ? `background:#000 url('${esc(o.poster)}') center/cover;` : `background:${grad};`;
+  return `<a href="${esc(o.url)}" style="text-decoration:none;display:block;margin:18px 0;text-align:center;">
+      <table role="presentation" align="center" cellpadding="0" cellspacing="0"><tr><td width="150" height="150" align="center" valign="middle" style="width:150px;height:150px;border-radius:50%;${posterBg}border:1px solid ${T.line};">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;background:rgba(0,0,0,.45);border-radius:50%;color:#fff;font-size:20px;">&#9654;</td></tr></table>
+      </td></tr></table>
+      <div style="font-size:13px;color:${T.ink3};margin-top:8px;">&#127909; ${esc(label)} &middot; ${esc(hint)}</div></a>`;
+}
+
+/* Хостовая страница воспроизведения (публичная, по токену) */
+function renderMediaPage(rec) {
+  const r = rec || {}; const isVoice = r.type === 'voice' || r.type === 'audio';
+  const agency = esc(r.agency || 'Lumen'); const broker = esc(r.brokerName || '');
+  const player = isVoice
+    ? `<audio controls autoplay style="width:100%;max-width:420px;margin-top:18px"><source src="${esc(r.url)}"></audio>`
+    : `<video controls autoplay playsinline style="width:100%;max-width:360px;border-radius:24px;margin-top:18px;background:#000"><source src="${esc(r.url)}"></video>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${agency}</title>
+    <style>body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f1ea;color:#141311;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+    .c{background:#fff;border:1px solid rgba(20,19,17,.1);border-radius:22px;padding:28px;max-width:460px;width:100%;text-align:center;box-shadow:0 30px 60px -30px rgba(0,0,0,.25)}
+    .a{font-weight:700;font-size:18px}.b{color:#8b8983;font-size:13px;margin-top:4px}</style></head>
+    <body><div class="c"><div class="a">${agency}</div>${broker ? `<div class="b">${isVoice ? 'Голосовое от' : 'Видео от'} ${broker}</div>` : ''}${player}</div></body></html>`;
+}
+
 /* ---------- Каскадное письмо лиду (омниканальный прожим): rich, персонализированное ---------- */
 function renderCascadeEmail(opts) {
-  const o = opts || {}; const lang = o.lang === 'en' ? 'en' : 'ru'; const en = lang === 'en'; const T = C;
+  const o = opts || {}; const lang = o.lang === 'en' ? 'en' : 'ru'; const en = lang === 'en';
+  const preset = EMAIL_PRESETS[o.preset] || EMAIL_PRESETS.classic;
+  const T = preset.theme === 'dark' ? D : C;
   const first = String(o.name || '').split(' ')[0] || '';
   const greet = en ? `Hello${first ? ', ' + esc(first) : ''}!` : `Здравствуйте${first ? ', ' + esc(first) : ''}!`;
   const bodyText = esc(o.text || '').replace(/\n/g, '<br>');
   let inner = `<p style="margin:0 0 14px 0;">${greet}</p><p style="margin:0 0 14px 0;">${bodyText}</p>`;
-  if (o.heroImg) inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0;"><tr><td style="border-radius:14px;overflow:hidden;"><img src="${esc(o.heroImg)}" width="100%" style="display:block;width:100%;max-width:100%;border-radius:14px;" alt=""></td></tr></table>` + inner;
+  if (o.heroImg && preset.hero) inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0;"><tr><td style="border-radius:14px;overflow:hidden;"><img src="${esc(o.heroImg)}" width="100%" style="display:block;width:100%;max-width:100%;border-radius:14px;" alt=""></td></tr></table>` + inner;
+  if (o.mediaCard) inner += o.mediaCard;   /* карточка голосового/видео-кружка → хостовая страница */
   if (o.ctaUrl) inner += emailButton(o.ctaUrl, o.ctaLabel || (en ? 'View options' : 'Посмотреть варианты'), { T });
   const sigName = o.brokerName || o.agency || '';
   const sigLine = [sigName, (o.agency && o.agency !== sigName) ? o.agency : ''].filter(Boolean).join(' · ');
   if (sigLine) inner += `<p style="margin:20px 0 0 0;color:${T.ink3};font-size:15px;">${en ? 'Best regards,' : 'С уважением,'}<br>${esc(sigLine)}</p>`;
   const opt = {
-    theme: 'light',
+    theme: preset.theme === 'dark' ? 'dark' : 'light',
+    plain: !!preset.plain,
     eyebrow: o.agency ? esc(o.agency) : null,
     preheader: String(o.text || '').replace(/<[^>]+>/g, '').slice(0, 90),
     manageNote: o.unsubUrl ? `<a href="${esc(o.unsubUrl)}" style="color:${T.ink3};text-decoration:underline;">${en ? 'Unsubscribe' : 'Отписаться'}</a>` : null,
@@ -898,4 +949,5 @@ module.exports = {
   DEFAULT_TEMPLATES, EMAIL_CATEGORIES, getTemplates, emailMeta, emailCatalog, defaultNotifyPrefs, canReceive,
   renderTemplate, interpolate, platformEmailCfg, sendViaResend, ART, C, D, pal,
   renderCascadeEmail, createDomain, getDomain, verifyDomain, deleteDomain,
+  emailMediaCard, renderMediaPage, EMAIL_PRESETS, emailPresetList,
 };

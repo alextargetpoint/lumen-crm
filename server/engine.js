@@ -98,7 +98,7 @@ function send(db, lead, text, via, opts = {}) {
           if (to) {
             /* rich-письмо через email.js + домен агентства (хук в index.js). Фолбэк — прежний plain-Resend. */
             if (module.exports.onEmailSend) {
-              const r = await module.exports.onEmailSend(db, lead, { to, subject: opts.subject || 'По вашей заявке', text });
+              const r = await module.exports.onEmailSend(db, lead, { to, subject: opts.subject || 'По вашей заявке', text, media: m0.media || (opts.media && opts.media.url ? opts.media : null) });
               if (!r || !r.ok) throw new Error((r && r.error) || 'email send failed');
             } else if (cfg.email.key && cfg.email.from) {
               const r = await fetch('https://api.resend.com/emails', {

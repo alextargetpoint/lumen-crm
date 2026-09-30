@@ -890,8 +890,20 @@ engine.onEmailSend = async (db, lead, msg) => {
       : ((db.properties || []).find(p => (p.images || [])[0]) || {}).images?.[0] || '';
     if (raw) heroImg = /^https?:\/\//i.test(raw) ? raw : (callBase(db) + raw);
   } catch (_) {}
+  const emailCfg = (db.settings.channels && db.settings.channels.email) || {};
+  const preset = emailCfg.preset || 'classic';
+  /* голосовое/видео-кружок → сохраняем медиа-запись и вставляем постер-карточку со ссылкой на /e/:id */
+  let mediaCard = '';
+  if (msg.media && ['voice', 'audio', 'video'].includes(msg.media.type) && msg.media.url) {
+    db.emailMedia = db.emailMedia || {};
+    const id = store.nextId('em');
+    const murl = /^https?:\/\//i.test(msg.media.url) ? msg.media.url : (callBase(db) + msg.media.url);
+    db.emailMedia[id] = { type: msg.media.type, url: murl, brokerName: broker ? broker.name : '', agency: (db.settings.agency && db.settings.agency.name) || '', leadId: lead.id, at: Date.now() };
+    store.save();
+    mediaCard = mailer.emailMediaCard({ type: msg.media.type, url: callBase(db) + '/e/' + id, en: lead.lang === 'en' }, preset === 'dark' ? mailer.D : mailer.C);
+  }
   const rich = mailer.renderCascadeEmail({
-    name: lead.name, lang: lead.lang, text: msg.text, subject: msg.subject,
+    name: lead.name, lang: lead.lang, text: msg.text, subject: msg.subject, preset, mediaCard,
     agency: (db.settings.agency && db.settings.agency.name) || '',
     brokerName: broker ? broker.name : ((db.settings.agency && db.settings.agency.manager && db.settings.agency.manager.name) || ''),
     heroImg,
@@ -1000,6 +1012,8 @@ function publicTenantFor(p) {
   if ((m = p.match(/^\/m\/(mt_[\w]+)/))) { const id = m[1]; return findTenant(() => (store.get().meetings || []).some(x => x.id === id)); }
   /* визитка брокера /b/:id */
   if ((m = p.match(/^\/b\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().brokers || []).some(x => x.id === id || x.cardId === id)); }
+  /* страница воспроизведения медиа из письма /e/:id */
+  if ((m = p.match(/^\/e\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => !!(store.get().emailMedia && store.get().emailMedia[id])); }
   return null;
 }
 /* короткий отпечаток устройства из UA (без внешних либ): платформа + браузер */
@@ -7793,7 +7807,7 @@ const server = http.createServer(async (req, res) => {
         try { live = await mailer.getDomain(key, e.domainId); if (live) { e.verified = live.status === 'verified'; if (live.records) e.records = live.records; store.save(); } }
         catch (err) { live = { error: err.message }; }
       }
-      return json(res, 200, { domain: e.domain || '', domainId: e.domainId || '', verified: !!e.verified, senderLocal: e.senderLocal || 'noreply', records: e.records || [], status: live && live.status, keyReady: !!mailer.platformEmailCfg(store.getRegistry()).key });
+      return json(res, 200, { domain: e.domain || '', domainId: e.domainId || '', verified: !!e.verified, senderLocal: e.senderLocal || 'noreply', records: e.records || [], status: live && live.status, keyReady: !!mailer.platformEmailCfg(store.getRegistry()).key, preset: e.preset || 'classic', presets: mailer.emailPresetList() });
     }
     if (p === '/api/email/domain' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
@@ -7842,6 +7856,29 @@ const server = http.createServer(async (req, res) => {
       const rich = mailer.renderCascadeEmail({ name: '', lang: 'ru', subject: 'Тест — ' + ((db.settings.agency && db.settings.agency.name) || 'Lumen'), text: 'Это тестовое письмо из CRM. Если оно во «Входящих» — домен и доставляемость настроены верно ✅', agency: (db.settings.agency && db.settings.agency.name) || '' });
       const r = await mailer.sendViaResend({ key, from }, to, rich.subject, rich.html);
       return json(res, r.ok ? 200 : 400, Object.assign({ from }, r));
+    }
+    /* превью письма для выбранного пресета оформления (owner) */
+    if (p === '/api/email/preview' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const preset = u.searchParams.get('preset') || ((db.settings.channels && db.settings.channels.email && db.settings.channels.email.preset) || 'classic');
+      const propImg = (((db.properties || []).find(pr => (pr.images || [])[0]) || {}).images || [])[0] || '';
+      const rich = mailer.renderCascadeEmail({
+        name: 'Иван', lang: 'ru', preset, subject: 'Пример письма',
+        text: 'Появились новые проекты у моря и готовые виллы под ваш запрос. Подобрал несколько вариантов — посмотрите, и подскажу детали по любому.',
+        agency: (db.settings.agency && db.settings.agency.name) || 'Ваше агентство',
+        brokerName: (db.brokers && db.brokers[0] && db.brokers[0].name) || ((db.settings.agency && db.settings.agency.manager && db.settings.agency.manager.name) || 'Менеджер'),
+        heroImg: propImg ? (/^https?:\/\//i.test(propImg) ? propImg : callBase(db) + propImg) : '',
+        mediaCard: mailer.emailMediaCard({ type: 'voice', url: '#', en: false }, preset === 'dark' ? mailer.D : mailer.C),
+      });
+      return json(res, 200, { html: rich.html, presets: mailer.emailPresetList(), preset });
+    }
+    if (p === '/api/email/preset' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const pr = String(b.preset || 'classic');
+      if (!mailer.EMAIL_PRESETS[pr]) return json(res, 400, { error: 'нет такого пресета' });
+      db.settings.channels = db.settings.channels || {}; db.settings.channels.email = db.settings.channels.email || { provider: 'resend' };
+      db.settings.channels.email.preset = pr; store.save();
+      return json(res, 200, { ok: true, preset: pr });
     }
 
     /* ── Подписки на письма: какие типы уведомлений получать на e-mail ──────
@@ -13029,6 +13066,13 @@ h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy
       return;
     }
 
+    /* ================= воспроизведение медиа из письма: /e/:id ================= */
+    if ((m = p.match(/^\/e\/([a-zA-Z0-9_]+)$/)) && req.method === 'GET') {
+      const rec = (db.emailMedia || {})[m[1]];
+      if (!rec) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(mailer.renderMediaPage(rec)); return;
+    }
     /* ================= публичная визитка брокера: /b/:id ================= */
     if ((m = p.match(/^\/b\/(br_[\w]+)$/)) && req.method === 'GET') {
       /* SEC: анти-харвест визиток брокеров (id последовательные и глобальны по всем тенантам) */

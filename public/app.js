@@ -9292,11 +9292,19 @@ PAGES.automations = async (root) => {
   (async () => {
     const card = $('#emDomainBody', root); if (!card) return;
     const e2 = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    function presetRow(d) {
+      const opts = (d.presets || [{ key: 'classic', label: 'Классика' }, { key: 'minimal', label: 'Минимал' }, { key: 'warm', label: 'Тёплый' }, { key: 'dark', label: 'Тёмный' }]).map(p => `<option value="${p.key}" ${p.key === (d.preset || 'classic') ? 'selected' : ''}>${e2(p.label)}</option>`).join('');
+      return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--stroke,rgba(20,19,17,.08))">
+        <span style="font-size:12px;color:var(--ink-3,#8b8983)">Оформление писем:</span>
+        <select id="emPreset" style="padding:5px 8px;border-radius:8px">${opts}</select>
+        <button class="btn btn-sm" id="emPreview">Превью</button></div>`;
+    }
     async function refresh() {
       let d; try { d = await api.get('/email/domain'); } catch (err) { card.innerHTML = '<span style="color:var(--bad,#c0392b)">' + e2(err.message) + '</span>'; return; }
-      if (!d.keyReady) { card.innerHTML = 'Оператор платформы ещё не задал общий Resend-ключ (RESEND_API_KEY). Как только он появится — можно будет подключить свой домен.'; return; }
+      const pr = presetRow(d);
+      if (!d.keyReady) { card.innerHTML = pr + 'Оператор платформы ещё не задал общий Resend-ключ (RESEND_API_KEY). Как только он появится — можно будет подключить свой домен.'; return; }
       if (!d.domain) {
-        card.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        card.innerHTML = pr + `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
             <div class="form-row" style="flex:1;min-width:170px;margin:0"><label>Ваш домен</label><input id="emDomIn" placeholder="mail.agency.com"></div>
             <div class="form-row" style="width:110px;margin:0"><label>Отправитель</label><input id="emDomLocal" value="noreply"></div>
             <button class="btn btn-sm btn-accent" id="emDomAdd">${ic(I.plus)}Подключить</button></div>
@@ -9304,7 +9312,7 @@ PAGES.automations = async (root) => {
         return;
       }
       const recs = (d.records || []).map(r => `<tr><td style="padding:4px 8px"><b>${e2(r.type || r.record || '')}</b></td><td style="padding:4px 8px;word-break:break-all">${e2(r.name || '')}</td><td style="padding:4px 8px;word-break:break-all">${e2(r.value || '')}</td><td style="padding:4px 8px">${e2(r.status || '')}</td></tr>`).join('');
-      card.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      card.innerHTML = pr + `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b>${e2(d.domain)}</b><span class="badge ${d.verified ? 'ok' : 'warn'}"><i></i>${d.verified ? 'верифицирован' : 'ожидает DNS'}</span>
           <span style="margin-left:auto;display:flex;gap:6px">
             ${d.verified ? `<button class="btn btn-sm" id="emDomTest">Тест-письмо</button>` : `<button class="btn btn-sm btn-accent" id="emDomVerify">${ic(I.refresh)}Проверить</button>`}
@@ -9314,8 +9322,24 @@ PAGES.automations = async (root) => {
           : `<div style="margin-top:8px">Пропишите у регистратора домена эти записи, затем «Проверить»:</div>
              <div style="overflow:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;min-width:100%"><thead><tr style="text-align:left"><th style="padding:4px 8px">Тип</th><th style="padding:4px 8px">Имя</th><th style="padding:4px 8px">Значение</th><th style="padding:4px 8px">Статус</th></tr></thead><tbody>${recs || '<tr><td colspan=4 style="padding:8px">записи появятся здесь</td></tr>'}</tbody></table></div>`}`;
     }
+    card.addEventListener('change', async (ev) => {
+      if (ev.target.id !== 'emPreset') return;
+      try { await api.post('/email/preset', { preset: ev.target.value }); toast('Оформление сохранено', ev.target.options[ev.target.selectedIndex].text, true); } catch (err) { toast('Ошибка', err.message, false); }
+    });
     card.addEventListener('click', async (ev) => {
       const b = ev.target.closest('button'); if (!b) return;
+      if (b.id === 'emPreview') {
+        const sel = ($('#emPreset', card) || {}).value || 'classic';
+        let r; try { r = await api.get('/email/preview?preset=' + encodeURIComponent(sel)); } catch (err) { toast('Ошибка', err.message, false); return; }
+        const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
+        ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee"><b style="font-size:13px">Превью письма</b><button id="emPvClose" class="btn btn-sm">Закрыть</button></div><iframe style="border:0;width:100%;height:78vh"></iframe></div>`;
+        document.body.appendChild(ov);
+        ov.querySelector('iframe').srcdoc = r.html;
+        const close = () => ov.remove();
+        ov.addEventListener('click', e3 => { if (e3.target === ov) close(); });
+        ov.querySelector('#emPvClose').addEventListener('click', close);
+        return;
+      }
       if (b.id === 'emDomAdd') { const dom = ($('#emDomIn', card) || {}).value?.trim(); const local = ($('#emDomLocal', card) || {}).value?.trim() || 'noreply'; if (!dom) { toast('Впишите домен', '', false); return; } b.disabled = true; try { await api.post('/email/domain', { domain: dom, senderLocal: local }); toast('Домен добавлен', 'Пропишите DNS-записи и «Проверить»', true); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
       else if (b.id === 'emDomVerify') { b.disabled = true; b.textContent = 'Проверяю…'; try { const r = await api.post('/email/domain/verify', {}); toast(r.verified ? 'Верифицирован ✅' : 'Пока не верифицирован', r.verified ? 'Домен готов' : 'DNS ещё не распространились — подождите и повторите', r.verified); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
       else if (b.id === 'emDomTest') { b.disabled = true; try { const r = await api.post('/email/test', {}); toast(r.ok ? 'Тест отправлен' : 'Не ушло', r.ok ? ('от ' + r.from) : r.error, r.ok); } catch (err) { toast('Ошибка', err.message, false); } b.disabled = false; }
