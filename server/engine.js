@@ -967,7 +967,7 @@ function inbound(db, lead, text, opts = {}) {
   db.messages.push(m);
   /* ЗОЛОТОЕ ПРАВИЛО: ответ «стоп/отписаться/stop/unsubscribe» → отписка от рассылок (любой канал) */
   if (/^\s*(стоп|stop|отпис|unsub|не пиш|не писать)/i.test(String(text || '')) && !lead.marketingOptOut) {
-    lead.marketingOptOut = true; lead.marketingOptOutAt = Date.now();
+    optOut(db, lead);   /* единый путь отписки: снимает с рассылок, чистит recipients, +1 к отпискам кампаний, шлёт подтверждение */
     ai.pushEvent(db, { type: 'optout', leadId: lead.id, text: `${lead.name}: отписался от рассылок («${String(text).trim().slice(0, 20)}»)` });
   }
   lead.unread = (lead.unread || 0) + 1;   /* счётчик непрочитанных для брокера (сбрасывается при открытии карточки / ответе человека) */
@@ -1064,7 +1064,7 @@ function optOut(db, lead) {
   lead.tags = [...new Set([...(lead.tags || []), 'отписался'])];
   for (const cmp of db.campaigns || []) { if ((cmp.recipients || []).includes(lead.id)) { cmp.stats = cmp.stats || {}; cmp.stats.unsubscribed = (cmp.stats.unsubscribed || 0) + 1; } cmp.recipients = (cmp.recipients || []).filter(id => id !== lead.id); }   /* честный счётчик отписок в аналитику (лид удаляется из recipients — сканом его уже не поймать) */
   if (lead.ai) lead.ai.enabled = false;
-  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name} отписался от рассылки (кнопка в шаблоне) — маркетинг остановлен` });
+  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name} отписался от рассылки — маркетинг остановлен` });
   const txt = (lead.lang === 'en')
     ? 'Done — you won’t receive promotional messages from us anymore. You can still reach us here anytime.'
     : 'Готово — рассылку вам больше присылать не будем. Написать нам сюда можно в любой момент.';
