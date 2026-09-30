@@ -392,6 +392,7 @@ function ensureTenantDefaults(db) {
   if (!s.comments) s.comments = { autoReply: false, autoHide: false };
   if (!s.social) s.social = { ig: { enabled: false, token: '', igId: '' }, fb: { enabled: false, token: '', pageId: '' } };
   if (!s.inventorySources) s.inventorySources = { reelly: { enabled: false, key: '', baseUrl: '' } };
+  if (!s.ownerTgCode) s.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex');   /* код привязки владельца к TG-боту (аналитика с телефона) — раньше был только у primary */
   /* все верхнеуровневые коллекции, которые код ждёт как массивы (seed даёт лишь часть) — чтобы новый тенант не падал ни на одной фиче */
   for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates', 'debugReports']) if (!Array.isArray(db[k])) db[k] = [];
   return db;
