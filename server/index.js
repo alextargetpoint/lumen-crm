@@ -15170,7 +15170,7 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 .edsave{background:linear-gradient(180deg,#d8b56a,#c19a4f);color:#14110c;border:0;font-size:14px;font-weight:800;padding:11px 22px;border-radius:11px;cursor:pointer}
 #edStatus{margin-left:12px;font-size:12.5px;color:#c9a25a}
 @media(max-width:640px){.cards{grid-template-columns:1fr 1fr}.hero h1{font-size:30px}.grid{grid-template-columns:110px repeat(${it.length},1fr);font-size:12px}}</style></head><body>
-<div class="top"><div class="top-in"><div class="brand">${esc2(rec.agency)}</div><div class="langs">${LANGS.map(([c, n]) => `<a href="?lang=${c}" class="${c === curLang ? 'on' : ''}">${n}</a>`).join('')}</div></div></div>
+<div class="top"><div class="top-in"><div class="brand">${esc2(rec.agency)}</div>${rec.showLangSwitcher ? `<div class="langs">${LANGS.map(([c, n]) => `<a href="?lang=${c}" class="${c === curLang ? 'on' : ''}">${n}</a>`).join('')}</div>` : ''}</div></div>
 <div class="wrap">
 <div class="hero"><div class="k">${esc2(rec.agency)}</div><h1>${esc2(T.title)}</h1><div class="sub">${esc2(T.sub)}</div></div>
 <div class="cards">${it.map(x => `<div class="card"><div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}</div></div>`).join('')}</div>

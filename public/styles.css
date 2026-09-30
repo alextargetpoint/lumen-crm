@@ -7589,6 +7589,11 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* в тёмных темах фото чуть притушено, чтобы не выбивалось */
 :root[data-night] .es-art .es-art-img { opacity: .8; }
 
+/* выбор языка клиентской страницы сравнения (пред-настройка в CRM, не на клиентской странице) */
+.cmp-langsel { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px; background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.cmp-langsel span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.cmp-langsel select { flex: 0 0 auto; min-width: 130px; }
+
 /* ===== Список пропущенных дублей при импорте ===== */
 .dup-list{display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow-y:auto}
 .dup-row{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--accent) 5%,transparent);border:1px solid var(--line)}

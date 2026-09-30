@@ -7965,6 +7965,7 @@ function openCompareModal(list) {
   </div>`;
   const incomplete = list.some(p => p.stub || !p.roi || !p.handover || !p.developer || p.developer === '—');
   const body2 = body + `<div class="cmp-ai">${incomplete ? `<button class="btn" id="cmpEnrich" style="width:100%;justify-content:center;margin-bottom:8px">${ic(I.spark)}Дополнить недостающее из сети (ИИ)</button><div id="cmpEnrOut"></div>` : ''}<button class="btn btn-accent" id="cmpAiGo" style="width:100%;justify-content:center">${ic(I.spark)}ИИ-анализ рынка (аналитик)</button><div id="cmpAiOut"></div>
+  <div class="cmp-langsel"><span>Язык страницы для клиента</span><select id="cmpLang">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
   <button class="btn" id="cmpShare" style="width:100%;justify-content:center;margin-top:8px">${ic(I.layers || I.doc)}Поделиться с клиентом (страница по ссылке)</button><div id="cmpShareOut"></div></div>`;
   const md = modal({ title: 'Сравнение объектов', sub: list.map(p => p.name).join(' · '), wide: true, body: body2, actions: [{ label: 'Закрыть' }] });
   $('#cmpEnrich', md)?.addEventListener('click', async (e) => {
@@ -7977,7 +7978,8 @@ function openCompareModal(list) {
   $('#cmpShare', md).addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); btn.disabled = true; const out = $('#cmpShareOut', md);
     out.innerHTML = motionLoader('Готовлю сводную страницу + ИИ-анализ…', 'web');
-    const r = await api.post('/properties/compare', { ids: list.map(p => p.id), lang: LANG, share: true }).catch(() => ({ error: 'сеть' }));
+    const cLang = ($('#cmpLang', md) && $('#cmpLang', md).value) || LANG;   /* язык клиента выбран ЗАРАНЕЕ в CRM, не на клиентской странице */
+    const r = await api.post('/properties/compare', { ids: list.map(p => p.id), lang: cLang, share: true }).catch(() => ({ error: 'сеть' }));
     if (r.error || !r.shareUrl) { out.innerHTML = '<div style="color:var(--bad);font-size:13px;padding:8px 0">' + esc(r.error || 'не вышло') + '</div>'; btn.disabled = false; return; }
     out.innerHTML = `<div class="cmp-share-ok"><span>Ссылка для клиента готова:</span><div class="cmp-share-row"><input readonly value="${esc(r.shareUrl)}" onclick="this.select()"><button class="btn btn-sm btn-accent" id="cmpCopy">Копировать</button><a class="btn btn-sm" href="${esc(r.shareUrl)}" target="_blank">Открыть</a></div>${r.editUrl ? `<div style="margin-top:7px;font-size:11.5px"><a class="link" href="${esc(r.editUrl)}" target="_blank">✎ Редактировать текст для клиента (рерайт, правки — только вы)</a></div>` : ''}</div>`;
     $('#cmpCopy', md).addEventListener('click', () => { navigator.clipboard.writeText(r.shareUrl).then(() => toast('Скопировано', 'Отправьте клиенту', true)); });
