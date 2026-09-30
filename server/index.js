@@ -11660,8 +11660,18 @@ ${SCR}
       }
       let srcPages = 0, via = scrapedSource ? 'source' : '';
       const q = [pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'Phuket condominium'].filter(Boolean).join(' ');
-      /* 2a) ДЁШЕВО: Google Programmable Search (image) — 100 запросов/день БЕСПЛАТНО, прямые URL фото,
-         НОЛЬ Firecrawl-кредитов. Включается парой env: GOOGLE_CSE_KEY + GOOGLE_CSE_CX. */
+      /* 2a-serper) ЛУЧШИЙ по цена/качество (2026): Serper.dev /images — прямые URL фото, JSON, 2500 запросов
+         БЕСПЛАТНО/мес, дальше ~$0.30-1 за 1000 (≈10× дешевле SerpApi), НОЛЬ Firecrawl. env: SERPER_API_KEY. */
+      if (cand.length < 8 && process.env.SERPER_API_KEY) {
+        try {
+          const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 12 }) });
+          const j = await r.json().catch(() => ({}));
+          (j.images || []).forEach(it => { const u = it && (it.imageUrl || it.link); if (okImg(u)) cand.push(u); });
+          if (cand.length) via = via ? via + '+serper' : 'serper';
+        } catch (_) {}
+      }
+      /* 2a-cse) Google Programmable Search (image) — 100/день бесплатно, но Google ЗАКРЫВАЕТ для новых
+         клиентов (миграция до 01.01.2027) → используем как запасной, если Serper не задан. */
       if (cand.length < 8 && process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX) {
         try {
           const r = await fetch(`https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CSE_KEY}&cx=${process.env.GOOGLE_CSE_CX}&searchType=image&num=10&imgSize=large&q=${encodeURIComponent(q)}`);
@@ -11712,7 +11722,7 @@ ${SCR}
         } catch (_) { good = good.slice(0, need); }
       } else { good = good.slice(0, need); }
       if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
-      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, via, cse: !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX), curatedPlans: planCount, curatedDropped: dropped, webKey: !!process.env.RENDER_API_KEY });
+      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, via, serper: !!process.env.SERPER_API_KEY, cse: !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX), curatedPlans: planCount, curatedDropped: dropped, webKey: !!process.env.RENDER_API_KEY });
     }
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
