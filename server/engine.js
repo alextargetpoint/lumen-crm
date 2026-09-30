@@ -17,7 +17,7 @@ function resolveChannel(db, lead) {
   const has = (ch) => {
     if (ch === 'wa') return (lead.channels?.wa || 'unknown') !== 'no';
     if (ch === 'email') return (lead.contacts || []).some(c => c.kind === 'email');
-    if (ch === 'tg') return (lead.channels?.tg === 'yes') || (lead.contacts || []).some(c => c.kind === 'telegram');
+    if (ch === 'tg') return lead.channels?.tg === 'yes' || (lead.channels?.tg !== 'no' && !!lead.phone) || (lead.contacts || []).some(c => c.kind === 'telegram');   /* холодный TG по номеру (прогретые аккаунты) — пробуем, пока не помечен 'no' */
     if (ch === 'viber') { const vb = cfg.viber || {}; return lead.channels?.viber === 'yes' || (vb.mode === 'bsp' && !!lead.phone && lead.channels?.viber !== 'no'); }   /* BSP шлёт по номеру → фолбэк-касание можно и без прежнего контакта */
     return false;
   };
@@ -53,6 +53,9 @@ const CHANNEL_TOUCH_CAP = { viber: 1, email: 1 };
    брокера (залипание за лидом), а не Cloud API/мок. Нет подключённого — поведение как раньше (мок). */
 let graySender = null;
 function setGraySender(fn) { graySender = fn; }
+/* Серый TELEGRAM-транспорт: холодное касание с прогретого TG-аккаунта (через tg-воркер). Внедряется из index.js. */
+let tgGraySender = null;
+function setTgGraySender(fn) { tgGraySender = fn; }
 
 function pickNumber(db, lead) {
   if (lead.numberId) {
@@ -110,11 +113,17 @@ function send(db, lead, text, via, opts = {}) {
             }
           }
         }
-        if (channel === 'tg' && cfg.tg.botToken && lead.channels?.tgChatId) {
-          await fetch(`https://api.telegram.org/bot${cfg.tg.botToken}/sendMessage`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: lead.channels.tgChatId, text }),
-          });
+        if (channel === 'tg') {
+          if (tgGraySender) {
+            /* холодное касание с прогретого TG-аккаунта (первое касание/цепочка) — как серый WA */
+            await tgGraySender(db, lead, m0);
+          } else if (cfg.tg.botToken && lead.channels?.tgChatId) {
+            /* фолбэк: бот-мост (лид уже привязан) */
+            await fetch(`https://api.telegram.org/bot${cfg.tg.botToken}/sendMessage`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: lead.channels.tgChatId, text }),
+            });
+          }
         }
         /* Viber — два официальных режима:
            • mode='bsp' (Infobip/др.): ХОЛОДНОЕ персональное касание по НОМЕРУ лида (Viber Business
@@ -1122,4 +1131,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, seqFilters, seqMatchesLead, seqSpecificity };
+module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity };

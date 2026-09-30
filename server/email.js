@@ -904,31 +904,54 @@ function renderMediaPage(rec) {
     <body><div class="c"><div class="a">${agency}</div>${broker ? `<div class="b">${isVoice ? 'Голосовое от' : 'Видео от'} ${broker}</div>` : ''}${player}</div></body></html>`;
 }
 
-/* ---------- Каскадное письмо лиду (омниканальный прожим): rich, персонализированное ---------- */
+/* ---------- Каскадное письмо ЛИДУ: ПОЛНОСТЬЮ в бренде агентства (0 упоминаний Lumen) ----------
+   Самостоятельный шаблон (НЕ emailWrap — там платформенный бренд Lumen). Оформление — по пресету агентства. */
+function cascadePalette(preset) {
+  const P = {
+    classic: { bg: '#f1ede4', card: '#ffffff', ink: '#1c1a17', sub: '#7a756c', accent: '#b0894f', line: '#e7e1d5', head: "Georgia,'Times New Roman',serif", body: "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" },
+    minimal: { bg: '#ffffff', card: '#ffffff', ink: '#111111', sub: '#8a8a8a', accent: '#111111', line: '#ededed', head: "-apple-system,'Segoe UI',Roboto,Arial,sans-serif", body: "-apple-system,'Segoe UI',Roboto,Arial,sans-serif" },
+    warm: { bg: '#f6efe8', card: '#fffdfb', ink: '#2a211c', sub: '#8a756a', accent: '#c2703d', line: '#ece0d6', head: "Georgia,serif", body: "-apple-system,'Segoe UI',Roboto,Arial,sans-serif" },
+    dark: { bg: '#17150f', card: '#201d16', ink: '#f3efe6', sub: '#a49c8b', accent: '#d8bd86', line: '#332e24', head: "Georgia,serif", body: "-apple-system,'Segoe UI',Roboto,Arial,sans-serif" },
+  };
+  return P[preset] || P.classic;
+}
 function renderCascadeEmail(opts) {
   const o = opts || {}; const lang = o.lang === 'en' ? 'en' : 'ru'; const en = lang === 'en';
-  const preset = EMAIL_PRESETS[o.preset] || EMAIL_PRESETS.classic;
-  const T = preset.theme === 'dark' ? D : C;
+  const t = cascadePalette(o.preset);
+  const agency = esc(o.agency || '');
   const first = String(o.name || '').split(' ')[0] || '';
   const greet = en ? `Hello${first ? ', ' + esc(first) : ''}!` : `Здравствуйте${first ? ', ' + esc(first) : ''}!`;
   const bodyText = esc(o.text || '').replace(/\n/g, '<br>');
-  let inner = `<p style="margin:0 0 14px 0;">${greet}</p><p style="margin:0 0 14px 0;">${bodyText}</p>`;
-  if (o.heroImg && preset.hero) inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0;"><tr><td style="border-radius:14px;overflow:hidden;"><img src="${esc(o.heroImg)}" width="100%" style="display:block;width:100%;max-width:100%;border-radius:14px;" alt=""></td></tr></table>` + inner;
-  if (o.mediaCard) inner += o.mediaCard;   /* карточка голосового/видео-кружка → хостовая страница */
-  if (o.ctaUrl) inner += emailButton(o.ctaUrl, o.ctaLabel || (en ? 'View options' : 'Посмотреть варианты'), { T });
-  const sigName = o.brokerName || o.agency || '';
-  const sigLine = [sigName, (o.agency && o.agency !== sigName) ? o.agency : ''].filter(Boolean).join(' · ');
-  if (sigLine) inner += `<p style="margin:20px 0 0 0;color:${T.ink3};font-size:15px;">${en ? 'Best regards,' : 'С уважением,'}<br>${esc(sigLine)}</p>`;
-  const opt = {
-    theme: preset.theme === 'dark' ? 'dark' : 'light',
-    plain: !!preset.plain,
-    eyebrow: o.agency ? esc(o.agency) : null,
-    preheader: String(o.text || '').replace(/<[^>]+>/g, '').slice(0, 90),
-    manageNote: o.unsubUrl ? `<a href="${esc(o.unsubUrl)}" style="color:${T.ink3};text-decoration:underline;">${en ? 'Unsubscribe' : 'Отписаться'}</a>` : null,
-  };
+  const header = o.agencyLogo
+    ? `<img src="${esc(o.agencyLogo)}" alt="${agency}" style="max-height:46px;max-width:230px;display:inline-block">`
+    : `<div style="font-family:${t.head};font-size:23px;font-weight:700;letter-spacing:.02em;color:${t.ink}">${agency || '&nbsp;'}</div>`;
+  let inner = '';
+  if (o.heroImg && o.preset !== 'minimal') inner += `<tr><td style="padding:0 0 18px"><img src="${esc(o.heroImg)}" width="100%" style="display:block;width:100%;max-width:100%;border-radius:12px" alt=""></td></tr>`;
+  inner += `<tr><td style="font-family:${t.body};font-size:16px;line-height:1.55;color:${t.ink}"><p style="margin:0 0 14px">${greet}</p><p style="margin:0 0 14px">${bodyText}</p></td></tr>`;
+  if (o.mediaCard) inner += `<tr><td style="padding:2px 0">${o.mediaCard}</td></tr>`;
+  if (o.ctaUrl) inner += `<tr><td style="padding:14px 0 4px"><a href="${esc(o.ctaUrl)}" style="display:inline-block;background:${t.accent};color:${o.preset === 'minimal' ? '#fff' : '#fff'};text-decoration:none;font-family:${t.body};font-weight:600;font-size:15px;padding:13px 28px;border-radius:10px">${esc(o.ctaLabel || (en ? 'View options' : 'Посмотреть варианты'))}</a></td></tr>`;
+  const brokerNm = esc(o.brokerName || '');
+  if (brokerNm || agency) inner += `<tr><td style="font-family:${t.body};font-size:15px;color:${t.sub};padding:20px 0 0">${en ? 'Best regards,' : 'С уважением,'}<br><span style="color:${t.ink}">${brokerNm || agency}</span>${agency && agency !== brokerNm ? `<br>${agency}` : ''}</td></tr>`;
+  const footBits = [];
+  if (o.agencyAddr) footBits.push(esc(o.agencyAddr));
+  if (o.agencySite) footBits.push(`<a href="${esc(o.agencySite)}" style="color:${t.sub}">${esc(String(o.agencySite).replace(/^https?:\/\//, ''))}</a>`);
+  const unsub = o.unsubUrl ? `<a href="${esc(o.unsubUrl)}" style="color:${t.sub};text-decoration:underline">${en ? 'Unsubscribe' : 'Отписаться'}</a>` : '';
+  const footer = [agency, footBits.join(' · '), unsub].filter(Boolean).join(' · ');
+  const preheader = String(o.text || '').replace(/<[^>]+>/g, '').slice(0, 90);
   const subject = o.subject || (en ? 'About your request' : 'По вашей заявке');
-  const title = o.title || (en ? `A note from ${o.agency || 'us'}` : `Сообщение от ${o.agency || 'команды'}`);
-  return { subject, html: emailWrap(title, inner, lang, opt) };
+  const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:${t.bg}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${t.bg}"><tr><td align="center" style="padding:28px 14px">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+    <tr><td align="center" style="padding:4px 0 18px">${header}</td></tr>
+    <tr><td style="background:${t.card};border:1px solid ${t.line};border-radius:16px;padding:28px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${inner}</table>
+    </td></tr>
+    <tr><td align="center" style="font-family:${t.body};font-size:12px;color:${t.sub};padding:16px 10px 6px;line-height:1.55">${footer || '&nbsp;'}</td></tr>
+  </table>
+</td></tr></table></body></html>`;
+  return { subject, html };
 }
 
 /* ---------- Resend Domains API (SaaS: агентство подключает свой домен) ---------- */

@@ -879,7 +879,9 @@ engine.onEmailSend = async (db, lead, msg) => {
   const platCfg = mailer.platformEmailCfg(reg);
   const key = platCfg.key || ((db.settings.channels && db.settings.channels.email && db.settings.channels.email.key) || '');
   if (!key) return { ok: false, error: 'нет Resend-ключа' };
-  const from = agencyEmailFrom(db) || platCfg.from;
+  const _ag = db.settings.agency || {};
+  /* отправитель = ИМЯ АГЕНТСТВА (не Lumen): верифиц. домен → agency@домен; иначе — имя агентства на общем адресе */
+  const from = agencyEmailFrom(db) || (`${(_ag.name || 'CRM').replace(/[<>@"]/g, '')} <onboarding@resend.dev>`);
   const broker = (db.brokers || []).find(b => b.id === lead.broker);
   /* визуал: hero-картинка из креатива рекламы лида ИЛИ фото первого объекта (только image; абсолютный URL) */
   let heroImg = '';
@@ -904,8 +906,11 @@ engine.onEmailSend = async (db, lead, msg) => {
   }
   const rich = mailer.renderCascadeEmail({
     name: lead.name, lang: lead.lang, text: msg.text, subject: msg.subject, preset, mediaCard,
-    agency: (db.settings.agency && db.settings.agency.name) || '',
-    brokerName: broker ? broker.name : ((db.settings.agency && db.settings.agency.manager && db.settings.agency.manager.name) || ''),
+    agency: _ag.name || '',
+    agencyLogo: _ag.logo || _ag.logoUrl || '',
+    agencyAddr: _ag.address || _ag.addr || '',
+    agencySite: _ag.site || _ag.website || '',
+    brokerName: broker ? broker.name : ((_ag.manager && _ag.manager.name) || ''),
     heroImg,
   });
   return mailer.sendViaResend({ key, from }, msg.to, rich.subject, rich.html);
@@ -3031,6 +3036,37 @@ engine.setGraySender(async (db, lead, m) => {
     else if (num._capWarnedDay !== today) { num._capWarnedDay = null; }
   }
   m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'delivered';
+  store.save();
+});
+
+/* Серый TELEGRAM: холодное касание с прогретого TG-аккаунта (первое касание/цепочка), когда каскад дошёл до TG.
+   Воркер /sessions/:sid/send {to,message} импортит контакт по номеру и шлёт. Лида нет в TG → tg='no', каскад дальше. */
+engine.setTgGraySender(async (db, lead, m) => {
+  const g = db.settings.tgGray || {};
+  if (!tgWorkerReady(db) || !(g.numbers || []).length || !lead.phone) { m.status = 'delivered'; store.save(); return; }   /* воркер/аккаунты не готовы — мок, поток не рвём */
+  let live = {}; try { live = (await tgGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) { m.status = 'delivered'; store.save(); return; }
+  const connected = (g.numbers || []).filter(n => { const s = live[tgGraySid(n.phone)]; return s && s.status === 'connected'; });
+  if (!connected.length) { m.status = 'delivered'; store.save(); return; }
+  const cap = grayNewLeadCap(db); const today = new Date().toISOString().slice(0, 10);
+  const newToday = n => n._tgNewDay === today ? (n._tgNewToday || 0) : 0;
+  let num;
+  if (lead.tgGrayPhone) num = connected.find(n => n.phone === lead.tgGrayPhone);                                          /* залипание за лидом */
+  if (!num && lead.broker) { const b = connected.filter(n => n.persona && n.persona.brokerId === lead.broker); if (b.length) num = b.sort((a, x) => newToday(a) - newToday(x))[0]; }   /* аккаунты брокера */
+  if (!num) { const under = connected.filter(n => newToday(n) < cap); num = (under.length ? under : connected).sort((a, x) => newToday(a) - newToday(x))[0]; }   /* распределение по кругу */
+  const wasNew = !lead.tgGrayPhone; const digits = String(lead.phone).replace(/\D/g, '');
+  try {
+    await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(num.phone) + '/send', { to: digits, message: m.text || '' });
+  } catch (e) {
+    lead.channels = lead.channels || {}; lead.channels.tg = 'no'; store.save();                                          /* лида нет в Telegram → канал недоступен, каскад дальше (Viber/email) */
+    throw new Error('TG-аккаунт: ' + e.message);
+  }
+  lead.tgGrayPhone = num.phone; lead.channels = lead.channels || {}; lead.channels.tg = 'yes'; lead.activeChannel = 'tg';
+  if (wasNew) {
+    if (num._tgNewDay !== today) { num._tgNewDay = today; num._tgNewToday = 0; }
+    num._tgNewToday = (num._tgNewToday || 0) + 1;
+    if (num._tgNewToday > cap && num._tgCapWarn !== today) { num._tgCapWarn = today; ai.pushEvent(db, { type: 'note', text: `⚠️ TG: с аккаунта ${num.phone} сегодня ${num._tgNewToday} первых касаний новым лидам (реком. ≤${cap}) — риск бана, распределите на другие аккаунты.` }); }
+  }
+  m.grayFrom = num.phone; m.status = 'delivered';
   store.save();
 });
 
@@ -7853,8 +7889,9 @@ const server = http.createServer(async (req, res) => {
       if (!to) return json(res, 400, { error: 'нет адреса' });
       const reg = store.getRegistry(); const platCfg = mailer.platformEmailCfg(reg);
       const key = platCfg.key; if (!key) return json(res, 400, { error: 'нет Resend-ключа' });
-      const from = agencyEmailFrom(db) || platCfg.from;
-      const rich = mailer.renderCascadeEmail({ name: '', lang: 'ru', subject: 'Тест — ' + ((db.settings.agency && db.settings.agency.name) || 'Lumen'), text: 'Это тестовое письмо из CRM. Если оно во «Входящих» — домен и доставляемость настроены верно ✅', agency: (db.settings.agency && db.settings.agency.name) || '' });
+      const _ag = db.settings.agency || {}; const _pr = (db.settings.channels && db.settings.channels.email && db.settings.channels.email.preset) || 'classic';
+      const from = agencyEmailFrom(db) || (`${(_ag.name || 'CRM').replace(/[<>@"]/g, '')} <onboarding@resend.dev>`);
+      const rich = mailer.renderCascadeEmail({ name: '', lang: 'ru', preset: _pr, subject: 'Тест — ' + (_ag.name || 'агентство'), text: 'Это тестовое письмо из CRM. Если оно во «Входящих» — домен и доставляемость настроены верно ✅', agency: _ag.name || '', agencyLogo: _ag.logo || _ag.logoUrl || '', agencyAddr: _ag.address || _ag.addr || '', agencySite: _ag.site || _ag.website || '' });
       const r = await mailer.sendViaResend({ key, from }, to, rich.subject, rich.html);
       return json(res, r.ok ? 200 : 400, Object.assign({ from }, r));
     }
@@ -7863,11 +7900,13 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const preset = u.searchParams.get('preset') || ((db.settings.channels && db.settings.channels.email && db.settings.channels.email.preset) || 'classic');
       const propImg = (((db.properties || []).find(pr => (pr.images || [])[0]) || {}).images || [])[0] || '';
+      const _ag = db.settings.agency || {};
       const rich = mailer.renderCascadeEmail({
         name: 'Иван', lang: 'ru', preset, subject: 'Пример письма',
         text: 'Появились новые проекты у моря и готовые виллы под ваш запрос. Подобрал несколько вариантов — посмотрите, и подскажу детали по любому.',
-        agency: (db.settings.agency && db.settings.agency.name) || 'Ваше агентство',
-        brokerName: (db.brokers && db.brokers[0] && db.brokers[0].name) || ((db.settings.agency && db.settings.agency.manager && db.settings.agency.manager.name) || 'Менеджер'),
+        agency: _ag.name || 'Ваше агентство',
+        agencyLogo: _ag.logo || _ag.logoUrl || '', agencyAddr: _ag.address || _ag.addr || '', agencySite: _ag.site || _ag.website || '',
+        brokerName: (db.brokers && db.brokers[0] && db.brokers[0].name) || ((_ag.manager && _ag.manager.name) || 'Менеджер'),
         heroImg: propImg ? (/^https?:\/\//i.test(propImg) ? propImg : callBase(db) + propImg) : '',
         mediaCard: mailer.emailMediaCard({ type: 'voice', url: '#', en: false }, preset === 'dark' ? mailer.D : mailer.C),
       });
