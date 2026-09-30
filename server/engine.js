@@ -93,15 +93,21 @@ function send(db, lead, text, via, opts = {}) {
     const cfg = db.settings.channels;
     (async () => {
       try {
-        if (channel === 'email' && cfg.email.key && cfg.email.from) {
+        if (channel === 'email') {
           const to = (lead.contacts || []).find(c => c.kind === 'email')?.value;
           if (to) {
-            const r = await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: { Authorization: 'Bearer ' + cfg.email.key, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ from: cfg.email.from, to, subject: opts.subject || 'По вашей заявке', text }),
-            });
-            if (!r.ok) throw new Error('resend ' + r.status);
+            /* rich-письмо через email.js + домен агентства (хук в index.js). Фолбэк — прежний plain-Resend. */
+            if (module.exports.onEmailSend) {
+              const r = await module.exports.onEmailSend(db, lead, { to, subject: opts.subject || 'По вашей заявке', text });
+              if (!r || !r.ok) throw new Error((r && r.error) || 'email send failed');
+            } else if (cfg.email.key && cfg.email.from) {
+              const r = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + cfg.email.key, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ from: cfg.email.from, to, subject: opts.subject || 'По вашей заявке', text }),
+              });
+              if (!r.ok) throw new Error('resend ' + r.status);
+            }
           }
         }
         if (channel === 'tg' && cfg.tg.botToken && lead.channels?.tgChatId) {

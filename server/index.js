@@ -866,6 +866,28 @@ engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
 /* ассистент ответил клиенту → уведомление брокеру в Telegram (видит, что ИИ ведёт диалог, может перехватить reply) */
 engine.onAiReply = (db, lead, m) => { try { tgbridge.forwardAiReply(db, lead, m).catch(() => {}); } catch (_) {} };
+/* from-адрес для email: домен агентства (если верифицирован) → «Агентство <noreply@домен>»; иначе null (платформенный дефолт) */
+function agencyEmailFrom(db) {
+  const e = (db.settings.channels && db.settings.channels.email) || {};
+  const agency = (db.settings.agency && db.settings.agency.name) || 'Lumen';
+  if (e.domain && e.verified) { const local = (e.senderLocal || 'noreply').replace(/[^a-z0-9._-]/gi, '') || 'noreply'; return `${agency} <${local}@${e.domain}>`; }
+  return null;
+}
+/* каскадное письмо лиду → rich-рендер (email.js) + отправка с домена агентства (платформенный Resend-ключ) */
+engine.onEmailSend = async (db, lead, msg) => {
+  const reg = store.getRegistry();
+  const platCfg = mailer.platformEmailCfg(reg);
+  const key = platCfg.key || ((db.settings.channels && db.settings.channels.email && db.settings.channels.email.key) || '');
+  if (!key) return { ok: false, error: 'нет Resend-ключа' };
+  const from = agencyEmailFrom(db) || platCfg.from;
+  const broker = (db.brokers || []).find(b => b.id === lead.broker);
+  const rich = mailer.renderCascadeEmail({
+    name: lead.name, lang: lead.lang, text: msg.text, subject: msg.subject,
+    agency: (db.settings.agency && db.settings.agency.name) || '',
+    brokerName: broker ? broker.name : ((db.settings.agency && db.settings.agency.manager && db.settings.agency.manager.name) || ''),
+  });
+  return mailer.sendViaResend({ key, from }, msg.to, rich.subject, rich.html);
+};
 engine.onInboundMessage = (db, lead, m) => {
   /* антислив: клиент упомянул увод на личный канал → флаг + тревога руководителю */
   try {
@@ -7728,6 +7750,67 @@ const server = http.createServer(async (req, res) => {
         store.save();
         return json(res, 200, { ok: true, synced, imported });
       } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+
+    /* ── SaaS: подключение своего домена для email (Resend Domains) — self-service в CRM ────── */
+    if (p === '/api/email/domain' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const e = (db.settings.channels && db.settings.channels.email) || {};
+      let live = null;
+      if (e.domainId) {
+        const key = mailer.platformEmailCfg(store.getRegistry()).key;
+        try { live = await mailer.getDomain(key, e.domainId); if (live) { e.verified = live.status === 'verified'; if (live.records) e.records = live.records; store.save(); } }
+        catch (err) { live = { error: err.message }; }
+      }
+      return json(res, 200, { domain: e.domain || '', domainId: e.domainId || '', verified: !!e.verified, senderLocal: e.senderLocal || 'noreply', records: e.records || [], status: live && live.status, keyReady: !!mailer.platformEmailCfg(store.getRegistry()).key });
+    }
+    if (p === '/api/email/domain' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const domain = String(b.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return json(res, 400, { error: 'некорректный домен (пример: mail.agency.com)' });
+      const key = mailer.platformEmailCfg(store.getRegistry()).key;
+      if (!key) return json(res, 400, { error: 'платформенный Resend-ключ не настроен (RESEND_API_KEY в Railway)' });
+      try {
+        const d = await mailer.createDomain(key, domain);
+        db.settings.channels = db.settings.channels || {}; db.settings.channels.email = db.settings.channels.email || { provider: 'resend' };
+        Object.assign(db.settings.channels.email, { provider: 'resend', domain, domainId: d.id, records: d.records || [], verified: false, senderLocal: (b.senderLocal || 'noreply').replace(/[^a-z0-9._-]/gi, '') || 'noreply' });
+        store.save();
+        return json(res, 200, { ok: true, domain, domainId: d.id, records: d.records || [] });
+      } catch (err) { return json(res, 400, { error: err.message }); }
+    }
+    if (p === '/api/email/domain/verify' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const e = (db.settings.channels && db.settings.channels.email) || {};
+      if (!e.domainId) return json(res, 400, { error: 'домен не добавлен' });
+      const key = mailer.platformEmailCfg(store.getRegistry()).key;
+      try {
+        await mailer.verifyDomain(key, e.domainId);
+        const live = await mailer.getDomain(key, e.domainId);
+        e.verified = live.status === 'verified'; if (live.records) e.records = live.records; store.save();
+        return json(res, 200, { ok: true, status: live.status, verified: e.verified, records: e.records || [] });
+      } catch (err) { return json(res, 400, { error: err.message }); }
+    }
+    if (p === '/api/email/domain' && req.method === 'DELETE') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const e = (db.settings.channels && db.settings.channels.email) || {};
+      const key = mailer.platformEmailCfg(store.getRegistry()).key;
+      if (e.domainId && key) { try { await mailer.deleteDomain(key, e.domainId); } catch (_) {} }
+      if (db.settings.channels && db.settings.channels.email) { delete db.settings.channels.email.domain; delete db.settings.channels.email.domainId; delete db.settings.channels.email.records; db.settings.channels.email.verified = false; store.save(); }
+      return json(res, 200, { ok: true });
+    }
+    /* тест-письмо себе (проверка домена/доставляемости) */
+    if (p === '/api/email/test' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const to = String(b.to || (db.settings.auth && db.settings.auth.email) || '').trim();
+      if (!to) return json(res, 400, { error: 'нет адреса' });
+      const reg = store.getRegistry(); const platCfg = mailer.platformEmailCfg(reg);
+      const key = platCfg.key; if (!key) return json(res, 400, { error: 'нет Resend-ключа' });
+      const from = agencyEmailFrom(db) || platCfg.from;
+      const rich = mailer.renderCascadeEmail({ name: '', lang: 'ru', subject: 'Тест — ' + ((db.settings.agency && db.settings.agency.name) || 'Lumen'), text: 'Это тестовое письмо из CRM. Если оно во «Входящих» — домен и доставляемость настроены верно ✅', agency: (db.settings.agency && db.settings.agency.name) || '' });
+      const r = await mailer.sendViaResend({ key, from }, to, rich.subject, rich.html);
+      return json(res, r.ok ? 200 : 400, Object.assign({ from }, r));
     }
 
     /* ── Подписки на письма: какие типы уведомлений получать на e-mail ──────

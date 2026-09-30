@@ -857,8 +857,45 @@ async function sendViaResend(cfg, to, subject, html, attachments) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+/* ---------- Каскадное письмо лиду (омниканальный прожим): rich, персонализированное ---------- */
+function renderCascadeEmail(opts) {
+  const o = opts || {}; const lang = o.lang === 'en' ? 'en' : 'ru'; const en = lang === 'en'; const T = C;
+  const first = String(o.name || '').split(' ')[0] || '';
+  const greet = en ? `Hello${first ? ', ' + esc(first) : ''}!` : `Здравствуйте${first ? ', ' + esc(first) : ''}!`;
+  const bodyText = esc(o.text || '').replace(/\n/g, '<br>');
+  let inner = `<p style="margin:0 0 14px 0;">${greet}</p><p style="margin:0 0 14px 0;">${bodyText}</p>`;
+  if (o.heroImg) inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0;"><tr><td style="border-radius:14px;overflow:hidden;"><img src="${esc(o.heroImg)}" width="100%" style="display:block;width:100%;max-width:100%;border-radius:14px;" alt=""></td></tr></table>` + inner;
+  if (o.ctaUrl) inner += emailButton(o.ctaUrl, o.ctaLabel || (en ? 'View options' : 'Посмотреть варианты'), { T });
+  const sigName = o.brokerName || o.agency || '';
+  const sigLine = [sigName, (o.agency && o.agency !== sigName) ? o.agency : ''].filter(Boolean).join(' · ');
+  if (sigLine) inner += `<p style="margin:20px 0 0 0;color:${T.ink3};font-size:15px;">${en ? 'Best regards,' : 'С уважением,'}<br>${esc(sigLine)}</p>`;
+  const opt = {
+    theme: 'light',
+    eyebrow: o.agency ? esc(o.agency) : null,
+    preheader: String(o.text || '').replace(/<[^>]+>/g, '').slice(0, 90),
+    manageNote: o.unsubUrl ? `<a href="${esc(o.unsubUrl)}" style="color:${T.ink3};text-decoration:underline;">${en ? 'Unsubscribe' : 'Отписаться'}</a>` : null,
+  };
+  const subject = o.subject || (en ? 'About your request' : 'По вашей заявке');
+  const title = o.title || (en ? `A note from ${o.agency || 'us'}` : `Сообщение от ${o.agency || 'команды'}`);
+  return { subject, html: emailWrap(title, inner, lang, opt) };
+}
+
+/* ---------- Resend Domains API (SaaS: агентство подключает свой домен) ---------- */
+async function resendApi(key, method, path, body) {
+  if (!key) throw new Error('нет платформенного Resend-ключа (RESEND_API_KEY в окружении)');
+  const r = await fetch('https://api.resend.com' + path, { method, headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j && (j.message || j.error || j.name)) || ('resend ' + r.status));
+  return j;
+}
+function createDomain(key, name, region) { return resendApi(key, 'POST', '/domains', { name, region: region || 'eu-west-1' }); }
+function getDomain(key, id) { return resendApi(key, 'GET', '/domains/' + id); }
+function verifyDomain(key, id) { return resendApi(key, 'POST', '/domains/' + id + '/verify'); }
+function deleteDomain(key, id) { return resendApi(key, 'DELETE', '/domains/' + id); }
+
 module.exports = {
   emailWrap, emailButton, emailPanel, emailBullets, emailFeatureList, emailCode, emailDetails, emailInvoice, emailReceipt, emailAvatar, emailInfoGrid, emailFootnote, emailStatGrid, emailLeadCard, svgIcon, iconChip,
   DEFAULT_TEMPLATES, EMAIL_CATEGORIES, getTemplates, emailMeta, emailCatalog, defaultNotifyPrefs, canReceive,
   renderTemplate, interpolate, platformEmailCfg, sendViaResend, ART, C, D, pal,
+  renderCascadeEmail, createDomain, getDomain, verifyDomain, deleteDomain,
 };
