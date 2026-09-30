@@ -7693,10 +7693,26 @@ const server = http.createServer(async (req, res) => {
       try {
         const list = await wa.listTemplates(db);
         const byName = {}; list.forEach(t => { byName[t.name + '|' + t.language] = t; if (!byName[t.name]) byName[t.name] = t; });
+        const mapStatus = st => { st = (st || '').toUpperCase(); return st === 'APPROVED' ? 'approved' : st === 'REJECTED' ? 'rejected' : 'pending'; };
         let synced = 0;
-        for (const tpl of db.templates) { if (!tpl.metaName) continue; const mt = byName[tpl.metaName + '|' + (tpl.metaLang || '')] || byName[tpl.metaName]; if (mt) { const st = (mt.status || '').toUpperCase(); tpl.status = st === 'APPROVED' ? 'approved' : st === 'REJECTED' ? 'rejected' : 'pending'; synced++; } }
+        const known = new Set();
+        for (const tpl of db.templates) { if (!tpl.metaName) continue; known.add(tpl.metaName + '|' + (tpl.metaLang || '')); known.add(tpl.metaName); const mt = byName[tpl.metaName + '|' + (tpl.metaLang || '')] || byName[tpl.metaName]; if (mt) { tpl.status = mapStatus(mt.status); synced++; } }
+        /* импорт: шаблоны, созданные в Meta напрямую (не через CRM) — заводим локальные записи, чтобы были доступны рассылкам */
+        let imported = 0;
+        for (const mt of list) {
+          if (known.has(mt.name + '|' + mt.language) || known.has(mt.name)) continue;
+          const bodyComp = (mt.components || []).find(c => (c.type || '').toUpperCase() === 'BODY');
+          const bodyText = bodyComp ? (bodyComp.text || '') : '';
+          if (!bodyText) continue;                       /* без тела импортировать нечего */
+          if (/\{\{\d+\}\}/.test(bodyText)) continue;    /* шаблоны с {{1}}-переменными несовместимы со статичной рассылкой — пропускаем */
+          const lang = /^ru/i.test(mt.language || '') ? 'ru' : 'en';
+          const cat = (mt.category || '').toUpperCase() === 'MARKETING' ? 'marketing' : 'utility';
+          const niceName = mt.name.replace(/_[a-z0-9]{6,}$/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          db.templates.push({ id: store.nextId('tpl'), name: niceName || mt.name, category: cat, lang, status: mapStatus(mt.status), body: bodyText, metaName: mt.name, metaLang: mt.language || (lang === 'ru' ? 'ru' : 'en_US'), noParams: true, metaId: mt.id || null });
+          known.add(mt.name + '|' + mt.language); known.add(mt.name); imported++;
+        }
         store.save();
-        return json(res, 200, { ok: true, synced });
+        return json(res, 200, { ok: true, synced, imported });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
 

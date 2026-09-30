@@ -14531,7 +14531,7 @@ PAGES.templates = async (root) => {
   });
   $('#newTpl').addEventListener('click', () => openTplModal(null));
   $('#tplLib', root)?.addEventListener('click', () => openTplLibrary(() => render()));
-  $('#syncTpl', root)?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/templates/sync-meta', {}); toast(r.ok ? 'Статусы обновлены' : 'Не вышло', r.ok ? ('синхронизировано: ' + r.synced) : (r.error || ''), r.ok); render(); } catch (er) { toast('Ошибка', er.message); b.disabled = false; } });
+  $('#syncTpl', root)?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/templates/sync-meta', {}); toast(r.ok ? 'Статусы обновлены' : 'Не вышло', r.ok ? ('обновлено: ' + r.synced + (r.imported ? ' · импортировано из Meta: ' + r.imported : '')) : (r.error || ''), r.ok); render(); } catch (er) { toast('Ошибка', er.message); b.disabled = false; } });
   $$('[data-tplmeta]', root).forEach(b => b.addEventListener('click', async () => {
     b.disabled = true; const o = b.innerHTML; b.textContent = 'Отправляю…';
     try { const r = await api.post('/templates/' + b.dataset.tplmeta + '/submit-meta', {}); if (r.ok) { toast('Отправлено в Meta', 'на модерации: ' + r.metaName, true); render(); } else { toast('Не вышло', r.error || ''); b.disabled = false; b.innerHTML = o; } }
