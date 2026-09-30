@@ -13668,7 +13668,7 @@ PAGES.numbers = async (root) => {
   const otpNums = otpData.list || [];
   let telData = { list: [] }; try { telData = await api.get('/telephony/numbers'); } catch (e) {}
   const telNums = (telData.list || []).filter(n => n && n.number);
-  const NUMTAB = window.__numTab || 'gray';
+  const NUMTAB = window.__numTab || (() => { try { return localStorage.getItem('lumen_numtab'); } catch (_) { return null; } })() || 'gray';   /* сохраняем под-вкладку при перезагрузке (была сброс на gray) */
   const brokerName = id => (STATE.brokers.find(b => b.id === id) || {}).name || '';
   const grayStatusBadge = (live) => { const s = live && live.status; return s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; };
   const warmLiveHtml = (w) => {
@@ -13846,9 +13846,7 @@ PAGES.numbers = async (root) => {
 
     <div class="glass card mb" id="metaCard">
       <div class="card-title" data-fold="1">${ic(I.chat)}Instagram и Facebook — Директ и комментарии<span class="sub">входящие DM + комментарии под рекламой → карточки лидов</span><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
-      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Тот же вебхук, что у WhatsApp. В <b>Meta → приложение → Webhooks</b> вставьте Callback URL и Verify token ниже и подпишите поля: <b>messages</b> (Директ Instagram), <b>comments</b> (комментарии Instagram), <b>feed</b> (комментарии Facebook-страницы). Пошагово — <a href="/help/meta-inbound" target="_blank" rel="noopener" style="color:var(--accent)">в справочнике →</a></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="muted" style="font-size:11px;width:92px">Callback URL</span><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${(STATE.settings.tunnelUrl || location.origin)}/wa/webhook</code><button class="btn btn-sm tc-copy" data-copy="${(STATE.settings.tunnelUrl || location.origin)}/wa/webhook">${ic(I.copy || I.doc)}</button></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><span class="muted" style="font-size:11px;width:92px">Verify token</span><code class="pill" style="flex:1;padding:8px 10px">${esc((STATE.settings.wa && STATE.settings.wa.webhookVerifyToken) || 'lumen-verify')}</code><button class="btn btn-sm tc-copy" data-copy="${esc((STATE.settings.wa && STATE.settings.wa.webhookVerifyToken) || 'lumen-verify')}">${ic(I.copy || I.doc)}</button></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px"><b>Вебхук тот же, что выше</b> (карточка «Вебхук официального WhatsApp» — Callback URL и Verify token оттуда). Здесь дополнительно подпишите в <b>Meta → приложение → Webhooks</b> поля: <b>messages</b> (Директ Instagram), <b>comments</b> (комментарии Instagram), <b>feed</b> (комментарии Facebook-страницы), и введите токены IG/FB ниже. Пошагово — <a href="/help/meta-inbound" target="_blank" rel="noopener" style="color:var(--accent)">в справочнике →</a></div>
       <div class="lp-sec" style="margin:4px 0 8px">Instagram — Директ и комментарии</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-row"><label>Instagram access token</label><input id="igTok" type="password" placeholder="${((STATE.settings.social || {}).ig || {}).tokenSet ? '•••••• сохранён' : 'токен (instagram_manage_messages/comments)'}"></div>
@@ -13972,6 +13970,7 @@ PAGES.numbers = async (root) => {
   /* вкладки страницы «Номера» */
   $$('#numTabs .seg-btn', root).forEach(b => b.addEventListener('click', () => {
     window.__numTab = b.dataset.numtab;
+    try { localStorage.setItem('lumen_numtab', b.dataset.numtab); } catch (_) {}   /* помним под-вкладку между перезагрузками */
     $$('#numTabs .seg-btn', root).forEach(x => x.classList.toggle('on', x === b));
     $$('[data-numpane]', root).forEach(pane => { pane.style.display = pane.dataset.numpane === b.dataset.numtab ? '' : 'none'; });
   }));
