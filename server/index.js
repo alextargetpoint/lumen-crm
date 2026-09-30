@@ -15281,6 +15281,7 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 .card .ph{height:150px;background:#e9e2d3 center/cover;position:relative}.card .ph::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.35))}
 .card .nm{position:absolute;left:12px;right:12px;bottom:9px;z-index:2;color:#fff;font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;line-height:1.1;text-shadow:0 1px 6px rgba(0,0,0,.5)}
 .card .pr{padding:11px 14px;font-size:17px;font-weight:800;color:var(--gold)}
+.card{transition:transform .15s,box-shadow .15s}.card:hover{transform:translateY(-3px);box-shadow:0 22px 54px -18px rgba(40,32,15,.42)}.card .pr .more{float:right;font-size:11.5px;font-weight:700;color:var(--mut)}
 .grid{display:grid;grid-template-columns:140px repeat(${it.length},1fr);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 14px 44px -16px rgba(40,32,15,.24)}
 .grid>div{padding:12px 14px;border-bottom:1px solid var(--line);font-size:13.5px}.grid>div:nth-last-child(-n+${it.length + 1}){border-bottom:0}
 .lbl{font-size:11.5px;color:var(--mut);font-weight:700}.val{font-weight:600}.win{background:color-mix(in srgb,#6d8a4f 13%,transparent);color:#3f6b2f;font-weight:800}.win .st{color:#cda34a;margin-left:5px}
