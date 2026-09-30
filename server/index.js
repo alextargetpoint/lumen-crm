@@ -6128,6 +6128,27 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/farm/agent-email' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); return json(res, 200, farmMail.allocate(b.numberId)); }
       if (p === '/api/admin/farm/agent-email-code' && req.method === 'GET') { return json(res, 200, farmMail.readCode(u.searchParams.get('address') || '')); }
       if (p === '/api/admin/farm/email-status' && req.method === 'GET') { return json(res, 200, { ok: true, ready: farmMail.ready(), domain: farmMail.domain() }); }
+      /* ПЛАТФОРМЕННЫЙ Resend-ключ (SaaS-почта): оператор задаёт ОДИН раз из панели — под ним все агентства
+         подключают свои домены. Агентства свой Resend НЕ заводят. Ключ хранится в реестре платформы. */
+      if (p === '/api/admin/platform-email' && req.method === 'GET') {
+        const reg = store.getRegistry(); const cfg = mailer.platformEmailCfg(reg);
+        return json(res, 200, { ok: true, keySet: !!cfg.key, from: cfg.from, source: (reg.email && reg.email.key) ? 'panel' : (process.env.RESEND_API_KEY ? 'env' : 'none') });
+      }
+      if (p === '/api/admin/platform-email' && req.method === 'POST') {
+        const b = await readBody(req);
+        const reg = store.getRegistry(); reg.email = reg.email || {};
+        if (b.clear) { reg.email.key = ''; store.saveRegistry(); return json(res, 200, { ok: true, cleared: true }); }
+        const key = String(b.key || '').trim();
+        if (key) {
+          if (!/^re_[A-Za-z0-9_-]{10,}$/.test(key)) return json(res, 400, { error: 'похоже на неверный Resend-ключ (формат re_…)' });
+          try { const vr = await fetch('https://api.resend.com/domains', { headers: { Authorization: 'Bearer ' + key } }); if (vr.status === 401 || vr.status === 403) return json(res, 400, { error: 'Resend отклонил ключ (401/403) — проверьте, что скопирован верно и с правами Domains+Sending' }); }
+          catch (e) { return json(res, 400, { error: 'Resend недоступен: ' + e.message }); }
+          reg.email.key = key;
+        }
+        if (b.from != null) reg.email.from = String(b.from).slice(0, 120);
+        store.saveRegistry();
+        return json(res, 200, { ok: true, keySet: !!reg.email.key, from: reg.email.from || '' });
+      }
 
       /* Р3 — прогрев */
       if (p === '/api/admin/farm/warmup-enroll' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmWarm.enroll(b.id); adminLog('farm.warm.enroll', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
