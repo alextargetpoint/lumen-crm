@@ -1482,6 +1482,9 @@ function publicSettings(db) {
   /* SEC: hooks.secret — мастер-ключ вебхуков/интеграций; НИКОГДА не отдаём в общий /api/state.
      Владельцу он до-инжектится отдельно (owner-ветка в /api/state), брокеры его не видят. */
   if (s.hooks) { s.hooksSecretSet = !!s.hooks.secret; delete s.hooks.secret; }
+  /* SEC: ownerTgCode = код привязки к боту как ВЛАДЕЛЕЦ (/start <code> → owner-права: аналитика/пульт). Брокер не должен его видеть
+     (иначе эскалация broker→owner через Telegram). Стрипаем; владельцу до-инжектим в owner-ветке /api/state. */
+  s.ownerTgCodeSet = !!s.ownerTgCode; delete s.ownerTgCode;
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
@@ -5294,12 +5297,18 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- Telegram-мост: статус / настройка (владелец) ---------------- */
     if (p === '/api/tgbridge' && req.method === 'GET') {
-      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const _R = sessionRole(req); if (!_R) return json(res, 401, { error: 'auth' });
       const tb = db.settings.tgBridge || {};
       /* гарантируем коды привязки (старые тенанты/брокеры могли их не иметь) */
       { let _chg = false; if (!db.settings.ownerTgCode) { db.settings.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex'); _chg = true; } for (const _b of (db.brokers || [])) if (!_b.tgBindCode) { _b.tgBindCode = crypto.randomBytes(3).toString('hex'); _chg = true; } if (_chg) store.save(); }
       const base = global.LUMEN_BASE || tunnelUrl() || ('http://localhost:' + (process.env.PORT || 5077));
       let _cbot = null; if (tgbridge.central()) { try { const _rg = store.getRegistry(); _cbot = (_rg.platformBridge && _rg.platformBridge.username) || null; } catch (_) {} }
+      /* SEC: БРОКЕРУ отдаём ТОЛЬКО его собственный код привязки. Иначе утечка: ownerTgCode (→ /start = owner-права)
+         и коды tgBindCode ЧУЖИХ брокеров (→ угон чужого канала). Полный вид — только владельцу. */
+      if (_R.role === 'broker') {
+        const me2 = (db.brokers || []).find(b => b.id === _R.brokerId) || {};
+        return json(res, 200, { central: tgbridge.central(), centralBot: _cbot, ready: tgbridge.ready(db), me: { name: me2.name || null, code: me2.tgBindCode || null, bound: !!me2.tgChatId } });
+      }
       return json(res, 200, {
         ownerTgCode: db.settings.ownerTgCode,
         enabled: !!tb.enabled,
@@ -6624,6 +6633,7 @@ const server = http.createServer(async (req, res) => {
       const pubS = publicSettings(db);
       if (!IS_BROKER) pubS.isPrimary = true; /* платформенную настройку (бот/воркер) даём любому владельцу — пока один оператор */
       if (!IS_BROKER && db.settings.hooks) pubS.hooks = Object.assign({}, pubS.hooks, { secret: db.settings.hooks.secret }); /* только владельцу — реальный секрет для ссылок вебхуков */
+      if (!IS_BROKER) pubS.ownerTgCode = db.settings.ownerTgCode; /* только владельцу — код owner-привязки к боту (эскалация broker→owner) */
       json(res, 200, {
         settings: pubS, brokers: db.brokers.map(brokerPub), numbers: IS_BROKER ? [] : db.numbers,
         templates: db.templates,
