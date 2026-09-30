@@ -144,14 +144,20 @@ function send(db, lead, text, via, opts = {}) {
     return m0;
   }
   const num = pickNumber(db, lead);
-  if (!num) {
+  /* нет записи в db.numbers — это НЕ повод молчать, если доступен серый транспорт (Baileys-воркер):
+     серые номера живут в settings.waGray.numbers и выбираются внутри graySender (pickGrayNumber),
+     а не в db.numbers. Раньше пустой db.numbers у тенанта отсекал ВСЕ ручные касания/цепочки до серого
+     транспорта. Жёстко пропускаем только когда нет ни номера в пуле, ни серого отправителя, ни Cloud. */
+  if (!num && !graySender && !wa.ready(db)) {
     ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Пропуск отправки ${lead.name}: нет доступного номера (лимиты/карантин)` });
     return null;
   }
-  lead.numberId = num.id;
-  num.sentToday += 1;
-  if (num.sentToday > num.dayLimit * 0.8) num.quality = Math.max(0, +(num.quality - 0.3).toFixed(1));
-  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel: 'wa', text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null, campaignId: opts.campaignId || null, waId: null };
+  if (num) {
+    lead.numberId = num.id;
+    num.sentToday += 1;
+    if (num.sentToday > num.dayLimit * 0.8) num.quality = Math.max(0, +(num.quality - 0.3).toFixed(1));
+  }
+  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel: 'wa', text, at: Date.now(), status: 'sent', numberId: num ? num.id : null, templateId: opts.templateId || null, campaignId: opts.campaignId || null, waId: null };
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500) };
   db.messages.push(m);
   lead.lastMsgAt = m.at;
