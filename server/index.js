@@ -11626,12 +11626,19 @@ ${SCR}
       const badImg = (s) => /favicon|logo|icon|sprite|avatar|placeholder|blank|banner|header|footer|\.svg(\?|$)/i.test(String(s || ''));
       const okImg = (u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !badImg(u);
       let cand = [];
-      if (pr.sourceUrl && /^https?:\/\//i.test(pr.sourceUrl)) {   /* 1) собственная страница объекта */
+      /* ⚠️ sourceUrl бывает СПИСКОМ/КАТАЛОГОМ (напр. resale-center.com/?view=search) — один URL на много объектов.
+         Скрейпить его нельзя: вернёт фото ВСЕГО каталога → чужая обложка. Тогда идём в веб-поиск по имени. */
+      const src = pr.sourceUrl || '';
+      const sharedSrc = src && (db.properties || []).filter(x => x.sourceUrl === src).length >= 3;
+      const srcIsList = sharedSrc || /[?&](view=search|search_view=|page=\d)|\/(search|catalog|listing|results)(\/|\?|$)/i.test(src);
+      let scrapedSource = false;
+      if (src && /^https?:\/\//i.test(src) && !srcIsList) {   /* 1) собственная страница КОНКРЕТНОГО объекта */
         try {
-          const r = await fetch(pr.sourceUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
+          const r = await fetch(src, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
           const html = await r.text();
-          scrapeImagesFromHtml(html, pr.sourceUrl).forEach(u => { if (okImg(u)) cand.push(u); });
-          if (cand.length < 3 && renderReady()) { const rp = await renderPage(pr.sourceUrl); if (rp && rp.html) scrapeImagesFromHtml(rp.html, pr.sourceUrl).forEach(u => { if (okImg(u)) cand.push(u); }); }
+          scrapeImagesFromHtml(html, src).forEach(u => { if (okImg(u)) cand.push(u); });
+          if (cand.length < 3 && renderReady()) { const rp = await renderPage(src); if (rp && rp.html) scrapeImagesFromHtml(rp.html, src).forEach(u => { if (okImg(u)) cand.push(u); }); }
+          scrapedSource = true;
         } catch (_) {}
       }
       let srcPages = 0;
@@ -11659,7 +11666,7 @@ ${SCR}
         if (cov.length) good = [cov.sort((a, b2) => (b2.size || 0) - (a.size || 0))[0]];
       }
       if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
-      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: !!pr.sourceUrl, candidates: cand.length, srcPages, webKey: !!process.env.RENDER_API_KEY });
+      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, webKey: !!process.env.RENDER_API_KEY });
     }
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
