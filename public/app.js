@@ -9161,6 +9161,10 @@ PAGES.automations = async (root) => {
             </select></div>
             <div class="form-row"><label>Viber PA token</label><input id="chVb" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'токен Public Account (режим PA)'}"></div>
           </div>
+          <div class="em-domain" id="emDomainCard" style="margin-top:12px;border:1px solid var(--stroke,rgba(20,19,17,.12));border-radius:12px;padding:14px;background:var(--bg-2,rgba(255,255,255,.5))">
+            <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">${ic(I.link)}Свой домен для e-mail <span class="muted" style="font-weight:400;font-size:11px">— письма уходят с вашего домена во «Входящие», не в спам</span></div>
+            <div id="emDomainBody" class="muted" style="font-size:12px;margin-top:10px">Загрузка…</div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
             <div class="form-row"><label>Viber BSP · провайдер</label><select id="chVbProv">
               <option value="infobip" ${(s.channels?.viber?.provider || 'infobip') === 'infobip' ? 'selected' : ''}>Infobip</option>
@@ -9284,6 +9288,41 @@ PAGES.automations = async (root) => {
   });
   $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
+  /* SaaS: свой домен для e-mail (Resend) — self-service подключение */
+  (async () => {
+    const card = $('#emDomainBody', root); if (!card) return;
+    const e2 = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    async function refresh() {
+      let d; try { d = await api.get('/email/domain'); } catch (err) { card.innerHTML = '<span style="color:var(--bad,#c0392b)">' + e2(err.message) + '</span>'; return; }
+      if (!d.keyReady) { card.innerHTML = 'Оператор платформы ещё не задал общий Resend-ключ (RESEND_API_KEY). Как только он появится — можно будет подключить свой домен.'; return; }
+      if (!d.domain) {
+        card.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-row" style="flex:1;min-width:170px;margin:0"><label>Ваш домен</label><input id="emDomIn" placeholder="mail.agency.com"></div>
+            <div class="form-row" style="width:110px;margin:0"><label>Отправитель</label><input id="emDomLocal" value="noreply"></div>
+            <button class="btn btn-sm btn-accent" id="emDomAdd">${ic(I.plus)}Подключить</button></div>
+          <div style="margin-top:8px">Добавим домен → покажем DNS-записи (SPF/DKIM/DMARC) → пропишете их у регистратора → «Проверить». Тогда письма пойдут с вашего домена во «Входящие».</div>`;
+        return;
+      }
+      const recs = (d.records || []).map(r => `<tr><td style="padding:4px 8px"><b>${e2(r.type || r.record || '')}</b></td><td style="padding:4px 8px;word-break:break-all">${e2(r.name || '')}</td><td style="padding:4px 8px;word-break:break-all">${e2(r.value || '')}</td><td style="padding:4px 8px">${e2(r.status || '')}</td></tr>`).join('');
+      card.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b>${e2(d.domain)}</b><span class="badge ${d.verified ? 'ok' : 'warn'}"><i></i>${d.verified ? 'верифицирован' : 'ожидает DNS'}</span>
+          <span style="margin-left:auto;display:flex;gap:6px">
+            ${d.verified ? `<button class="btn btn-sm" id="emDomTest">Тест-письмо</button>` : `<button class="btn btn-sm btn-accent" id="emDomVerify">${ic(I.refresh)}Проверить</button>`}
+            <button class="btn btn-sm" id="emDomDel" title="Отключить">✕</button></span></div>
+        ${d.verified
+          ? `<div style="margin-top:8px;color:var(--good,#6d8a4f)">Письма уходят с ${e2(d.senderLocal)}@${e2(d.domain)} ✅</div>`
+          : `<div style="margin-top:8px">Пропишите у регистратора домена эти записи, затем «Проверить»:</div>
+             <div style="overflow:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;min-width:100%"><thead><tr style="text-align:left"><th style="padding:4px 8px">Тип</th><th style="padding:4px 8px">Имя</th><th style="padding:4px 8px">Значение</th><th style="padding:4px 8px">Статус</th></tr></thead><tbody>${recs || '<tr><td colspan=4 style="padding:8px">записи появятся здесь</td></tr>'}</tbody></table></div>`}`;
+    }
+    card.addEventListener('click', async (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      if (b.id === 'emDomAdd') { const dom = ($('#emDomIn', card) || {}).value?.trim(); const local = ($('#emDomLocal', card) || {}).value?.trim() || 'noreply'; if (!dom) { toast('Впишите домен', '', false); return; } b.disabled = true; try { await api.post('/email/domain', { domain: dom, senderLocal: local }); toast('Домен добавлен', 'Пропишите DNS-записи и «Проверить»', true); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
+      else if (b.id === 'emDomVerify') { b.disabled = true; b.textContent = 'Проверяю…'; try { const r = await api.post('/email/domain/verify', {}); toast(r.verified ? 'Верифицирован ✅' : 'Пока не верифицирован', r.verified ? 'Домен готов' : 'DNS ещё не распространились — подождите и повторите', r.verified); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
+      else if (b.id === 'emDomTest') { b.disabled = true; try { const r = await api.post('/email/test', {}); toast(r.ok ? 'Тест отправлен' : 'Не ушло', r.ok ? ('от ' + r.from) : r.error, r.ok); } catch (err) { toast('Ошибка', err.message, false); } b.disabled = false; }
+      else if (b.id === 'emDomDel') { try { await api.del('/email/domain'); toast('Домен отключён', '', true); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
+    });
+    refresh();
+  })();
   $('#rotSave', root)?.addEventListener('click', async () => {
     const rotation = { enabled: $('#rotEnabled', root).checked, afterTouches: +$('#rotTouches', root).value || 3, afterHours: +$('#rotHours', root).value || 48, maxRotations: +$('#rotMax', root).value || 2, toQualifier: $('#rotToQual', root).checked };
     await saveAuto({ rotation });
