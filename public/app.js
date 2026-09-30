@@ -7872,15 +7872,18 @@ async function initPropMap(props) {
     const root2 = e.popup.getElement();
     root2.addEventListener('mouseenter', clearPopT);   /* курсор в попапе — не закрываем */
     root2.addEventListener('mouseleave', schedClose);   /* ушёл из попапа — закрываем */
-    const b = root2.querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propFrom = 'map'; render(); });   /* propMap оставляем true → «Назад» вернёт на карту */
+    /* ⚠️ Leaflet ПЕРЕИСПОЛЬЗУЕТ DOM попапа между hover-открытиями, а popupopen срабатывает каждый раз →
+       addEventListener стакался на одну кнопку (compare тоггал чётно/нечётно = «то добавляется, то нет»;
+       hydrate слал N дублей-запросов). Guard-флаг: вешаем обработчик на элемент РОВНО один раз. */
+    const b = root2.querySelector('[data-propopen]'); if (b && !b._openBound) { b._openBound = true; b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propFrom = 'map'; render(); }); }   /* propMap оставляем true → «Назад» вернёт на карту */
     const h = root2.querySelector('[data-prophydrate]');
-    if (h) h.addEventListener('click', async () => {
+    if (h && !h._hydBound) { h._hydBound = true; h.addEventListener('click', async () => {
       clearPopT(); showLoader('ИИ собирает карточку — цена, юниты, фото…', 'card');   /* глобальный оверлей ПОВЕРХ карты (попап закрывался hover-intent'ом) */
       try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true, lang: LANG }); hideLoader(); if (r.error) { toast('Не вышло', r.error); return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propFrom = 'map'; render(); }
       catch (err) { hideLoader(); toast('Ошибка', err.message); }
-    });
+    }); }
     const cm = root2.querySelector('[data-propcmp]');
-    if (cm) cm.addEventListener('click', (e) => {
+    if (cm && !cm._cmpBound) { cm._cmpBound = true; cm.addEventListener('click', (e) => {
       e.stopPropagation();
       PAGE_STATE.compare = PAGE_STATE.compare || [];
       const id = cm.dataset.propcmp; const i = PAGE_STATE.compare.indexOf(id); let on;
@@ -7888,7 +7891,7 @@ async function initPropMap(props) {
       else { if (PAGE_STATE.compare.length >= 3) return toast('Максимум 3 для сравнения'); PAGE_STATE.compare.push(id); on = true; }
       cm.classList.toggle('on', on); cm.innerHTML = ic(I.layers || I.grid, 2) + (on ? 'В сравнении ✓' : 'Сравнить');   /* мгновенный отклик без перерендера карты */
       renderCompareBar(); toast(on ? 'Добавлено в сравнение' : 'Убрано', PAGE_STATE.compare.length + ' выбрано');
-    });
+    }); }
   });
   if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
   /* ⭐ контрол тепловой карты: раскрасить пины по метрике + легенда */

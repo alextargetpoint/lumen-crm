@@ -1342,6 +1342,11 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 /* ---------- объекты ---------- */
 .prop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(206px, 1fr)); gap: 12px; }
 .prop-card { padding: 17px 18px; }
+/* ускорение скролла длинных списков: не рендерим/не грузим обложки карточек вне экрана,
+   резервируем высоту (contain-intrinsic-size) чтобы скроллбар не прыгал. Обложки подтягиваются
+   по мере приближения к вьюпорту → скролл плавный, а не «тугой». */
+.prop-card.v2 { content-visibility: auto; contain-intrinsic-size: auto 296px; }
+.pr-split-list .prm-row { content-visibility: auto; contain-intrinsic-size: auto 64px; }
 .prop-top { display: flex; gap: 10px; align-items: flex-start; }
 .prop-top > div { flex: 1; min-width: 0; }
 .prop-name { font-size: 14.5px; font-weight: 700; color: var(--navy-900); }
