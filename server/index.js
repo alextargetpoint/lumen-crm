@@ -934,7 +934,7 @@ engine.onEmailSend = async (db, lead, msg) => {
   const rich = mailer.renderCascadeEmail({
     name: lead.name, lang: lead.lang, text: msg.text, subject: msg.subject, preset, mediaCard,
     agency: _ag.name || '',
-    agencyLogo: _ag.logo || _ag.logoUrl || '',
+    agencyLogo: (raw => raw ? (/^https?:\/\//i.test(raw) ? raw : (callBase(db) + (raw[0] === '/' ? '' : '/') + raw)) : '')(_ag.logo || _ag.logoUrl || ''),   /* относительный путь → абсолютный (в письме иначе битая картинка) */
     agencyAddr: _ag.address || _ag.addr || '',
     agencySite: _ag.site || _ag.website || '',
     brokerName: broker ? broker.name : ((_ag.manager && _ag.manager.name) || ''),
@@ -7712,7 +7712,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       /* брокер создаёт ЛИЧНУЮ цепочку (ownerId=он, visibility=private); владелец — агентскую (base) */
       const owned = IS_BROKER ? ROLE.brokerId : null;
-      const seq = { id: store.nextId('seq'), name: String(b.name || (IS_BROKER ? 'Моя цепочка' : 'Новая цепочка')).slice(0, 80), geo: b.geo || 'all', active: false, ownerId: owned, visibility: owned ? 'private' : 'base', sharedWith: [], steps: b.steps || [{ day: 0, channel: 'wa', mode: 'text', text: 'Здравствуйте, {name}! Это {agency} — вы оставляли заявку по {geo}. Подскажите, рассматриваете для жизни или как инвестицию?', label: 'Первое касание', active: true }] };
+      const seq = { id: store.nextId('seq'), name: String(b.name || (IS_BROKER ? 'Моя цепочка' : 'Новая цепочка')).slice(0, 80), geo: b.geo || 'all', active: false, ownerId: owned, visibility: owned ? 'private' : 'base', sharedWith: [], steps: b.steps || [{ day: 0, channel: 'wa', mode: 'personalize', text: 'Здравствуйте, {name}! Это {agency} — вы оставляли заявку по {creative}. Подобрать актуальные варианты под ваш запрос?', label: 'Первое касание (ИИ-персонализация)', active: true }] };
       db.sequences.push(seq); store.save();
       return json(res, 200, seq);
     }
@@ -7951,7 +7951,7 @@ const server = http.createServer(async (req, res) => {
         name: 'Иван', lang: 'ru', preset, subject: 'Пример письма',
         text: 'Появились новые проекты у моря и готовые виллы под ваш запрос. Подобрал несколько вариантов — посмотрите, и подскажу детали по любому.',
         agency: _ag.name || 'Ваше агентство',
-        agencyLogo: _ag.logo || _ag.logoUrl || '', agencyAddr: _ag.address || _ag.addr || '', agencySite: _ag.site || _ag.website || '',
+        agencyLogo: (raw => raw ? (/^https?:\/\//i.test(raw) ? raw : (callBase(db) + (raw[0] === '/' ? '' : '/') + raw)) : '')(_ag.logo || _ag.logoUrl || ''),   /* относительный путь → абсолютный (в письме иначе битая картинка) */ agencyAddr: _ag.address || _ag.addr || '', agencySite: _ag.site || _ag.website || '',
         brokerName: (db.brokers && db.brokers[0] && db.brokers[0].name) || ((_ag.manager && _ag.manager.name) || 'Менеджер'),
         heroImg: propImg ? (/^https?:\/\//i.test(propImg) ? propImg : callBase(db) + propImg) : '',
         mediaCard: mailer.emailMediaCard({ type: 'voice', url: '#', en: false }, preset === 'dark' ? mailer.D : mailer.C),
@@ -7995,6 +7995,7 @@ const server = http.createServer(async (req, res) => {
         if (b.channels.enabled) Object.assign(ch.enabled, b.channels.enabled);
         for (const k2 of ['tg', 'viber', 'email']) if (b.channels[k2]) Object.assign(ch[k2], b.channels[k2]);
         if (b.channels.secondRound != null) ch.secondRound = b.channels.secondRound;
+        if (b.channels.emailAlongside != null) ch.emailAlongside = !!b.channels.emailAlongside;   /* первое касание дублировать письмом (параллельно мессенджеру) */
         if (b.channels.cascadeAfterTouches != null) ch.cascadeAfterTouches = Math.max(0, Math.min(10, +b.channels.cascadeAfterTouches || 0));
         delete b.channels;
       }
@@ -11652,21 +11653,30 @@ ${SCR}
           scrapedSource = true;
         } catch (_) {}
       }
-      let srcPages = 0, snippetImgs = [];
-      if (cand.length < 8 && process.env.RENDER_API_KEY) {   /* 2) веб-поиск + ГЛУБОКИЙ скрейп топ-страниц-источников */
+      let srcPages = 0, via = scrapedSource ? 'source' : '';
+      const q = [pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'Phuket condominium'].filter(Boolean).join(' ');
+      /* 2a) ДЁШЕВО: Google Programmable Search (image) — 100 запросов/день БЕСПЛАТНО, прямые URL фото,
+         НОЛЬ Firecrawl-кредитов. Включается парой env: GOOGLE_CSE_KEY + GOOGLE_CSE_CX. */
+      if (cand.length < 8 && process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX) {
         try {
-          /* EN-запрос: у пхукетских проектов англ. имена → порталы/сайты застройщика находятся лучше */
-          const q = [pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'Phuket condominium project'].filter(Boolean).join(' ');
-          const sr = await webSearch(q, 8, { media: true });
-          /* сниппет-картинки из выдачи — НИЗКИЙ приоритет (много мусора), придержим на добор */
-          snippetImgs = (sr && sr.images || []).filter(okImg);
-          /* ПРИОРИТЕТ: рендерим ТОП страниц-источников и тянем их РЕАЛЬНЫЕ галереи (у популярных ЖК — полные фото) */
+          const r = await fetch(`https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_CSE_KEY}&cx=${process.env.GOOGLE_CSE_CX}&searchType=image&num=10&imgSize=large&q=${encodeURIComponent(q)}`);
+          const j = await r.json().catch(() => ({}));
+          (j.items || []).forEach(it => { if (it && okImg(it.link)) cand.push(it.link); });
+          if (cand.length) via = via ? via + '+cse' : 'cse';
+        } catch (_) {}
+      }
+      /* 2b) РЕЗЕРВ (Firecrawl, дороже — экономим): 1 лёгкий /search (без media) → ПЛАЙН-ФЕТЧ источников (бесплатно) →
+         renderPage ТОЛЬКО как последний резерв и ТОЛЬКО 1 страница. Раньше жгли ~12 кредитов/объект (media×8 + 4 рендера). */
+      if (cand.length < 6 && process.env.RENDER_API_KEY) {
+        try {
+          const sr = await webSearch(q, 5);   /* без media — не скрейпим html всех результатов */
           const srcUrls = [...new Set((sr && sr.sources || []).map(s => s && s.url).filter(Boolean))].slice(0, 4);
-          for (const su of srcUrls) {
-            try { const rp = await renderPage(su); if (rp && rp.html) { scrapeImagesFromHtml(rp.html, su).forEach(u => { if (okImg(u)) cand.push(u); }); srcPages++; } } catch (_) {}
+          for (const su of srcUrls) {   /* плайн-фетч (Node fetch, БЕСПЛАТНО) */
+            if (cand.length >= 16) break;
+            try { const rr = await fetch(su, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' }); const html = await rr.text(); scrapeImagesFromHtml(html, su).forEach(u => { if (okImg(u)) cand.push(u); }); } catch (_) {}
           }
-          /* галереи источников не набрали — добираем сниппет-картинками */
-          if (cand.length < 6) snippetImgs.forEach(u => cand.push(u));
+          if (cand.length < 3 && renderReady() && srcUrls[0]) { try { const rp = await renderPage(srcUrls[0]); if (rp && rp.html) { scrapeImagesFromHtml(rp.html, srcUrls[0]).forEach(u => { if (okImg(u)) cand.push(u); }); srcPages++; } } catch (_) {} }
+          via = via ? via + '+web' : 'web';
         } catch (_) {}
       }
       cand = [...new Set(cand)].filter(u => !(pr.images || []).includes(u)).slice(0, 30);
@@ -11697,7 +11707,7 @@ ${SCR}
         } catch (_) { good = good.slice(0, need); }
       } else { good = good.slice(0, need); }
       if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
-      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, curatedPlans: planCount, curatedDropped: dropped, webKey: !!process.env.RENDER_API_KEY });
+      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, via, cse: !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX), curatedPlans: planCount, curatedDropped: dropped, webKey: !!process.env.RENDER_API_KEY });
     }
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });

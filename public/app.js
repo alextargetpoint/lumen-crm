@@ -6995,8 +6995,8 @@ PAGES.sequences = async (root) => {
   };
   const delayLabel = (st, i) => { const d = stepDelayParts(st, i); return d.val === 0 ? 'сразу' : `через ${d.val} ${d.unit === 'min' ? 'мин' : d.unit === 'hour' ? 'ч' : 'дн'}`; };
   const stepNode = (st, i) => {
-    const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы' }[st.mode] || st.mode;
-    const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : st.mode === 'creative' ? ('🎬 Креатив, по которому пришёл лид' + (st.text ? ' + подпись' : '')) : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
+    const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы', personalize: 'ИИ-персонализация' }[st.mode] || st.mode;
+    const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : st.mode === 'creative' ? ('🎬 Креатив, по которому пришёл лид' + (st.text ? ' + подпись' : '')) : st.mode === 'personalize' ? '✨ ИИ соберёт персональное касание с отсылкой на объявление' : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
     const _d = stepDelayParts(st, i);
     if (editIx === i) {
       const hasFixed = !!(st.creative && st.creative.url);
@@ -7004,7 +7004,7 @@ PAGES.sequences = async (root) => {
       const needType = st._needType || '';               /* 'pdf' | 'video' | 'image' */
       const acceptBy = { pdf: 'application/pdf', video: 'video/mp4,video/webm,video/quicktime', image: 'image/png,image/jpeg,image/webp' }[needType] || 'image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime';
       const upLabel = needType === 'pdf' ? 'Загрузить PDF' : needType === 'video' ? 'Загрузить видео' : needType === 'image' ? 'Загрузить фото' : 'Загрузить фото/видео';
-      const MODES = [['text', 'Свой текст', I.chat], ['ai', 'ИИ-текст', I.spark], ['template', 'Шаблон', I.doc], ['creative', 'Креатив', I.image]];
+      const MODES = [['personalize', 'ИИ-персонализация', I.spark], ['text', 'Свой текст', I.chat], ['ai', 'ИИ-текст', I.spark], ['template', 'Шаблон', I.doc], ['creative', 'Креатив', I.image]];
       return `
       <div class="fl-node fl-edit se2" data-i="${i}" data-mode="${st.mode || 'text'}">
         <!-- 1. Когда -->
@@ -7030,8 +7030,9 @@ PAGES.sequences = async (root) => {
         <div class="se2-content">
           <div data-se-tplwrap style="${st.mode === 'template' ? '' : 'display:none'}"><select data-se="templateId" class="se2-full">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('') || '<option>Нет шаблонов — создайте в «Шаблоны»</option>'}</select></div>
           <textarea data-se="prompt" class="se2-full se2-ta" placeholder="Что сказать ИИ. Напр.: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»" style="${st.mode === 'ai' ? '' : 'display:none'}">${esc(st.prompt || '')}</textarea>
-          <textarea data-se="text" class="se2-full se2-ta" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'}" style="${st.mode === 'text' || st.mode === 'creative' ? '' : 'display:none'}">${esc(st.text || '')}</textarea>
-          <div class="se2-tools" data-se-tools style="${st.mode === 'template' ? 'display:none' : ''}">
+          <textarea data-se="text" class="se2-full se2-ta" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : st.mode === 'personalize' ? 'Запасной текст, если ИИ недоступен (необязательно)…' : 'Текст сообщения…'}" style="${st.mode === 'text' || st.mode === 'creative' || st.mode === 'personalize' ? '' : 'display:none'}">${esc(st.text || '')}</textarea>
+          <div data-se-pers class="muted" style="font-size:11.8px;line-height:1.55;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:10px;padding:11px 13px;margin-top:8px;display:${st.mode === 'personalize' ? 'flex' : 'none'};gap:8px;align-items:flex-start">${ic(I.spark)}<span><b>ИИ соберёт персональное касание сам</b> — как кнопка «Персонализировать» в карточке лида: с отсылкой на объявление, по которому пришёл лид, сильные стороны проекта и критерии из заявки. Если канал шага — <b>E-mail</b>, текст будет в официальном тоне и с темой письма. Идеально для <b>первого касания</b>.</span></div>
+          <div class="se2-tools" data-se-tools style="${st.mode === 'template' || st.mode === 'personalize' ? 'display:none' : ''}">
             <button type="button" class="btn btn-sm btn-accent" data-se-aidraft>${ic(I.spark)}Собрать через ИИ</button>
             <button type="button" class="btn btn-sm" data-se-varbtn>${ic(I.plus)}Переменная</button>
             <span class="se-ai-note" data-se-ainote></span>
@@ -7437,8 +7438,9 @@ PAGES.sequences = async (root) => {
       $$('.se2-mode', eb).forEach(b => b.classList.toggle('on', b.dataset.mode === m));
       { const tw = eb.querySelector('[data-se-tplwrap]'); if (tw) tw.style.display = m === 'template' ? '' : 'none'; }
       eb.querySelector('[data-se="prompt"]').style.display = m === 'ai' ? '' : 'none';
-      const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) { ta2.style.display = (m === 'text' || m === 'creative') ? '' : 'none'; ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'; }
-      const tools = eb.querySelector('[data-se-tools]'); if (tools) tools.style.display = m === 'template' ? 'none' : '';
+      const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) { ta2.style.display = (m === 'text' || m === 'creative' || m === 'personalize') ? '' : 'none'; ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : m === 'personalize' ? 'Запасной текст, если ИИ недоступен (необязательно)…' : 'Текст сообщения…'; }
+      const pers = eb.querySelector('[data-se-pers]'); if (pers) pers.style.display = m === 'personalize' ? 'flex' : 'none';
+      const tools = eb.querySelector('[data-se-tools]'); if (tools) tools.style.display = (m === 'template' || m === 'personalize') ? 'none' : '';
       const cr = eb.querySelector('[data-se-crea]'); if (cr) cr.style.display = m === 'creative' ? '' : 'none';
     };
     $$('.se2-mode', eb).forEach(b => b.addEventListener('click', () => { eb.dataset.mode = b.dataset.mode; syncMode(); }));
@@ -9194,46 +9196,62 @@ PAGES.automations = async (root) => {
           </div>
         </div>
         <div class="glass card mb" data-ag="reports">
+          ${(() => {
+            const chip = (ok, okТ, noТ) => `<span style="font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap;${ok ? 'color:var(--ok,#1E7A64);background:rgba(30,122,100,.12)' : 'color:var(--ink-3,#8b8983);background:rgba(20,19,17,.06)'}">${ok ? '● ' + okТ : '○ ' + noТ}</span>`;
+            const secH = (n, title, sub) => `<div style="display:flex;align-items:baseline;gap:9px;margin:18px 0 10px"><span style="width:22px;height:22px;flex:0 0 22px;border-radius:7px;background:var(--accent,#1a1815);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">${n}</span><span style="font-weight:650;font-size:14px">${title}</span>${sub ? `<span class="muted" style="font-size:11.5px;font-weight:400">${sub}</span>` : ''}</div>`;
+            const chBlock = (icn, name, statusChip, desc, inner) => `<div style="border:1px solid var(--stroke,rgba(20,19,17,.1));border-radius:12px;padding:13px 14px;margin-top:10px;background:var(--bg-2,rgba(255,255,255,.45))">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="opacity:.7;display:inline-flex">${ic(icn)}</span><b style="font-size:13.5px;flex:1">${name}</b>${statusChip}</div>
+              <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:11px">${desc}</div>${inner}</div>`;
+            const vbMode = s.channels?.viber?.mode || 'pa';
+            const names = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' };
+            const connOf = { wa: true, tg: !!s.channels?.tg?.keySet, viber: !!s.channels?.viber?.keySet, email: !!s.channels?.email?.verified };
+            return `
           <div class="card-title">${ic(I.send)}Омниканальный каскад ${hint('cascade', 'Как работает каскад', [
-            ['Приоритет сверху вниз', 'Каналы без контакта у клиента пропускаются'],
-            ['Второй круг', 'Молчит весь круг — переключение на следующий канал и повтор касаний']])}</div>
-          <div id="chPrio">${(a2 => (s.channels?.priority || ['wa', 'tg', 'viber', 'email']).map((ch, i2) => {
-            const names = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail (официальный тон)' };
-            return `<div class="ch-prio" data-ch="${ch}">
-              <b>${i2 + 1}</b><span style="flex:1">${names[ch]}</span>
+            ['Порядок сверху вниз', 'Первый канал — основной. Каналов, где у клиента нет контакта, каскад пропускает'],
+            ['Переход', 'Молчит N касаний (или вся цепочка) — уходим в следующий канал и продолжаем касания']])}</div>
+          <div class="muted" style="font-size:12px;margin:-2px 0 12px;line-height:1.55">Клиент не ответил в одном канале — система <b>сама</b> переходит в следующий по приоритету и продолжает цепочку касаний. Ниже настраивается <b>порядок каналов</b>, <b>когда переключаться</b> и <b>подключение</b> каждого канала.</div>
+          <div style="display:flex;gap:10px;align-items:flex-start;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:12px;padding:12px 14px">
+            <span style="opacity:.75;flex:0 0 auto;margin-top:1px">${ic(I.spark)}</span>
+            <div style="flex:1;font-size:12.5px;line-height:1.55"><b>Тексты касаний — в цепочке касаний.</b> Каждый шаг (в т.ч. <b>письмо</b> — это шаг с каналом «E-mail») задаётся там: «Свой текст», «Шаблон» или <b>«ИИ-персонализация»</b> — ИИ соберёт касание сам, с отсылкой на объявление лида (как кнопка «Персонализировать» в карточке).</div>
+            <button class="btn btn-sm btn-accent" data-go="sequences" style="flex:0 0 auto">${ic(I.send)}Открыть цепочку</button>
+          </div>
+
+          ${secH(1, 'Порядок каналов', 'стрелками — приоритет; тумблер — включён ли канал в каскад')}
+          <div id="chPrio">${(s.channels?.priority || ['wa', 'tg', 'viber', 'email']).map((ch, i2) => `<div class="ch-prio" data-ch="${ch}">
+              <b>${i2 + 1}</b><span style="flex:1;display:flex;align-items:center;gap:8px">${names[ch]}${ch === 'wa' ? '' : chip(connOf[ch], 'подключён', 'не настроен')}</span>
               <button class="btn-ghost" data-chmv="-1">${ic(I.up || I.chev)}</button>
               <button class="btn-ghost" data-chmv="1" style="transform:rotate(180deg)">${ic(I.up || I.chev)}</button>
               <label class="switch"><input type="checkbox" data-chen="${ch}" ${s.channels?.enabled?.[ch] ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
-            </div>`;
-          }).join(''))()}</div>
-          ${swRow('Второй круг на следующем канале', 'Цепочка исчерпана без ответа → каскад переключает канал и повторяет касания', sw('chSecond', s.channels?.secondRound))}
-          ${swRow('Переход по каналам через N касаний', 'Через сколько касаний БЕЗ ответа переключаться на следующий мессенджер (0 = только когда цепочка исчерпана). Напр. 3 — после 3 касаний в WhatsApp уйти в Telegram', `<input id="chCascadeN" type="number" min="0" max="10" style="width:70px" value="${+(s.channels?.cascadeAfterTouches || 0)}">`)}
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
-            <div class="form-row"><label>Telegram Bot Token</label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'от @BotFather'}"></div>
-            <div class="form-row"><label>Resend API key (e-mail)</label><input id="chEm" type="password" placeholder="${s.channels?.email?.keySet ? '•••••• сохранён' : 're_…'}"></div>
-            <div class="form-row"><label>E-mail отправителя</label><input id="chFrom" value="${esc(s.channels?.email?.from || '')}" placeholder="sales@agency.com"></div>
-            <div class="form-row"><label>Viber · режим</label><select id="chVbMode">
-              <option value="pa" ${(s.channels?.viber?.mode || 'pa') === 'pa' ? 'selected' : ''}>Public Account (тёплые, кто написал)</option>
-              <option value="bsp" ${s.channels?.viber?.mode === 'bsp' ? 'selected' : ''}>Business Messages / BSP (холодные по номерам)</option>
+            </div>`).join('')}</div>
+
+          ${secH(2, 'Когда переключать канал')}
+          ${swRow('Переход через N касаний без ответа', 'Сколько касаний без ответа сделать в канале, прежде чем уйти в следующий. <b>0</b> = переключаться только когда вся цепочка в канале исчерпана. Пример: <b>3</b> — после 3 сообщений в WhatsApp без ответа уходим в Telegram', `<input id="chCascadeN" type="number" min="0" max="10" style="width:70px" value="${+(s.channels?.cascadeAfterTouches || 0)}">`)}
+          ${swRow('Второй круг на следующем канале', 'Когда цепочка в канале закончилась без ответа — повторить её касания уже в следующем канале (а не уводить лид в «спящие»)', sw('chSecond', s.channels?.secondRound))}
+          ${swRow('Дублировать первое касание в E-mail', 'Первое касание уходит СРАЗУ в двух каналах: мессенджер + персональное письмо (с отсылкой на объявление лида). Нужен адрес у лида и включённый E-mail. Остальные касания идут каскадом по очереди', sw('chEmailAlong', s.channels?.emailAlongside))}
+
+          ${secH(3, 'Подключение каналов', 'заполняется один раз')}
+          ${chBlock(I.wa || I.send, 'WhatsApp', chip(true, 'работает', ''), 'Первое касание и вся переписка идут через <b>серые/облачные номера</b> агентства. Подключение и распределение номеров — в разделе <b>«Номера»</b>.', `<button class="btn btn-sm" data-go="numbers">${ic(I.link)}Открыть «Номера»</button>`)}
+          ${chBlock(I.send, 'Telegram', chip(connOf.tg, 'бот подключён', 'бот не подключён'), 'Официальный <b>бот</b> — для тёплых (кто сам написал боту). <b>Холодные</b> касания по номерам идут через прогретые TG-аккаунты из раздела «Номера» — токен для этого не нужен.', `<div class="form-row" style="margin:0"><label>Telegram Bot Token <span class="muted" style="font-weight:400">— от @BotFather, необязательно</span></label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'вставьте токен бота'}"></div>`)}
+          ${chBlock(I.link, 'E-mail (официальный тон)', chip(connOf.email, 'домен верифицирован', 'домен не подключён'), 'Одно вежливое письмо, если в мессенджерах тишина. Уходит <b>с вашего домена</b> — попадает во «Входящие», не в спам. Ключ отправки задаёт платформа, вам нужно подключить только домен ↓', `<div class="em-domain" id="emDomainCard"><div id="emDomainBody" class="muted" style="font-size:12px">Загрузка…</div></div>`)}
+          ${chBlock(I.send, 'Viber', chip(connOf.viber, 'подключён', 'не настроен'), 'Одно персональное касание. <b>Public Account</b> — тёплым (кто вам написал). <b>BSP</b> (Infobip/360dialog) — официальные холодные касания по номерам: платно, нужна бизнес-верификация и согласие клиента. ⛔ Массовых рассылок в Viber не делаем.', `
+            <div class="form-row"><label>Режим</label><select id="chVbMode">
+              <option value="pa" ${vbMode === 'pa' ? 'selected' : ''}>Public Account — тёплые (кто написал)</option>
+              <option value="bsp" ${vbMode === 'bsp' ? 'selected' : ''}>Business Messages / BSP — холодные по номерам</option>
             </select></div>
-            <div class="form-row"><label>Viber PA token</label><input id="chVb" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'токен Public Account (режим PA)'}"></div>
-          </div>
-          <div class="em-domain" id="emDomainCard" style="margin-top:12px;border:1px solid var(--stroke,rgba(20,19,17,.12));border-radius:12px;padding:14px;background:var(--bg-2,rgba(255,255,255,.5))">
-            <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">${ic(I.link)}Свой домен для e-mail <span class="muted" style="font-weight:400;font-size:11px">— письма уходят с вашего домена во «Входящие», не в спам</span></div>
-            <div id="emDomainBody" class="muted" style="font-size:12px;margin-top:10px">Загрузка…</div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
-            <div class="form-row"><label>Viber BSP · провайдер</label><select id="chVbProv">
-              <option value="infobip" ${(s.channels?.viber?.provider || 'infobip') === 'infobip' ? 'selected' : ''}>Infobip</option>
-              <option value="360dialog" ${s.channels?.viber?.provider === '360dialog' ? 'selected' : ''}>360dialog</option>
-              <option value="vonage" ${s.channels?.viber?.provider === 'vonage' ? 'selected' : ''}>Vonage</option>
-            </select></div>
-            <div class="form-row"><label>BSP API key</label><input id="chVbKey" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'ключ BSP (режим BSP)'}"></div>
-            <div class="form-row"><label>BSP base URL</label><input id="chVbBase" value="${esc(s.channels?.viber?.baseUrl || '')}" placeholder="xxxxx.api.infobip.com"></div>
-            <div class="form-row" style="grid-column:1 / -1"><label>Viber sender (верифиц. имя отправителя)</label><input id="chVbSender" value="${esc(s.channels?.viber?.sender || '')}" placeholder="напр. TargetPoint"></div>
-          </div>
-          <div class="muted" style="font-size:11px;margin-top:6px">Viber BSP (Infobip/360dialog) = официальные холодные персональные касания по номерам (аналог WA Cloud API): платно, нужна бизнес-верификация и consent. ⛔ Рассылки не делаем. Серого Viber (как WA/TG) нет.</div>
-          <button class="btn" id="chSave">Сохранить каскад</button>
+            <div id="vbPa" style="${vbMode === 'bsp' ? 'display:none' : ''};margin-top:8px"><div class="form-row" style="margin:0"><label>Viber PA token</label><input id="chVb" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'токен Public Account'}"></div></div>
+            <div id="vbBsp" style="${vbMode === 'bsp' ? '' : 'display:none'};margin-top:8px;display:${vbMode === 'bsp' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:10px">
+              <div class="form-row" style="margin:0"><label>BSP-провайдер</label><select id="chVbProv">
+                <option value="infobip" ${(s.channels?.viber?.provider || 'infobip') === 'infobip' ? 'selected' : ''}>Infobip</option>
+                <option value="360dialog" ${s.channels?.viber?.provider === '360dialog' ? 'selected' : ''}>360dialog</option>
+                <option value="vonage" ${s.channels?.viber?.provider === 'vonage' ? 'selected' : ''}>Vonage</option>
+              </select></div>
+              <div class="form-row" style="margin:0"><label>BSP API key</label><input id="chVbKey" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'ключ BSP'}"></div>
+              <div class="form-row" style="margin:0"><label>BSP base URL</label><input id="chVbBase" value="${esc(s.channels?.viber?.baseUrl || '')}" placeholder="xxxxx.api.infobip.com"></div>
+              <div class="form-row" style="margin:0"><label>Sender (верифиц. имя)</label><input id="chVbSender" value="${esc(s.channels?.viber?.sender || '')}" placeholder="напр. Trust Phuket"></div>
+            </div>`)}
+
+          <button class="btn btn-accent" id="chSave" style="margin-top:16px">Сохранить каскад</button>`;
+          })()}
         </div>
         <div class="glass card mb" data-ag="meet">
           <div class="card-title">${ic(I.cal)}Встречи</div>
@@ -9322,13 +9340,19 @@ PAGES.automations = async (root) => {
     if (sib) (+b.dataset.chmv < 0 ? sib.before(row) : sib.after(row));
     $$('#chPrio .ch-prio b', root).forEach((x, i2) => x.textContent = i2 + 1);
   }));
+  /* Viber: показать поля только выбранного режима (PA / BSP) */
+  { const vm = $('#chVbMode'); if (vm) vm.addEventListener('change', () => {
+      const bsp = vm.value === 'bsp';
+      const pa = $('#vbPa'), bp = $('#vbBsp');
+      if (pa) pa.style.display = bsp ? 'none' : '';
+      if (bp) bp.style.display = bsp ? 'grid' : 'none';
+    }); }
   $('#chSave').addEventListener('click', async () => {
     const priority = $$('#chPrio .ch-prio', root).map(x => x.dataset.ch);
     const enabled = {};
     $$('[data-chen]', root).forEach(x => enabled[x.dataset.chen] = x.checked);
-    const ch = { priority, enabled, email: { from: $('#chFrom').value.trim() } };
-    if ($('#chTg').value.trim()) ch.tg = { botToken: $('#chTg').value.trim() };
-    if ($('#chEm').value.trim()) ch.email.key = $('#chEm').value.trim();
+    const ch = { priority, enabled, email: {} };
+    if ($('#chTg') && $('#chTg').value.trim()) ch.tg = { botToken: $('#chTg').value.trim() };
     ch.viber = {};
     const vbMode = ($('#chVbMode') || {}).value || 'pa'; ch.viber.mode = vbMode;
     if ($('#chVb') && $('#chVb').value.trim()) ch.viber.token = $('#chVb').value.trim();
@@ -9338,12 +9362,14 @@ PAGES.automations = async (root) => {
     if ($('#chVbProv')) ch.viber.provider = $('#chVbProv').value;
     const sec = root.querySelector('[data-auto="chSecond"]');
     if (sec) ch.secondRound = sec.checked;
+    const ea = root.querySelector('[data-auto="chEmailAlong"]');
+    if (ea) ch.emailAlongside = ea.checked;
     const casc = $('#chCascadeN'); if (casc) ch.cascadeAfterTouches = Math.max(0, Math.min(10, +casc.value || 0));
     await api.patch('/settings', { channels: ch });
     toast('Каскад сохранён', 'Порядок и каналы применены', true);
     loadState();
   });
-  $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
+  $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'chEmailAlong', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
   /* SaaS: свой домен для e-mail (Resend) — self-service подключение */
   (async () => {

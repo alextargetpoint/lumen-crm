@@ -85,6 +85,19 @@ function send(db, lead, text, via, opts = {}) {
     if (text) { try { const tn = control.toneScan(text); if (tn) { const br = db.brokers.find(b => b.id === lead.broker); if (br) { br.toneFlags = (br.toneFlags || 0) + 1; br.lastToneFlag = { at: Date.now(), reason: tn.reason, leadId: lead.id }; } ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `⚠️ Тон: ${(db.brokers.find(b => b.id === lead.broker) || {}).name || 'брокер'} — ${tn.reason} в сообщении клиенту ${lead.name}` }); } } catch (_) {} }
   }
   const channel = opts.channel || resolveChannel(db, lead);
+  /* 🛡️ ЗОЛОТОЕ ПРАВИЛО АНТИ-ДУБЛЬ (анти-бан): одно и то же содержимое (текст / видео / фото) НИКОГДА
+     не уходит лиду повторно в ТОМ ЖЕ канале. Дубли = спам = мгновенный бан номера. Это защитная сетка
+     поверх маршрутизации: даже при баге/повторном тике/двойном каскаде клиент не получит одно и то же дважды.
+     Разрешено: то же содержимое в ДРУГОМ канале (второй круг каскада) и ручная отправка брокером (via='human'). */
+  const _dupKey = (opts.media && opts.media.url) ? ('m:' + String(opts.media.url)) : (text ? ('t:' + String(text).trim().slice(0, 300)) : '');
+  if (_dupKey && via !== 'human' && !opts.allowDup) {
+    const since = Date.now() - 14 * 864e5;
+    const keyOf = mm => (mm.media && mm.media.url) ? ('m:' + mm.media.url) : (mm.text ? ('t:' + String(mm.text).trim().slice(0, 300)) : '');
+    if (db.messages.some(mm => mm.leadId === lead.id && mm.dir === 'out' && (mm.channel || 'wa') === channel && mm.at > since && keyOf(mm) === _dupKey)) {
+      ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Анти-дубль (${CH_NAMES[channel] || channel}, ${lead.name}): это сообщение уже отправлялось — повторно не шлём` });
+      return null;
+    }
+  }
   if (channel !== 'wa') {
     /* не-WA каналы: mock-запись в переписку; боевые слоты (TG-бот/Viber/Resend) включаются токенами */
     const m0 = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel, text, at: Date.now(), status: 'sent', templateId: opts.templateId || null };
@@ -462,10 +475,41 @@ function tickChains(db) {
     if (step.channel === 'email' || (lead.activeChannel === 'email' && step.channel !== 'voice')) {
       sendOpts.channel = 'email';
       sendOpts.subject = fillVars(db, lead, step.subject || 'По вашей заявке — {agency}');
+    } else if (lead.activeChannel && lead.activeChannel !== 'wa' && step.channel !== 'voice') {
+      /* каскад ушёл на tg/viber — держим канал ЖЁСТКО. Иначе send() пере-резолвит канал и, если
+         активный канал помечен недоступным, касание молча утекает в WhatsApp (повторный WA-контакт). */
+      sendOpts.channel = lead.activeChannel;
     }
     if (step.mode === 'template') {
       const tpl = db.templates.find(t => t.id === step.templateId);
       text = tpl ? renderTemplate(db, tpl, lead) : null;
+    } else if (step.mode === 'personalize') {
+      /* 🤖 ИИ-ПЕРСОНАЛИЗАЦИЯ КАСАНИЯ (тот же движок, что кнопка «Персонализировать» в карточке):
+         с отсылкой на объявление лида, сильные стороны проекта, критерии из лид-формы. Генерится
+         асинхронно (LLM), результат кэшируется на лиде → на следующем тике уходит. E-mail — официальным тоном. */
+      const isEmail = sendOpts.channel === 'email';
+      const ck = isEmail ? '_ptEmail' : '_ptText';
+      if (lead.ai[ck]) { text = lead.ai[ck]; if (isEmail && lead.ai._ptEmailSubj) sendOpts.subject = lead.ai._ptEmailSubj; }
+      else if (llm.available && llm.available() && llm.composeFirstTouch) {
+        if (!lead.ai['_g' + ck]) {
+          lead.ai['_g' + ck] = true;
+          const styleSamples = ((db.touchStyles && (db.touchStyles[lead.broker] || db.touchStyles.owner)) || []).map(x => x.text).filter(Boolean);
+          const agencyName = (db.settings.agency && db.settings.agency.name) || 'агентство';
+          (async () => {
+            try {
+              const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { email: isEmail });
+              lead.ai[ck] = (out && out.message) || '';
+              if (isEmail && out && out.subject) lead.ai._ptEmailSubj = out.subject;
+            } catch (e) {
+              lead.ai[ck] = fillVars(db, lead, step.text || '{name}, здравствуйте! Вы оставляли заявку на {creative} — подобрать актуальные варианты под ваш запрос?');
+              ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `ИИ-персонализация ${isEmail ? 'e-mail' : 'касания'} не удалась (${lead.name}): ${e.message} — ушёл запасной текст` });
+            } finally { lead.ai['_g' + ck] = false; store.save(); }
+          })();
+        }
+        continue;   /* генерация идёт — ждём следующего тика (текст ещё не готов) */
+      } else {
+        text = fillVars(db, lead, step.text || '{name}, здравствуйте! Подобрать варианты по вашей заявке на {creative}?');   /* нет LLM — запасной шаблон */
+      }
     } else if (step.mode === 'text' || step.mode === 'creative') {
       text = step.text ? fillVars(db, lead, step.text) : '';   /* для «Креатив из рекламы» текст = подпись (необязательна) */
     } else {
@@ -486,8 +530,9 @@ function tickChains(db) {
     }
     if (text || stepCreative) {
       if (text && sendOpts.channel === 'email') {
-        /* официальный тон для e-mail */
-        text = 'Здравствуйте' + (lead.name && !/^[+\d]/.test(lead.name) ? ', ' + lead.name.split(' ')[0] : '') + '!\n\n' + text.replace(/^\{?name\}?,?\s*/i, '').replace(/😉|👌|🤝|🙏|\)\)/g, '') + '\n\nС уважением,\n' + (db.settings.agency.manager?.name || db.settings.agency.name) + '\n' + db.settings.agency.name;
+        /* e-mail: приветствие («Здравствуйте, Имя!») и подпись добавляет шаблон письма (renderCascadeEmail) —
+           здесь только лёгкая чистка, иначе выходило ДВОЙНОЕ приветствие/подпись. */
+        text = text.replace(/^\{?name\}?,?\s*/i, '').replace(/😉|👌|🤝|🙏|\)\)/g, '');
       } else if (text && llm.humanize) {
         text = llm.humanize(text);   /* чистим AI-почерк (длинные тире и т.п.) в WhatsApp/мессенджер-касаниях */
       }
@@ -503,6 +548,22 @@ function tickChains(db) {
       else send(db, lead, text, 'chain', sendOpts);
       if (lead.stage === 'new') lead.stage = 'touch';
       ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `Касание ${lead.ai.chainStep + 1}/${seq.steps.length}: ${lead.name} — ${step.label}${stepCreative ? ' · +креатив' : ''}` });
+      /* 📧 ОДНОВРЕМЕННЫЙ E-MAIL: на ПЕРВОМ касании в мессенджере параллельно уходит персонализированное
+         письмо (если включено, есть адрес и e-mail-канал активен). Так клиента касаемся сразу двумя каналами. */
+      if (lead.ai.chainStep === 0 && sendOpts.channel !== 'email' && db.settings.channels && db.settings.channels.emailAlongside
+          && db.settings.channels.enabled && db.settings.channels.enabled.email && !lead.ai._emailAlso && !lead.marketingOptOut
+          && (lead.contacts || []).some(c => c.kind === 'email')) {
+        lead.ai._emailAlso = true;
+        if (llm.available && llm.available() && llm.composeFirstTouch) {
+          const styleSamples = ((db.touchStyles && (db.touchStyles[lead.broker] || db.touchStyles.owner)) || []).map(x => x.text).filter(Boolean);
+          const agencyName = (db.settings.agency && db.settings.agency.name) || 'агентство';
+          (async () => {
+            try { const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { email: true });
+              send(db, lead, (out && out.message) || '', 'chain', { channel: 'email', subject: (out && out.subject) || 'По вашей заявке' });
+            } catch (e) { /* основной канал уже коснулся — молча */ }
+          })();
+        }
+      }
     }
     lead.ai.chainStep += 1;
     const next = seq.steps.filter(s => s.active)[lead.ai.chainStep];

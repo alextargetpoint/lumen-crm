@@ -925,7 +925,10 @@ function renderCascadeEmail(opts) {
   const first = String(o.name || '').split(' ')[0] || '';
   const greet = en ? `Hello${first ? ', ' + esc(first) : ''}!` : `Здравствуйте${first ? ', ' + esc(first) : ''}!`;
   const bodyText = esc(o.text || '').replace(/\n/g, '<br>');
-  const header = o.agencyLogo
+  /* логотип показываем ТОЛЬКО если это валидный публичный абсолютный URL (иначе в почтовике «битая картинка»).
+     Нет годного URL → аккуратный текстовый вордмарк с названием агентства (выглядит цельно, не сломано). */
+  const logoOk = o.agencyLogo && /^https:\/\/[^\s"']+\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(String(o.agencyLogo));
+  const header = logoOk
     ? `<img src="${esc(o.agencyLogo)}" alt="${agency}" style="max-height:46px;max-width:230px;display:inline-block">`
     : `<div style="font-family:${t.head};font-size:23px;font-weight:700;letter-spacing:.02em;color:${t.ink}">${agency || '&nbsp;'}</div>`;
   let inner = '';
