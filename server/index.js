@@ -11658,15 +11658,17 @@ ${SCR}
           if (cand.length < 6) snippetImgs.forEach(u => cand.push(u));
         } catch (_) {}
       }
-      cand = [...new Set(cand)].filter(u => !(pr.images || []).includes(u)).slice(0, 60);
-      const dl = (await Promise.all(cand.map(u => downloadImageToAsset(upgradeCdnUrl(u)).catch(() => downloadImageToAsset(u).catch(() => null))))).filter(Boolean);
-      let good = dl.sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
-      /* если галерейного качества не нашлось, но кандидаты есть — берём хотя бы ОБЛОЖКУ мягким фильтром (≥200px),
-         чтобы карточка перестала быть пустым чёрным прямоугольником */
-      if (!good.length && cand.length && !have.length) {
-        const cov = (await Promise.all(cand.slice(0, 12).map(u => downloadCover(upgradeCdnUrl(u)).catch(() => downloadCover(u).catch(() => null))))).filter(Boolean);
-        if (cov.length) good = [cov.sort((a, b2) => (b2.size || 0) - (a.size || 0))[0]];
-      }
+      cand = [...new Set(cand)].filter(u => !(pr.images || []).includes(u)).slice(0, 30);
+      /* одна попытка на URL: сначала хай-рес (≥720px, галерейное качество), затем медиум-фолбэк (≥200px) —
+         галереи порталов часто отдают превью 300-500px, строгий фильтр их резал → пусто. Берём несколько. */
+      const dl = (await Promise.all(cand.map(async u => {
+        const uu = upgradeCdnUrl(u);
+        return (await downloadImageToAsset(uu).catch(() => null))
+          || (await downloadImageToAsset(u).catch(() => null))
+          || (await downloadCover(uu).catch(() => null))
+          || (await downloadCover(u).catch(() => null));
+      }))).filter(Boolean);
+      const good = dl.sort((a, b2) => (((b2.w || 0) * (b2.h || 0)) || (b2.size || 0)) - (((a.w || 0) * (a.h || 0)) || (a.size || 0))).slice(0, need);
       if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
       return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, webKey: !!process.env.RENDER_API_KEY });
     }
