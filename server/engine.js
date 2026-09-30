@@ -1038,7 +1038,10 @@ function inbound(db, lead, text, opts = {}) {
             l2.summary = ai.buildSummary(fresh, l2);
             ai.pushEvent(fresh, { type: 'qualified', leadId: l2.id, text: `${l2.name} квалифицирован ИИ (LLM) — готов к передаче брокеру` });
           }
-          if (!was && l2.stage === 'qualified' && module.exports.onQualified) module.exports.onQualified(fresh, l2);
+          if (!was && l2.stage === 'qualified') {
+            if (module.exports.onQualified) module.exports.onQualified(fresh, l2);
+            if ((fresh.settings.automations || {}).autoHandover) handover(fresh, l2);   /* авто-передача и на LLM-ветке квалификации (была только на синхронной) */
+          }
         }
         send(fresh, l2, out.text, 'ai');
       } else {

@@ -383,6 +383,15 @@ function ensureTenantDefaults(db) {
   if (!s.waGray) s.waGray = { url: '', token: '', numbers: [], warmup: { running: false, perDay: 16 } };
   if (!s.tgBridge) s.tgBridge = { enabled: false, botToken: '', secret: crypto.randomBytes(12).toString('hex') };
   if (!s.hooks) s.hooks = { secret: crypto.randomBytes(12).toString('hex') };
+  /* ⚠️ЭТИ ДЕФОЛТЫ РАНЬШЕ СИДЕЛИ В СТАРТОВОМ БЛОКЕ (только PRIMARY) → тенанты-агентства их НЕ получали:
+     automations отсутствовал → PATCH настроек не мог сохранить autoHandover/assignMode/напоминания (Object.assign не за что цеплять). */
+  if (!s.automations) s.automations = { assignMode: 'load', autoHandover: false, meetingReminderHrs: 3, noShowMessage: true, rrCursor: 0, rotation: { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false } };
+  if (!s.automations.rotation) s.automations.rotation = { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false };
+  s.ai = s.ai || {};
+  if (!s.ai.autoOff) s.ai.autoOff = { onHumanReply: true, onHumanRequest: true, onEscalation: true };
+  if (!s.comments) s.comments = { autoReply: false, autoHide: false };
+  if (!s.social) s.social = { ig: { enabled: false, token: '', igId: '' }, fb: { enabled: false, token: '', pageId: '' } };
+  if (!s.inventorySources) s.inventorySources = { reelly: { enabled: false, key: '', baseUrl: '' } };
   /* все верхнеуровневые коллекции, которые код ждёт как массивы (seed даёт лишь часть) — чтобы новый тенант не падал ни на одной фиче */
   for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates', 'debugReports']) if (!Array.isArray(db[k])) db[k] = [];
   return db;
@@ -4194,6 +4203,7 @@ const server = http.createServer(async (req, res) => {
   }
   store.enterTenant(_tid);
   const db = store.get();
+  ensureTenantDefaults(db);   /* дефолты настроек — для КАЖДОГО тенанта на каждом запросе (идемпотентно). Иначе агентства не получали automations/ai.autoOff/social и т.п. — они были только у primary */
   /* SaaS: приостановленный админом тенант — блок всех API-операций (кроме платформенного админа) */
   if (_tid !== store.PRIMARY && _reg.tenants[_tid] && _reg.tenants[_tid].suspended && p.startsWith('/api/') && !p.startsWith('/api/admin/')) return json(res, 403, { error: 'Аккаунт приостановлен. Свяжитесь с поддержкой.' });
   /* заголовки безопасности на все ответы: анти-кликджекинг + анти-MIME-sniffing + реферер-политика */
