@@ -11593,7 +11593,7 @@ ${SCR}
         const src = absU(pj.url || '');
         const image = absU(pj.image || '');
         const dup = db.properties.find(x => (src && x.sourceUrl === src) || (x.name || '').toLowerCase().trim() === nm.toLowerCase());
-        if (dup) { if (image && !((dup.images || []).length)) backfill.push({ dup, image }); continue; }
+        if (dup) { const cur = (dup.images || [])[0]; const needCover = dup.stub && (!cur || !/^\/media\//.test(cur)); if (image && needCover) backfill.push({ dup, image }); continue; }   /* стаб без обложки ИЛИ с внешней/битой ссылкой → перезальём в /media */
         fresh.push({ pj, nm, src, image });
       }
       const covers = await Promise.all(fresh.map(f => (f.image && /^https?:\/\//.test(f.image)) ? downloadCover(f.image).catch(() => null) : Promise.resolve(null)));   /* мягкий фильтр: превью листинга мелкие/webp, строгий хи-рес их резал → 0 обложек */
@@ -11612,7 +11612,7 @@ ${SCR}
         created++;
       });
       let backfilled = 0;
-      backfill.forEach((f, i) => { const cov = bfCovers[i] && bfCovers[i].url; if (cov && !((f.dup.images || []).length)) { f.dup.images = [cov]; backfilled++; } });
+      backfill.forEach((f, i) => { const cov = bfCovers[i] && bfCovers[i].url; if (cov) { const keep = (f.dup.images || []).filter(u => /^\/media\//.test(u)); f.dup.images = [cov, ...keep.filter(u => u !== cov)]; backfilled++; } });   /* ставим свежую /media-обложку первой, битые внешние ссылки отбрасываем */
       const skipped = (projects || []).length - created - backfilled;
       store.save();
       return json(res, 200, { ok: true, created, backfilled, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length });
