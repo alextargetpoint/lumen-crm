@@ -6746,6 +6746,7 @@ const server = http.createServer(async (req, res) => {
         quals: { purpose: null, timeline: null, budget: null, type: null },
         ai: { enabled: true, chainStep: 0, nextTouchAt: Date.now() + 15e3, silentSince: null },
         broker: null, summary: null, tags: [], numberId: null,
+        contacts: b.email ? [{ kind: 'email', value: String(b.email).slice(0, 200) }] : [],   /* email → контакт (нужно для email-канала/рассылки) */
       };
       db.leads.push(lead);
       ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Новый лид: ${lead.name} · ${db.settings.geoNames[lead.geo]}` });
@@ -7291,7 +7292,7 @@ const server = http.createServer(async (req, res) => {
         filters: b.filters || { stages: ['sleeping'] }, batchSize: b.batchSize || 3,
         pauseMin: b.pauseMin || [20, 60], window: b.window || [10, 20],
         templateId: b.templateId || 'tpl_wake_ru', text: b.text || '', startAt,
-        channel: ['wa', 'email'].includes(b.channel) ? b.channel : 'wa',   /* канал рассылки: WA Cloud (деф.) или email */
+        channel: ['wa', 'email', 'viber'].includes(b.channel) ? b.channel : 'wa',   /* канал рассылки: WA Cloud (деф.) / email / Viber */
         subject: b.subject || '',                                          /* тема письма (для email-рассылки) */
         senderPhoneId: b.senderPhoneId || null, senderLabel: b.senderLabel || '',   /* с какого Cloud API-номера шлём рассылку (иначе дефолтный) */
         stats: { sent: 0, delivered: 0, replied: 0, qualified: 0, skipped: 0 },

@@ -905,7 +905,7 @@ function inbound(db, lead, text, opts = {}) {
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120) };
   db.messages.push(m);
   /* ЗОЛОТОЕ ПРАВИЛО: ответ «стоп/отписаться/stop/unsubscribe» → отписка от рассылок (любой канал) */
-  if (/^\s*(стоп|stop|отписаться|отписка|unsubscribe|unsub)\b/i.test(String(text || '')) && !lead.marketingOptOut) {
+  if (/^\s*(стоп|stop|отпис|unsub|не пиш|не писать)/i.test(String(text || '')) && !lead.marketingOptOut) {
     lead.marketingOptOut = true; lead.marketingOptOutAt = Date.now();
     ai.pushEvent(db, { type: 'optout', leadId: lead.id, text: `${lead.name}: отписался от рассылок («${String(text).trim().slice(0, 20)}»)` });
   }
