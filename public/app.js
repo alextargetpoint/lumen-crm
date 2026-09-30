@@ -8965,13 +8965,19 @@ function cmpCard(c) {
   return `<div class="glass cmp-card ${c.state === 'scheduled' ? 'sched' : ''}" data-cmp="${c.id}">
     <div class="cmp-head"><div class="nm">${esc(c.name)}</div>${stateBadge}</div>
     ${c.state === 'scheduled' && startStr ? `<div class="cmp-sched">${ic(I.clock, 2)}Запланирована на <b>${startStr}</b> · запустится сама</div>` : ''}
-    <div class="muted" style="font-size:11.5px;margin-top:4px">${c.senderLabel ? `${ic(I.shield, 2)}с номера <b>${esc(c.senderLabel)}</b> · ` : ''}пачка ${c.batchSize} · пауза ${c.pauseMin[0]}–${c.pauseMin[1]} ${STATE.settings.demo.accelerate ? 'сек (демо)' : 'мин'} · окно ${c.window[0]}:00–${c.window[1]}:00 по поясу клиента</div>
+    <div class="muted" style="font-size:11.5px;margin-top:4px"><b style="color:var(--accent)">${({ wa: 'WhatsApp', email: 'E-mail', viber: 'Viber' })[c.channel || 'wa']}</b> · ${c.channel === 'email' && c.subject ? `тема «${esc(c.subject)}» · ` : ''}${c.senderLabel ? `${ic(I.shield, 2)}с номера <b>${esc(c.senderLabel)}</b> · ` : ''}пачка ${c.batchSize} · пауза ${c.pauseMin[0]}–${c.pauseMin[1]} ${STATE.settings.demo.accelerate ? 'сек (демо)' : 'мин'} · окно ${c.window[0]}:00–${c.window[1]}:00 по поясу клиента</div>
     <div class="cmp-stats">
       <div class="cmp-stat"><div class="v">${c.stats.sent}</div><div class="k">отправлено</div></div>
       <div class="cmp-stat"><div class="v">${c.stats.replied}</div><div class="k">ответили</div></div>
       <div class="cmp-stat"><div class="v">${c.stats.qualified}</div><div class="k">до квалификации</div></div>
       <div class="cmp-stat"><div class="v">${c.stats.skipped}</div><div class="k">пропуски</div></div>
     </div>
+    ${(c.channel === 'email' || c.channel === 'viber') ? `<div class="cmp-stats" style="margin-top:8px;opacity:.95">
+      <div class="cmp-stat"><div class="v">${c.stats.delivered || 0}</div><div class="k">доставлено</div></div>
+      <div class="cmp-stat"><div class="v">${c.stats.opened || 0}</div><div class="k">${c.channel === 'email' ? 'открыто' : 'прочитано'}</div></div>
+      ${c.channel === 'email' ? `<div class="cmp-stat"><div class="v">${c.stats.clicked || 0}</div><div class="k">клики</div></div>` : ''}
+      <div class="cmp-stat"><div class="v">${(c.stats.complained || 0)}</div><div class="k">жалобы/отписки</div></div>
+    </div>` : ''}
     ${c.funnel && c.funnel.sent ? `<div class="cmp-stats" style="margin-top:8px;opacity:.95">
       <div class="cmp-stat"><div class="v">${c.funnel.deliveredPct}%</div><div class="k">доставлено</div></div>
       <div class="cmp-stat"><div class="v">${c.funnel.readPct}%</div><div class="k">прочитано</div></div>
