@@ -3083,10 +3083,15 @@ engine.setTgGraySender(async (db, lead, m) => {
   if (!num && lead.broker) { const b = connected.filter(n => n.persona && n.persona.brokerId === lead.broker); if (b.length) num = b.sort((a, x) => newToday(a) - newToday(x))[0]; }   /* аккаунты брокера */
   if (!num) { const under = connected.filter(n => newToday(n) < cap); num = (under.length ? under : connected).sort((a, x) => newToday(a) - newToday(x))[0]; }   /* распределение по кругу */
   const wasNew = !lead.tgGrayPhone; const digits = String(lead.phone).replace(/\D/g, '');
+  /* медиа-касание (креатив/фото/голос/PDF) — воркер шлёт файлом; URL делаем абсолютным (относительный воркер не скачает) */
+  const media = (m.media && m.media.url) ? { type: m.media.type || 'image', url: /^https?:\/\//i.test(m.media.url) ? m.media.url : (callBase(db) + m.media.url), name: m.media.name || '', mimetype: m.media.mimetype || '' } : null;
   try {
-    await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(num.phone) + '/send', { to: digits, message: m.text || '' });
+    await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(num.phone) + '/send', { to: digits, message: m.text || '', media });
   } catch (e) {
-    lead.channels = lead.channels || {}; lead.channels.tg = 'no'; store.save();                                          /* лида нет в Telegram → канал недоступен, каскад дальше (Viber/email) */
+    /* канал 'no' помечаем ТОЛЬКО если лида реально нет в Telegram (иначе транзиентная/медиа-ошибка навсегда убьёт TG для лида) */
+    if (/not found|no user|PHONE_NOT_OCCUPIED|PEER_ID_INVALID|cannot find|не найден|no such|resolve/i.test(String(e.message || ''))) {
+      lead.channels = lead.channels || {}; lead.channels.tg = 'no'; store.save();
+    }
     throw new Error('TG-аккаунт: ' + e.message);
   }
   lead.tgGrayPhone = num.phone; lead.channels = lead.channels || {}; lead.channels.tg = 'yes'; lead.activeChannel = 'tg';
