@@ -9245,7 +9245,11 @@ PAGES.automations = async (root) => {
 
           ${secH(3, 'Подключение каналов', 'заполняется один раз')}
           ${chBlock(I.wa || I.send, 'WhatsApp', chip(true, 'работает', ''), 'Первое касание и вся переписка идут через <b>серые/облачные номера</b> агентства. Подключение и распределение номеров — в разделе <b>«Номера»</b>.', `<button class="btn btn-sm" data-go="numbers">${ic(I.link)}Открыть «Номера»</button>`)}
-          ${chBlock(I.send, 'Telegram', chip(connOf.tg, 'подключён', 'не настроен'), 'Официальный <b>бот</b> — для тёплых (кто сам написал боту). <b>Холодные</b> касания по номерам идут через прогретые TG-аккаунты из раздела «Номера» — токен для этого не нужен.', `<div class="form-row" style="margin:0"><label>Telegram Bot Token <span class="muted" style="font-weight:400">— от @BotFather, необязательно</span></label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'вставьте токен бота'}"></div>`)}
+          ${chBlock(I.send, 'Telegram', chip(connOf.tg, 'подключён', 'не настроен'), 'В каскаде касания идут через <b>прогретые TG-аккаунты</b> агентства (QR-подключение в «Номера») — как серый WhatsApp. <b>Бот-токен для каскада НЕ нужен</b>: он только для официальной массовой рассылки по спящей базе и приёма тёплых, кто сам написал боту.', `
+            <button class="btn btn-sm" data-go="numbers">${ic(I.link)}Открыть «Номера» (TG-аккаунты)</button>
+            <details style="margin-top:10px"><summary class="muted" style="font-size:11.5px;cursor:pointer">Bot Token (необязательно — для рассылки/тёплых)</summary>
+              <div class="form-row" style="margin:8px 0 0"><label>Telegram Bot Token <span class="muted" style="font-weight:400">— от @BotFather</span></label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'вставьте токен бота'}"></div>
+            </details>`)}
           ${chBlock(I.link, 'E-mail (официальный тон)', chip(connOf.email, 'домен верифицирован', 'домен не подключён'), 'Одно вежливое письмо, если в мессенджерах тишина. Уходит <b>с вашего домена</b> — попадает во «Входящие», не в спам. Ключ отправки задаёт платформа, вам нужно подключить только домен ↓', `<div class="em-domain" id="emDomainCard"><div id="emDomainBody" class="muted" style="font-size:12px">Загрузка…</div></div>`)}
           ${chBlock(I.send, 'Viber', chip(connOf.viber, 'подключён', 'не настроен'), 'Одно персональное касание. <b>Public Account</b> — тёплым (кто вам написал). <b>BSP</b> (Infobip/360dialog) — официальные холодные касания по номерам: платно, нужна бизнес-верификация и согласие клиента. ⛔ Массовых рассылок в Viber не делаем.', `
             <div class="form-row"><label>Режим</label><select id="chVbMode">
@@ -9390,11 +9394,13 @@ PAGES.automations = async (root) => {
     const card = $('#emDomainBody', root); if (!card) return;
     const e2 = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     function presetRow(d) {
-      const opts = (d.presets || [{ key: 'classic', label: 'Классика' }, { key: 'minimal', label: 'Минимал' }, { key: 'warm', label: 'Тёплый' }, { key: 'dark', label: 'Тёмный' }]).map(p => `<option value="${p.key}" ${p.key === (d.preset || 'classic') ? 'selected' : ''}>${e2(p.label)}</option>`).join('');
+      const presets = d.presets || [{ key: 'classic', label: 'Классика' }, { key: 'minimal', label: 'Минимал' }, { key: 'warm', label: 'Тёплый' }, { key: 'dark', label: 'Тёмный' }];
+      const cur = d.preset || 'classic';
+      const chips = presets.map(p => `<button type="button" class="chip-t${p.key === cur ? ' on' : ''}" data-empreset="${p.key}">${e2(p.label)}</button>`).join('');
       return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--stroke,rgba(20,19,17,.08))">
         <span style="font-size:12px;color:var(--ink-3,#8b8983)">Оформление писем:</span>
-        <select id="emPreset" style="padding:5px 8px;border-radius:8px">${opts}</select>
-        <button class="btn btn-sm" id="emPreview">Превью</button></div>`;
+        <div id="emPresetSeg" style="display:inline-flex;gap:5px;flex-wrap:wrap">${chips}</div>
+        <button class="btn btn-sm" id="emPreview">${ic(I.eye)}Превью</button></div>`;
     }
     async function refresh() {
       let d; try { d = await api.get('/email/domain'); } catch (err) { card.innerHTML = '<span style="color:var(--bad,#c0392b)">' + e2(err.message) + '</span>'; return; }
@@ -9419,22 +9425,19 @@ PAGES.automations = async (root) => {
           : `<div style="margin-top:8px">Пропишите у регистратора домена эти записи, затем «Проверить»:</div>
              <div style="overflow:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;min-width:100%"><thead><tr style="text-align:left"><th style="padding:4px 8px">Тип</th><th style="padding:4px 8px">Имя</th><th style="padding:4px 8px">Значение</th><th style="padding:4px 8px">Статус</th></tr></thead><tbody>${recs || '<tr><td colspan=4 style="padding:8px">записи появятся здесь</td></tr>'}</tbody></table></div>`}`;
     }
-    card.addEventListener('change', async (ev) => {
-      if (ev.target.id !== 'emPreset') return;
-      try { await api.post('/email/preset', { preset: ev.target.value }); toast('Оформление сохранено', ev.target.options[ev.target.selectedIndex].text, true); } catch (err) { toast('Ошибка', err.message, false); }
-    });
+    const curPreset = () => (card.querySelector('#emPresetSeg .chip-t.on') || {}).dataset?.empreset || 'classic';
     card.addEventListener('click', async (ev) => {
+      const chip = ev.target.closest('[data-empreset]');
+      if (chip) {
+        $$('#emPresetSeg .chip-t', card).forEach(x => x.classList.toggle('on', x === chip));
+        try { await api.post('/email/preset', { preset: chip.dataset.empreset }); toast('Оформление сохранено', chip.textContent.trim(), true); } catch (err) { toast('Ошибка', err.message, false); }
+        return;
+      }
       const b = ev.target.closest('button'); if (!b) return;
       if (b.id === 'emPreview') {
-        const sel = ($('#emPreset', card) || {}).value || 'classic';
-        let r; try { r = await api.get('/email/preview?preset=' + encodeURIComponent(sel)); } catch (err) { toast('Ошибка', err.message, false); return; }
-        const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
-        ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee"><b style="font-size:13px">Превью письма</b><button id="emPvClose" class="btn btn-sm">Закрыть</button></div><iframe style="border:0;width:100%;height:78vh"></iframe></div>`;
-        document.body.appendChild(ov);
-        ov.querySelector('iframe').srcdoc = r.html;
-        const close = () => ov.remove();
-        ov.addEventListener('click', e3 => { if (e3.target === ov) close(); });
-        ov.querySelector('#emPvClose').addEventListener('click', close);
+        let r; try { r = await api.get('/email/preview?preset=' + encodeURIComponent(curPreset())); } catch (err) { toast('Ошибка', err.message, false); return; }
+        const bd = modal({ title: 'Превью письма', sub: 'Так письмо увидит клиент', wide: true, body: `<iframe id="emPvFrame" style="border:0;width:100%;height:70vh;border-radius:10px;background:#fff;display:block"></iframe>`, actions: [{ label: 'Закрыть' }] });
+        const f = bd && bd.querySelector && bd.querySelector('#emPvFrame'); if (f) f.srcdoc = r.html;
         return;
       }
       if (b.id === 'emDomAdd') { const dom = ($('#emDomIn', card) || {}).value?.trim(); const local = ($('#emDomLocal', card) || {}).value?.trim() || 'noreply'; if (!dom) { toast('Впишите домен', '', false); return; } b.disabled = true; try { await api.post('/email/domain', { domain: dom, senderLocal: local }); toast('Домен добавлен', 'Пропишите DNS-записи и «Проверить»', true); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }

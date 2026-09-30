@@ -9428,6 +9428,9 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, r);
     }
     if (p === '/api/viber/inbound' && req.method === 'POST') {
+      /* SEC: опциональный секрет вебхука Viber (Infobip). Если задан VIBER_WEBHOOK_SECRET — требуем ?key=… совпадение,
+         иначе подделка входящих/DLR (создание фейк-лидов, пометка «ответил» → глушит каскад). Без секрета — как раньше. */
+      if (process.env.VIBER_WEBHOOK_SECRET && u.searchParams.get('key') !== process.env.VIBER_WEBHOOK_SECRET) { secOnDeny(req, 403, p); return json(res, 403, { error: 'bad webhook secret' }); }
       const b = await readBody(req);
       const results = (b && (b.results || b.messages)) || (Array.isArray(b) ? b : []);
       for (const r of results) {
@@ -9501,7 +9504,23 @@ const server = http.createServer(async (req, res) => {
     /* ---------------- Аналитика EMAIL (вебхук Resend) → статус сообщения + метрики кампании ----------------
        Платформенный вебхук (один на все агентства). Тенант находим по сообщению с этим emailId. */
     if (p === '/api/email/resend-webhook' && req.method === 'POST') {
-      const b = await readBody(req);
+      /* SEC: подпись Svix (Resend). Проверяем, ТОЛЬКО если задан RESEND_WEBHOOK_SECRET (whsec_…) — иначе не ломаем
+         уже настроенный вебхук. Без секрета эндпоинт остаётся emailId-gated (UUID), но подделку событий
+         (в т.ч. complained→принудительная отписка) отсекает именно подпись. Поставь секрет из Resend → verify включится. */
+      let raw = ''; req.on('data', c => { raw += c; if (raw.length > 2e6) req.destroy(); }); await new Promise(r => req.on('end', r));
+      const _wsec = process.env.RESEND_WEBHOOK_SECRET || '';
+      if (_wsec) {
+        try {
+          const sid = req.headers['svix-id'], sts = req.headers['svix-timestamp'], ssig = String(req.headers['svix-signature'] || '');
+          if (!sid || !sts || !ssig) { secOnDeny(req, 403, p); return json(res, 403, { error: 'no signature' }); }
+          if (Math.abs(Date.now() / 1000 - (+sts || 0)) > 300) return json(res, 403, { error: 'stale' });
+          const keyB64 = _wsec.startsWith('whsec_') ? _wsec.slice(6) : _wsec;
+          const expected = crypto.createHmac('sha256', Buffer.from(keyB64, 'base64')).update(`${sid}.${sts}.${raw}`).digest('base64');
+          const ok = ssig.split(' ').map(s => s.split(',')[1]).some(v => { try { return v && crypto.timingSafeEqual(Buffer.from(v), Buffer.from(expected)); } catch (_) { return false; } });
+          if (!ok) { secOnDeny(req, 403, p); return json(res, 403, { error: 'signature mismatch' }); }
+        } catch (_) { return json(res, 403, { error: 'signature error' }); }
+      }
+      let b; try { b = JSON.parse(raw || '{}'); } catch (_) { return json(res, 400, { error: 'bad json' }); }
       const type = String((b && b.type) || '');
       const emailId = (b && b.data && (b.data.email_id || b.data.id)) || (b && b.email_id) || '';
       if (!emailId) return json(res, 200, { ok: true });
