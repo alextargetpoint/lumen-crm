@@ -356,7 +356,7 @@ function seqMatchesLead(seq, lead) {
   if (f.geos.length && !f.geos.includes(lead.geo)) return false;
   if (f.sources.length && !f.sources.includes(lead.source)) return false;
   if (f.channels.length && !f.channels.includes(lead.channel || lead.activeChannel || 'wa')) return false;
-  if (f.contractors.length && !f.contractors.includes(lead.vendor || lead.contractor || '')) return false;
+  if (f.contractors.length && !f.contractors.includes(lead.vendorId || lead.vendor || lead.contractor || '')) return false;   /* хук пишет vendorId — раньше фильтр по подрядчику НИКОГДА не матчил (проверял lead.vendor) */
   if (f.brokers !== 'all' && Array.isArray(f.brokers) && !f.brokers.includes(lead.broker)) return false;
   return true;
 }
