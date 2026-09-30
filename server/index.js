@@ -395,6 +395,15 @@ function ensureTenantDefaults(db) {
   if (!s.ownerTgCode) s.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex');   /* код привязки владельца к TG-боту (аналитика с телефона) — раньше был только у primary */
   /* все верхнеуровневые коллекции, которые код ждёт как массивы (seed даёт лишь часть) — чтобы новый тенант не падал ни на одной фиче */
   for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates', 'debugReports']) if (!Array.isArray(db[k])) db[k] = [];
+  /* БЭКФИЛЛ: уже провиженные брокеры (email+PIN+active) должны быть в reg.byEmail, иначе /auth/login не найдёт их тенанта.
+     Пишем только когда отсутствует (после первого раза — без записей). Не клобберим чужой маппинг. */
+  try {
+    if ((db.brokers || []).some(b => b.email && b.pinHash && b.active !== false)) {
+      const _reg = store.getRegistry(); const _tid = store.currentTid(); let _ch = false;
+      for (const b of db.brokers) { if (b.email && b.pinHash && b.active !== false) { const em = String(b.email).toLowerCase(); if (!_reg.byEmail[em]) { _reg.byEmail[em] = _tid; _ch = true; } } }
+      if (_ch) store.saveRegistry();
+    }
+  } catch (_) {}
   return db;
 }
 {
@@ -7386,6 +7395,9 @@ const server = http.createServer(async (req, res) => {
       else { let tries = 0; do { pin = String(Math.floor(100000 + Math.random() * 900000)); tries++; } while ((verifyPassword(pin, db.settings.auth.passHash) || db.brokers.some(x => x.pinPlain === pin)) && tries < 40); }
       if (verifyPassword(pin, db.settings.auth.passHash) || db.brokers.some(x => x.id !== br.id && x.pinPlain === pin)) return json(res, 400, { error: 'такой PIN уже занят' });
       br.pinHash = hashPassword(pin); br.pinPlain = pin; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice(); br.accessAt = Date.now();
+      /* 🔴 КРИТ: без этого брокер НЕ мог войти — /auth/login резолвит тенанта по reg.byEmail (только владельцы),
+         email брокера туда не попадал → «wrong password» при верном PIN. Регистрируем email брокера → его тенант. */
+      if (br.email) { try { const _reg = store.getRegistry(); const _em = String(br.email).toLowerCase(); const _mine = store.currentTid(); if (!_reg.byEmail[_em] || _reg.byEmail[_em] === _mine) { _reg.byEmail[_em] = _mine; store.saveRegistry(); } } catch (_) {} }
       if (ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* тип сотрудника: broker/assistant/marketer/manager */
       if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту */
       /* стартовый чеклист в его кабинет — один раз (br.onboarded) */
