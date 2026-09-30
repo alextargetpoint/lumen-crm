@@ -146,6 +146,7 @@ function send(db, lead, text, via, opts = {}) {
       store.save();
     })();
     store.save();
+    if (via === 'ai' && lead.broker && module.exports.onAiReply) { try { module.exports.onAiReply(db, lead, m0); } catch (_) {} }   /* брокеру в Telegram: «ассистент ответил клиенту» */
     return m0;
   }
   const num = pickNumber(db, lead);
@@ -211,6 +212,7 @@ function send(db, lead, text, via, opts = {}) {
     setTimeout(() => { if (m.status === 'sent') m.status = 'delivered'; store.save(); }, 1500); // mock-доставка
   }
   store.save();
+  if (via === 'ai' && lead.broker && module.exports.onAiReply) { try { module.exports.onAiReply(db, lead, m); } catch (_) {} }   /* брокеру в Telegram: «ассистент ответил клиенту» */
   return m;
 }
 

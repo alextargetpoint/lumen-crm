@@ -864,6 +864,8 @@ engine.onControlAlert = (db, r) => {
 };
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
+/* ассистент ответил клиенту → уведомление брокеру в Telegram (видит, что ИИ ведёт диалог, может перехватить reply) */
+engine.onAiReply = (db, lead, m) => { try { tgbridge.forwardAiReply(db, lead, m).catch(() => {}); } catch (_) {} };
 engine.onInboundMessage = (db, lead, m) => {
   /* антислив: клиент упомянул увод на личный канал → флаг + тревога руководителю */
   try {
@@ -8858,7 +8860,9 @@ const server = http.createServer(async (req, res) => {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const b = await readBody(req);
       const phone = String(b.phone || '').replace(/[^0-9]/g, '');
-      try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/send', { to: b.to, text: b.text }); return json(res, 200, r); }
+      const _sbody = { to: b.to, text: b.text || '' };
+      if (b.media && b.media.url) { const _mu = /^https?:\/\//i.test(b.media.url) ? b.media.url : (callBase(db) + b.media.url); _sbody.media = { type: b.media.type || 'image', url: _mu, name: b.media.name || '', mimetype: b.media.mimetype || '' }; }
+      try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/send', _sbody); return json(res, 200, r); }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* закрепить прогретый номер за брокером (без перезапуска сессии) — с него уходит первое касание и вся цепочка лидов брокера */
