@@ -163,7 +163,7 @@ function send(db, lead, text, via, opts = {}) {
     if (num.sentToday > num.dayLimit * 0.8) num.quality = Math.max(0, +(num.quality - 0.3).toFixed(1));
   }
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel: 'wa', text, at: Date.now(), status: 'sent', numberId: num ? num.id : null, templateId: opts.templateId || null, campaignId: opts.campaignId || null, waId: null };
-  if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500) };
+  if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120), mimetype: opts.media.mimetype || '' };
   db.messages.push(m);
   lead.lastMsgAt = m.at;
   lead.lastDir = 'out';

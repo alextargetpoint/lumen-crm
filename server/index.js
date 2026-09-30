@@ -2961,7 +2961,13 @@ engine.setGraySender(async (db, lead, m) => {
   const wasNew = !lead.grayPhone;
   const num = pickGrayNumber(db, lead, live);
   if (!num) { m.status = 'delivered'; store.save(); return; }   /* нет подключённых — прежний мок, не ломаем поток */
-  await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', { to: lead.phone, text: m.text });
+  /* медиа (голос/видео/фото/подборки-документы/PDF) — прокидываем воркеру абсолютным URL, который он скачает и отправит через Baileys */
+  const _grayBody = { to: lead.phone, text: m.text || '' };
+  if (m.media && m.media.url) {
+    const _mu = /^https?:\/\//i.test(m.media.url) ? m.media.url : (callBase(db) + m.media.url);
+    _grayBody.media = { type: m.media.type || 'image', url: _mu, name: m.media.name || '', mimetype: m.media.mimetype || '' };
+  }
+  await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', _grayBody);
   lead.grayPhone = num.phone;                    /* закрепляем номер за лидом — цепочка остаётся на нём */
   if (wasNew) {
     const today = new Date().toISOString().slice(0, 10);
