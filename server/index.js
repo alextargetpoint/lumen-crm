@@ -2946,11 +2946,15 @@ function pickGrayNumber(db, lead, live) {
   if (!connected.length) return null;
   if (lead.grayPhone) { const s = connected.find(n => n.phone === lead.grayPhone); if (s) return s; }          /* действующий диалог: вся цепочка с одного номера, без лимита */
   /* НОВЫЙ лид (первое касание): потолок новых лидов — МЯГКИЙ. Предпочитаем номер под лимитом,
-     но НЕ блокируем отправку (только френдли-предупреждение в graySender). Закреп за брокером в приоритете. */
+     но НЕ блокируем отправку (только френдли-предупреждение в graySender). */
   const cap = grayNewLeadCap(db);
-  if (lead.broker) { const b = connected.find(n => n.brokerId === lead.broker); if (b) return b; }             /* прогретый номер закреплённого брокера */
-  const under = connected.filter(n => grayNewToday(n) < cap);
-  const pool = under.length ? under : connected;                                                                /* под лимитом, иначе — все (мягко) */
+  /* РАСПРЕДЕЛЕНИЕ по номерам БРОКЕРА: если за брокером закреплено НЕСКОЛЬКО номеров — раскидываем первые
+     касания по кругу (наименее нагруженный новыми лидами сегодня), а не шлём всё с одного. Так все номера
+     брокера греются равномерно, и отвал одного номера рвёт связь лишь с частью лидов, а не со всеми. */
+  let scope = connected;
+  if (lead.broker) { const mine = connected.filter(n => n.brokerId === lead.broker); if (mine.length) scope = mine; }
+  const under = scope.filter(n => grayNewToday(n) < cap);
+  const pool = under.length ? under : scope;                                                                    /* под лимитом, иначе — все в scope (мягко) */
   return pool.sort((a, b) => grayNewToday(a) - grayNewToday(b))[0];                                             /* наименее нагруженный новыми лидами */
 }
 
