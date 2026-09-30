@@ -11668,9 +11668,25 @@ ${SCR}
           || (await downloadCover(uu).catch(() => null))
           || (await downloadCover(u).catch(() => null));
       }))).filter(Boolean);
-      const good = dl.sort((a, b2) => (((b2.w || 0) * (b2.h || 0)) || (b2.size || 0)) - (((a.w || 0) * (a.h || 0)) || (a.size || 0))).slice(0, need);
+      let good = dl.sort((a, b2) => (((b2.w || 0) * (b2.h || 0)) || (b2.size || 0)) - (((a.w || 0) * (a.h || 0)) || (a.size || 0))).slice(0, need + 4);
+      /* ⭐ VISION-КУРИРОВАНИЕ: не ставим на обложку/в галерею планировки, людей/селфи, мусор.
+         Планировки уносим в layouts (не теряем). Читаем скачанные файлы напрямую (server→self HTTP на Railway падает). */
+      let planCount = 0, dropped = 0;
+      if (good.length && llm.available()) {
+        try {
+          const items = good.map(g => { try { const fp = path.join(MEDIA_DIR, g.url.replace(/^\/media\//, '')); const buf = fs.readFileSync(fp); const ext = path.extname(fp).toLowerCase(); const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'; return { mime, data: buf.toString('base64') }; } catch (_) { return null; } });
+          const verd = await llm.curatePhotos(items.map(x => x || 'about:blank'));
+          const photos = [], plans = [];
+          good.forEach((g, i) => { const v = verd[i] || { kind: 'photo' }; if (v.kind === 'plan') plans.push(g.url); else if (v.kind === 'photo') photos.push(g); else dropped++; });
+          if (photos.length) {   /* доверяем только если что-то осталось (иначе — сбой vision, оставляем как есть) */
+            good = photos.slice(0, need);
+            planCount = plans.length;
+            if (plans.length) pr.layouts = [...(pr.layouts || []), ...plans.map(u => ({ label: 'Планировка', url: u }))].slice(0, 20);
+          } else { good = good.slice(0, need); }
+        } catch (_) { good = good.slice(0, need); }
+      } else { good = good.slice(0, need); }
       if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
-      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, webKey: !!process.env.RENDER_API_KEY });
+      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, curatedPlans: planCount, curatedDropped: dropped, webKey: !!process.env.RENDER_API_KEY });
     }
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });

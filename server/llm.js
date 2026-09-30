@@ -970,8 +970,9 @@ async function curatePhotos(items) {
   const parts = [{ text: `Ты — фоторедактор карточки недвижимости. Для КАЖДОГО изображения по порядку верни объект {kind, caption}.
 kind:
 - "photo" — ЛЮБОЕ пригодное фото/рендер: экстерьер здания, интерьер, бассейн/удобства, вид, пляж, локация. ВАЖНО: если это нормальное фото, но с ВОДЯНЫМ ЗНАКОМ или мелким логотипом в углу — всё равно "photo" (не выбрасывай!).
-- "plan" — архитектурная планировка/чертёж этажа (комнаты, размеры).
-- "junk" — ТОЛЬКО чистый мусор: коллаж из логотипов брендов, прайс-лист/таблица, слайд где почти один текст, инфографика, титульный слайд с крупным заголовком, сильно обрезанный/битый кадр.
+- "plan" — архитектурная планировка/чертёж этажа/сайт-план (комнаты, размеры, вид сверху со схемой).
+- "person" — кадр, где ГЛАВНЫЙ объект человек/люди (портрет, селфи, лицо крупным планом, постановочное лайфстайл-фото с людьми) — а не сама недвижимость.
+- "junk" — ТОЛЬКО чистый мусор: коллаж из логотипов брендов, прайс-лист/таблица, слайд где почти один текст, инфографика, титульный слайд с крупным заголовком, сильно обрезанный/битый кадр, карта/скриншот карты, случайное фото не про недвижимость.
 caption — короткая подпись по-русски (2-4 слова) ЧТО НА ФОТО: напр. «Вид на бассейн», «Гостиная», «Фасад комплекса», «Пляж рядом», «Лобби», «Спальня», «Вид на море». Для plan — «Планировка». Для junk — "".
 Верни СТРОГО JSON: {"items":[{"kind":"photo","caption":"…"}, …]} — РОВНО ${avail.length} в ТОМ ЖЕ порядке.` }];
   avail.forEach(a => parts.push({ inline_data: { mime_type: a.im.mime, data: a.im.data } }));
@@ -979,7 +980,7 @@ caption — короткая подпись по-русски (2-4 слова) �
   try { const out = await callGeminiVision(parts, 1200); arr = Array.isArray(out.items) ? out.items : []; }
   catch (e) { console.error('[llm] curatePhotos: ' + e.message); return list.map(() => ({ keep: true, kind: 'photo', caption: 'Фото' })); }
   const res = list.map(() => ({ keep: true, kind: 'photo', caption: 'Фото' }));   /* дефолт — оставить (безопасно) */
-  avail.forEach((a, j) => { const it = arr[j] || {}; const kind = ['photo', 'plan', 'junk'].includes(it.kind) ? it.kind : 'photo'; res[a.i] = { keep: kind !== 'junk', kind, caption: String(it.caption || (kind === 'plan' ? 'Планировка' : 'Фото')).slice(0, 40) }; });
+  avail.forEach((a, j) => { const it = arr[j] || {}; const kind = ['photo', 'plan', 'person', 'junk'].includes(it.kind) ? it.kind : 'photo'; res[a.i] = { keep: kind === 'photo', kind, caption: String(it.caption || (kind === 'plan' ? 'Планировка' : kind === 'person' ? 'Человек' : 'Фото')).slice(0, 40) }; });
   return res;
 }
 
