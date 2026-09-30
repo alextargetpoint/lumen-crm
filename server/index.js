@@ -5944,10 +5944,11 @@ const server = http.createServer(async (req, res) => {
     const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
     const farmEmailOk = p === '/api/farm/email-inbound' && req.method === 'POST';  /* вебхук входящей почты фермы (Telegram-коды), секрет внутри */
     const emailInboundOk = p === '/api/email/inbound' && req.method === 'POST';    /* вебхук входящих писем (ответы лидов), тенант по домену-получателю */
+    const emailHookOk = p === '/api/email/resend-webhook' && req.method === 'POST'; /* вебхук аналитики Resend (delivered/opened/clicked/…), матч по emailId */
     const meetingBotOk = p === '/api/meeting-bot/webhook' && req.method === 'POST'; /* вебхук Recall.ai (транскрипт готов), секрет внутри */
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
     const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !cmpEditOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !emailInboundOk && !meetingBotOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !cmpEditOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !emailInboundOk && !emailHookOk && !meetingBotOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
 
     /* вебхук входящей почты фермы: Cloudflare Email Worker шлёт {to,subject,text,secret}; читаем код Telegram */
     if (farmEmailOk) {
@@ -9448,6 +9449,31 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    /* ---------------- Аналитика EMAIL (вебхук Resend) → статус сообщения + метрики кампании ----------------
+       Платформенный вебхук (один на все агентства). Тенант находим по сообщению с этим emailId. */
+    if (p === '/api/email/resend-webhook' && req.method === 'POST') {
+      const b = await readBody(req);
+      const type = String((b && b.type) || '');
+      const emailId = (b && b.data && (b.data.email_id || b.data.id)) || (b && b.email_id) || '';
+      if (!emailId) return json(res, 200, { ok: true });
+      const tid = findTenant(() => (store.get().messages || []).some(x => x.emailId === emailId));
+      if (!tid) return json(res, 200, { ok: true });
+      await store.runInTenant(tid, () => {
+        const tdb = store.get();
+        const msg = (tdb.messages || []).find(x => x.emailId === emailId); if (!msg) return;
+        const cmp = msg.campaignId ? (tdb.campaigns || []).find(c => c.id === msg.campaignId) : null;
+        msg._ev = msg._ev || {};
+        const once = (k, cb) => { if (!msg._ev[k]) { msg._ev[k] = 1; if (cmp) cmp.stats[k] = (cmp.stats[k] || 0) + 1; if (cb) cb(); } };
+        if (type === 'email.delivered') { if (!['opened', 'clicked'].includes(msg.status)) msg.status = 'delivered'; once('delivered'); }
+        else if (type === 'email.opened') { msg.status = 'opened'; once('opened'); }
+        else if (type === 'email.clicked') { msg.status = 'clicked'; once('clicked'); }
+        else if (type === 'email.bounced' || type === 'email.delivery_delayed') { msg.status = 'failed'; once('bounced'); }
+        else if (type === 'email.complained') { msg.status = 'failed'; once('complained', () => { const l = (tdb.leads || []).find(x => x.id === msg.leadId); if (l) { l.marketingOptOut = true; l.marketingOptOutAt = Date.now(); } }); }
+        store.save();
+      });
+      return json(res, 200, { ok: true });
+    }
+
     /* ---------------- Одноразовая миграция базы локаль→облако ----------------
        Работает ТОЛЬКО если задан env MIGRATION_TOKEN и он совпадает с Bearer.
        После переноса переменную убрать (эндпоинт снова закроется). */
@@ -11607,14 +11633,32 @@ ${SCR}
           if (cand.length < 3 && renderReady()) { const rp = await renderPage(pr.sourceUrl); if (rp && rp.html) scrapeImagesFromHtml(rp.html, pr.sourceUrl).forEach(u => { if (okImg(u)) cand.push(u); }); }
         } catch (_) {}
       }
-      if (cand.length < 2 && process.env.RENDER_API_KEY) {   /* 2) фолбэк: веб-поиск фото */
-        try { const sr = await webSearch([pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'недвижимость проект'].filter(Boolean).join(' '), 6, { media: true }); (sr && sr.images || []).forEach(u => { if (okImg(u)) cand.push(u); }); } catch (_) {}
+      let srcPages = 0;
+      if (cand.length < 8 && process.env.RENDER_API_KEY) {   /* 2) веб-поиск + ГЛУБОКИЙ скрейп топ-страниц-источников */
+        try {
+          /* EN-запрос: у пхукетских проектов англ. имена → порталы/сайты застройщика находятся лучше */
+          const q = [pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'Phuket condominium project'].filter(Boolean).join(' ');
+          const sr = await webSearch(q, 8, { media: true });
+          (sr && sr.images || []).forEach(u => { if (okImg(u)) cand.push(u); });
+          /* рендерим ТОП страниц-источников и тянем их галереи (у популярных ЖК — полные фотогалереи) */
+          const srcUrls = [...new Set((sr && sr.sources || []).map(s => s && s.url).filter(Boolean))].slice(0, 4);
+          for (const su of srcUrls) {
+            if (cand.length >= 24) break;
+            try { const rp = await renderPage(su); if (rp && rp.html) { scrapeImagesFromHtml(rp.html, su).forEach(u => { if (okImg(u)) cand.push(u); }); srcPages++; } } catch (_) {}
+          }
+        } catch (_) {}
       }
-      cand = [...new Set(cand)].filter(u => !(pr.images || []).includes(u)).slice(0, 40);
+      cand = [...new Set(cand)].filter(u => !(pr.images || []).includes(u)).slice(0, 60);
       const dl = (await Promise.all(cand.map(u => downloadImageToAsset(upgradeCdnUrl(u)).catch(() => downloadImageToAsset(u).catch(() => null))))).filter(Boolean);
-      const good = dl.sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
+      let good = dl.sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
+      /* если галерейного качества не нашлось, но кандидаты есть — берём хотя бы ОБЛОЖКУ мягким фильтром (≥200px),
+         чтобы карточка перестала быть пустым чёрным прямоугольником */
+      if (!good.length && cand.length && !have.length) {
+        const cov = (await Promise.all(cand.slice(0, 12).map(u => downloadCover(upgradeCdnUrl(u)).catch(() => downloadCover(u).catch(() => null))))).filter(Boolean);
+        if (cov.length) good = [cov.sort((a, b2) => (b2.size || 0) - (a.size || 0))[0]];
+      }
       if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
-      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: !!pr.sourceUrl });
+      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: !!pr.sourceUrl, candidates: cand.length, srcPages, webKey: !!process.env.RENDER_API_KEY });
     }
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });

@@ -761,7 +761,7 @@ function tickCampaigns(db) {
   if (db.settings.wa.bcastDay !== bDay) { db.settings.wa.bcastDay = bDay; db.settings.wa.bcastSent = 0; db.settings.wa.bcastByNum = {}; }
   db.settings.wa.bcastByNum = db.settings.wa.bcastByNum || {};
   for (const cmp of db.campaigns) {
-    /* КАНАЛ рассылки: 'wa' (Cloud API, дефолт) | 'email' (Resend). Лимит/ramp + счётчик + достижимость + отправка — свои. */
+    /* КАНАЛ рассылки: 'wa' (Cloud API, дефолт) | 'email' (Resend) | 'viber' (BSP). Лимит/ramp + счётчик + достижимость + отправка — свои. */
     const chan = cmp.channel || 'wa';
     const fromId = cmp.senderPhoneId || db.settings.wa.phoneId;
     let cap, sentCount, bumpSent, reachable, sendOne;
@@ -774,6 +774,15 @@ function tickCampaigns(db) {
       reachable = (lead) => (lead.contacts || []).some(c => c.kind === 'email' && c.value) || !!lead.email;
       const subj = cmp.subject || (db.templates.find(t => t.id === cmp.templateId) || {}).name || 'По вашей заявке';
       sendOne = (lead, text) => send(db, lead, text, 'wake', { broadcast: true, campaignId: cmp.id, channel: 'email', subject: subj });
+    } else if (chan === 'viber') {
+      const vbr = db.settings.viberBcast = db.settings.viberBcast || { day: bDay, sent: 0 };
+      if (vbr.day !== bDay) { vbr.day = bDay; vbr.sent = 0; }
+      cap = ((db.settings.channels && db.settings.channels.viber && db.settings.channels.viber.dailyCap)) || 500;
+      sentCount = () => vbr.sent || 0;
+      bumpSent = () => { vbr.sent = (vbr.sent || 0) + 1; };
+      reachable = (lead) => !!lead.phone && (lead.channels && lead.channels.viber) !== 'no';
+      /* золотое правило: opt-out в тексте (Viber BSP не несёт кнопок в текст-сообщении) */
+      sendOne = (lead, text) => send(db, lead, (text || '') + (text ? '\n\n' : '') + 'Ответьте «стоп», чтобы отписаться от рассылки.', 'wake', { broadcast: true, campaignId: cmp.id, channel: 'viber' });
     } else {
       cap = broadcastTierCap(db, senderRegAt(db, fromId));
       sentCount = () => db.settings.wa.bcastByNum[fromId] || 0;
@@ -895,6 +904,11 @@ function inbound(db, lead, text, opts = {}) {
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'in', via: null, text, at: Date.now(), status: 'received' };
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120) };
   db.messages.push(m);
+  /* ЗОЛОТОЕ ПРАВИЛО: ответ «стоп/отписаться/stop/unsubscribe» → отписка от рассылок (любой канал) */
+  if (/^\s*(стоп|stop|отписаться|отписка|unsubscribe|unsub)\b/i.test(String(text || '')) && !lead.marketingOptOut) {
+    lead.marketingOptOut = true; lead.marketingOptOutAt = Date.now();
+    ai.pushEvent(db, { type: 'optout', leadId: lead.id, text: `${lead.name}: отписался от рассылок («${String(text).trim().slice(0, 20)}»)` });
+  }
   lead.unread = (lead.unread || 0) + 1;   /* счётчик непрочитанных для брокера (сбрасывается при открытии карточки / ответе человека) */
   lead.lastInboundAt = m.at;
   /* ⭐STICKY-БРОКЕР + умное перераспределение: лид ВСЕГДА возвращается к своему брокеру-владельцу

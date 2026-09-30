@@ -8045,7 +8045,9 @@ PAGES.properties = async (root) => {
                 <div class="pd-sub pd2-sub">${combo('area', geoMD.areas, pr.area, 'район')} ${combo('developer', geoMD.developers, pr.developer, 'застройщик')}</div>
               </div>
               <div class="pd2-priceside">
-                <div class="pd2-price">от <input class="gi gi-price pd2-priceinp" data-f="priceFrom" type="text" inputmode="numeric" data-money value="${pr.priceFrom}"><select class="gi pd2-cur" data-f="currency" title="Валюта — поправьте, если распозналась неверно">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'IDR', 'GBP'].map(c => `<option ${(pr.currency || 'USD').toUpperCase() === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+                ${editMode
+                  ? `<div class="pd2-price">от <input class="gi gi-price pd2-priceinp" data-f="priceFrom" type="text" inputmode="numeric" data-money value="${pr.priceFrom}"><select class="gi pd2-cur" data-f="currency" title="Валюта — поправьте, если распозналась неверно">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'IDR', 'GBP'].map(c => `<option ${(pr.currency || 'USD').toUpperCase() === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>`
+                  : `<div class="pd2-price pd2-price-ro">${pr.priceFrom ? 'от ' + money(pr.priceFrom, pr.currency) : '<span class="pd2-price-empty">цена не указана</span>'}</div>`}
                 ${pr.priceFrom && (pr.currency || 'USD').toUpperCase() !== (FX.base || 'USD') ? `<div class="pd2-conv">≈ ${money(convTo(pr.priceFrom, pr.currency, FX.base) || 0, FX.base)} <span class="muted">в базовой (${FX.base})</span></div>` : ''}
                 <div class="pd2-selects">
                   <select id="pdMarket" style="width:128px"><option value="offplan" ${pr.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
@@ -9025,6 +9027,10 @@ async function newCampaignModal() {
     body: `
       <div class="form-row"><label>Название</label><input id="cName" value="Пробуждение базы"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Канал рассылки</label><select id="cChan"><option value="wa">WhatsApp (Cloud API)</option><option value="email">E-mail (свой домен)</option><option value="viber">Viber (BSP)</option></select></div>
+        <div class="form-row"><label>Тема письма <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(для email)</span></label><input id="cSubject" placeholder="Новые проекты у моря"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-row"><label>Направление</label><select id="cGeo"><option value="">Все</option>${s.agency.geos.map(g => `<option value="${g}">${s.geoNames[g]}</option>`).join('')}</select></div>
         <div class="form-row"><label>Молчат дольше</label><select id="cOlder">${olderOpts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>
       </div>
@@ -9067,6 +9073,7 @@ async function newCampaignModal() {
         const senderSel = $('#cSender', bd); const senderOpt = senderSel && senderSel.selectedOptions[0];
         const body = {
           name: $('#cName', bd).value, templateId: $('#cTpl', bd).value,
+          channel: ($('#cChan', bd) && $('#cChan', bd).value) || 'wa', subject: ($('#cSubject', bd) && $('#cSubject', bd).value) || '',
           senderPhoneId: (senderSel && senderSel.value) || null, senderLabel: (senderOpt && senderOpt.dataset.lbl) || '',
           filters: { stages: ['sleeping'], geo: $('#cGeo', bd).value || null, olderDays: +$('#cOlder', bd).value || 0, maxDays: +$('#cMax', bd).value || null, segment: $('#cSeg', bd).value || null, sources: $('#cSrc', bd).value ? [$('#cSrc', bd).value] : [], broker: $('#cBrk', bd).value || null, tags: ($('#cTags', bd).value || '').split(',').map(t => t.trim()).filter(Boolean) },
           batchSize: +$('#cBatch', bd).value, pauseMin: [+$('#cP1', bd).value, +$('#cP2', bd).value],
