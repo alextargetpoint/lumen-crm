@@ -7030,6 +7030,7 @@ PAGES.sequences = async (root) => {
           <span class="se2-k">Канал</span>
           <select data-se="channel" class="se2-sel"><option value="wa" ${!['voice', 'email'].includes(st.channel) ? 'selected' : ''}>WhatsApp (авто-каскад)</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option><option value="email" ${st.channel === 'email' ? 'selected' : ''}>E-mail</option></select>
           <input data-se="subject" value="${esc(st.subject || '')}" placeholder="Тема письма" class="se2-grow" style="${st.channel === 'email' ? '' : 'display:none'}">
+          <button type="button" class="btn btn-sm" data-se-empv style="${st.channel === 'email' ? '' : 'display:none'}" title="Показать, как это письмо увидит клиент — ваш текст в выбранном оформлении">${ic(I.eye)}Превью письма</button>
           <input data-se="label" value="${esc(st.label || '')}" placeholder="Название шага (для себя)" class="se2-grow">
         </div>
         <!-- 3. Что отправляем -->
@@ -7470,7 +7471,16 @@ PAGES.sequences = async (root) => {
       const cr = eb.querySelector('[data-se-crea]'); if (cr) cr.style.display = m === 'creative' ? '' : 'none';
     };
     $$('.se2-mode', eb).forEach(b => b.addEventListener('click', () => { eb.dataset.mode = b.dataset.mode; syncMode(); }));
-    { const chSel = eb.querySelector('[data-se="channel"]'), subjIn = eb.querySelector('[data-se="subject"]'); if (chSel && subjIn) chSel.addEventListener('change', () => { subjIn.style.display = chSel.value === 'email' ? '' : 'none'; }); }   /* смена канала шага на E-mail → показать поле «Тема письма» */
+    { const chSel = eb.querySelector('[data-se="channel"]'), subjIn = eb.querySelector('[data-se="subject"]'), pvBtn = eb.querySelector('[data-se-empv]'); if (chSel) chSel.addEventListener('change', () => { const em = chSel.value === 'email'; if (subjIn) subjIn.style.display = em ? '' : 'none'; if (pvBtn) pvBtn.style.display = em ? '' : 'none'; }); }   /* смена канала на E-mail → поле «Тема» + кнопка превью */
+    { const pv = eb.querySelector('[data-se-empv]'); if (pv) pv.addEventListener('click', async () => {
+        const subj = (eb.querySelector('[data-se="subject"]') || {}).value || '';
+        const mode = curMode();
+        const txt = (eb.querySelector('[data-se="text"]') || {}).value || (eb.querySelector('[data-se="prompt"]') || {}).value || '';
+        const qs = new URLSearchParams({ mode }); if (subj) qs.set('subject', subj); if (txt && mode !== 'personalize' && mode !== 'ai') qs.set('text', txt);
+        let r; try { r = await api.get('/email/preview?' + qs.toString()); } catch (e) { toast('Ошибка превью', e.message, false); return; }
+        const bd = modal({ title: 'Превью письма', sub: mode === 'personalize' ? 'ИИ соберёт текст под каждого лида — тут показан стиль оформления' : 'Ваш текст в выбранном оформлении', wide: true, body: `<iframe id="sePvFrame" style="border:0;width:100%;height:70vh;border-radius:10px;background:#fff;display:block"></iframe>`, actions: [{ label: 'Закрыть' }] });
+        const f = bd && bd.querySelector && bd.querySelector('#sePvFrame'); if (f) f.srcdoc = r.html;
+      }); }
     const ta = eb.querySelector('[data-se="text"]');
     const promptInp = eb.querySelector('[data-se="prompt"]');
     /* переменные спрятаны за кнопкой «Переменная» (поповер) — не заваливаем экран */

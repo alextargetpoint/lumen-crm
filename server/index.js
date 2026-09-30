@@ -7981,9 +7981,17 @@ const server = http.createServer(async (req, res) => {
       const preset = u.searchParams.get('preset') || ((db.settings.channels && db.settings.channels.email && db.settings.channels.email.preset) || 'classic');
       const propImg = (((db.properties || []).find(pr => (pr.images || [])[0]) || {}).images || [])[0] || '';
       const _ag = db.settings.agency || {};
+      /* превью реального текста шага цепочки (если передан) — иначе образец. {переменные} заменяем демо-значениями. */
+      const _demoVars = (t) => String(t || '').replace(/\{name\}/gi, 'Иван').replace(/\{agency\}/gi, _ag.name || 'агентство').replace(/\{geo\}/gi, 'Пхукет').replace(/\{creative\}|\{ad\}|\{project\}/gi, 'Evgenia Laya Resort').replace(/\{district\}/gi, 'Пхукет').replace(/\{budget\}/gi, '$500k').replace(/\{[a-z_]+\}/gi, '');
+      const _pvText = u.searchParams.get('text');
+      const _pvSubj = u.searchParams.get('subject');
+      const _isAi = (u.searchParams.get('mode') === 'personalize' || u.searchParams.get('mode') === 'ai');
       const rich = mailer.renderCascadeEmail({
-        name: 'Иван', lang: 'ru', preset, subject: 'Пример письма',
-        text: 'Появились новые проекты у моря и готовые виллы под ваш запрос. Подобрал несколько вариантов — посмотрите, и подскажу детали по любому.',
+        name: 'Иван', lang: 'ru', preset,
+        subject: _pvSubj ? _demoVars(_pvSubj).slice(0, 200) : (_isAi ? 'Evgenia Laya Resort — подобрал варианты под вашу заявку' : 'Пример письма'),
+        text: _pvText ? _demoVars(_pvText).slice(0, 3000)
+          : _isAi ? 'Благодарю за интерес к Evgenia Laya Resort — сильный проект для жизни и инвестиций на Пхукете. Закрытая территория, до пляжа ~10 минут, первая очередь уже приносит владельцам доход.\n\nГотов прислать актуальные планировки и расчёт по рассрочке под ваш бюджет. Подобрать?'
+          : 'Появились новые проекты у моря и готовые виллы под ваш запрос. Подобрал несколько вариантов — посмотрите, и подскажу детали по любому.',
         agency: _ag.name || 'Ваше агентство',
         agencyLogo: (raw => raw ? (/^https?:\/\//i.test(raw) ? raw : (callBase(db) + (raw[0] === '/' ? '' : '/') + raw)) : '')(_ag.logo || _ag.logoUrl || ''),   /* относительный путь → абсолютный (в письме иначе битая картинка) */ agencyAddr: _ag.address || _ag.addr || '', agencySite: _ag.site || _ag.website || '',
         brokerName: (db.brokers && db.brokers[0] && db.brokers[0].name) || ((_ag.manager && _ag.manager.name) || 'Менеджер'),
@@ -11962,7 +11970,14 @@ ${SCR}
       /* share:true → сохраняем снапшот для ПУБЛИЧНОЙ страницы клиента (/cmp/:id) */
       if (b.share) {
         db.compares = db.compares || [];
-        const snap = items.map(p => ({ id: p.id, name: p.name, area: p.area || '', developer: p.developer || '', type: p.type || '', priceFrom: p.priceFrom || 0, currency: p.currency || 'USD', roi: p.roi || '', appreciation: p.appreciation || '', handover: p.handover || '', market: p.market || 'offplan', beds: p.beds || 0, units: (p.units || []).length, image: (p.images || [])[0] || '', description: (p.i18n && p.i18n[b.lang] && p.i18n[b.lang].description) || p.description || '' }));
+        const snap = items.map(p => ({ id: p.id, name: p.name, area: p.area || '', developer: p.developer || '', type: p.type || '', priceFrom: p.priceFrom || 0, currency: p.currency || 'USD', roi: p.roi || '', appreciation: p.appreciation || '', handover: p.handover || '', market: p.market || 'offplan', beds: p.beds || 0, units: (p.units || []).length, image: (p.images || [])[0] || '', description: (p.i18n && p.i18n[b.lang] && p.i18n[b.lang].description) || p.description || '',
+          /* для детальной ПОД-СТРАНИЦЫ проекта (/cmp/:id?p=projId) — галерея, планировки, район, аргументы */
+          gallery: (p.images || []).slice(0, 12), layouts: (p.layouts || []).slice(0, 8).map(l => ({ label: String(l.label || 'Планировка').slice(0, 40), url: String(l.url || '') })).filter(l => l.url),
+          amenities: (p.amenities || []).slice(0, 24).map(x => String(x).slice(0, 60)),
+          invest: (p.investmentHighlights || []).slice(0, 8).map(x => String(x).slice(0, 200)),
+          whyRent: (p.whyRent || []).slice(0, 4).map(x => String(x).slice(0, 300)),
+          district: p.district && (p.district.blurb || (p.district.times || []).length) ? { name: String(p.district.name || p.area || '').slice(0, 60), blurb: String(p.district.blurb || '').slice(0, 500), times: (p.district.times || []).slice(0, 6).map(t => ({ min: +t.min || 0, place: String(t.place || '').slice(0, 60) })) } : null,
+          payment: String(p.payment || '').slice(0, 200), hookTitle: String(p.hookTitle || '').slice(0, 160), video: (p.videos || [])[0] || '' }));
         const rec = { id: 'cmp_' + crypto.randomBytes(6).toString('hex'), token: crypto.randomBytes(8).toString('hex'), items: snap, analysis: an, lang: b.lang || 'ru', agency: (db.settings.agency && db.settings.agency.name) || 'Lumen', createdAt: Date.now() };
         db.compares.unshift(rec); db.compares = db.compares.slice(0, 200); store.save();
         const host = req.headers.host && !/localhost|127\.0\.0\.1|railway/.test(req.headers.host) ? 'https://' + req.headers.host : (global.LUMEN_BASE || 'https://app.lumen247.com');
@@ -15185,6 +15200,66 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
       const num = (s) => { const mm = String(s || '').match(/(\d+(?:[.,]\d+)?)/); return mm ? parseFloat(mm[1].replace(',', '.')) : null; };
       const FX = await getFxRates().catch(() => ({ USD: 1 }));
       const pxUsd = (x) => { const r = FX[String(x.currency || 'USD').toUpperCase()]; return r ? (+x.priceFrom || 0) / r : +x.priceFrom || 0; };
+      /* ⭐ ПОД-СТРАНИЦА проекта: /cmp/:id?p=projId — детальная карточка (галерея/планировки/район/аргументы/вердикт) */
+      const projId = u.searchParams.get('p');
+      if (projId) {
+        const px = (rec.items || []).find(x => x.id === projId);
+        if (!px) { res.writeHead(302, { Location: '/cmp/' + rec.id }); res.end(); return; }
+        const tx = (it || []).find(x => x.id === projId) || px;
+        const desc = tx.description || px.description || '';
+        const vv = ((a.verdicts) || []).find(v => v.name === px.name) || null;
+        const factRow = [[T.price, money(px.priceFrom, px.currency)], [T.roi, px.roi], [T.apprec, px.appreciation], [T.ho, px.handover], [T.type, px.type], [T.area, px.area], [T.dev, px.developer], [T.market, px.market === 'secondary' ? T.sec : T.prim]].filter(([, v]) => v && v !== '—');
+        const gallery = (px.gallery && px.gallery.length ? px.gallery : (px.image ? [px.image] : []));
+        const backT = curLang === 'ru' ? '← К сравнению' : '← Back to comparison';
+        const sub = `<!doctype html><html lang="${curLang}"${curLang === 'ar' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc2(px.name)} · ${esc2(rec.agency)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}:root{--gold:#b8863c;--ink:#221f1a;--mut:#8a8378;--line:#ece2ce;--paper:#f7f3ea}
+body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+.top{position:sticky;top:0;z-index:5;background:rgba(247,243,234,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1000px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.back{font-size:13px;font-weight:700;color:var(--gold);text-decoration:none}.brand{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);font-weight:800}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px 70px}
+.phero{position:relative;height:min(52vh,440px);border-radius:0 0 22px 22px;overflow:hidden;background:#e9e2d3 center/cover;margin-bottom:22px}
+.phero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.55))}
+.phero-t{position:absolute;left:24px;right:24px;bottom:20px;z-index:2;color:#fff}
+.phero-t .k{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.85;font-weight:700}
+.phero-t h1{font-family:'Cormorant Garamond',Georgia,serif;font-size:38px;font-weight:700;margin:4px 0;line-height:1.05;text-shadow:0 2px 10px rgba(0,0,0,.4)}
+.phero-t .pr{font-size:22px;font-weight:800;color:#ffe6b0}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px}
+.fact{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 15px}.fact .l{font-size:11px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.04em}.fact .v{font-size:16px;font-weight:700;margin-top:3px}
+h2.sec{font-family:'Cormorant Garamond',serif;font-size:25px;font-weight:700;margin:26px 0 12px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.gal img{width:100%;height:120px;object-fit:cover;border-radius:12px;cursor:zoom-in;display:block}
+.desc{font-size:15px;line-height:1.7;color:#3a352d;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:#fff;border:1px solid var(--line);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:600}
+.args{list-style:none;padding:0;margin:0;display:grid;gap:8px}.args li{background:#fffdf9;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:0 12px 12px 0;padding:11px 15px;font-size:14px}
+.tim{display:grid;gap:6px}.tim .r{display:flex;align-items:center;gap:10px;font-size:14px}.tim .m{flex:0 0 54px;font-weight:800;color:var(--gold)}
+.lays{display:flex;flex-wrap:wrap;gap:10px}.lay{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--ink);text-decoration:none}
+.verd{background:linear-gradient(180deg,#fbf6ec,#f7efdd);border-radius:16px;padding:20px 22px}.verd .fw{font-size:13px;color:var(--mut);margin-bottom:8px}.verd ul{margin:6px 0 0;padding-left:18px;font-size:14px}.verd .pros li{color:#4a7a4f}.verd .cons li{color:#b4553a}
+.ftt{text-align:center;color:#a89f90;font-size:12px;margin-top:40px}
+.lb{position:fixed;inset:0;background:rgba(20,17,12,.92);display:none;place-items:center;z-index:50;cursor:zoom-out}.lb.on{display:grid}.lb img{max-width:94vw;max-height:92vh;border-radius:10px}
+@media(max-width:640px){.phero-t h1{font-size:28px}.gal img{height:96px}}</style></head><body>
+<div class="top"><div class="top-in"><a class="back" href="/cmp/${rec.id}${curLang !== (rec.lang || 'ru') ? '?lang=' + curLang : ''}">${backT}</a><div class="brand">${esc2(rec.agency)}</div></div></div>
+<div class="phero" style="background-image:url('${esc2(gallery[0] || '')}')"><div class="phero-t">${px.hookTitle ? `<div class="k">${esc2(px.hookTitle)}</div>` : ''}<h1>${esc2(px.name)}</h1><div class="pr">${money(px.priceFrom, px.currency)}</div></div></div>
+<div class="wrap">
+<div class="facts">${factRow.map(([l, v]) => `<div class="fact"><div class="l">${esc2(l)}</div><div class="v">${esc2(v)}</div></div>`).join('')}</div>
+${desc ? `<h2 class="sec">${curLang === 'ru' ? 'О проекте' : 'About'}</h2><div class="desc">${esc2(desc)}</div>` : ''}
+${gallery.length > 1 ? `<h2 class="sec">${curLang === 'ru' ? 'Галерея' : 'Gallery'}</h2><div class="gal">${gallery.map(u2 => `<img loading="lazy" src="${esc2(u2)}" data-full="${esc2(u2)}">`).join('')}</div>` : ''}
+${(px.invest && px.invest.length) ? `<h2 class="sec">${curLang === 'ru' ? 'Инвест-аргументы' : 'Investment highlights'}</h2><ul class="args">${px.invest.map(x => `<li>${esc2(x)}</li>`).join('')}</ul>` : ''}
+${(px.district && (px.district.blurb || (px.district.times || []).length)) ? `<h2 class="sec">${curLang === 'ru' ? 'Район' : 'District'}${px.district.name ? ' · ' + esc2(px.district.name) : ''}</h2>${px.district.blurb ? `<div class="desc" style="margin-bottom:12px">${esc2(px.district.blurb)}</div>` : ''}${(px.district.times || []).length ? `<div class="tim">${px.district.times.map(t => `<div class="r"><span class="m">${t.min}′</span><span>${esc2(t.place)}</span></div>`).join('')}</div>` : ''}` : ''}
+${(px.whyRent && px.whyRent.length) ? `<h2 class="sec">${curLang === 'ru' ? 'Почему сдаётся' : 'Rental case'}</h2><ul class="args">${px.whyRent.map(x => `<li>${esc2(x)}</li>`).join('')}</ul>` : ''}
+${(px.layouts && px.layouts.length) ? `<h2 class="sec">${curLang === 'ru' ? 'Планировки' : 'Floor plans'}</h2><div class="lays">${px.layouts.map(l => `<a class="lay" href="${esc2(l.url)}" target="_blank">▦ ${esc2(l.label)}</a>`).join('')}</div>` : ''}
+${(px.amenities && px.amenities.length) ? `<h2 class="sec">${curLang === 'ru' ? 'Инфраструктура' : 'Amenities'}</h2><div class="chips">${px.amenities.map(x => `<span class="chip">${esc2(x)}</span>`).join('')}</div>` : ''}
+${vv ? `<h2 class="sec">${curLang === 'ru' ? 'Кому подходит' : 'Who it fits'}</h2><div class="verd">${vv.forWhom ? `<div class="fw">${esc2(vv.forWhom)}</div>` : ''}${(vv.pros || []).length ? `<ul class="pros">${vv.pros.map(x => `<li>${esc2(x)}</li>`).join('')}</ul>` : ''}${(vv.cons || []).length ? `<ul class="cons">${vv.cons.map(x => `<li>${esc2(x)}</li>`).join('')}</ul>` : ''}</div>` : ''}
+${px.video ? `<h2 class="sec">${curLang === 'ru' ? 'Видео' : 'Video'}</h2><a class="lay" href="${esc2(px.video)}" target="_blank">▶ ${curLang === 'ru' ? 'Смотреть видео-тур' : 'Watch video tour'}</a>` : ''}
+<div class="ftt">${esc2(T.ft)} · ${esc2(rec.agency)}</div>
+</div>
+<div class="lb" id="lb"><img id="lbimg" src=""></div>
+<script>(function(){var lb=document.getElementById('lb'),im=document.getElementById('lbimg');document.querySelectorAll('.gal img').forEach(function(g){g.onclick=function(){im.src=g.dataset.full;lb.classList.add('on')}});lb.onclick=function(){lb.classList.remove('on');im.src=''}})();</script>
+</body></html>`;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=120' });
+        res.end(sub); return;
+      }
       const rows = [[T.price, x => money(x.priceFrom, x.currency), pxUsd, 'min'], [T.area, x => esc2(x.area) || '—'], [T.dev, x => esc2(x.developer) || '—'], [T.type, x => esc2(x.type) || '—'], [T.roi, x => esc2(x.roi) || '—', x => num(x.roi), 'max'], [T.apprec || T.apprec, x => esc2(x.appreciation) || '—', x => num(x.appreciation), 'max'], [T.ho, x => esc2(x.handover) || '—'], [T.units, x => x.units || '—', x => +x.units || null, 'max'], [T.market, x => x.market === 'secondary' ? T.sec : T.prim]];
       const bestI = (vf, dir) => { if (!vf || !dir || it.length < 2) return -1; const vals = it.map(vf); const has = vals.filter(v => v != null); if (has.length < 2) return -1; let bi = -1, bv = null; vals.forEach((v, i) => { if (v == null) return; if (bv == null || (dir === 'min' ? v < bv : v > bv)) { bv = v; bi = i; } }); return vals.filter(v => v === bv).length === it.length ? -1 : bi; };
       const editMode = u.searchParams.get('edit') === rec.token;   /* брокер редактирует текст клиенту */
@@ -15230,7 +15305,7 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 <div class="top"><div class="top-in"><div class="brand">${esc2(rec.agency)}</div>${rec.showLangSwitcher ? `<div class="langs">${LANGS.map(([c, n]) => `<a href="?lang=${c}" class="${c === curLang ? 'on' : ''}">${n}</a>`).join('')}</div>` : ''}</div></div>
 <div class="wrap">
 <div class="hero"><div class="k">${esc2(rec.agency)}</div><h1>${esc2(T.title)}</h1><div class="sub">${esc2(T.sub)}</div></div>
-<div class="cards">${it.map(x => `<div class="card"><div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}</div></div>`).join('')}</div>
+<div class="cards">${it.map(x => `<a class="card" href="/cmp/${rec.id}?p=${encodeURIComponent(x.id)}${curLang !== (rec.lang || 'ru') ? '&lang=' + curLang : ''}" style="text-decoration:none;color:inherit;display:block"><div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}<span class="more">${curLang === 'ru' ? 'подробнее →' : 'details →'}</span></div></a>`).join('')}</div>
 <div class="grid"><div class="lbl"></div>${it.map(() => '<div class="lbl"></div>').join('')}
 ${rows.map(([l, fn, vf, dir]) => { const bi = bestI(vf, dir); return `<div class="lbl">${esc2(l)}</div>${it.map((x, i) => `<div class="val${i === bi ? ' win' : ''}">${fn(x)}${i === bi ? `<span class="st" title="${esc2(T.best)}">★</span>` : ''}</div>`).join('')}`; }).join('')}</div>
 ${((a.summary || verd || editMode) && (!H.ai || editMode)) ? `<div class="ai${H.ai ? ' is-hid' : ''}" data-blk="ai"><h2><span class="d">✦</span>${esc2(T.ai)}${editMode ? '<button class="delx" data-del="ai" title="Убрать весь блок у клиента">×</button>' : ''}</h2>${((a.summary || editMode) && (!H.summary || editMode)) ? `<div class="sum${H.summary ? ' is-hid' : ''}" data-blk="summary">${editMode ? '<button class="delx" data-del="summary" title="Убрать у клиента">×</button>' : ''}<span${ed('summary')}>${esc2(a.summary)}</span></div>` : ''}<div class="vgrid">${verd}</div>
