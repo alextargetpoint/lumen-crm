@@ -8921,7 +8921,7 @@ function cmpCard(c) {
   return `<div class="glass cmp-card ${c.state === 'scheduled' ? 'sched' : ''}" data-cmp="${c.id}">
     <div class="cmp-head"><div class="nm">${esc(c.name)}</div>${stateBadge}</div>
     ${c.state === 'scheduled' && startStr ? `<div class="cmp-sched">${ic(I.clock, 2)}Запланирована на <b>${startStr}</b> · запустится сама</div>` : ''}
-    <div class="muted" style="font-size:11.5px;margin-top:4px">пачка ${c.batchSize} · пауза ${c.pauseMin[0]}–${c.pauseMin[1]} ${STATE.settings.demo.accelerate ? 'сек (демо)' : 'мин'} · окно ${c.window[0]}:00–${c.window[1]}:00 по поясу клиента</div>
+    <div class="muted" style="font-size:11.5px;margin-top:4px">${c.senderLabel ? `${ic(I.shield, 2)}с номера <b>${esc(c.senderLabel)}</b> · ` : ''}пачка ${c.batchSize} · пауза ${c.pauseMin[0]}–${c.pauseMin[1]} ${STATE.settings.demo.accelerate ? 'сек (демо)' : 'мин'} · окно ${c.window[0]}:00–${c.window[1]}:00 по поясу клиента</div>
     <div class="cmp-stats">
       <div class="cmp-stat"><div class="v">${c.stats.sent}</div><div class="k">отправлено</div></div>
       <div class="cmp-stat"><div class="v">${c.stats.replied}</div><div class="k">ответили</div></div>
@@ -8968,10 +8968,13 @@ function cmpDemoFill(txt, geoName) {
     .replace(/\{priceLine\}/g, 'Цены в этой вилке — от $145 000. ')
     .replace(/\{[a-zA-Z]+\}/g, '…');
 }
-function newCampaignModal() {
+async function newCampaignModal() {
   const s = STATE.settings;
   const marketingTpls = STATE.templates.filter(t => t.category === 'marketing');
   const olderOpts = [['0', 'любой срок'], ['14', 'больше 14 дней'], ['30', 'больше 30 дней'], ['60', 'больше 60 дней'], ['90', 'больше 90 дней']];
+  /* Cloud API-номера-отправители (рассылка идёт ТОЛЬКО с них; первое касание — с QR-номеров) */
+  const cloudList = ((await api.get('/telephony/otp/list').catch(() => ({}))).list || []).filter(n => n.cloud && n.cloud.phoneId);
+  const senderOpts = cloudList.map(n => `<option value="${esc(n.cloud.phoneId)}" data-lbl="${esc(n.number)}" ${n.connected ? '' : 'disabled'}>${esc(n.number)}${n.cloud.verifiedName ? ' · ' + esc(n.cloud.verifiedName) : ''}${n.connected ? '' : ' · не подключён'}</option>`).join('');
   const segOpts = [['', 'Все сегменты'], ['A', 'A · будить первыми'], ['B', 'B · вторая волна'], ['C', 'C · фон']];
   const bd = modal({
     title: 'Новая кампания реанимации',
@@ -8993,8 +8996,12 @@ function newCampaignModal() {
       </div>
       <div class="form-row"><label>Теги (через запятую) — по желанию</label><input id="cTags" placeholder="напр. инвестор, VIP, горячий"></div>
       <div class="cmp-count" id="cCountBox"><span class="cmp-count-dot"></span><b id="cCount">…</b> получателей под эти условия</div>
+      <div class="form-row" style="margin-top:2px"><label>${ic(I.shield, 2)}Номер-отправитель (Cloud API) <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— рассылка идёт с него; первое касание новым лидам — с QR-номеров</span></label>
+        <select id="cSender">${senderOpts || '<option value="" disabled>Нет подключённых Cloud API-номеров — подключите в «Номера → Cloud API»</option>'}</select>
+        <div class="muted" style="font-size:11px;margin-top:4px">${ic(I.spark, 2)}Новый номер шлём дозированно (ramp-up): &lt;2 дн — до 50/сут, &lt;4 дн — 150, &lt;7 дн — 500, дальше по тиру WABA. Защита от бана.</div></div>
       <div class="form-row" style="margin-top:2px"><label style="display:flex;align-items:center;justify-content:space-between">Шаблон первого касания <button class="btn-ghost" id="cTplNew" type="button" style="font-size:11px">${ic(I.plus)}Создать шаблон реанимации</button></label>
-        <select id="cTpl">${marketingTpls.length ? marketingTpls.map(t => `<option value="${t.id}" ${t.status !== 'approved' ? 'disabled' : ''}>${esc(t.name)}${t.status !== 'approved' ? ' · на модерации' : ''}</option>`).join('') : '<option value="" disabled>Нет marketing-шаблонов — создайте</option>'}</select></div>
+        <select id="cTpl">${marketingTpls.length ? marketingTpls.map(t => `<option value="${t.id}" ${t.status !== 'approved' ? 'disabled' : ''}>${esc(t.name)}${t.status !== 'approved' ? ' · на модерации' : ''}</option>`).join('') : '<option value="" disabled>Нет marketing-шаблонов — создайте</option>'}</select>
+        <div class="muted" style="font-size:11px;margin-top:4px">${ic(I.check, 2)}В marketing-шаблон кнопка «Отписаться» добавляется автоматически (обязательно — иначе бан).</div></div>
       <div class="cmp-prev" id="cPrev"></div>
       <div class="lp-sec" style="margin-top:14px">Темп рассылки</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
@@ -9015,8 +9022,10 @@ function newCampaignModal() {
       { label: 'Создать кампанию', cls: 'btn-accent', onClick: async (bd) => {
         const dv = $('#cDate', bd).value, tv = $('#cTime', bd).value || '10:00';
         const startAt = dv ? new Date(dv + 'T' + tv).getTime() : null;
+        const senderSel = $('#cSender', bd); const senderOpt = senderSel && senderSel.selectedOptions[0];
         const body = {
           name: $('#cName', bd).value, templateId: $('#cTpl', bd).value,
+          senderPhoneId: (senderSel && senderSel.value) || null, senderLabel: (senderOpt && senderOpt.dataset.lbl) || '',
           filters: { stages: ['sleeping'], geo: $('#cGeo', bd).value || null, olderDays: +$('#cOlder', bd).value || 0, maxDays: +$('#cMax', bd).value || null, segment: $('#cSeg', bd).value || null, sources: $('#cSrc', bd).value ? [$('#cSrc', bd).value] : [], broker: $('#cBrk', bd).value || null, tags: ($('#cTags', bd).value || '').split(',').map(t => t.trim()).filter(Boolean) },
           batchSize: +$('#cBatch', bd).value, pauseMin: [+$('#cP1', bd).value, +$('#cP2', bd).value],
           window: [+$('#cW1', bd).value, +$('#cW2', bd).value],

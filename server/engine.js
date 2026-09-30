@@ -176,7 +176,7 @@ function send(db, lead, text, via, opts = {}) {
         job = job.then(res => { wa.sendText(db, lead, text).catch(() => {}); return res; });
       }
     } else {
-      job = tpl && tpl.status === 'approved' ? wa.sendTemplate(db, lead, tpl, text) : wa.sendText(db, lead, text);
+      job = tpl && tpl.status === 'approved' ? wa.sendTemplate(db, lead, tpl, text, { phoneId: opts.phoneId }) : wa.sendText(db, lead, text);
     }
     job.then(res => { m.waId = res.messages?.[0]?.id || null; store.save(); })
       .catch(err => {
@@ -679,22 +679,35 @@ function tickRotation(db) {
 
 /* Дневной потолок рассылок: лимит из тира WABA × градация свежести номера (плавный рост).
    Meta сама режет по тирам; это наша ПОДУШКА сверху, чтобы свежий номер не спалить объёмом. */
-function broadcastTierCap(db) {
+function broadcastTierCap(db, regAt) {
   const tier = (db.settings.wa && db.settings.wa.tier) || 'TIER_250';
   const map = { TIER_50: 50, TIER_250: 250, TIER_1K: 1000, TIER_10K: 10000, TIER_100K: 100000, TIER_UNLIMITED: 1e9, UNLIMITED: 1e9 };
   let cap = map[tier] || 250;
-  const reg = db.settings.wa && db.settings.wa.cloudRegisteredAt;
+  /* градация свежести: у нового номера дозируем объём (ramp-up), чтобы не спалить. regAt — дата регистрации
+     ВЫБРАННОГО номера-отправителя (per-number), фолбэк — глобальная cloudRegisteredAt. */
+  const reg = regAt || (db.settings.wa && db.settings.wa.cloudRegisteredAt);
   if (reg) { const days = (Date.now() - reg) / 864e5; if (days < 2) cap = Math.min(cap, 50); else if (days < 4) cap = Math.min(cap, 150); else if (days < 7) cap = Math.min(cap, 500); }
   return cap;
+}
+/* дата регистрации Cloud API-номера по его phoneId (для per-number ramp) */
+function senderRegAt(db, phoneId) {
+  if (!phoneId) return null;
+  const nums = (db.settings.telephony && db.settings.telephony.otpNumbers) || {};
+  for (const k in nums) { const c = nums[k].cloud; if (c && c.phoneId === phoneId) return c.connectedAt || nums[k].at || null; }
+  return null;
 }
 
 function tickCampaigns(db) {
   const nowT = Date.now();
-  const bcastCap = broadcastTierCap(db);
   const bDay = new Date(nowT).toISOString().slice(0, 10);
   db.settings.wa = db.settings.wa || {};
-  if (db.settings.wa.bcastDay !== bDay) { db.settings.wa.bcastDay = bDay; db.settings.wa.bcastSent = 0; }
+  if (db.settings.wa.bcastDay !== bDay) { db.settings.wa.bcastDay = bDay; db.settings.wa.bcastSent = 0; db.settings.wa.bcastByNum = {}; }
+  db.settings.wa.bcastByNum = db.settings.wa.bcastByNum || {};
   for (const cmp of db.campaigns) {
+    /* номер-отправитель кампании: выбранный Cloud API-номер или дефолтный. Лимит и ramp — ПО ЭТОМУ номеру. */
+    const fromId = cmp.senderPhoneId || db.settings.wa.phoneId;
+    const bcastCap = broadcastTierCap(db, senderRegAt(db, fromId));
+    const numSent = () => db.settings.wa.bcastByNum[fromId] || 0;
     /* авто-старт запланированных кампаний, когда наступило время */
     if (cmp.state === 'scheduled' && cmp.startAt && nowT >= cmp.startAt) {
       cmp.log.unshift({ at: nowT, text: 'Автозапуск по расписанию' });
@@ -703,9 +716,9 @@ function tickCampaigns(db) {
     if (cmp.state !== 'running') continue;
     if (cmp.nextBatchAt && nowT < cmp.nextBatchAt) continue;
     /* дневной лимит рассылок достигнут — ждём обновления лимита (новый день/повышение тира) */
-    if ((db.settings.wa.bcastSent || 0) >= bcastCap) {
+    if (numSent() >= bcastCap) {
       cmp.nextBatchAt = nowT + 3600e3;
-      if (!cmp._capLogged) { cmp.log.unshift({ at: nowT, text: `Дневной лимит рассылок достигнут (${bcastCap}/сут по тиру WABA + градация свежести). Продолжим, когда лимит обновится.` }); cmp._capLogged = true; }
+      if (!cmp._capLogged) { cmp.log.unshift({ at: nowT, text: `Дневной лимит номера-отправителя достигнут (${bcastCap}/сут: тир WABA + градация свежести). Продолжим, когда лимит обновится / номер «дозреет».` }); cmp._capLogged = true; }
       continue;
     }
     cmp._capLogged = false;
@@ -721,7 +734,7 @@ function tickCampaigns(db) {
       const lead = db.leads.find(l => l.id === id);
       if (!lead || !lead.phone) { cmp.stats.skipped += 1; continue; }
       if (lead.marketingOptOut) { cmp.stats.skipped += 1; continue; }   /* отписался в процессе кампании — пропускаем */
-      if ((db.settings.wa.bcastSent || 0) >= bcastCap) { cmp.recipients.push(id); cmp.stats.skipped += 1; continue; }   /* упёрлись в дневной лимит посреди пачки — остаток на завтра */
+      if (numSent() >= bcastCap) { cmp.recipients.push(id); cmp.stats.skipped += 1; continue; }   /* упёрлись в дневной лимит номера посреди пачки — остаток на завтра */
       const hour = new Date(nowT + (lead.tz || 0) * 3600e3).getUTCHours();
       if (!db.settings.demo.accelerate && (hour < cmp.window[0] || hour >= cmp.window[1])) {
         cmp.recipients.push(id); // вне окна клиента — в конец очереди
@@ -730,10 +743,11 @@ function tickCampaigns(db) {
       }
       const tpl = db.templates.find(t => t.id === cmp.templateId);
       const text = tpl ? renderTemplate(db, tpl, lead) : (cmp.text || '');
-      const m = send(db, lead, text, 'wake', { templateId: cmp.templateId, broadcast: true, campaignId: cmp.id });   /* рассылка = только Cloud API */
+      const m = send(db, lead, text, 'wake', { templateId: cmp.templateId, broadcast: true, campaignId: cmp.id, phoneId: fromId });   /* рассылка = только Cloud API, с выбранного номера */
       if (m && m.status !== 'failed') {
         cmp.stats.sent += 1;
-        db.settings.wa.bcastSent = (db.settings.wa.bcastSent || 0) + 1;   /* учёт в дневном лимите рассылок */
+        db.settings.wa.bcastSent = (db.settings.wa.bcastSent || 0) + 1;   /* глобальный счётчик (совместимость) */
+        db.settings.wa.bcastByNum[fromId] = numSent() + 1;   /* per-номер дневной лимит/ramp */
         lead.ai.enabled = true; // ответ подхватит квалификатор
         lead.tags = [...new Set([...(lead.tags || []), 'реанимация'])];
       } else cmp.stats.skipped += 1;

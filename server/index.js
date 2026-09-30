@@ -7143,6 +7143,7 @@ const server = http.createServer(async (req, res) => {
         filters: b.filters || { stages: ['sleeping'] }, batchSize: b.batchSize || 3,
         pauseMin: b.pauseMin || [20, 60], window: b.window || [10, 20],
         templateId: b.templateId || 'tpl_wake_ru', text: b.text || '', startAt,
+        senderPhoneId: b.senderPhoneId || null, senderLabel: b.senderLabel || '',   /* с какого Cloud API-номера шлём рассылку (иначе дефолтный) */
         stats: { sent: 0, delivered: 0, replied: 0, qualified: 0, skipped: 0 },
         recipients: [], cursor: 0, log: [], createdAt: Date.now(), nextBatchAt: null,
       };
