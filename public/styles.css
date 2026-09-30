@@ -2095,7 +2095,10 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 /* ---------- прелоадер: двойной брендинг агентство × Lumen ---------- */
 .pl-center.duo .pl-sub { display: none; }
 .pl-ag { display: grid; place-items: center; gap: 12px; margin-bottom: 26px; }
-.pl-ag img { max-width: 200px; max-height: 96px; object-fit: contain; animation: logoBreath 2.6s var(--ease-soft) infinite; }
+/* логотип тенанта БЕЗ цветного drop-shadow: акцент бренда (напр. зелёный у Trust Phuket) давал уродливое
+   свечение вокруг тёмного лого-бокса. Только деликатное «дыхание» масштабом — никакой подсветки. */
+.pl-ag img { max-width: 200px; max-height: 96px; object-fit: contain; animation: logoBreathSoft 3s var(--ease-soft) infinite; }
+@keyframes logoBreathSoft { 0%, 100% { transform: scale(1); opacity: .97; } 50% { transform: scale(1.028); opacity: 1; } }
 .pl-agname { font-size: 15px; font-weight: 650; letter-spacing: .14em; color: #fff; text-transform: uppercase; }
 .pl-pow { font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--blue-300); opacity: .75; margin-bottom: 8px; }
 .pl-lrow { display: flex; gap: 8px; align-items: center; justify-content: center; opacity: .85; }
