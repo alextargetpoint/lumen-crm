@@ -881,10 +881,20 @@ engine.onEmailSend = async (db, lead, msg) => {
   if (!key) return { ok: false, error: 'нет Resend-ключа' };
   const from = agencyEmailFrom(db) || platCfg.from;
   const broker = (db.brokers || []).find(b => b.id === lead.broker);
+  /* визуал: hero-картинка из креатива рекламы лида ИЛИ фото первого объекта (только image; абсолютный URL) */
+  let heroImg = '';
+  try {
+    const adRec = lead.ads && lead.ads.adId ? (db.ads || []).find(a => String(a.adId) === String(lead.ads.adId)) : null;
+    let raw = (adRec && adRec.media && adRec.media.url && !/\.(mp4|webm|mov)(\?|$)/i.test(adRec.media.url)) ? adRec.media.url
+      : (lead.creativeUrl && !/\.(mp4|webm|mov)(\?|$)/i.test(lead.creativeUrl)) ? lead.creativeUrl
+      : ((db.properties || []).find(p => (p.images || [])[0]) || {}).images?.[0] || '';
+    if (raw) heroImg = /^https?:\/\//i.test(raw) ? raw : (callBase(db) + raw);
+  } catch (_) {}
   const rich = mailer.renderCascadeEmail({
     name: lead.name, lang: lead.lang, text: msg.text, subject: msg.subject,
     agency: (db.settings.agency && db.settings.agency.name) || '',
     brokerName: broker ? broker.name : ((db.settings.agency && db.settings.agency.manager && db.settings.agency.manager.name) || ''),
+    heroImg,
   });
   return mailer.sendViaResend({ key, from }, msg.to, rich.subject, rich.html);
 };
