@@ -5878,10 +5878,11 @@ const server = http.createServer(async (req, res) => {
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
     const farmEmailOk = p === '/api/farm/email-inbound' && req.method === 'POST';  /* вебхук входящей почты фермы (Telegram-коды), секрет внутри */
+    const emailInboundOk = p === '/api/email/inbound' && req.method === 'POST';    /* вебхук входящих писем (ответы лидов), тенант по домену-получателю */
     const meetingBotOk = p === '/api/meeting-bot/webhook' && req.method === 'POST'; /* вебхук Recall.ai (транскрипт готов), секрет внутри */
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
     const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !cmpEditOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !meetingBotOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !cmpEditOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !emailInboundOk && !meetingBotOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
 
     /* вебхук входящей почты фермы: Cloudflare Email Worker шлёт {to,subject,text,secret}; читаем код Telegram */
     if (farmEmailOk) {
@@ -9308,6 +9309,41 @@ const server = http.createServer(async (req, res) => {
           store.save();
         });
       }
+      return json(res, 200, { ok: true });
+    }
+
+    /* ---------------- Входящее ПИСЬМО (ответ лида) → в карточку/чат + брокеру в Telegram ----------------
+       Вебхук Resend Inbound (или форвард-сервис). Тенант — по домену адреса-получателя (verified-домен агентства).
+       Так email становится ДВУСТОРОННИМ: ответ клиента синкается в диалог как и WhatsApp/Telegram. */
+    if (p === '/api/email/inbound' && req.method === 'POST') {
+      const b = await readBody(req);
+      const d = (b && (b.data || b)) || {};                          /* Resend оборачивает в {type,data} */
+      const parseAddr = s => { const m2 = String(s || '').match(/<([^>]+)>/); return (m2 ? m2[1] : String(s || '')).trim().toLowerCase(); };
+      const fromEmail = parseAddr(d.from || d.sender || '');
+      const toRaw = Array.isArray(d.to) ? d.to[0] : (d.to || d.recipient || '');
+      const toEmail = parseAddr(toRaw);
+      const toDomain = (toEmail.split('@')[1] || '').toLowerCase();
+      let text = String(d.text || d.body || (d.html ? String(d.html).replace(/<[^>]+>/g, ' ') : '') || '').trim();
+      /* отрезаем цитату предыдущего письма */
+      text = text.split(/\n(?:On .+wrote:|-{2,} ?Original|От:|_{5,}|>{1,} )/)[0].trim().slice(0, 4000);
+      if (!fromEmail || !toDomain || !text) return json(res, 200, { ok: true, skip: 'empty' });
+      const tid = findTenant(() => { const e = ((store.get().settings.channels || {}).email) || {}; return !!(e.domain && e.verified && String(toDomain) === String(e.domain).toLowerCase()); });
+      if (!tid) return json(res, 200, { ok: true, skip: 'no tenant' });
+      await store.runInTenant(tid, async () => {
+        const tdb = store.get();
+        let lead = (tdb.leads || []).find(l => (l.contacts || []).some(c => c.kind === 'email' && String(c.value || '').toLowerCase() === fromEmail) || String(l.email || '').toLowerCase() === fromEmail);
+        if (!lead) {
+          const geo0 = ((tdb.settings.agency && tdb.settings.agency.geos) || ['dubai'])[0];
+          const nm = (d.from && String(d.from).replace(/<[^>]+>/, '').replace(/["']/g, '').trim()) || fromEmail.split('@')[0];
+          lead = { id: store.nextId('ld'), name: nm || fromEmail, phone: '', geo: geo0, lang: 'ru', tz: 3, stage: 'new', score: 0, source: 'email', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['E-mail'], numberId: null, ads: null, contacts: [{ kind: 'email', value: fromEmail }] };
+          tdb.leads = tdb.leads || []; tdb.leads.push(lead);
+          ai.pushEvent(tdb, { type: 'lead_new', leadId: lead.id, text: `Входящий (E-mail): ${lead.name}` });
+        }
+        lead.contacts = lead.contacts || []; if (!lead.contacts.some(c => c.kind === 'email')) lead.contacts.push({ kind: 'email', value: fromEmail });
+        lead.channels = lead.channels || {}; lead.channels.email = 'yes'; lead.activeChannel = 'email';
+        try { engine.inbound(tdb, lead, text, { channel: 'email', subject: d.subject || '' }); } catch (e) {}
+        store.save();
+      });
       return json(res, 200, { ok: true });
     }
 
