@@ -873,6 +873,27 @@ function agencyEmailFrom(db) {
   if (e.domain && e.verified) { const local = (e.senderLocal || 'noreply').replace(/[^a-z0-9._-]/gi, '') || 'noreply'; return `${agency} <${local}@${e.domain}>`; }
   return null;
 }
+/* ЦЕНТРАЛИЗОВАННОЕ оформление Cloud API: один агентский шаблон профиля (settings.wa.profile) → на все номера + авто на новые */
+function cloudPhoneIds(db) {
+  const ids = new Set();
+  if (db.settings.wa && db.settings.wa.phoneId) ids.add(db.settings.wa.phoneId);
+  const on = (db.settings.telephony && db.settings.telephony.otpNumbers) || {};
+  for (const k of Object.keys(on)) { const c = on[k].cloud; if (c && c.phoneId) ids.add(c.phoneId); }
+  return [...ids];
+}
+async function applyCloudProfile(db, phoneId) {
+  const pf = db.settings.wa && db.settings.wa.profile;
+  if (!pf || !phoneId || !(db.settings.wa && db.settings.wa.token)) return;
+  const fields = {};
+  if (pf.about) fields.about = pf.about;
+  if (pf.description) fields.description = pf.description;
+  if (pf.address) fields.address = pf.address;
+  if (pf.email) fields.email = pf.email;
+  if (pf.website) fields.websites = [pf.website];
+  if (pf.avatarHandle) fields.profile_picture_handle = pf.avatarHandle;
+  if (!Object.keys(fields).length) return;
+  await wa.setBusinessProfile(db, phoneId, fields);
+}
 /* каскадное письмо лиду → rich-рендер (email.js) + отправка с домена агентства (платформенный Resend-ключ) */
 engine.onEmailSend = async (db, lead, msg) => {
   const reg = store.getRegistry();
@@ -8343,6 +8364,33 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, sms: (rec && rec.sms) || [], numbers: Object.keys(t.otpNumbers || {}).map(k => (t.otpNumbers[k].number || ('+' + k))) });
     }
 
+    /* ЦЕНТРАЛИЗОВАННОЕ оформление Cloud API: GET — сохранённый агентский шаблон + сколько номеров подключено */
+    if (p === '/api/telephony/otp/wa-profile' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const pf = (db.settings.wa && db.settings.wa.profile) || {};
+      return json(res, 200, { ok: true, profile: { about: pf.about || '', description: pf.description || '', address: pf.address || '', email: pf.email || '', website: pf.website || '', avatarUrl: pf.avatarUrl || '' }, phoneCount: cloudPhoneIds(db).length });
+    }
+    /* POST — сохранить агентский шаблон + применить НА ВСЕ подключённые Cloud-номера (аватар грузим 1 раз) */
+    if (p === '/api/telephony/otp/wa-profile' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!(db.settings.wa && db.settings.wa.token)) return json(res, 400, { error: 'сначала подключи хотя бы один Cloud API номер' });
+      const b = await readBody(req);
+      db.settings.wa.profile = db.settings.wa.profile || {};
+      const pf = db.settings.wa.profile;
+      if (b.about != null) pf.about = String(b.about).slice(0, 139);
+      if (b.description != null) pf.description = String(b.description).slice(0, 512);
+      if (b.address != null) pf.address = String(b.address).slice(0, 256);
+      if (b.email != null) pf.email = String(b.email).slice(0, 128);
+      if (b.website != null) pf.website = String(b.website).trim().slice(0, 256);
+      try {
+        if (b.avatarUrl && String(b.avatarUrl).trim() && b.avatarUrl !== pf.avatarUrl) { pf.avatarHandle = await wa.uploadProfilePhoto(db, '', String(b.avatarUrl).trim()); pf.avatarUrl = String(b.avatarUrl).trim(); }
+        store.save();
+        const targets = cloudPhoneIds(db); let applied = 0; const errors = [];
+        for (const pid of targets) { try { await applyCloudProfile(db, pid); applied++; } catch (e) { errors.push(pid + ': ' + e.message); } }
+        return json(res, 200, { ok: true, applied, total: targets.length, errors });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+
     /* список моих номеров */
     if (p === '/api/telephony/numbers' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
@@ -8933,6 +8981,7 @@ const server = http.createServer(async (req, res) => {
         const ok2 = String(b.otpKey || '').replace(/[^0-9]/g, '');
         if (ok2) { const t2 = db.settings.telephony || (db.settings.telephony = {}); t2.otpNumbers = t2.otpNumbers || {}; const rec2 = t2.otpNumbers[ok2] || (t2.otpNumbers[ok2] = { number: '+' + ok2, at: Date.now(), sms: [] }); rec2.cloud = { phoneId: pnid, wabaId: wabaId || (rec2.cloud && rec2.cloud.wabaId) || '', hasToken: true, connectedAt: Date.now() }; }
         store.save();
+        try { await applyCloudProfile(db, pnid); } catch (_) {}   /* авто-оформление нового номера по агентскому шаблону */
         return json(res, 200, { ok: true, result: j });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
@@ -8973,6 +9022,7 @@ const server = http.createServer(async (req, res) => {
       const okk = String(b.otpKey || '').replace(/[^0-9]/g, '');
       if (okk) { const t2 = db.settings.telephony || (db.settings.telephony = {}); t2.otpNumbers = t2.otpNumbers || {}; const rec2 = t2.otpNumbers[okk] || (t2.otpNumbers[okk] = { number: '+' + okk, at: Date.now(), sms: [] }); rec2.cloud = { phoneId: pnid, wabaId: wabaId || (rec2.cloud && rec2.cloud.wabaId) || '', hasToken: true, connectedAt: Date.now(), verifiedName: (verify && verify.verified_name) || (rec2.cloud && rec2.cloud.verifiedName) || '' }; }
       store.save();
+      try { await applyCloudProfile(db, pnid); } catch (_) {}   /* авто-оформление по агентскому шаблону */
       return json(res, 200, { ok: true, verify, verifyError });
     }
     /* ТЕСТ официальной отправки через Meta Graph (wa.js): {to, template, lang} или {to, text} */
@@ -11325,6 +11375,28 @@ ${SCR}
       return json(res, 200, db.properties);
     }
     /* ---------------- ИМПОРТ ИНВЕНТАРЯ ОБЪЕКТОВ ---------------- */
+    /* ── анти-дубли объектов: нормализация имени + поиск точного/похожего дубля (SIGNAL) ──
+       Раньше дубли ловились только по ТОЧНОМУ sourceUrl/имени → один проект с двух порталов
+       (или ручное добавление) молча дублировался. Теперь: точный дубль (url‖норм-имя) + «возможный»
+       (то же гео/район + совпадение спален + цена ±7%) — чтобы система СИГНАЛИЗИРОВАЛА. */
+    const normPropName = (s) => String(s || '').toLowerCase()
+      .replace(/[«»"'`.,()\[\]\-–—/\\]+/g, ' ')
+      .replace(/\b(phuket|thailand|таиланд|пхукет|tambon|amphoe|amphoe mueang|chang wat|mueang|soi|road|rd|moo|kathu|тамбон|ампхе|столичный)\b/gi, ' ')
+      .replace(/\b\d{5,6}\b/g, ' ')                       /* индексы */
+      .replace(/\b[a-z0-9]{3,}\+[a-z0-9]{2,}\b/gi, ' ')   /* плюс-коды Google (Q897+MV, 38P2+63R) */
+      .replace(/\s+/g, ' ').trim();
+    const propMoneyUsd = (pr) => { const n = +pr.priceFrom || 0; const c = (pr.currency || 'USD').toUpperCase(); return c === 'THB' ? n / 35 : c === 'AED' ? n / 3.67 : c === 'EUR' ? n * 1.08 : n; };
+    const findPropDup = (cand, excludeId) => {
+      const nn = normPropName(cand.name); const src = String(cand.sourceUrl || '').trim();
+      const list = db.properties || [];
+      const exact = list.find(x => x.id !== excludeId && ((src && x.sourceUrl === src) || (nn && nn.length >= 4 && normPropName(x.name) === nn)));
+      if (exact) return { dup: exact, kind: 'exact' };
+      /* возможный: то же гео + совпадение спален + цена ±7% (когда имена расходятся: адрес vs имя).
+         ТОЛЬКО для карточек с реальными спальнями (beds>0) — иначе стабы beds:0 ложно матчатся по цене. */
+      const cUsd = propMoneyUsd(cand), cBeds = +cand.beds || 0, cGeo = cand.geo || '';
+      if (cUsd && cBeds > 0) { const sim = list.find(x => x.id !== excludeId && (x.geo || '') === cGeo && (+x.beds || 0) === cBeds && propMoneyUsd(x) && Math.abs(propMoneyUsd(x) - cUsd) / cUsd <= 0.07); if (sim) return { dup: sim, kind: 'similar' }; }
+      return null;
+    };
     if (p === '/api/properties/import' && req.method === 'POST') {
       const b = await readBody(req);
       const defaults = b.defaults || {};
@@ -11504,6 +11576,34 @@ ${SCR}
     /* ⭐ ОБОГАЩЕНИЕ ИЗ ОТКРЫТЫХ ИСТОЧНИКОВ: чего нет на портале (срок сдачи, доходность, прирост,
        ход стройки) — ищем в вебе по названию+застройщику. apply:false = предложение, apply:true = мёрж.
        want — конкретный запрос («срок сдачи», «доходность»…). */
+    /* ⭐ ДОЗАЛИТЬ ФОТО/ОБЛОЖКУ: для объектов без медиа — сначала пере-скрейп СОБСТВЕННОЙ страницы объекта
+       (надёжнее веб-поиска: берём реальные фото листинга), затем фолбэк на веб-поиск. Чинит «пустые» карточки
+       после каталожного импорта, где обложка не извлеклась. Переиспользует существующие хелперы. */
+    if ((m = p.match(/^\/api\/properties\/([^/]+)\/refetch-media$/)) && req.method === 'POST') {
+      const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
+      const have = (pr.images || []).filter(u => /^\/media\//.test(u));
+      const need = Math.max(0, 15 - have.length);
+      if (!need) return json(res, 200, { ok: true, added: 0, images: (pr.images || []).length });
+      const badImg = (s) => /favicon|logo|icon|sprite|avatar|placeholder|blank|banner|header|footer|\.svg(\?|$)/i.test(String(s || ''));
+      const okImg = (u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !badImg(u);
+      let cand = [];
+      if (pr.sourceUrl && /^https?:\/\//i.test(pr.sourceUrl)) {   /* 1) собственная страница объекта */
+        try {
+          const r = await fetch(pr.sourceUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
+          const html = await r.text();
+          scrapeImagesFromHtml(html, pr.sourceUrl).forEach(u => { if (okImg(u)) cand.push(u); });
+          if (cand.length < 3 && renderReady()) { const rp = await renderPage(pr.sourceUrl); if (rp && rp.html) scrapeImagesFromHtml(rp.html, pr.sourceUrl).forEach(u => { if (okImg(u)) cand.push(u); }); }
+        } catch (_) {}
+      }
+      if (cand.length < 2 && process.env.RENDER_API_KEY) {   /* 2) фолбэк: веб-поиск фото */
+        try { const sr = await webSearch([pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'недвижимость проект'].filter(Boolean).join(' '), 6, { media: true }); (sr && sr.images || []).forEach(u => { if (okImg(u)) cand.push(u); }); } catch (_) {}
+      }
+      cand = [...new Set(cand)].filter(u => !(pr.images || []).includes(u)).slice(0, 40);
+      const dl = (await Promise.all(cand.map(u => downloadImageToAsset(upgradeCdnUrl(u)).catch(() => downloadImageToAsset(u).catch(() => null))))).filter(Boolean);
+      const good = dl.sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
+      if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
+      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: !!pr.sourceUrl });
+    }
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
       if (!process.env.RENDER_API_KEY) return json(res, 400, { error: 'нужен RENDER_API_KEY (веб-поиск)' });
@@ -11846,13 +11946,24 @@ ${SCR}
       db.properties = db.properties || [];
       /* новые (не дубли) проекты + их обложки — скачиваем ПАРАЛЛЕЛЬНО (одна обложка на стаб, чтобы карточки
          каталога были не пустыми серыми, а с фото — см. просьбу пользователя) */
-      const fresh = []; const backfill = [];   /* backfill: уже существующие стабы БЕЗ обложки — доставим им фото при реимпорте */
+      const fresh = []; const backfill = []; const duplicates = [];   /* backfill: существующие стабы БЕЗ обложки; duplicates: пропущенные дубли (для СИГНАЛА в UI) */
+      const seenBatch = new Map();   /* within-batch дедуп: норм-имя → уже взятый в этом импорте (каталоги задваивают листинги) */
       for (const pj of (projects || []).slice(0, 80)) {
         const nm = String(pj.name || '').trim(); if (nm.length < 3) continue;
         const src = absU(pj.url || '');
         const image = absU(pj.image || '');
-        const dup = db.properties.find(x => (src && x.sourceUrl === src) || (x.name || '').toLowerCase().trim() === nm.toLowerCase());
-        if (dup) { const cur = (dup.images || [])[0]; const needCover = dup.stub && (!cur || !/^\/media\//.test(cur)); if (image && needCover) backfill.push({ dup, image }); continue; }   /* стаб без обложки ИЛИ с внешней/битой ссылкой → перезальём в /media */
+        const nn = normPropName(nm);
+        /* дубль в самом импорте (одна и та же карточка дважды в каталоге) */
+        if (nn && nn.length >= 4 && seenBatch.has(nn)) { duplicates.push({ name: nm, existingName: seenBatch.get(nn), kind: 'batch' }); continue; }
+        /* дубль против базы: точный url ИЛИ нормализованное имя (ловит «The Baya» ↔ «The Baya Phuket 83130») */
+        const dup = db.properties.find(x => (src && x.sourceUrl === src) || (nn && nn.length >= 4 && normPropName(x.name) === nn));
+        if (dup) {
+          const cur = (dup.images || [])[0]; const needCover = dup.stub && (!cur || !/^\/media\//.test(cur));
+          if (image && needCover) backfill.push({ dup, image });
+          else duplicates.push({ name: nm, existingName: dup.name, kind: 'exists' });
+          continue;
+        }
+        if (nn && nn.length >= 4) seenBatch.set(nn, nm);
         fresh.push({ pj, nm, src, image });
       }
       const covers = await Promise.all(fresh.map(f => (f.image && /^https?:\/\//.test(f.image)) ? downloadCover(f.image).catch(() => null) : Promise.resolve(null)));   /* мягкий фильтр: превью листинга мелкие/webp, строгий хи-рес их резал → 0 обложек */
@@ -11874,7 +11985,7 @@ ${SCR}
       backfill.forEach((f, i) => { const cov = bfCovers[i] && bfCovers[i].url; if (cov) { const keep = (f.dup.images || []).filter(u => /^\/media\//.test(u)); f.dup.images = [cov, ...keep.filter(u => u !== cov)]; backfilled++; } });   /* ставим свежую /media-обложку первой, битые внешние ссылки отбрасываем */
       const skipped = (projects || []).length - created - backfilled;
       store.save();
-      return json(res, 200, { ok: true, created, backfilled, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length });
+      return json(res, 200, { ok: true, created, backfilled, skipped: Math.max(0, skipped), total: (projects || []).length, covers: covers.filter(Boolean).length, duplicates: duplicates.slice(0, 40) });
     }
     /* гео-кодинг объектов для карты: area → координаты (Nominatim/OSM, бесплатно), кэш на объекте.
        До 10 за вызов (rate-limit OSM ~1/сек) — клиент дёргает, пока remaining>0. */
@@ -11943,7 +12054,12 @@ ${SCR}
     }
     if (p === '/api/properties' && req.method === 'POST') {
       const b = await readBody(req);
-      const pr = { id: store.nextId('pr'), name: b.name || 'Объект', area: b.area || '', developer: b.developer || '', market: b.market === 'secondary' ? 'secondary' : 'offplan', type: b.type || '', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD', handover: b.handover || '', payment: b.payment || '', geo: b.geo || 'dubai', tags: b.tags || [], materials: [], note: b.note || '', ownerId: propOwnerId(req), visibility: b.visibility === 'private' ? 'private' : 'team' };
+      /* СИГНАЛ дубля перед созданием (раньше молча плодил копии) — если не force */
+      if (b.force !== 'new') {
+        const hit = findPropDup({ name: b.name, sourceUrl: b.sourceUrl, geo: b.geo || 'dubai', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD' });
+        if (hit) return json(res, 200, { exists: true, kind: hit.kind, existingId: hit.dup.id, existingName: hit.dup.name });
+      }
+      const pr = { id: store.nextId('pr'), name: b.name || 'Объект', area: b.area || '', developer: b.developer || '', market: b.market === 'secondary' ? 'secondary' : 'offplan', type: b.type || '', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD', handover: b.handover || '', payment: b.payment || '', geo: b.geo || 'dubai', tags: b.tags || [], materials: [], note: b.note || '', sourceUrl: String(b.sourceUrl || '').slice(0, 500) || undefined, ownerId: propOwnerId(req), visibility: b.visibility === 'private' ? 'private' : 'team' };
       db.properties.push(pr); store.save();
       return json(res, 200, pr);
     }

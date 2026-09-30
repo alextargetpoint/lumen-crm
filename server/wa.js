@@ -54,6 +54,30 @@ async function verify(db) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+/* ---------- Бизнес-профиль номера (оформление: аватар, «о нас», адрес, сайт) ---------- */
+async function getBusinessProfile(db, phoneId) {
+  const j = await graphGet(db, phoneId + '/whatsapp_business_profile', { fields: 'about,address,description,email,vertical,websites,profile_picture_url' });
+  return (j.data && j.data[0]) || {};
+}
+async function setBusinessProfile(db, phoneId, fields) {
+  return post(db, phoneId + '/whatsapp_business_profile', Object.assign({ messaging_product: 'whatsapp' }, fields));
+}
+/* загрузка аватара: скачиваем картинку → resumable-upload в приложение Meta → возвращаем handle для profile_picture_handle */
+async function uploadProfilePhoto(db, appIdMaybe, imageUrl) {
+  const wa = db.settings.wa;
+  let appId = appIdMaybe || wa.appId || '';
+  if (!appId) { try { const dbg = await graphGet(db, 'debug_token', { input_token: wa.token }); appId = (dbg.data && dbg.data.app_id) || ''; } catch (_) {} }
+  if (!appId) throw new Error('нет App ID (META_APP_ID) для загрузки фото');
+  const ir = await fetch(imageUrl); if (!ir.ok) throw new Error('не скачать фото: ' + ir.status);
+  const buf = Buffer.from(await ir.arrayBuffer());
+  const type = ir.headers.get('content-type') || 'image/jpeg';
+  const sr = await fetch(`${GRAPH}/${appId}/uploads?file_length=${buf.length}&file_type=${encodeURIComponent(type)}&access_token=${encodeURIComponent(wa.token)}`, { method: 'POST' });
+  const sj = await sr.json().catch(() => ({})); if (!sr.ok || !sj.id) throw new Error('upload-сессия: ' + (sj.error?.message || sr.status));
+  const ur = await fetch(`${GRAPH}/${sj.id}`, { method: 'POST', headers: { Authorization: 'OAuth ' + wa.token, file_offset: '0' }, body: buf });
+  const uj = await ur.json().catch(() => ({})); if (!ur.ok || !uj.h) throw new Error('загрузка байтов: ' + (uj.error?.message || ur.status));
+  return uj.h;
+}
+
 async function listTemplates(db) {
   if (!db.settings.wa.wabaId) throw new Error('WABA ID не задан');
   const t = await graphGet(db, `${db.settings.wa.wabaId}/message_templates`, { fields: 'name,status,category,language,components', limit: 100 });
@@ -145,4 +169,4 @@ function applyStatuses(db, value) {
   return changed;
 }
 
-module.exports = { ready, sendText, sendTemplate, sendMedia, downloadMedia, mediaSupportsCaption, applyStatuses, verify, listTemplates, createTemplate };
+module.exports = { ready, sendText, sendTemplate, sendMedia, downloadMedia, mediaSupportsCaption, applyStatuses, verify, listTemplates, createTemplate, getBusinessProfile, setBusinessProfile, uploadProfilePhoto };

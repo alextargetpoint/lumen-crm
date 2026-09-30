@@ -1717,6 +1717,32 @@ window.openYesimActivate = async function (phone) {
 };
 /* OTP-мастер для ОФИЦИАЛЬНОГО WhatsApp Cloud API: покупаем реальный SMS-номер Telnyx →
    регистрируешь его в мастере Meta («Enter a new phone number») → код (OTP) прилетает СЮДА автоматически. */
+/* ЦЕНТРАЛИЗОВАННОЕ оформление Cloud API профиля — одно на все номера + авто на новые */
+window.openCloudProfile = async function () {
+  const bd = modal({ title: 'Оформление Cloud API профиля', sub: 'Одно оформление → на ВСЕ номера + автоматически на каждый новый. Отображаемое имя (verified_name) меняется только через ревью Meta.', wide: true, body: '<div id="cpBody">Загрузка…</div>', actions: [{ label: 'Закрыть', onClick: () => {} }] });
+  const box = bd.querySelector('#cpBody');
+  let cur = {}, cnt = 0;
+  try { const r = await api.get('/telephony/otp/wa-profile'); cur = r.profile || {}; cnt = r.phoneCount || 0; } catch (e) { box.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; return; }
+  box.innerHTML = `
+    <div class="muted" style="font-size:12px;margin-bottom:12px">Применится на все подключённые Cloud-номера (<b>${cnt}</b>) и автоматически на каждый новый добавленный.</div>
+    <div class="form-row"><label>Аватар (URL картинки, квадрат)</label><input id="cpAvatar" value="${esc(cur.avatarUrl || '')}" placeholder="https://…/logo.png"></div>
+    <div class="form-row"><label>О нас (до 139 символов)</label><input id="cpAbout" maxlength="139" value="${esc(cur.about || '')}" placeholder="Недвижимость на Пхукете"></div>
+    <div class="form-row"><label>Описание</label><textarea id="cpDesc" rows="2" maxlength="512" style="width:100%;box-sizing:border-box">${esc(cur.description || '')}</textarea></div>
+    <div class="form-row"><label>Адрес</label><input id="cpAddr" value="${esc(cur.address || '')}"></div>
+    <div class="form-row"><label>E-mail</label><input id="cpEmail" value="${esc(cur.email || '')}"></div>
+    <div class="form-row"><label>Сайт</label><input id="cpSite" value="${esc(cur.website || '')}" placeholder="https://…"></div>
+    <div style="margin-top:12px"><button class="btn btn-accent btn-sm" id="cpSave">Сохранить и применить на все</button> <span id="cpOut" class="muted" style="font-size:12px"></span></div>`;
+  box.querySelector('#cpSave').addEventListener('click', async (e) => {
+    const b = e.currentTarget; b.disabled = true; const out = box.querySelector('#cpOut'); out.textContent = 'Применяю…';
+    try {
+      const r = await api.post('/telephony/otp/wa-profile', { avatarUrl: box.querySelector('#cpAvatar').value.trim(), about: box.querySelector('#cpAbout').value, description: box.querySelector('#cpDesc').value, address: box.querySelector('#cpAddr').value, email: box.querySelector('#cpEmail').value, website: box.querySelector('#cpSite').value });
+      out.innerHTML = `<span style="color:var(--good,#6d8a4f)">Применено на ${r.applied}/${r.total} номеров${r.errors && r.errors.length ? ' · ошибок: ' + r.errors.length : ''}</span>`;
+      toast('Оформление применено', `${r.applied} из ${r.total} номеров`, true);
+    } catch (err) { out.innerHTML = '<span style="color:var(--bad)">' + esc(err.message) + '</span>'; }
+    b.disabled = false;
+  });
+};
+
 window.openTelnyxOtp = async function (preselect) {
   let pollTimer = null, current = '', allNums = [], cloudMap = {};
   const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
@@ -4485,6 +4511,12 @@ const SELCFG_PROPS = {
           } },
           { label: 'Отмена' },
         ] });
+    } },
+    { id: 'bulkRefetch', label: 'Дозалить фото', ic: I.image || I.spark, run: async () => {
+      const ids = [...selSet('properties')]; if (!ids.length) return;
+      showLoader(`Дозаливаю фото… 0/${ids.length}`, 'card'); let ok = 0, added = 0;
+      for (let i = 0; i < ids.length; i++) { setLoader(`Дозаливаю фото… ${i + 1}/${ids.length}`); try { const r = await api.post('/properties/' + ids[i] + '/refetch-media', {}); if (!r.error) { ok++; added += (r.added || 0); } } catch (_) {} }
+      hideLoader(); selSet('properties').clear(); toast('Готово', `объектов: ${ok}/${ids.length} · фото добавлено: ${added}`, true); render();
     } },
     { id: 'bulkCurate', label: 'Отобрать фото', ic: I.image || I.eye, run: async () => {
       const ids = [...selSet('properties')]; if (!ids.length) return;
@@ -8488,6 +8520,7 @@ PAGES.properties = async (root) => {
           }
           /* без ссылки — создаём заготовку по имени и сразу дополняем из сети */
           const cr = await api.post('/properties', { name: c.name, area: c.area, developer: c.developer, priceFrom: c.priceFrom, currency: c.currency, geo: geoF || PAGE_STATE.propGeo || 'phuket' });
+          if (cr && cr.exists) { toast(cr.kind === 'similar' ? 'Похоже, уже есть' : 'Уже есть', cr.existingName || ''); PAGE_STATE.propView = cr.existingId; return render(); }
           const pid = (cr.property || cr).id;
           if (pid) { await api.post('/properties/' + pid + '/enrich', { apply: true, media: true, units: true }).catch(() => {}); toast('Карточка создана и дополнена', c.name, true); PAGE_STATE.propView = pid; render(); }
           else { b.disabled = false; b.textContent = 'Создать карточку'; toast('Не вышло', 'не удалось создать'); }
@@ -8539,8 +8572,8 @@ PAGES.properties = async (root) => {
   }));
   wireShelfDrag(root, '[data-dragprop]', async (itemId, folderId) => { await api.patch('/properties/' + itemId, { folderId }); render(); });
   $('#prAdd').addEventListener('click', async () => {
-    const pr = await api.post('/properties', { name: 'Новый объект', geo: PAGE_STATE.propGeo || st.agency.geos[0] });
-    PAGE_STATE.propView = pr.id;
+    const pr = await api.post('/properties', { name: 'Новый объект', geo: PAGE_STATE.propGeo || st.agency.geos[0], force: 'new' });
+    PAGE_STATE.propView = (pr.property || pr).id;
     render();
   });
   $('#prImport').addEventListener('click', () => {
@@ -8669,8 +8702,16 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
       try {
         const r = await api.post('/properties/import-catalog', { portal: $('#impCatPortal', bd).value, ...defaults() });
         if (r.error) { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error) + '</span>'; btn.disabled = false; return; }
-        toast('Каталог импортирован', `новых проектов: ${r.created}${r.skipped ? ' · пропущено ' + r.skipped : ''}`, true);
-        closeModal(); PAGE_STATE.propMap = true; render();
+        const dups = (r.duplicates || []).length;
+        const parts = [`новых: ${r.created}`];
+        if (r.backfilled) parts.push(`обложек дозалито: ${r.backfilled}`);
+        if (dups) parts.push(`дублей пропущено: ${dups}`);
+        toast('Каталог импортирован', parts.join(' · '), true);
+        if (dups) {   /* СИГНАЛ о дублях — раньше система молчала (modal() сам закроет окно импорта) */
+          const list = (r.duplicates || []).slice(0, 20).map(d => `<div class="dup-row"><b>${esc(d.name)}</b><span>${d.kind === 'batch' ? 'дубль внутри каталога' : 'уже есть'}${d.existingName && d.existingName !== d.name ? ' → «' + esc(d.existingName) + '»' : ''}</span></div>`).join('');
+          modal({ title: `Пропущены дубли: ${dups}`, sub: 'Эти проекты уже есть в базе (совпадение по ссылке или названию) — новые копии не создавались', wide: true, body: `<div class="dup-list">${list}</div>`, actions: [{ label: 'Понятно', cls: 'btn-accent' }] });
+        } else { closeModal(); }
+        PAGE_STATE.propMap = true; render();
       } catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; btn.disabled = false; }
     });
   });
@@ -13881,6 +13922,7 @@ PAGES.numbers = async (root) => {
         <button class="btn btn-accent btn-sm" id="waHostedBtn">${ic(I.link)}Подключить WhatsApp Business</button>
         <button class="btn btn-sm" id="cloudBuyBtn">${ic(I.sim)}Купить Cloud API номер</button>
         <button class="btn btn-sm" id="numAdd">${ic(I.plus)}Добавить вручную</button>
+        <button class="btn btn-sm" id="cloudProfileBtn">${ic(I.user)}Оформление профиля (все номера)</button>
       </div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
@@ -14056,6 +14098,7 @@ PAGES.numbers = async (root) => {
   $$('[data-otpfeed]', root).forEach(b => b.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp('+' + b.dataset.otpfeed)));
   $$('[data-otprepair]', root).forEach(b => b.addEventListener('click', async () => { b.disabled = true; const o = b.innerHTML; b.textContent = 'Проверяю…'; try { await api.post('/telephony/otp/repair', { number: '+' + b.dataset.otprepair }); toast('Статус обновлён', 'подтянул актуальный статус от Meta и привязку Telnyx', true); if (CUR === 'numbers') render(); } catch (e) { toast('Ошибка', e.message); b.disabled = false; b.innerHTML = o; } }));
   $('#cloudBuyBtn', root)?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
+  $('#cloudProfileBtn', root)?.addEventListener('click', () => window.openCloudProfile && window.openCloudProfile());
   $('#telBuyBtn', root)?.addEventListener('click', () => window.openTelBuy && window.openTelBuy());
   /* Viber: копирование адреса вебхука + сохранение BSP-настроек */
   $$('[data-numpane="viber"] .tc-copy', root).forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText(c.dataset.copy); toast('Скопировано', 'Вставьте в Inbound webhook Infobip', true); }));
@@ -17509,9 +17552,17 @@ function quickPropertyModal() {
       </div>`,
     actions: [{ label: 'Создать и открыть', cls: 'btn-accent', onClick: async (bd) => {
       const name = $('#qpName', bd).value.trim() || 'Новый объект';
-      const pr = await api.post('/properties', { name, geo: $('#qpGeo', bd).value, market: $('#qpMarket', bd).value });
+      const geo = $('#qpGeo', bd).value, market = $('#qpMarket', bd).value;
+      let pr = await api.post('/properties', { name, geo, market });
+      if (pr && pr.exists) {
+        const openIt = await uiConfirm(pr.kind === 'similar' ? 'Похоже, такой объект уже есть' : 'Такой объект уже есть в базе',
+          `«${esc(pr.existingName || '')}». Открыть существующий или всё равно создать новый?`,
+          { ok: 'Открыть существующий', cancel: 'Всё равно создать' });
+        if (openIt) { PAGE_STATE.propView = pr.existingId; return go('properties'); }
+        pr = await api.post('/properties', { name, geo, market, force: 'new' });
+      }
       toast('Объект создан', 'Открываю карточку', true);
-      PAGE_STATE.propView = pr.id; go('properties');
+      PAGE_STATE.propView = (pr.property || pr).id; go('properties');
     } }, { label: 'Отмена' }],
   });
 }
