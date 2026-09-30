@@ -11641,19 +11641,21 @@ ${SCR}
           scrapedSource = true;
         } catch (_) {}
       }
-      let srcPages = 0;
+      let srcPages = 0, snippetImgs = [];
       if (cand.length < 8 && process.env.RENDER_API_KEY) {   /* 2) веб-поиск + ГЛУБОКИЙ скрейп топ-страниц-источников */
         try {
           /* EN-запрос: у пхукетских проектов англ. имена → порталы/сайты застройщика находятся лучше */
           const q = [pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'Phuket condominium project'].filter(Boolean).join(' ');
           const sr = await webSearch(q, 8, { media: true });
-          (sr && sr.images || []).forEach(u => { if (okImg(u)) cand.push(u); });
-          /* рендерим ТОП страниц-источников и тянем их галереи (у популярных ЖК — полные фотогалереи) */
+          /* сниппет-картинки из выдачи — НИЗКИЙ приоритет (много мусора), придержим на добор */
+          snippetImgs = (sr && sr.images || []).filter(okImg);
+          /* ПРИОРИТЕТ: рендерим ТОП страниц-источников и тянем их РЕАЛЬНЫЕ галереи (у популярных ЖК — полные фото) */
           const srcUrls = [...new Set((sr && sr.sources || []).map(s => s && s.url).filter(Boolean))].slice(0, 4);
           for (const su of srcUrls) {
-            if (cand.length >= 24) break;
             try { const rp = await renderPage(su); if (rp && rp.html) { scrapeImagesFromHtml(rp.html, su).forEach(u => { if (okImg(u)) cand.push(u); }); srcPages++; } } catch (_) {}
           }
+          /* галереи источников не набрали — добираем сниппет-картинками */
+          if (cand.length < 6) snippetImgs.forEach(u => cand.push(u));
         } catch (_) {}
       }
       cand = [...new Set(cand)].filter(u => !(pr.images || []).includes(u)).slice(0, 60);
