@@ -9217,7 +9217,8 @@ PAGES.automations = async (root) => {
               <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:11px">${desc}</div>${inner}</div>`;
             const vbMode = s.channels?.viber?.mode || 'pa';
             const names = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' };
-            const connOf = { wa: true, tg: !!s.channels?.tg?.keySet, viber: !!s.channels?.viber?.keySet, email: !!s.channels?.email?.verified };
+            /* «подключён» = канал реально пригоден для касаний: TG — бот ИЛИ серые/прогретые TG-аккаунты; иначе чип врёт «не настроен» при живых аккаунтах */
+            const connOf = { wa: true, tg: !!(s.channels?.tg?.keySet || (s.tgGray?.numbers || []).length), viber: !!s.channels?.viber?.keySet, email: !!s.channels?.email?.verified };
             return `
           <div class="card-title">${ic(I.send)}Омниканальный каскад ${hint('cascade', 'Как работает каскад', [
             ['Порядок сверху вниз', 'Первый канал — основной. Каналов, где у клиента нет контакта, каскад пропускает'],
@@ -9244,7 +9245,7 @@ PAGES.automations = async (root) => {
 
           ${secH(3, 'Подключение каналов', 'заполняется один раз')}
           ${chBlock(I.wa || I.send, 'WhatsApp', chip(true, 'работает', ''), 'Первое касание и вся переписка идут через <b>серые/облачные номера</b> агентства. Подключение и распределение номеров — в разделе <b>«Номера»</b>.', `<button class="btn btn-sm" data-go="numbers">${ic(I.link)}Открыть «Номера»</button>`)}
-          ${chBlock(I.send, 'Telegram', chip(connOf.tg, 'бот подключён', 'бот не подключён'), 'Официальный <b>бот</b> — для тёплых (кто сам написал боту). <b>Холодные</b> касания по номерам идут через прогретые TG-аккаунты из раздела «Номера» — токен для этого не нужен.', `<div class="form-row" style="margin:0"><label>Telegram Bot Token <span class="muted" style="font-weight:400">— от @BotFather, необязательно</span></label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'вставьте токен бота'}"></div>`)}
+          ${chBlock(I.send, 'Telegram', chip(connOf.tg, 'подключён', 'не настроен'), 'Официальный <b>бот</b> — для тёплых (кто сам написал боту). <b>Холодные</b> касания по номерам идут через прогретые TG-аккаунты из раздела «Номера» — токен для этого не нужен.', `<div class="form-row" style="margin:0"><label>Telegram Bot Token <span class="muted" style="font-weight:400">— от @BotFather, необязательно</span></label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'вставьте токен бота'}"></div>`)}
           ${chBlock(I.link, 'E-mail (официальный тон)', chip(connOf.email, 'домен верифицирован', 'домен не подключён'), 'Одно вежливое письмо, если в мессенджерах тишина. Уходит <b>с вашего домена</b> — попадает во «Входящие», не в спам. Ключ отправки задаёт платформа, вам нужно подключить только домен ↓', `<div class="em-domain" id="emDomainCard"><div id="emDomainBody" class="muted" style="font-size:12px">Загрузка…</div></div>`)}
           ${chBlock(I.send, 'Viber', chip(connOf.viber, 'подключён', 'не настроен'), 'Одно персональное касание. <b>Public Account</b> — тёплым (кто вам написал). <b>BSP</b> (Infobip/360dialog) — официальные холодные касания по номерам: платно, нужна бизнес-верификация и согласие клиента. ⛔ Массовых рассылок в Viber не делаем.', `
             <div class="form-row"><label>Режим</label><select id="chVbMode">
