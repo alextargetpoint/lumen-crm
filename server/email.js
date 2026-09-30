@@ -844,16 +844,19 @@ function renderTemplate(registry, key, vars, lang) {
 }
 
 function platformEmailCfg(registry) { return { key: (registry.email && registry.email.key) || process.env.RESEND_API_KEY || '', from: (registry.email && registry.email.from) || process.env.RESEND_FROM || 'Lumen <onboarding@resend.dev>' }; }
-async function sendViaResend(cfg, to, subject, html, attachments) {
+async function sendViaResend(cfg, to, subject, html, attachments, opts) {
   if (!cfg.key) return { ok: false, error: 'Resend не настроен (нет API-ключа)' };
   if (!to) return { ok: false, error: 'нет адреса получателя' };
   try {
     const payload = { from: cfg.from, to, subject, html };
-    /* вложения: [{filename, content: base64}] (Resend-формат) */
     if (Array.isArray(attachments) && attachments.length) payload.attachments = attachments.map(a => ({ filename: a.filename, content: a.content }));
+    /* золотое правило: List-Unsubscribe (one-click) — почтовики показывают «Отписаться», меньше спам-репортов */
+    if (opts && opts.unsubUrl) payload.headers = { 'List-Unsubscribe': '<' + opts.unsubUrl + '>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' };
+    if (opts && opts.tags) payload.tags = opts.tags;   /* метки для аналитики (campaignId/leadId) */
     const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, error: 'Resend ' + r.status + (t ? ': ' + t.slice(0, 160) : '') }; }
-    return { ok: true };
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { return { ok: false, error: 'Resend ' + r.status + (j && j.message ? ': ' + String(j.message).slice(0, 160) : '') }; }
+    return { ok: true, id: j && j.id };
   } catch (e) { return { ok: false, error: e.message }; }
 }
 

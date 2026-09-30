@@ -873,6 +873,12 @@ function agencyEmailFrom(db) {
   if (e.domain && e.verified) { const local = (e.senderLocal || 'noreply').replace(/[^a-z0-9._-]/gi, '') || 'noreply'; return `${agency} <${local}@${e.domain}>`; }
   return null;
 }
+/* opt-out для email/рассылок: токен на лида → ссылка отписки → страница /u/:token помечает marketingOptOut */
+function ensureUnsubToken(db, lead) {
+  if (!lead.unsubToken) { lead.unsubToken = crypto.randomBytes(9).toString('hex'); }
+  return lead.unsubToken;
+}
+function unsubUrlFor(db, lead) { const base = callBase(db); return base ? (base + '/u/' + ensureUnsubToken(db, lead)) : ''; }
 /* ЦЕНТРАЛИЗОВАННОЕ оформление Cloud API: один агентский шаблон профиля (settings.wa.profile) → на все номера + авто на новые */
 function cloudPhoneIds(db) {
   const ids = new Set();
@@ -932,9 +938,9 @@ engine.onEmailSend = async (db, lead, msg) => {
     agencyAddr: _ag.address || _ag.addr || '',
     agencySite: _ag.site || _ag.website || '',
     brokerName: broker ? broker.name : ((_ag.manager && _ag.manager.name) || ''),
-    heroImg,
+    heroImg, unsubUrl: unsubUrlFor(db, lead),                       /* золотое правило: ссылка отписки в каждом письме */
   });
-  return mailer.sendViaResend({ key, from }, msg.to, rich.subject, rich.html);
+  return mailer.sendViaResend({ key, from }, msg.to, rich.subject, rich.html, null, { unsubUrl: unsubUrlFor(db, lead) });
 };
 engine.onInboundMessage = (db, lead, m) => {
   /* антислив: клиент упомянул увод на личный канал → флаг + тревога руководителю */
@@ -1040,6 +1046,8 @@ function publicTenantFor(p) {
   if ((m = p.match(/^\/b\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().brokers || []).some(x => x.id === id || x.cardId === id)); }
   /* страница воспроизведения медиа из письма /e/:id */
   if ((m = p.match(/^\/e\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => !!(store.get().emailMedia && store.get().emailMedia[id])); }
+  /* отписка от рассылок /u/:token */
+  if ((m = p.match(/^\/u\/([a-zA-Z0-9]+)/))) { const tok = m[1]; return findTenant(() => (store.get().leads || []).some(l => l.unsubToken === tok)); }
   return null;
 }
 /* короткий отпечаток устройства из UA (без внешних либ): платформа + браузер */
@@ -7282,6 +7290,8 @@ const server = http.createServer(async (req, res) => {
         filters: b.filters || { stages: ['sleeping'] }, batchSize: b.batchSize || 3,
         pauseMin: b.pauseMin || [20, 60], window: b.window || [10, 20],
         templateId: b.templateId || 'tpl_wake_ru', text: b.text || '', startAt,
+        channel: ['wa', 'email'].includes(b.channel) ? b.channel : 'wa',   /* канал рассылки: WA Cloud (деф.) или email */
+        subject: b.subject || '',                                          /* тема письма (для email-рассылки) */
         senderPhoneId: b.senderPhoneId || null, senderLabel: b.senderLabel || '',   /* с какого Cloud API-номера шлём рассылку (иначе дефолтный) */
         stats: { sent: 0, delivered: 0, replied: 0, qualified: 0, skipped: 0 },
         recipients: [], cursor: 0, log: [], createdAt: Date.now(), nextBatchAt: null,
@@ -7890,7 +7900,9 @@ const server = http.createServer(async (req, res) => {
       try {
         await mailer.verifyDomain(key, e.domainId);
         const live = await mailer.getDomain(key, e.domainId);
-        e.verified = live.status === 'verified'; if (live.records) e.records = live.records; store.save();
+        e.verified = live.status === 'verified'; if (live.records) e.records = live.records;
+        if (e.verified && !e.verifiedAt) e.verifiedAt = Date.now();   /* для ramp email-рассылки от свежести домена */
+        store.save();
         return json(res, 200, { ok: true, status: live.status, verified: e.verified, records: e.records || [] });
       } catch (err) { return json(res, 400, { error: err.message }); }
     }
@@ -13263,6 +13275,15 @@ h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy
       if (!rec) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('not found'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(mailer.renderMediaPage(rec)); return;
+    }
+    /* ================= отписка от рассылок: /u/:token (GET подтверждает, POST one-click) ================= */
+    if ((m = p.match(/^\/u\/([a-zA-Z0-9]+)$/)) && (req.method === 'GET' || req.method === 'POST')) {
+      const lead = (db.leads || []).find(l => l.unsubToken === m[1]);
+      if (lead && !lead.marketingOptOut) { lead.marketingOptOut = true; lead.marketingOptOutAt = Date.now(); ai.pushEvent(db, { type: 'optout', leadId: lead.id, text: `${lead.name}: отписался от рассылок (email)` }); store.save(); }
+      const ag = (db.settings.agency && db.settings.agency.name) || '';
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(ag)}</title><style>body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f1ea;color:#141311;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}.c{background:#fff;border:1px solid rgba(20,19,17,.1);border-radius:20px;padding:34px;max-width:440px;text-align:center;box-shadow:0 30px 60px -30px rgba(0,0,0,.2)}.a{font-weight:700;font-size:18px;margin-bottom:8px}.b{color:#6b675f;font-size:14px;line-height:1.5}</style></head><body><div class="c"><div class="a">${esc(ag) || 'Готово'}</div><div class="b">✅ Вы отписались от рассылок${lead ? '' : ' (или ссылка устарела)'}. Больше писем не придёт. Спасибо!</div></div></body></html>`);
+      return;
     }
     /* ================= публичная визитка брокера: /b/:id ================= */
     if ((m = p.match(/^\/b\/(br_[\w]+)$/)) && req.method === 'GET') {

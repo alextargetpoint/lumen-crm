@@ -13954,6 +13954,8 @@ PAGES.numbers = async (root) => {
         <div class="num-actions" style="margin-top:12px">
           <button class="btn btn-sm btn-accent" data-otpfeed="${esc(n.key)}">${ic(I.spark)}Коды / OTP + активация</button>
           <button class="btn btn-sm" data-otprepair="${esc(n.key)}">${ic(I.refresh)}Проверить статус</button>
+          <span class="tb-spacer"></span>
+          <button class="btn-ghost" data-otpdel="${esc(n.key)}" title="Удалить номер">${ic(I.x)}</button>
         </div>
       </div>`; }).join('')}
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Cloud-API-номеров пока нет — нажмите «Купить Cloud API номер», затем зарегистрируйте его в WhatsApp.</div>`}
@@ -14097,6 +14099,7 @@ PAGES.numbers = async (root) => {
   /* Cloud API карточки: лента/активация, проверка привязки, покупка */
   $$('[data-otpfeed]', root).forEach(b => b.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp('+' + b.dataset.otpfeed)));
   $$('[data-otprepair]', root).forEach(b => b.addEventListener('click', async () => { b.disabled = true; const o = b.innerHTML; b.textContent = 'Проверяю…'; try { await api.post('/telephony/otp/repair', { number: '+' + b.dataset.otprepair }); toast('Статус обновлён', 'подтянул актуальный статус от Meta и привязку Telnyx', true); if (CUR === 'numbers') render(); } catch (e) { toast('Ошибка', e.message); b.disabled = false; b.innerHTML = o; } }));
+  $$('[data-otpdel]', root).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Удалить Cloud API номер?', 'Номер будет отпущен в Telnyx и убран из CRM. Действие необратимо.', { ok: 'Удалить', danger: true })) return; b.disabled = true; try { await api.post('/telephony/otp/release', { number: '+' + b.dataset.otpdel }); toast('Номер удалён', null, true); if (CUR === 'numbers') render(); } catch (e) { toast('Не вышло', e.message); b.disabled = false; } }));
   $('#cloudBuyBtn', root)?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
   $('#cloudProfileBtn', root)?.addEventListener('click', () => window.openCloudProfile && window.openCloudProfile());
   $('#telBuyBtn', root)?.addEventListener('click', () => window.openTelBuy && window.openTelBuy());

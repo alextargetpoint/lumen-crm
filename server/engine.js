@@ -101,8 +101,9 @@ function send(db, lead, text, via, opts = {}) {
           if (to) {
             /* rich-письмо через email.js + домен агентства (хук в index.js). Фолбэк — прежний plain-Resend. */
             if (module.exports.onEmailSend) {
-              const r = await module.exports.onEmailSend(db, lead, { to, subject: opts.subject || 'По вашей заявке', text, media: m0.media || (opts.media && opts.media.url ? opts.media : null) });
+              const r = await module.exports.onEmailSend(db, lead, { to, subject: opts.subject || 'По вашей заявке', text, media: m0.media || (opts.media && opts.media.url ? opts.media : null), campaignId: opts.campaignId || null });
               if (!r || !r.ok) throw new Error((r && r.error) || 'email send failed');
+              if (r.id) { m0.emailId = r.id; store.save(); }   /* id Resend → для аналитики (вебхук)*/
             } else if (cfg.email.key && cfg.email.from) {
               const r = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
@@ -737,6 +738,14 @@ function broadcastTierCap(db, regAt) {
   if (reg) { const days = (Date.now() - reg) / 864e5; if (days < 2) cap = Math.min(cap, 50); else if (days < 4) cap = Math.min(cap, 150); else if (days < 7) cap = Math.min(cap, 500); }
   return cap;
 }
+/* Дневной потолок EMAIL-рассылки: базовый лимит × ramp свежести домена (сырой домен дозируем). */
+function emailBroadcastCap(db) {
+  const e = (db.settings.channels && db.settings.channels.email) || {};
+  let cap = e.dailyCap || 300;
+  const reg = e.verifiedAt;
+  if (reg) { const days = (Date.now() - reg) / 864e5; if (days < 2) cap = Math.min(cap, 50); else if (days < 4) cap = Math.min(cap, 150); else if (days < 7) cap = Math.min(cap, 500); }
+  return cap;
+}
 /* дата регистрации Cloud API-номера по его phoneId (для per-number ramp) */
 function senderRegAt(db, phoneId) {
   if (!phoneId) return null;
@@ -752,10 +761,26 @@ function tickCampaigns(db) {
   if (db.settings.wa.bcastDay !== bDay) { db.settings.wa.bcastDay = bDay; db.settings.wa.bcastSent = 0; db.settings.wa.bcastByNum = {}; }
   db.settings.wa.bcastByNum = db.settings.wa.bcastByNum || {};
   for (const cmp of db.campaigns) {
-    /* номер-отправитель кампании: выбранный Cloud API-номер или дефолтный. Лимит и ramp — ПО ЭТОМУ номеру. */
+    /* КАНАЛ рассылки: 'wa' (Cloud API, дефолт) | 'email' (Resend). Лимит/ramp + счётчик + достижимость + отправка — свои. */
+    const chan = cmp.channel || 'wa';
     const fromId = cmp.senderPhoneId || db.settings.wa.phoneId;
-    const bcastCap = broadcastTierCap(db, senderRegAt(db, fromId));
-    const numSent = () => db.settings.wa.bcastByNum[fromId] || 0;
+    let cap, sentCount, bumpSent, reachable, sendOne;
+    if (chan === 'email') {
+      const eb = db.settings.emailBcast = db.settings.emailBcast || { day: bDay, sent: 0 };
+      if (eb.day !== bDay) { eb.day = bDay; eb.sent = 0; }
+      cap = emailBroadcastCap(db);
+      sentCount = () => eb.sent || 0;
+      bumpSent = () => { eb.sent = (eb.sent || 0) + 1; };
+      reachable = (lead) => (lead.contacts || []).some(c => c.kind === 'email' && c.value) || !!lead.email;
+      const subj = cmp.subject || (db.templates.find(t => t.id === cmp.templateId) || {}).name || 'По вашей заявке';
+      sendOne = (lead, text) => send(db, lead, text, 'wake', { broadcast: true, campaignId: cmp.id, channel: 'email', subject: subj });
+    } else {
+      cap = broadcastTierCap(db, senderRegAt(db, fromId));
+      sentCount = () => db.settings.wa.bcastByNum[fromId] || 0;
+      bumpSent = () => { db.settings.wa.bcastByNum[fromId] = sentCount() + 1; db.settings.wa.bcastSent = (db.settings.wa.bcastSent || 0) + 1; };
+      reachable = (lead) => !!lead.phone;
+      sendOne = (lead, text) => send(db, lead, text, 'wake', { templateId: cmp.templateId, broadcast: true, campaignId: cmp.id, phoneId: fromId });
+    }
     /* авто-старт запланированных кампаний, когда наступило время */
     if (cmp.state === 'scheduled' && cmp.startAt && nowT >= cmp.startAt) {
       cmp.log.unshift({ at: nowT, text: 'Автозапуск по расписанию' });
@@ -763,10 +788,10 @@ function tickCampaigns(db) {
     }
     if (cmp.state !== 'running') continue;
     if (cmp.nextBatchAt && nowT < cmp.nextBatchAt) continue;
-    /* дневной лимит рассылок достигнут — ждём обновления лимита (новый день/повышение тира) */
-    if (numSent() >= bcastCap) {
+    /* дневной лимит достигнут — ждём обновления (новый день / рост тира-домена) */
+    if (sentCount() >= cap) {
       cmp.nextBatchAt = nowT + 3600e3;
-      if (!cmp._capLogged) { cmp.log.unshift({ at: nowT, text: `Дневной лимит номера-отправителя достигнут (${bcastCap}/сут: тир WABA + градация свежести). Продолжим, когда лимит обновится / номер «дозреет».` }); cmp._capLogged = true; }
+      if (!cmp._capLogged) { cmp.log.unshift({ at: nowT, text: chan === 'email' ? `Дневной лимит email-рассылки достигнут (${cap}/сут, ramp домена). Продолжим завтра.` : `Дневной лимит номера-отправителя достигнут (${cap}/сут: тир WABA + свежесть). Продолжим, когда лимит обновится.` }); cmp._capLogged = true; }
       continue;
     }
     cmp._capLogged = false;
@@ -780,9 +805,9 @@ function tickCampaigns(db) {
     }
     for (const id of batch) {
       const lead = db.leads.find(l => l.id === id);
-      if (!lead || !lead.phone) { cmp.stats.skipped += 1; continue; }
-      if (lead.marketingOptOut) { cmp.stats.skipped += 1; continue; }   /* отписался в процессе кампании — пропускаем */
-      if (numSent() >= bcastCap) { cmp.recipients.push(id); cmp.stats.skipped += 1; continue; }   /* упёрлись в дневной лимит номера посреди пачки — остаток на завтра */
+      if (!lead || !reachable(lead)) { cmp.stats.skipped += 1; continue; }
+      if (lead.marketingOptOut) { cmp.stats.skipped += 1; continue; }   /* отписался — пропускаем (золотое правило) */
+      if (sentCount() >= cap) { cmp.recipients.push(id); cmp.stats.skipped += 1; continue; }   /* упёрлись в дневной лимит посреди пачки — остаток на завтра */
       const hour = new Date(nowT + (lead.tz || 0) * 3600e3).getUTCHours();
       if (!db.settings.demo.accelerate && (hour < cmp.window[0] || hour >= cmp.window[1])) {
         cmp.recipients.push(id); // вне окна клиента — в конец очереди
@@ -791,11 +816,10 @@ function tickCampaigns(db) {
       }
       const tpl = db.templates.find(t => t.id === cmp.templateId);
       const text = tpl ? renderTemplate(db, tpl, lead) : (cmp.text || '');
-      const m = send(db, lead, text, 'wake', { templateId: cmp.templateId, broadcast: true, campaignId: cmp.id, phoneId: fromId });   /* рассылка = только Cloud API, с выбранного номера */
+      const m = sendOne(lead, text);
       if (m && m.status !== 'failed') {
         cmp.stats.sent += 1;
-        db.settings.wa.bcastSent = (db.settings.wa.bcastSent || 0) + 1;   /* глобальный счётчик (совместимость) */
-        db.settings.wa.bcastByNum[fromId] = numSent() + 1;   /* per-номер дневной лимит/ramp */
+        bumpSent();
         lead.ai.enabled = true; // ответ подхватит квалификатор
         lead.tags = [...new Set([...(lead.tags || []), 'реанимация'])];
       } else cmp.stats.skipped += 1;
