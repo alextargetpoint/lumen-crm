@@ -7891,8 +7891,10 @@ function renderCompareBar() {
      раньше крепилась к карте (_prMapEl) и исчезала при уходе в карточку → «второй объект не добавить». */
   const old = document.getElementById('prCmpBar'); if (old) old.remove();
   if (typeof CUR !== 'undefined' && CUR !== 'properties') return;   /* только в разделе объектов */
-  const src = window._prAll || window._prItems || [];
-  const cmp = (PAGE_STATE.compare || []).map(id => src.find(x => x.id === id)).filter(Boolean);
+  /* устойчивый резолв: мёржим ВСЕ источники (список + карта) в индекс по id; если объект вдруг не нашёлся —
+     показываем чип с фолбэком (а НЕ выбрасываем молча) → второй/третий объект больше не пропадает из панели */
+  const byId = {}; [...(window._prAll || []), ...(window._prItems || [])].forEach(x => { if (x && x.id) byId[x.id] = x; });
+  const cmp = (PAGE_STATE.compare || []).map(id => byId[id] || { id, name: 'Объект', images: [] });
   if (!cmp.length) return;
   const bar = document.createElement('div'); bar.id = 'prCmpBar'; bar.className = 'prcmp';
   bar.innerHTML = `<div class="prcmp-cnt">${ic(I.layers || I.grid, 2)}<b>${cmp.length}</b> ${plural(cmp.length, 'объект', 'объекта', 'объектов')} для сравнения</div><div class="prcmp-items">${cmp.map(c => `<span class="prcmp-chip" title="${esc(c.name)}"><span class="prcmp-th" style="background-image:url('${esc((c.images || [])[0] || '')}')"></span>${esc(c.name.slice(0, 18))}<b data-cmpdel="${c.id}" title="убрать">×</b></span>`).join('')}</div><div class="prcmp-acts"><button class="btn btn-sm btn-accent" id="prCmpGo"${cmp.length < 2 ? ' disabled title="выберите минимум 2"' : ''}>${ic(I.grid || I.layers, 2)}Сравнить${cmp.length >= 2 ? ' (' + cmp.length + ')' : ''}</button><button class="btn btn-sm prcmp-clear" id="prCmpClear" title="Очистить">${ic(I.x, 2)}</button></div>`;
