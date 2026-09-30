@@ -1062,7 +1062,7 @@ function optOut(db, lead) {
   lead.marketingOptOut = true;
   lead.optOutAt = Date.now();
   lead.tags = [...new Set([...(lead.tags || []), 'отписался'])];
-  for (const cmp of db.campaigns || []) cmp.recipients = (cmp.recipients || []).filter(id => id !== lead.id);
+  for (const cmp of db.campaigns || []) { if ((cmp.recipients || []).includes(lead.id)) { cmp.stats = cmp.stats || {}; cmp.stats.unsubscribed = (cmp.stats.unsubscribed || 0) + 1; } cmp.recipients = (cmp.recipients || []).filter(id => id !== lead.id); }   /* честный счётчик отписок в аналитику (лид удаляется из recipients — сканом его уже не поймать) */
   if (lead.ai) lead.ai.enabled = false;
   ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name} отписался от рассылки (кнопка в шаблоне) — маркетинг остановлен` });
   const txt = (lead.lang === 'en')

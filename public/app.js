@@ -8981,7 +8981,7 @@ function cmpCard(c) {
       <div class="cmp-stat"><div class="v">${c.stats.delivered || 0}</div><div class="k">доставлено</div></div>
       <div class="cmp-stat"><div class="v">${c.stats.opened || 0}</div><div class="k">${c.channel === 'email' ? 'открыто' : 'прочитано'}</div></div>
       ${c.channel === 'email' ? `<div class="cmp-stat"><div class="v">${c.stats.clicked || 0}</div><div class="k">клики</div></div>` : ''}
-      <div class="cmp-stat"><div class="v">${(c.stats.complained || 0)}</div><div class="k">жалобы/отписки</div></div>
+      <div class="cmp-stat"><div class="v"${(c.stats.unsubscribed || c.stats.complained) ? ' style="color:var(--warn)"' : ''}>${(c.stats.unsubscribed || c.stats.complained || 0)}</div><div class="k">отписки</div></div>
     </div>` : ''}
     ${c.funnel && c.funnel.sent ? `<div class="cmp-stats" style="margin-top:8px;opacity:.95">
       <div class="cmp-stat"><div class="v">${c.funnel.deliveredPct}%</div><div class="k">доставлено</div></div>

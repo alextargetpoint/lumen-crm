@@ -7295,6 +7295,7 @@ const server = http.createServer(async (req, res) => {
           else if (m2.status === 'failed') failed++;
         }
         for (const id of rec) { const l = db.leads.find(x => x.id === id); if (l && l.marketingOptOut) optedOut++; }
+        optedOut = Math.max(optedOut, (c.stats && c.stats.unsubscribed) || 0);   /* отписавшихся удаляют из recipients — берём максимум со счётчиком stats.unsubscribed */
         const pct = (n) => sent ? Math.round(n / sent * 100) : 0;
         return Object.assign({}, c, { funnel: { audience: rec.size, sent, delivered, read, failed, replied: c.stats.replied || 0, optedOut, deliveredPct: pct(delivered), readPct: pct(read), failedPct: pct(failed) } });
       });
@@ -9486,7 +9487,7 @@ const server = http.createServer(async (req, res) => {
         else if (type === 'email.opened') { msg.status = 'opened'; once('opened'); }
         else if (type === 'email.clicked') { msg.status = 'clicked'; once('clicked'); }
         else if (type === 'email.bounced' || type === 'email.delivery_delayed') { msg.status = 'failed'; once('bounced'); }
-        else if (type === 'email.complained') { msg.status = 'failed'; once('complained', () => { const l = (tdb.leads || []).find(x => x.id === msg.leadId); if (l) { l.marketingOptOut = true; l.marketingOptOutAt = Date.now(); } }); }
+        else if (type === 'email.complained') { msg.status = 'failed'; once('complained', () => { const l = (tdb.leads || []).find(x => x.id === msg.leadId); if (l) { l.marketingOptOut = true; l.marketingOptOutAt = Date.now(); } if (cmp) { cmp.stats.unsubscribed = (cmp.stats.unsubscribed || 0) + 1; } }); }   /* жалоба на спам = отписка → в счётчик отписок */
         store.save();
       });
       return json(res, 200, { ok: true });
