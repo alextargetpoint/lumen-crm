@@ -7573,6 +7573,12 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* в тёмных темах фото чуть притушено, чтобы не выбивалось */
 :root[data-night] .es-art .es-art-img { opacity: .8; }
 
+/* ===== Список пропущенных дублей при импорте ===== */
+.dup-list{display:flex;flex-direction:column;gap:7px;max-height:52vh;overflow-y:auto}
+.dup-row{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--accent) 5%,transparent);border:1px solid var(--line)}
+.dup-row b{font-size:13px;font-weight:650;color:var(--ink)}
+.dup-row span{font-size:11.5px;color:var(--muted)}
+
 /* ===== Кастомный анимированный пустой стейт «Ленты» — вещание в эфир ===== */
 .fd-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 52px 24px 44px !important; overflow: hidden; position: relative; }
 .fd-empty::before { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%); pointer-events: none; }
