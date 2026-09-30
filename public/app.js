@@ -1491,11 +1491,21 @@ window.openWaPersona = function (phone, n) {
       <div class="form-row"><label>Имя (видит лид, до 25 симв.)</label><input id="wapName" maxlength="25" value="${esc(p.name || '')}" placeholder="напр. Анна · TargetPoint"></div>
       <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><input id="wapAbout" maxlength="139" value="${esc(p.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10–20"></div>
       <div class="form-row"><label>Аватар (URL картинки)</label><input id="wapAvatar" value="${esc(p.avatar || '')}" placeholder="https://…/photo.jpg"></div>
+      <div style="display:flex;gap:10px">
+        <div class="form-row" style="flex:1"><label>Режим номера</label><select id="wapMode">
+          <option value="qualifier" ${(p.mode === 'broker') ? '' : 'selected'}>Шаблонная от агентства (пул, без закрепа)</option>
+          <option value="broker" ${p.mode === 'broker' ? 'selected' : ''}>Закреплена за брокером</option>
+        </select></div>
+        <div class="form-row" style="flex:1"><label>Брокер за номером</label><select id="wapBroker"><option value="">— пул агентства</option>${(STATE.brokers || []).map(b2 => `<option value="${esc(b2.id)}" ${(n && n.brokerId) === b2.id ? 'selected' : ''}>${esc(b2.name)}</option>`).join('')}</select></div>
+      </div>
+      <div class="muted" style="font-size:11px;line-height:1.5;margin-top:2px">Шаблонная — номер в общем пуле, первые касания раскидываются по кругу (прогрев + меньше риск). Закреплённая — все касания «своих» лидов идут с этого номера (личный номер брокера).</div>
       <div id="wapOut" class="muted" style="font-size:11.5px;margin-top:4px"></div>`,
     actions: [{ label: 'Сохранить и применить', cls: 'btn-accent', onClick: async (b) => {
       const out = $('#wapOut', b); if (out) out.textContent = 'Сохраняю и синкаю в WhatsApp…';
       try {
-        const r = await api.post('/wa/gray/persona', { phone, name: ($('#wapName', b) || {}).value, about: ($('#wapAbout', b) || {}).value, avatar: ($('#wapAvatar', b) || {}).value });
+        const wMode = ($('#wapMode', b) || {}).value || 'qualifier';
+        const wBroker = wMode === 'broker' ? (($('#wapBroker', b) || {}).value || null) : null;   /* шаблонная = в пул (brokerId снимаем) */
+        const r = await api.post('/wa/gray/persona', { phone, name: ($('#wapName', b) || {}).value, about: ($('#wapAbout', b) || {}).value, avatar: ($('#wapAvatar', b) || {}).value, mode: wMode, brokerId: wBroker });
         const sy = r.sync || {};
         if (sy.error) toast('Сохранено', 'применится после подключения', true);
         else toast('Профиль сохранён и применён к WhatsApp', null, true);
@@ -1510,6 +1520,7 @@ window.openWaPersona = function (phone, n) {
     if (ava) { let img = ava.querySelector('img'); if (av) { if (!img) { img = document.createElement('img'); img.style.cssText = 'width:100%;height:100%;object-fit:cover'; ava.insertBefore(img, ava.firstChild); } img.onerror = () => { img.style.display = 'none'; if (tx) tx.style.display = ''; }; img.src = av; img.style.display = ''; if (tx) tx.style.display = 'none'; } else { if (img) img.style.display = 'none'; if (tx) tx.style.display = ''; } }
   };
   ['wapName', 'wapAbout', 'wapAvatar'].forEach(id => { const el = $('#' + id, bd); if (el) el.addEventListener('input', updWa); });
+  { const wm = $('#wapMode', bd), wb = $('#wapBroker', bd); const syncWm = () => { if (wb) { const tmpl = (wm || {}).value !== 'broker'; wb.disabled = tmpl; wb.style.opacity = tmpl ? '.5' : '1'; } }; if (wm) wm.addEventListener('change', syncWm); syncWm(); }
 };
 
 /* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */

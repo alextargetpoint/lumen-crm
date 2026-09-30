@@ -9167,6 +9167,8 @@ const server = http.createServer(async (req, res) => {
       if (b.name != null) rec.persona.name = String(b.name).slice(0, 25);       // лимит имени WA
       if (b.about != null) rec.persona.about = String(b.about).slice(0, 139);    // «О себе» WA
       if (b.avatar != null) rec.persona.avatar = String(b.avatar).slice(0, 500);
+      if (b.mode != null) rec.persona.mode = ['qualifier', 'broker', 'neutral'].includes(b.mode) ? b.mode : 'qualifier';   // режим: шаблонная от агентства (qualifier) / закреплена за брокером
+      if ('brokerId' in b) rec.brokerId = b.brokerId ? String(b.brokerId) : null;   // закрепление номера за брокером (pickGrayNumber роутит по n.brokerId; пул = null)
       store.save();
       let sync = null;
       if (waWorkerReady(db)) { try { sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' }); } catch (e) { sync = { error: e.message }; } }
