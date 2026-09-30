@@ -14501,7 +14501,7 @@ PAGES.templates = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'left', hue: '#64748B' })}
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px"><button class="btn btn-sm" id="syncTpl">${ic(I.refresh)}Синк статусов из Meta</button><button class="btn btn-sm" id="tplLib">${ic(I.doc)}Библиотека</button><button class="btn btn-accent page-primary" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px"><button class="btn btn-sm" id="syncTpl">${ic(I.refresh)}Синк статусов из Meta</button><button class="btn btn-sm" id="tplLib">${ic(I.doc)}Библиотека</button><button class="btn btn-sm btn-accent" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
     <div class="two-col">
       <div><div class="nav-label" style="padding-left:2px">Utility — сервисные (дешевле, быстрее модерация)</div>
         ${st.templates.filter(t => t.category === 'utility').map(t => tplCard(t, stBadge)).join('')}</div>
