@@ -171,7 +171,12 @@ function send(db, lead, text, via, opts = {}) {
     store.save();
     return m;
   }
-  if (wa.ready(db)) {
+  /* МАРШРУТ КАНАЛА WA (архитектура клиента):
+     • Cloud API — ТОЛЬКО массовые рассылки по спящей базе (opts.broadcast).
+     • Серый номер (Baileys) — ВСЯ основная переписка: первое касание, цепочка, ИИ, ручное.
+     Поэтому через Cloud идём только для broadcast; либо как фолбэк, если серого транспорта нет вообще. */
+  const goCloud = wa.ready(db) && (opts.broadcast || !graySender);
+  if (goCloud) {
     const tpl = opts.templateId ? db.templates.find(t => t.id === opts.templateId) : null;
     let job;
     if (opts.media && opts.media.url) {
