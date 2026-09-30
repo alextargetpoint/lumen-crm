@@ -1153,19 +1153,25 @@ function tickScheduled(db) {
 /* ---------- основной цикл ---------- */
 function startLoop() {
   setInterval(() => {
-    try {
-      const db = store.get();
-      tickChains(db);
-      tickCampaigns(db);
-      tickMeetings(db);
-      tickSla(db);
-      tickRotation(db);
-      tickReports(db);
-      tickSimulator(db);
-      tickControl(db);
-      tickScheduled(db);
-      store.save();
-    } catch (e) { console.error('[engine]', e); }
+    let tids;
+    try { tids = store.listTenants(); } catch (_) { tids = [store.PRIMARY]; }
+    for (const tid of tids) {
+      try {
+        store.runInTenant(tid, () => {
+          const db = store.get();
+          tickChains(db);
+          tickCampaigns(db);
+          tickMeetings(db);
+          tickSla(db);
+          tickRotation(db);
+          tickReports(db);
+          tickSimulator(db);
+          tickControl(db);
+          tickScheduled(db);
+          store.save();
+        });
+      } catch (e) { console.error('[engine]', tid, e); }
+    }
   }, 5000);
 }
 
