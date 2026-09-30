@@ -7042,7 +7042,22 @@ PAGES.sequences = async (root) => {
           <div data-se-tplwrap style="${st.mode === 'template' ? '' : 'display:none'}"><select data-se="templateId" class="se2-full">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('') || '<option>Нет шаблонов — создайте в «Шаблоны»</option>'}</select></div>
           <textarea data-se="prompt" class="se2-full se2-ta" placeholder="Что сказать ИИ. Напр.: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»" style="${st.mode === 'ai' ? '' : 'display:none'}">${esc(st.prompt || '')}</textarea>
           <textarea data-se="text" class="se2-full se2-ta" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : st.mode === 'personalize' ? 'Запасной текст, если ИИ недоступен (необязательно)…' : 'Текст сообщения…'}" style="${st.mode === 'text' || st.mode === 'creative' || st.mode === 'personalize' ? '' : 'display:none'}">${esc(st.text || '')}</textarea>
-          <div data-se-pers class="muted" style="font-size:11.8px;line-height:1.55;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:10px;padding:11px 13px;margin-top:8px;display:${st.mode === 'personalize' ? 'flex' : 'none'};gap:8px;align-items:flex-start">${ic(I.spark)}<span><b>ИИ соберёт персональное касание сам</b> — как кнопка «Персонализировать» в карточке лида: с отсылкой на объявление, по которому пришёл лид, сильные стороны проекта и критерии из заявки. Если канал шага — <b>E-mail</b>, текст будет в официальном тоне и с темой письма. Идеально для <b>первого касания</b>.</span></div>
+          <div data-se-pers style="margin-top:8px;display:${st.mode === 'personalize' ? 'block' : 'none'}">
+            <div class="muted" style="font-size:11.8px;line-height:1.55;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:10px;padding:11px 13px;display:flex;gap:8px;align-items:flex-start">${ic(I.spark)}<span><b>ИИ соберёт персональное касание сам</b> — как кнопка «Персонализировать» в карточке лида: с отсылкой на объявление, по которому пришёл лид, сильные стороны проекта и критерии из заявки. Если канал шага — <b>E-mail</b>, текст будет в официальном тоне и с темой письма. Идеально для <b>первого касания</b>.</span></div>
+            <div style="font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin:12px 2px 5px">Пример — так это выглядит для лида с объявления «Evgenia Laya Resort», бюджет $500k, инвестиции:</div>
+            <div style="display:grid;gap:8px">
+              <div style="border:1px solid var(--stroke,rgba(20,19,17,.1));border-radius:12px;padding:10px 12px;background:var(--paper,#fff)">
+                <div style="font-size:10px;font-weight:700;color:#25D366;display:flex;align-items:center;gap:5px;margin-bottom:5px">${ic(I.chat)}WHATSAPP / TELEGRAM (живой тон)</div>
+                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Приветствую, Евгения! Отличный выбор — <b>Evgenia Laya Resort</b> сейчас на слуху у тех, кто планирует Пхукет всерьёз.<br><br>Проект в тихом районе, до моря 10 минут пешком, первая очередь уже работает — управляющая компания берёт аренду на себя.<br><br>Подсказать, какие свободные юниты подходят под инвестиции в вашей вилке? 🌴</div>
+              </div>
+              <div style="border:1px solid var(--stroke,rgba(20,19,17,.1));border-radius:12px;padding:10px 12px;background:var(--paper,#fff)">
+                <div style="font-size:10px;font-weight:700;color:var(--accent,#2563eb);display:flex;align-items:center;gap:5px;margin-bottom:5px">${ic(I.link)}E-MAIL (официальный тон + тема)</div>
+                <div style="font-size:11.5px;color:var(--ink-3,#8b8983);margin-bottom:6px"><b style="color:var(--ink)">Тема:</b> Evgenia Laya Resort — подобрал варианты под вашу заявку</div>
+                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Здравствуйте, Евгения!<br><br>Благодарю за интерес к <b>Evgenia Laya Resort</b> — действительно сильный проект для жизни и инвестиций на Пхукете. Закрытая территория, до пляжа ~10 минут, первая очередь уже приносит владельцам доход.<br><br>Готов прислать актуальные планировки и расчёт по рассрочке под ваш бюджет. Подобрать?<br><br><span style="color:var(--ink-3,#8b8983)">С уважением,<br>эксперт агентства</span></div>
+              </div>
+            </div>
+            <div class="muted" style="font-size:10.5px;margin-top:6px;font-style:italic">Это иллюстрация стиля — реальный текст ИИ генерит под каждого лида отдельно (его имя, объявление, бюджет, цель).</div>
+          </div>
           <div class="se2-tools" data-se-tools style="${st.mode === 'template' || st.mode === 'personalize' ? 'display:none' : ''}">
             <button type="button" class="btn btn-sm btn-accent" data-se-aidraft>${ic(I.spark)}Собрать через ИИ</button>
             <button type="button" class="btn btn-sm" data-se-varbtn>${ic(I.plus)}Переменная</button>
@@ -7450,7 +7465,7 @@ PAGES.sequences = async (root) => {
       { const tw = eb.querySelector('[data-se-tplwrap]'); if (tw) tw.style.display = m === 'template' ? '' : 'none'; }
       eb.querySelector('[data-se="prompt"]').style.display = m === 'ai' ? '' : 'none';
       const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) { ta2.style.display = (m === 'text' || m === 'creative' || m === 'personalize') ? '' : 'none'; ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : m === 'personalize' ? 'Запасной текст, если ИИ недоступен (необязательно)…' : 'Текст сообщения…'; }
-      const pers = eb.querySelector('[data-se-pers]'); if (pers) pers.style.display = m === 'personalize' ? 'flex' : 'none';
+      const pers = eb.querySelector('[data-se-pers]'); if (pers) pers.style.display = m === 'personalize' ? 'block' : 'none';
       const tools = eb.querySelector('[data-se-tools]'); if (tools) tools.style.display = (m === 'template' || m === 'personalize') ? 'none' : '';
       const cr = eb.querySelector('[data-se-crea]'); if (cr) cr.style.display = m === 'creative' ? '' : 'none';
     };
