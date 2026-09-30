@@ -7455,6 +7455,7 @@ PAGES.sequences = async (root) => {
       const cr = eb.querySelector('[data-se-crea]'); if (cr) cr.style.display = m === 'creative' ? '' : 'none';
     };
     $$('.se2-mode', eb).forEach(b => b.addEventListener('click', () => { eb.dataset.mode = b.dataset.mode; syncMode(); }));
+    { const chSel = eb.querySelector('[data-se="channel"]'), subjIn = eb.querySelector('[data-se="subject"]'); if (chSel && subjIn) chSel.addEventListener('change', () => { subjIn.style.display = chSel.value === 'email' ? '' : 'none'; }); }   /* смена канала шага на E-mail → показать поле «Тема письма» */
     const ta = eb.querySelector('[data-se="text"]');
     const promptInp = eb.querySelector('[data-se="prompt"]');
     /* переменные спрятаны за кнопкой «Переменная» (поповер) — не заваливаем экран */
@@ -9250,7 +9251,17 @@ PAGES.automations = async (root) => {
             <details style="margin-top:10px"><summary class="muted" style="font-size:11.5px;cursor:pointer">Bot Token (необязательно — для рассылки/тёплых)</summary>
               <div class="form-row" style="margin:8px 0 0"><label>Telegram Bot Token <span class="muted" style="font-weight:400">— от @BotFather</span></label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'вставьте токен бота'}"></div>
             </details>`)}
-          ${chBlock(I.link, 'E-mail (официальный тон)', chip(connOf.email, 'домен верифицирован', 'домен не подключён'), 'Одно вежливое письмо, если в мессенджерах тишина. Уходит <b>с вашего домена</b> — попадает во «Входящие», не в спам. Ключ отправки задаёт платформа, вам нужно подключить только домен ↓', `<div class="em-domain" id="emDomainCard"><div id="emDomainBody" class="muted" style="font-size:12px">Загрузка…</div></div>`)}
+          ${chBlock(I.link, 'E-mail (официальный тон)', chip(connOf.email, 'домен верифицирован', 'домен не подключён'), 'Одно вежливое письмо, если в мессенджерах тишина. Настраивается в три слоя ↓', `
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;gap:9px;align-items:flex-start;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.12));border-radius:10px;padding:10px 12px">
+                <span style="opacity:.7;flex:0 0 auto;margin-top:1px">${ic(I.chat)}</span>
+                <div style="flex:1;font-size:12px;line-height:1.5"><b>1 · Что писать (текст + тема).</b> Задаётся в <b>цепочке касаний</b> — шаг с каналом «E-mail»: «Свой текст», «Шаблон» или «ИИ-персонализация» (ИИ соберёт письмо с отсылкой на объявление лида + тему). Это и есть текст письма.</div>
+                <button class="btn btn-sm btn-accent" data-go="sequences" style="flex:0 0 auto">Открыть цепочку</button>
+              </div>
+              <div style="font-size:12px;color:var(--ink-3,#8b8983);line-height:1.5"><b style="color:var(--ink)">2 · Как выглядит (оформление).</b> Ниже — визуальный шаблон письма (пресет + превью). Текст из шага цепочки автоматически вставляется в этот дизайн, с приветствием и подписью агентства.</div>
+              <div style="font-size:12px;color:var(--ink-3,#8b8983);line-height:1.5"><b style="color:var(--ink)">3 · Откуда уходит (домен).</b> Письма идут с вашего домена во «Входящие», не в спам. Ключ отправки задаёт платформа — вам нужно только подключить домен.</div>
+              <div class="em-domain" id="emDomainCard"><div id="emDomainBody" class="muted" style="font-size:12px">Загрузка…</div></div>
+            </div>`)}
           ${chBlock(I.send, 'Viber', chip(connOf.viber, 'подключён', 'не настроен'), 'Одно персональное касание. <b>Public Account</b> — тёплым (кто вам написал). <b>BSP</b> (Infobip/360dialog) — официальные холодные касания по номерам: платно, нужна бизнес-верификация и согласие клиента. ⛔ Массовых рассылок в Viber не делаем.', `
             <div class="form-row"><label>Режим</label><select id="chVbMode">
               <option value="pa" ${vbMode === 'pa' ? 'selected' : ''}>Public Account — тёплые (кто написал)</option>
