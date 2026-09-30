@@ -81,6 +81,7 @@ const I = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   trophy: '<path d="M6 4h12v5a6 6 0 0 1-12 0V4z"/><path d="M6 6H3.5v1.5A3.5 3.5 0 0 0 6.5 11M18 6h2.5v1.5A3.5 3.5 0 0 1 17.5 11M9.5 20h5M8 20a4 4 0 0 1 8 0M12 15v3"/>',
   circle: '<circle cx="12" cy="12" r="8.5"/>',
+  refresh: '<path d="M21 4v6h-6"/><path d="M3 20v-6h6"/><path d="M3.5 9a8 8 0 0 1 13.3-3L21 10M3 14l4.2 4a8 8 0 0 0 13.3-3"/>',
   grip: '<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
   bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
   star: '<path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 18.9 6.2 21l1.1-6.45-4.7-4.6 6.5-.95L12 2.6z"/>',
