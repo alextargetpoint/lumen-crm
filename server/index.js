@@ -417,6 +417,7 @@ function ensureTenantDefaults(db) {
     const a2 = (db.ads || []).find(x => x.adId === '120211478921230742'); if (a2 && !a2.priceFrom) a2.priceFrom = 180000; }
   for (const l of db.leads) { if (!l.notes) l.notes = []; if (!l.contacts) l.contacts = []; }
   /* правила авто-отключения ИИ (перехват человеком) */
+  db.settings.ai = db.settings.ai || {};
   if (!db.settings.ai.autoOff) db.settings.ai.autoOff = { onHumanReply: true, onHumanRequest: true, onEscalation: true };
   /* автоматизации агентства */
   if (!db.settings.automations) db.settings.automations = {
@@ -6922,12 +6923,13 @@ const server = http.createServer(async (req, res) => {
         /* первое касание вручную: если в панели показан креатив (загруженный ИЛИ атрибуция объявления,
            l.adCreative), он уходит первым сообщением — как это делает автопилот на chainStep 0. */
         const cu = b.creativeUrl ? String(b.creativeUrl).slice(0, 500) : '';
-        if (cu) engine.send(db, lead, '', 'human', { media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } });
-        if (b.text || !cu) engine.send(db, lead, b.text || '', 'human');
+        const _ch = ['wa', 'tg', 'viber', 'email'].includes(b.channel) ? b.channel : undefined;   /* явный выбор канала касания */
+        if (cu) engine.send(db, lead, '', 'human', { channel: _ch, media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } });
+        if (b.text || !cu) engine.send(db, lead, b.text || '', 'human', _ch ? { channel: _ch } : undefined);
         /* «дообучение под брокера»: отправленное из панели первого касания сообщение учим как СТИЛЬ пишущего */
         if (b.learnStyle && b.text) captureTouchStyle(db, IS_BROKER ? ROLE.brokerId : 'owner', b.text, (lead.ads && lead.ads.adName) || '');
         /* менеджер подхватил — ИИ на паузу (правило autoOff.onHumanReply) */
-        if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) {
+        if (db.settings.ai && db.settings.ai.autoOff && db.settings.ai.autoOff.onHumanReply && lead.ai && lead.ai.enabled) {
           lead.ai.enabled = false;
           ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `${lead.name}: менеджер подхватил диалог — автопилот на паузе` });
         }
