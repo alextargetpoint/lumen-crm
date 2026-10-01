@@ -807,6 +807,9 @@ function adsInScope(db, cid) {
   if (!accts.size) return [];
   return (db.ads || []).filter(a => accts.has(metaads.acctId(a.adAccountId)));
 }
+/* qualMode выбранного подрядчика (peak|current|undefined=peak) — чтобы ВСЕ эндпоинты аналитики
+   считали квалы одинаково (раньше только /compare учитывал ct.qualMode, остальные были peak) */
+function scopeQualMode(db, cid) { return ((db.mpContractors || []).find(c => c.id === cid) || {}).qualMode; }
 
 /* ⭐ Квал по «максимально достигнутой стадии» (high-water mark), а НЕ по текущей.
    Для аналитики трафик-подрядчиков/кампаний/источников: лид, который был квалифицирован, а потом
@@ -1768,7 +1771,7 @@ async function refreshIcsBusy(b) {
 }
 function brokerBusyIntervals(db, b) {
   const iv = [];
-  (db.meetings || []).filter(m => m.brokerId === b.id && m.at).forEach(m => iv.push({ s: m.at, e: m.at + (m.durationMin || 30) * 60000 }));
+  (db.meetings || []).filter(m => m.brokerId === b.id && m.at).forEach(m => iv.push({ s: m.at, e: m.at + ((+m.dur || +m.durationMin || 30)) * 60000 }));   /* FIX: реальное поле длительности — m.dur (durationMin не существует) → длинные встречи занимали лишь 30мин → риск двойной брони */
   (db.brokerTasks || []).filter(t => t.brokerId === b.id && t.due && t.status !== 'done').forEach(t => iv.push({ s: t.due, e: t.due + 30 * 60000 }));
   const c = ICS_CACHE[b.id]; if (c) iv.push(...c.intervals);
   if (b.busyIcsUrl && (!c || Date.now() - c.at > 30 * 60000)) refreshIcsBusy(b);   /* фоновое обновление кэша */
@@ -11588,7 +11591,7 @@ ${SCR}
         const mine = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leads = mine.length;
         const dialogs = mine.filter(l => hasIn(l.id) || ['dialog', ...QUAL].includes(l.stage)).length;
-        const qualified = mine.filter(l => everReachedQual(db, l)).length;   /* high-water: был квалифицирован, даже если сейчас отвалился */
+        const qualified = mine.filter(l => everReachedQual(db, l, scopeQualMode(db, u.searchParams.get("contractorId")))).length;   /* high-water: был квалифицирован, даже если сейчас отвалился */
         const deals = mine.filter(l => l.stage === 'deal').length;
         const rm = adRangeMetrics(ad, from, to);
         const spend = rm.spend;
@@ -11730,7 +11733,7 @@ ${SCR}
       for (const ad of _ADS) {
         const crmLeads = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leadsCRM = crmLeads.length;
-        const quals = (ad.qualsFact != null && !from && !to) ? ad.qualsFact : crmLeads.filter(l => everReachedQual(db, l)).length;
+        const quals = (ad.qualsFact != null && !from && !to) ? ad.qualsFact : crmLeads.filter(l => everReachedQual(db, l, scopeQualMode(db, u.searchParams.get("contractorId")))).length;
         const rm = adRangeMetrics(ad, from, to); const dR = dailyIn(ad.daily);
         const am = { spend: rm.spend, leads: rm.leadsMeta, leadsCRM, quals, clicks: rm.clicks, impr: rm.impr, daily: dR, dailyR: dR };
         const cn = ad.campaignName || '— без кампании';
@@ -11760,7 +11763,7 @@ ${SCR}
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
         .map(l => ({ id: l.id, name: l.name, phone: l.phone, stage: l.stage, geo: l.geo, createdAt: l.createdAt, broker: l.broker }));
       const breakdown = {}; for (const l of leads) breakdown[l.stage] = (breakdown[l.stage] || 0) + 1;
-      const quals = leads.filter(l => everReachedQual(db, l)).length;
+      const quals = leads.filter(l => everReachedQual(db, l, scopeQualMode(db, u.searchParams.get("contractorId")))).length;
       return json(res, 200, { leads, total: leads.length, quals, breakdown, stageNames: namesCfg, qualStages: QUAL });
     }
     if (p === '/api/ads/leadanalytics' && req.method === 'GET') {
@@ -11773,7 +11776,7 @@ ${SCR}
       const campMap = db.settings.adCampaignMap || {}; const langMap = db.settings.adCampaignLangMap || {};
       const dirs = db.settings.adDirections || []; const dirName = (k) => (dirs.find(d => d.key === k) || {}).name || 'Прочее (вне плана)';
       const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
-      const isQual = (l) => everReachedQual(db, l);   /* high-water mark для качества трафика */
+      const isQual = (l) => everReachedQual(db, l, scopeQualMode(db, u.searchParams.get("contractorId")));   /* high-water mark для качества трафика */
       /* страна → флаг (ручная карта → ISO-2 → словарь имён → 🌐) */
       const FMAP = { 'UAE': '🇦🇪', 'United Arab Emirates': '🇦🇪', 'Эмираты': '🇦🇪', 'ОАЭ': '🇦🇪', 'Saudi Arabia': '🇸🇦', 'Саудовская Аравия': '🇸🇦', 'Russia': '🇷🇺', 'Россия': '🇷🇺', 'United Kingdom': '🇬🇧', 'Великобритания': '🇬🇧', 'United States': '🇺🇸', 'США': '🇺🇸', 'Canada': '🇨🇦', 'Канада': '🇨🇦', 'Australia': '🇦🇺', 'Австралия': '🇦🇺', 'Germany': '🇩🇪', 'Германия': '🇩🇪', 'France': '🇫🇷', 'Франция': '🇫🇷', 'Italy': '🇮🇹', 'Италия': '🇮🇹', 'Spain': '🇪🇸', 'Испания': '🇪🇸', 'Turkey': '🇹🇷', 'Турция': '🇹🇷', 'Thailand': '🇹🇭', 'Таиланд': '🇹🇭', 'Indonesia': '🇮🇩', 'Индонезия': '🇮🇩', 'India': '🇮🇳', 'Индия': '🇮🇳', 'Ukraine': '🇺🇦', 'Украина': '🇺🇦', 'Kazakhstan': '🇰🇿', 'Казахстан': '🇰🇿', 'Israel': '🇮🇱', 'Израиль': '🇮🇱', 'Qatar': '🇶🇦', 'Катар': '🇶🇦' };
       const N2I = { 'czechia': 'CZ', 'чехия': 'CZ', 'switzerland': 'CH', 'швейцария': 'CH', 'finland': 'FI', 'финляндия': 'FI', 'sweden': 'SE', 'швеция': 'SE', 'denmark': 'DK', 'дания': 'DK', 'netherlands': 'NL', 'нидерланды': 'NL', 'belgium': 'BE', 'бельгия': 'BE', 'austria': 'AT', 'австрия': 'AT', 'poland': 'PL', 'польша': 'PL', 'portugal': 'PT', 'португалия': 'PT', 'greece': 'GR', 'греция': 'GR', 'ireland': 'IE', 'ирландия': 'IE', 'cyprus': 'CY', 'кипр': 'CY', 'malta': 'MT', 'мальта': 'MT', 'armenia': 'AM', 'армения': 'AM', 'georgia': 'GE', 'грузия': 'GE', 'azerbaijan': 'AZ', 'азербайджан': 'AZ', 'uzbekistan': 'UZ', 'узбекистан': 'UZ', 'belarus': 'BY', 'беларусь': 'BY', 'lithuania': 'LT', 'литва': 'LT', 'latvia': 'LV', 'латвия': 'LV', 'estonia': 'EE', 'эстония': 'EE', 'norway': 'NO', 'норвегия': 'NO' };
