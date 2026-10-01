@@ -3496,10 +3496,16 @@ function meetingMatchKeys(mt) {
   const gm = link.match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i); if (gm) keys.push(gm[1].toLowerCase());
   return keys;
 }
-/* найти встречу по ЛЮБОМУ ключу: внутренний id, Zoom-номер или Google Meet-код (приложение шлёт то, что прочитало) */
+/* найти встречу по ЛЮБОМУ ключу: внутренний id, Zoom-номер или Google Meet-код (приложение шлёт то, что прочитало).
+   ⚠️ Zoom Personal Meeting ID переиспользуется на каждом звонке → один код = много встреч во времени.
+   Поэтому приоритет: лид ЖИВ > ещё не завершена > самая свежая. Иначе матчились сироты (удалённый лид → «лид не найден»). */
 function findMeetingByKey(db, key) {
   const k = String(key || '').trim().toLowerCase(); if (!k) return null;
-  return (db.meetings || []).find(m => m.id === key || String(m.zoomMeetingId || '').toLowerCase() === k || meetingMatchKeys(m).some(x => x.toLowerCase() === k)) || null;
+  const matches = (db.meetings || []).filter(m => m.id === key || String(m.zoomMeetingId || '').toLowerCase() === k || meetingMatchKeys(m).some(x => x.toLowerCase() === k));
+  if (!matches.length) return null;
+  const leadAlive = m => (db.leads || []).some(l => l.id === m.leadId);
+  matches.sort((a, b) => (leadAlive(b) - leadAlive(a)) || ((a.transcriptStatus === 'done') - (b.transcriptStatus === 'done')) || ((b.at || 0) - (a.at || 0)));
+  return matches[0];
 }
 /* видео-встречи брокера (или всего тенанта, если broker пуст) в окне now-6ч..+12ч — повестка нотетейкера */
 function notetakerAgendaItems(db, broker) {
@@ -7120,7 +7126,7 @@ const server = http.createServer(async (req, res) => {
           l.tags = (l.tags || []).filter(t => t !== 'нужен человек');
           done++;
         }
-        else if (action === 'delete') { db.messages = db.messages.filter(mm2 => mm2.leadId !== l.id); db.leads = db.leads.filter(x => x.id !== l.id); done++; }
+        else if (action === 'delete') { db.messages = db.messages.filter(mm2 => mm2.leadId !== l.id); db.meetings = (db.meetings || []).filter(mt => mt.leadId !== l.id); db.leads = db.leads.filter(x => x.id !== l.id); done++; }   /* + чистим встречи, чтобы не копились сироты (ломали матч нотетейкера по переиспользуемому коду) */
       }
       if (IS_BROKER) audit(db, req, `массовое действие «${action}» над ${done} лид(ами)`);
       const labels = { stage: 'перемещено', archive: 'в архив', broker: 'передано', tag: 'помечено', untag: 'снят тег', ai: b.value ? 'ИИ включён' : 'ИИ выключен', chain: 'запущена цепочка', delete: 'удалено' };
