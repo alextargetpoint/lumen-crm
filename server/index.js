@@ -9509,6 +9509,18 @@ const server = http.createServer(async (req, res) => {
       const r = await viberTestConn((db.settings.channels || {}).viber, b.to || '', (db.settings.agency && db.settings.agency.name) || '');
       return json(res, 200, r);
     }
+    /* диагностика Viber: логи/отчёты доставки Infobip (почему PENDING не дошло — sender не одобрен / нет Viber / нет consent) */
+    if (p === '/api/viber/diag' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role === 'broker') return json(res, 403, { error: 'только владелец' });
+      const vb = (db.settings.channels || {}).viber || {};
+      const key = vb.apiKey || vb.key || vb.token || ''; const base = String(vb.baseUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+      if (!key || !base) return json(res, 200, { ok: false, error: 'нет ключа/baseUrl BSP' });
+      const out = { ok: true, sender: vb.sender || '', logs: [], reports: [], senders: null };
+      const hdr = { Authorization: 'App ' + key, Accept: 'application/json' };
+      try { const r1 = await fetch('https://' + base + '/viber/1/logs?limit=8', { headers: hdr }); const j1 = await r1.json().catch(() => ({})); out.logs = (j1.results || []).map(x => ({ to: x.to, at: x.sentAt || x.doneAt, status: (x.status && (x.status.name || x.status.groupName)) || '', reason: (x.error && (x.error.name || x.error.description)) || (x.status && x.status.description) || '' })); } catch (e) { out.logsErr = e.message; }
+      try { const r3 = await fetch('https://' + base + '/viber/2/messages/senders', { headers: hdr }); const j3 = await r3.json().catch(() => ({})); out.senders = j3.senders || j3.results || j3; } catch (e) { out.sendersErr = e.message; }
+      return json(res, 200, out);
+    }
     if (p === '/api/viber/inbound' && req.method === 'POST') {
       /* SEC: опциональный секрет вебхука Viber (Infobip). Если задан VIBER_WEBHOOK_SECRET — требуем ?key=… совпадение,
          иначе подделка входящих/DLR (создание фейк-лидов, пометка «ответил» → глушит каскад). Без секрета — как раньше. */
