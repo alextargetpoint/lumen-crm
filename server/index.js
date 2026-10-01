@@ -1463,6 +1463,8 @@ function publicSettings(db) {
   if (s.wa.appSecret) { s.wa.appSecretSet = true; delete s.wa.appSecret; }
   if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
   { s.meetingBot = s.meetingBot || { enabled: true }; if (s.meetingBot.key) { s.meetingBot.keySet = true; delete s.meetingBot.key; } s.meetingBot.platform = !!process.env.RECALL_API_KEY; s.meetingBot.ready = meetingBot.ready(); }  /* авто-транскрипция встреч: платформенный ключ → агентству настраивать нечего */
+  /* SEC: Zoom-токены агентства (access/refresh) — секрет, НИКОГДА наружу. Отдаём только безопасный статус подключения. */
+  delete s.zoom; s.zoom = zoom.status(db);
   if (s.voice && s.voice.key) { s.voice.keySet = true; delete s.voice.key; }
   if (s.channels) {
     for (const k of ['tg', 'viber', 'email']) {
@@ -3413,10 +3415,10 @@ async function farmReclaimFromTenant(prevTid, phone) {
    Recall → авто-запись+транскрипт), иначе бесплатный Jitsi (работает в браузере, но бот его НЕ пишет) */
 async function genMeetingLink(db, kind, lead, atMs, durMin) {
   if (kind !== 'video') return null;
-  if (zoom.ready()) {
+  if (zoom.ready(db)) {
     try {
       const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
-      const r = await zoom.createMeeting({ topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id });
+      const r = await zoom.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id });
       if (r && r.ok && r.joinUrl) return r.joinUrl;
       console.error('[zoom] создать встречу не вышло:', r && r.error);
     } catch (e) { console.error('[zoom]', e.message); }
@@ -5209,6 +5211,20 @@ const server = http.createServer(async (req, res) => {
       try { const rr = db.waitlist[idx]; if (!rr.emailedAt) sendWaitlistEmail(db, rr).then(r => { if (r && r.ok) { rr.emailedAt = Date.now(); if (rr.status === 'new') rr.status = 'emailed'; store.save(); } }).catch(() => {}); } catch (_) {}
       return json(res, 200, { ok: true, count: db.waitlist.length, position: idx + 1 });
     }
+    /* ---------- Zoom: подключение СВОЕГО аккаунта агентства (только владелец) ---------- */
+    if (p === '/api/zoom/connect' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!zoom.appConfigured()) return json(res, 400, { error: 'на платформе не настроено Zoom-приложение (ZOOM_OAUTH_CLIENT_ID/SECRET + PUBLIC_BASE_URL)' });
+      return json(res, 200, { url: zoom.startAuth(store.currentTid()) });
+    }
+    if (p === '/api/zoom/disconnect' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      zoom.disconnect(db); return json(res, 200, { ok: true });
+    }
+    if (p === '/api/zoom/status' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      return json(res, 200, zoom.status(db));
+    }
     /* ---------- АДМИНКА листа ожидания (только владелец) ---------- */
     if (p === '/api/waitlist/list' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
@@ -5706,6 +5722,17 @@ const server = http.createServer(async (req, res) => {
       if (sid) { delete db.settings.auth.sessions[sid]; store.save(); const rg = store.getRegistry(); if (rg.sessions[sid]) { delete rg.sessions[sid]; store.saveRegistry(); } }
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'lumen_sid=; Path=/; Max-Age=0' });
       res.end(JSON.stringify({ ok: true })); return;
+    }
+    /* ---------------- Zoom OAuth callback (публичный: Zoom редиректит сюда после согласия) ---------------- */
+    if (p === '/auth/zoom/callback' && req.method === 'GET') {
+      const code = u.searchParams.get('code') || '';
+      const err = u.searchParams.get('error') || '';
+      const tid = zoom.consumeState(u.searchParams.get('state') || '');
+      if (err || !code || !tid) { res.writeHead(302, { Location: '/?zoom=error' }); return res.end(); }
+      try {
+        await store.runInTenant(tid, async () => { const tdb = store.get(); await zoom.exchangeCode(tdb, code); });
+        res.writeHead(302, { Location: '/?zoom=connected' }); return res.end();
+      } catch (e) { console.error('[zoom callback]', e.message); res.writeHead(302, { Location: '/?zoom=error' }); return res.end(); }
     }
     /* ---------------- Супер-админ платформы (основатель) ---------------- */
     if (p === '/auth/admin-login' && req.method === 'POST') {

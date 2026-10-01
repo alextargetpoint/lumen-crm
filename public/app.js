@@ -5426,7 +5426,11 @@ function openMeetingModal(lead, after) {
         <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
       </select></div>
       <div class="form-row" id="mtLinkRow" style="display:none"><label>Ссылка Zoom / Google Meet <span class="muted" style="font-weight:400">(необязательно)</span></label><input id="mtLink" placeholder="https://zoom.us/j/… или https://meet.google.com/…">
-        ${(STATE.settings.meetingBot && STATE.settings.meetingBot.ready) ? '<div class="muted" style="font-size:11px;margin-top:4px">Вставите ссылку Zoom/Meet — встречу автоматически запишем и расшифруем в карточку. Пусто — используем нашу видео-комнату (без записи).</div>' : '<div class="muted" style="font-size:11px;margin-top:4px">Пусто — используем нашу видео-комнату. (Авто-запись встреч подключается платформой.)</div>'}</div>
+        ${((STATE.settings.zoom && STATE.settings.zoom.connected))
+          ? '<div class="muted" style="font-size:11px;margin-top:4px">Оставьте пусто — ссылку создадим автоматически под вашим Zoom' + (STATE.settings.zoom.email ? ' (' + esc(STATE.settings.zoom.email) + ')' : '') + ', встречу запишем и расшифруем в карточку. Или вставьте свою ссылку Zoom/Meet.</div>'
+          : (STATE.settings.meetingBot && STATE.settings.meetingBot.ready)
+            ? '<div class="muted" style="font-size:11px;margin-top:4px">Вставьте ссылку Zoom/Meet — встречу автоматически запишем и расшифруем в карточку. Пусто — используем нашу видео-комнату (без записи). <span style="opacity:.8">Подключите свой Zoom в «Подключениях» — ссылки будут создаваться сами.</span></div>'
+            : '<div class="muted" style="font-size:11px;margin-top:4px">Пусто — используем нашу видео-комнату. (Авто-Zoom и запись подключаются в «Подключениях».)</div>'}</div>
       <div class="form-row"><label>Эксперт</label><select id="mtBroker">${brokers.map(b => `<option value="${b.id}">${esc(b.name)} · ${STATE.settings.geoNames[b.geo]}</option>`).join('')}</select></div>
       <div class="form-row"><label>Заметка (видна только команде)</label><input id="mtNote" placeholder="например: подготовить 3 варианта под $172k"></div>
       <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Кнопка «Подключиться» на странице встречи</div><div class="sd">Выкл — на странице не будет кнопки подключения; эксперт сам пришлёт ссылку в переписке</div></div><label class="switch"><input type="checkbox" id="mtShowJoin" checked><span class="tr"></span><span class="th"></span></label></div>`,
@@ -17229,6 +17233,14 @@ PAGES.settings = async (root) => {
       ${meta ? `<span class="set-link-meta">${meta}</span>` : ''}
       <span class="set-link-chev">${ic(I.chev)}</span>
     </button>`;
+  const zm = s.zoom || {};
+  const zoomForm = !zm.appReady
+    ? `<div class="muted" style="font-size:12px;line-height:1.6">Авто-создание Zoom-ссылок подключается платформой (OAuth-приложение). Пока не настроено — видео-встречи используют нашу комнату (Jitsi), без авто-записи.</div>`
+    : zm.connected
+      ? `<div class="set-row"><div class="sp"><div class="sl">Подключён аккаунт${zm.email ? ': <b>' + esc(zm.email) + '</b>' : ''}</div><div class="sd">Видео-встречи автоматически создаются как Zoom под вашим аккаунтом. Бот заходит, пишет и расшифровывает — транскрипт, резюме и квалы ложатся в карточку лида.</div></div><span class="badge ok">подключён</span></div>
+         <button class="btn btn-sm" id="zoomDisconnect" style="margin-top:8px">Отключить Zoom</button>`
+      : `<div class="muted" style="font-size:12.3px;line-height:1.6;margin-bottom:10px">Подключите свой Zoom — тогда при назначении видео-встречи ссылка создастся автоматически <b>под вашим аккаунтом</b> (ваш хост, ваш брендинг), а встречу запишем и расшифруем в карточку. Без подключения используем бесплатную комнату Jitsi (без записи).</div>
+         <button class="btn btn-accent" id="zoomConnect" style="width:100%;justify-content:center">${ic(I.chat || I.spark)}Подключить мой Zoom</button>`;
   root.innerHTML = `
     <div class="set-sec-h">${ic(I.users)}Аккаунт и команда</div>
     ${linkCard('data-ovgo="roles"', I.users, 'Роли и доступы', 'Кто из команды что видит и какие карточки лидов — права на сервере', `${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}`)}
@@ -17240,6 +17252,7 @@ PAGES.settings = async (root) => {
     ${coll(`${ic(I.chat)}WhatsApp Cloud API — официальный канал Meta`, waCloudForm, { open: false })}
     ${coll(`${ic(I.send)}Мост Telegram — брокеры отвечают с телефона`, tgBridgeForm, { open: false })}
     ${coll(`${ic(I.phone)}Телефония — звонки в карточку`, telForm, { open: false })}
+    ${coll(`${ic(I.cal || I.chat)}Zoom — авто-ссылки и запись встреч`, zoomForm, { open: false })}
 
     <div class="set-sec-h">${ic(I.spark)}ИИ и автоматизация</div>
     ${coll(`${ic(I.spark)}Движок ИИ`, aiForm, { open: false })}
@@ -17380,6 +17393,15 @@ PAGES.settings = async (root) => {
     setTimeout(() => $('#waSyncTpl') && $('#waSyncTpl').click(), 1200);
   });
   $('#aiProv').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { provider: e.target.value } }); loadState(); });
+  $('#zoomConnect')?.addEventListener('click', async () => {
+    try { const r = await api.get('/zoom/connect'); if (r.url) location.href = r.url; }
+    catch (e) { toast('Не удалось начать подключение', e.message); }
+  });
+  $('#zoomDisconnect')?.addEventListener('click', async () => {
+    if (!await uiConfirm('Отключить Zoom?', 'Новые видео-встречи будут использовать бесплатную комнату Jitsi (без авто-записи), пока не подключите снова.')) return;
+    try { await api.post('/zoom/disconnect', {}); toast('Zoom отключён', null, true); await loadState(); PAGES.settings(root); }
+    catch (e) { toast('Ошибка', e.message); }
+  });
   $('#vSave').addEventListener('click', async () => {
     const v = { voiceId: $('#vId').value.trim() };
     if ($('#vKey').value.trim()) v.key = $('#vKey').value.trim();
@@ -17645,6 +17667,13 @@ window.addEventListener('hashchange', () => {
     return;
   }
   await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
+  /* возврат с Zoom OAuth → тост + чистим query, чтобы не повторялось на F5 */
+  try {
+    const qp = new URLSearchParams(location.search);
+    if (qp.get('zoom') === 'connected') { toast('Zoom подключён', 'Видео-встречи теперь создаются под вашим аккаунтом и пишутся в карточку', true); }
+    else if (qp.get('zoom') === 'error') { toast('Zoom не подключён', 'Согласие не получено или истёк срок — попробуйте ещё раз в «Подключениях»'); }
+    if (qp.has('zoom')) history.replaceState(null, '', location.pathname + location.hash);
+  } catch (_) {}
   mountFab();
   watchVersion();   /* SPA-вкладка живёт долго → мягко сообщаем о новом деплое (частая путаница «вижу старую версию») */
   applyI18n(document.body);  /* перевод статичного chrome (топбар: «Новый лид», поиск) при LANG='en' */
