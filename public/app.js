@@ -15608,7 +15608,7 @@ PAGES.brokers = async (root) => {
           if (!email) { $('#invOut', bd).textContent = 'Введите e-mail'; return false; }
           try {
             const r = await api.post('/brokers/invite', { email, name, phone });
-            $('#invOut', bd).innerHTML = `Готово${r.mailed ? ' — письмо отправлено' : ''}. Ссылка-приглашение (скопируйте и отправьте брокеру):<br><input readonly value="${esc(r.link)}" style="width:100%;margin-top:6px" onclick="this.select()">`;
+            $('#invOut', bd).innerHTML = `Готово. ${r.mailed ? '<b style="color:var(--ok,#1E7A64)">✓ Письмо-приглашение отправлено на ' + esc(r.broker.email) + '</b>' : '<span style="color:var(--warn,#9A6700)">Письмо не ушло' + (r.mailErr ? ' (' + esc(r.mailErr) + ')' : '') + ' — отправьте ссылку вручную:</span>'}<br><input readonly value="${esc(r.link)}" style="width:100%;margin-top:6px" onclick="this.select()">`;
           } catch (e) { $('#invOut', bd).textContent = e.message || 'Не удалось'; }
           return false; /* держим модалку открытой, чтобы показать ссылку */
         } },

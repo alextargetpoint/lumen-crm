@@ -5783,17 +5783,23 @@ const server = http.createServer(async (req, res) => {
       store.saveRegistry(); store.save();
       const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
       const link = base + '/invite?token=' + token;
-      let mailed = false;
+      let mailed = false, mailErr = '';
       try {
+        const agencyNm = (db.settings.agency && db.settings.agency.name) || 'Lumen';
+        /* ПЛАТФОРМЕННЫЙ путь: ключ платформы (env/registry) + отправитель = домен агентства (noreply@домен, если верифицирован),
+           иначе общий платформенный from. Раньше слали через per-tenant ec.key — у SaaS-тенантов он пуст → письмо не уходило. */
+        const pcfg = mailer.platformEmailCfg(store.getRegistry());
+        const from = agencyEmailFrom(db) || pcfg.from;
         const ec = (db.settings.channels && db.settings.channels.email) || {};
-        if (ec.key && ec.from) {
-          const agencyNm = (db.settings.agency && db.settings.agency.name) || 'Lumen';
-          const r2 = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + ec.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: ec.from, to: email, subject: 'Приглашение в ' + agencyNm, html: `<p>Вас пригласили в CRM <b>${esc(agencyNm)}</b>. Перейдите по ссылке, чтобы задать пароль и войти:</p><p><a href="${link}">${link}</a></p>` }) });
-          mailed = r2.ok;
-        }
-      } catch (e) {}
+        const key = ec.key || pcfg.key;   /* если агентство задало свой ключ — уважаем, иначе платформенный */
+        if (key) {
+          const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:480px;margin:0 auto"><h2 style="font-weight:700">${esc(agencyNm)}</h2><p>Вас пригласили в CRM <b>${esc(agencyNm)}</b>. Нажмите, чтобы задать пароль и войти в рабочее место:</p><p style="margin:20px 0"><a href="${link}" style="background:#1a1815;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;display:inline-block;font-weight:600">Принять приглашение</a></p><p style="color:#888;font-size:12px">Или скопируйте ссылку: ${link}</p></div>`;
+          const r2 = await mailer.sendViaResend({ key, from }, email, 'Приглашение в ' + agencyNm, html);
+          mailed = !!(r2 && (r2.id || r2.ok)); if (!mailed) mailErr = (r2 && r2.error) || '';
+        } else { mailErr = 'платформенный e-mail не настроен'; }
+      } catch (e) { mailErr = e.message; }
       audit(db, req, 'пригласил брокера', { email });
-      return json(res, 200, { ok: true, link, mailed, broker: { id: br.id, name: br.name, email } });
+      return json(res, 200, { ok: true, link, mailed, mailErr, broker: { id: br.id, name: br.name, email } });
     }
     /* SaaS: текущий тариф + лимиты + использование */
     if (p === '/api/plan' && req.method === 'GET') {
