@@ -3411,47 +3411,52 @@ async function farmReclaimFromTenant(prevTid, phone) {
    SaaS-модель: ОДИН платформенный ключ (env RECALL_API_KEY) → работает для ВСЕХ агентств
    автоматически, настраивать ничего не надо. Бронь встречи с Zoom/Meet-ссылкой → бот сам
    заходит → транскрипт+ИИ-резюме в карточку. Стоимость — расходник платформы. */
-/* ссылка на видео-встречу: Zoom (если заданы платформенные/агентские ключи — её умеет писать бот
-   Recall → авто-запись+транскрипт), иначе бесплатный Jitsi (работает в браузере, но бот его НЕ пишет) */
+/* ссылка на видео-встречу. Возвращает { url, zoomMeetingId }:
+   - Zoom (свой/платформенный аккаунт) → Zoom ПИШЕТ САМ в облако (auto_recording:cloud), транскрипт заберём
+     вебхуком /hooks/zoom бесплатно/дёшево — бот Recall НЕ нужен (zoomMeetingId → по нему вебхук найдёт встречу);
+   - иначе бесплатный Jitsi (браузер, без записи). */
 async function genMeetingLink(db, kind, lead, atMs, durMin) {
-  if (kind !== 'video') return null;
+  if (kind !== 'video') return { url: null, zoomMeetingId: '' };
   if (zoom.ready(db)) {
     try {
       const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
       const r = await zoom.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id });
-      if (r && r.ok && r.joinUrl) return r.joinUrl;
+      if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: r.meetingId || '' };
       console.error('[zoom] создать встречу не вышло:', r && r.error);
     } catch (e) { console.error('[zoom]', e.message); }
   }
-  return `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}`;
+  return { url: `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}`, zoomMeetingId: '' };
 }
 async function maybeScheduleMeetingBot(db, mt) {
   try {
-    if ((db.settings.meetingBot || {}).enabled === false) return;
-    if (!meetingBot.ready()) return;                                          /* нет платформенного ключа → тихо */
     if (!mt || !mt.link || !meetingBot.isSupportedMeetingUrl(mt.link)) return; /* только Zoom/Meet/Teams (не Jitsi) */
+    /* Zoom-ссылка + Zoom подключён → запись идёт НАТИВНО в облаке Zoom (дёшево/бесплатно) → бот Recall не нужен */
+    if (/zoom\.us/i.test(mt.link) && zoom.ready(db)) { mt.transcriptStatus = 'zoom_native'; store.save(); return; }
+    if ((db.settings.meetingBot || {}).enabled === false) return;
+    if (!meetingBot.ready()) return;                                          /* нет платформенного ключа Recall → тихо (для Meet/Teams-ссылок) */
     const r = await meetingBot.scheduleBot(mt.link, mt.at, { meetingId: mt.id, leadId: mt.leadId, tid: store.currentTid() });
     if (r.ok) { mt.botId = r.botId; mt.transcriptStatus = 'scheduled'; }
     else { mt.transcriptStatus = 'error'; mt.transcriptError = String(r.error || '').slice(0, 140); }
     store.save();
   } catch (_) {}
 }
-async function ingestMeetingTranscript(db, mt) {
-  if (!mt || !mt.botId || mt.transcriptStatus === 'done') return false;
-  const r = await meetingBot.fetchTranscript(mt.botId);
-  if (!r.ok || !r.text) return false;
+/* общий конвейер «готовый текст транскрипта → карточка лида»: пуш в transcripts + ИИ-резюме + разбор по полям.
+   Используют и Recall-ingest, и Zoom-native (запись в облаке Zoom). Идемпотентно по mt.transcriptStatus. */
+async function applyMeetingTranscript(db, mt, text, srcLabel) {
+  if (!mt || mt.transcriptStatus === 'done') return false;
+  text = String(text || '').trim(); if (!text) return false;
   const lead = (db.leads || []).find(l => l.id === mt.leadId); if (!lead) return false;
   lead.transcripts = lead.transcripts || [];
   const kindRu = { call: 'Созвон', video: 'Видео-встреча', tour: 'Показ' }[mt.kind] || 'Встреча';
-  lead.transcripts.push({ id: store.nextId('tr'), at: Date.now(), label: kindRu + ' (авто-запись)', text: r.text.slice(0, 40000), audio: null, meetingId: mt.id });
-  mt.transcript = r.text.slice(0, 40000); mt.transcriptStatus = 'done'; mt.transcriptAt = Date.now();
+  lead.transcripts.push({ id: store.nextId('tr'), at: Date.now(), label: kindRu + (srcLabel ? ' (' + srcLabel + ')' : ' (авто-запись)'), text: text.slice(0, 40000), audio: null, meetingId: mt.id });
+  mt.transcript = text.slice(0, 40000); mt.transcriptStatus = 'done'; mt.transcriptAt = Date.now();
   ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Транскрипт встречи готов (${kindRu}) — в карточке лида` });
   store.save();
   if (llm.available()) {
     try { const sum = await llm.summarize(db, lead); if (sum) { lead.summary = sum; lead.summaryAt = Date.now(); store.save(); } } catch (_) {}
     /* разбор транскрипта по полям карточки: заполняем ТОЛЬКО пустые квалы (не затираем проставленное человеком) */
     try {
-      const ex = await llm.extractQuals(db, lead, r.text);
+      const ex = await llm.extractQuals(db, lead, text);
       if (ex) {
         lead.quals = lead.quals || {};
         for (const k of ['purpose', 'timeline', 'type']) {
@@ -3472,15 +3477,40 @@ async function ingestMeetingTranscript(db, mt) {
   }
   return true;
 }
+async function ingestMeetingTranscript(db, mt) {
+  if (!mt || !mt.botId || mt.transcriptStatus === 'done') return false;
+  const r = await meetingBot.fetchTranscript(mt.botId);
+  if (!r.ok || !r.text) return false;
+  return applyMeetingTranscript(db, mt, r.text, 'авто-запись');
+}
+/* добрать транскрипт Zoom-native встречи (если вебхук /hooks/zoom не дошёл ИЛИ в аккаунте выключен авто-транскрипт).
+   Сначала бесплатный VTT Zoom; если его нет — дешёвый свой STT (Whisper ~$0.36/ч) по аудио. */
+async function ingestZoomRecording(db, mt) {
+  if (!mt || !mt.zoomMeetingId || mt.transcriptStatus === 'done') return false;
+  const rec = await zoom.getRecording(db, mt.zoomMeetingId);
+  let text = rec.text || '';
+  if (!text && rec.audioUrl && llm.available()) {
+    try { const ar = await fetch(rec.audioUrl); if (ar.ok) text = await llm.transcribe(Buffer.from(await ar.arrayBuffer()), 'meeting.m4a'); } catch (e) { console.error('[zoom stt]', e.message); }
+  }
+  if (!text) return false;
+  return applyMeetingTranscript(db, mt, text, 'Zoom-запись');
+}
 /* поллинг-фолбэк: добрать транскрипты завершившихся встреч, если вебхук не пришёл */
 async function meetingBotTick() {
-  if (!meetingBot.ready()) return;
   for (const tid of store.listTenants()) {
     try {
       await store.runInTenant(tid, async () => {
         const db = store.get(); const now = Date.now();
-        const pend = (db.meetings || []).filter(mt => mt.botId && mt.transcriptStatus === 'scheduled' && (mt.at + (mt.dur || 60) * 60e3 + 3 * 60e3) < now);
-        for (const mt of pend.slice(0, 25)) await ingestMeetingTranscript(db, mt).catch(() => {});   /* фолбэк к вебхуку /hooks/recall; 25/тенант/цикл с запасом под масштаб */
+        /* Recall-бот (Meet/Teams) — фолбэк к вебхуку /hooks/recall */
+        if (meetingBot.ready()) {
+          const pend = (db.meetings || []).filter(mt => mt.botId && mt.transcriptStatus === 'scheduled' && (mt.at + (mt.dur || 60) * 60e3 + 3 * 60e3) < now);
+          for (const mt of pend.slice(0, 25)) await ingestMeetingTranscript(db, mt).catch(() => {});
+        }
+        /* Zoom-native — фолбэк к вебхуку /hooks/zoom (ждём +10 мин после конца: Zoom успевает обработать запись) */
+        if (zoom.ready(db)) {
+          const zp = (db.meetings || []).filter(mt => mt.zoomMeetingId && mt.transcriptStatus === 'zoom_native' && (mt.at + (mt.dur || 60) * 60e3 + 10 * 60e3) < now);
+          for (const mt of zp.slice(0, 25)) await ingestZoomRecording(db, mt).catch(() => {});
+        }
       });
     } catch (_) {}
   }
@@ -4869,10 +4899,10 @@ const server = http.createServer(async (req, res) => {
           id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: abroker.id,
           at: +b.at || Date.now() + 24 * 3600e3, kind: ['call', 'video', 'tour'].includes(b.kind) ? b.kind : 'call',
           dur: Math.max(15, Math.min(240, +b.dur || 60)), note: String(b.note || '').slice(0, 400), status: 'scheduled', createdAt: Date.now(),
-          link: b.kind === 'video' ? await genMeetingLink(db, 'video', lead, (+b.at || Date.now() + 24 * 3600e3), Math.max(15, Math.min(240, +b.dur || 60))) : null,
         };
+        { const _mk = mt.kind === 'video' ? await genMeetingLink(db, 'video', lead, mt.at, mt.dur) : { url: null, zoomMeetingId: '' }; mt.link = _mk.url; if (_mk.zoomMeetingId) mt.zoomMeetingId = _mk.zoomMeetingId; }
         db.meetings = db.meetings || []; db.meetings.push(mt);
-        await maybeScheduleMeetingBot(db, mt);   /* авто-бот на Zoom-ссылку → транскрипт в карточку */
+        await maybeScheduleMeetingBot(db, mt);   /* Zoom-native (запись в облаке) или бот Recall для Meet/Teams → транскрипт в карточку */
         if (b.confirm !== false) {
           const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
           const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
@@ -5020,6 +5050,33 @@ const server = http.createServer(async (req, res) => {
         billing.markInvoicePaid(db, (o.metadata && o.metadata.invId) || o.client_reference_id || null);
       }
       return json(res, 200, { received: true });
+    }
+    /* Вебхук Zoom — Zoom сам пишет встречу в облако и сам делает транскрипт (ДЁШЕВО/бесплатно, без бота Recall).
+       endpoint.url_validation — отвечаем HMAC-токеном; события recording.* — забираем ГОТОВЫЙ VTT (бесплатно).
+       STT-фолбэк (если авто-транскрипт в аккаунте выключен) — в meetingBotTick, не здесь. */
+    if (p === '/hooks/zoom' && req.method === 'POST') {
+      let raw = ''; req.on('data', c => { raw += c; if (raw.length > 2e6) req.destroy(); }); await new Promise(r => req.on('end', r));
+      let b; try { b = JSON.parse(raw || '{}'); } catch (_) { return json(res, 400, { error: 'bad json' }); }
+      const evt = String(b.event || '');
+      if (evt === 'endpoint.url_validation') return json(res, 200, zoom.urlValidation(b.payload && b.payload.plainToken));
+      if (!zoom.verifyWebhook(req.headers['x-zm-request-timestamp'], raw, req.headers['x-zm-signature'])) { secOnDeny(req, 403, p); return json(res, 403, { error: 'bad signature' }); }
+      if (!/recording/.test(evt)) return json(res, 200, { ok: true, skip: evt });
+      const obj = (b.payload && b.payload.object) || {};
+      const meetingId = String(obj.id || obj.uuid || '');
+      const tf = {}; (obj.tracking_fields || []).forEach(f => { if (f && f.field) tf[f.field] = f.value; });
+      if (!meetingId) return json(res, 200, { ok: true, skip: 'no meeting id' });
+      const act = async (tid) => { await store.runInTenant(tid, async () => {
+        const db = store.get();
+        const mt = (db.meetings || []).find(m => (String(m.zoomMeetingId || '') === meetingId) || (tf.leadId && m.leadId === tf.leadId && m.transcriptStatus === 'zoom_native'));
+        if (!mt || mt.transcriptStatus === 'done') return;
+        const rec = await zoom.getRecording(db, meetingId);
+        if (rec.text) await applyMeetingTranscript(db, mt, rec.text, 'Zoom-запись');   /* только готовый VTT (бесплатно); аудио-STT — в поллинге */
+      }); };
+      try {
+        if (tf.tid) await act(tf.tid);
+        else { for (const tid of store.listTenants()) { let found = false; await store.runInTenant(tid, () => { found = (store.get().meetings || []).some(m => String(m.zoomMeetingId || '') === meetingId); }); if (found) { await act(tid); break; } } }
+      } catch (e) { console.error('[zoom hook]', e.message); }
+      return json(res, 200, { ok: true });
     }
     /* Вебхук Recall.ai — МГНОВЕННЫЙ приём транскриптов (параллельно, сколько бы встреч ни завершилось разом).
        Платформенный (один URL на все агентства): маршрутизируем по metadata.tid, который проставили при заказе бота.
@@ -9784,14 +9841,14 @@ const server = http.createServer(async (req, res) => {
         at: +b.at || Date.now() + 24 * 3600e3, kind: b.kind || 'call',
         dur: Math.max(15, Math.min(240, +b.dur || 60)),
         note: b.note || '', status: 'scheduled', createdAt: Date.now(),
-        /* видео-встреча: Zoom (платформенный SaaS-аккаунт, если заданы ключи → бот Recall её пишет),
-           иначе бесплатный Jitsi из коробки (браузер, без аккаунтов, но бот его НЕ пишет) */
-        link: b.link || (b.kind === 'video' ? await genMeetingLink(db, 'video', lead, (+b.at || Date.now() + 24 * 3600e3), Math.max(15, Math.min(240, +b.dur || 60))) : null),
+        /* видео-встреча: Zoom (свой/платформенный аккаунт → Zoom пишет сам в облако, транскрипт вебхуком),
+           иначе бесплатный Jitsi из коробки (браузер, без записи). Вставленную вручную Meet/Teams-ссылку пишет бот Recall. */
         hideJoin: !!b.hideJoin,   /* версия страницы БЕЗ кнопки «Подключиться» — брокер сам пришлёт ссылку в переписке */
       };
+      { const _mk = (mt.kind === 'video' && !b.link) ? await genMeetingLink(db, 'video', lead, mt.at, Math.max(15, Math.min(240, +b.dur || 60))) : { url: b.link || null, zoomMeetingId: '' }; mt.link = _mk.url; if (_mk.zoomMeetingId) mt.zoomMeetingId = _mk.zoomMeetingId; }
       db.meetings = db.meetings || [];
       db.meetings.push(mt);
-      await maybeScheduleMeetingBot(db, mt);   /* авто-бот на Zoom/Meet-ссылку → транскрипт в карточку */
+      await maybeScheduleMeetingBot(db, mt);   /* Zoom-native или бот Recall (Meet/Teams) → транскрипт в карточку */
       if (b.confirm !== false) {
         const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
         const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });

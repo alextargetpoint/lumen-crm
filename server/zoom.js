@@ -134,7 +134,7 @@ async function createMeeting(db, { topic, startAtMs, durationMin, tid, leadId })
     start_time: new Date(Math.max(Date.now(), startAtMs || Date.now())).toISOString(),
     duration: Math.max(15, Math.min(240, durationMin || 60)),
     timezone: 'UTC',
-    settings: { join_before_host: true, waiting_room: false, auto_recording: 'none', approval_type: 2 },
+    settings: { join_before_host: true, waiting_room: false, auto_recording: 'cloud', approval_type: 2 },   /* Zoom пишет сам в облако → транскрипт заберём вебхуком, без платного бота */
     agenda: ('CRM lead ' + (leadId || '') + ' · tenant ' + (tid || '')).slice(0, 2000),
     tracking_fields: [{ field: 'tid', value: String(tid || '') }, { field: 'leadId', value: String(leadId || '') }],
   };
@@ -154,4 +154,59 @@ async function createMeeting(db, { topic, startAtMs, durationMin, tid, leadId })
   } catch (e) { return { error: String(e.message || e).slice(0, 160) }; }
 }
 
-module.exports = { ready, status, createMeeting, appConfigured, s2sConfigured, startAuth, consumeState, exchangeCode, disconnect };
+/* ---------- Zoom-native запись: вебхук + забор транскрипта (ДЁШЕВЫЙ путь, без бота Recall) ---------- */
+const crypto = require('crypto');
+function webhookSecret() { return process.env.ZOOM_WEBHOOK_SECRET_TOKEN || ''; }
+/* ответ на endpoint.url_validation (Zoom требует вернуть HMAC от plainToken) */
+function urlValidation(plainToken) {
+  const enc = crypto.createHmac('sha256', webhookSecret()).update(String(plainToken || '')).digest('hex');
+  return { plainToken: String(plainToken || ''), encryptedToken: enc };
+}
+/* проверка подписи события: x-zm-signature = 'v0=' + HMAC('v0:{ts}:{rawBody}') */
+function verifyWebhook(ts, rawBody, sig) {
+  const sec = webhookSecret(); if (!sec) return true;   /* секрет не задан → не ломаем (эндпоинт и так matched по tracking_fields) */
+  try {
+    const msg = 'v0:' + ts + ':' + rawBody;
+    const expected = 'v0=' + crypto.createHmac('sha256', sec).update(msg).digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(String(sig || '')), Buffer.from(expected));
+  } catch (_) { return false; }
+}
+
+/* токен под текущий тенант: свой OAuth ИЛИ платформенный S2S */
+async function anyToken(db) {
+  const c = conn(db);
+  if (c.connected && c.refreshToken) return await accessToken(db);
+  if (s2sConfigured()) return await s2sToken(s2sCreds());
+  throw new Error('нет токена Zoom');
+}
+/* VTT → чистый текст (убираем WEBVTT, индексы, таймкоды, дубли подряд) */
+function parseVtt(vtt) {
+  const out = []; let last = '';
+  for (let line of String(vtt || '').split(/\r?\n/)) {
+    line = line.trim();
+    if (!line || line === 'WEBVTT' || /^\d+$/.test(line) || line.includes('-->') || /^NOTE\b/.test(line)) continue;
+    if (line !== last) { out.push(line); last = line; }
+  }
+  return out.join('\n');
+}
+/* забрать готовую расшифровку встречи. Возвращает { text } (готовый транскрипт Zoom, БЕСПЛАТНО),
+   либо { audioUrl, token } (если транскрипта нет — index прогонит свой дешёвый STT), либо { error }. */
+async function getRecording(db, meetingId) {
+  try {
+    const token = await anyToken(db);
+    const r = await fetch('https://api.zoom.us/v2/meetings/' + encodeURIComponent(meetingId) + '/recordings', { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: 'zoom rec ' + r.status + ': ' + (j.message || '') };
+    const files = j.recording_files || [];
+    const vtt = files.find(f => f.file_type === 'TRANSCRIPT' || f.recording_type === 'audio_transcript');
+    if (vtt && vtt.download_url) {
+      const tr = await fetch(vtt.download_url + (vtt.download_url.includes('?') ? '&' : '?') + 'access_token=' + token);
+      if (tr.ok) { const text = parseVtt(await tr.text()); if (text) return { text }; }
+    }
+    const audio = files.find(f => f.file_type === 'M4A') || files.find(f => f.file_type === 'MP4');
+    if (audio && audio.download_url) return { audioUrl: audio.download_url + (audio.download_url.includes('?') ? '&' : '?') + 'access_token=' + token, token };
+    return { error: 'нет файлов записи' };
+  } catch (e) { return { error: String(e.message || e).slice(0, 160) }; }
+}
+
+module.exports = { ready, status, createMeeting, appConfigured, s2sConfigured, startAuth, consumeState, exchangeCode, disconnect, webhookSecret, urlValidation, verifyWebhook, getRecording };
