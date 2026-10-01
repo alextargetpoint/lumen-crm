@@ -3442,13 +3442,17 @@ async function maybeScheduleMeetingBot(db, mt) {
 }
 /* общий конвейер «готовый текст транскрипта → карточка лида»: пуш в transcripts + ИИ-резюме + разбор по полям.
    Используют и Recall-ingest, и Zoom-native (запись в облаке Zoom). Идемпотентно по mt.transcriptStatus. */
-async function applyMeetingTranscript(db, mt, text, srcLabel) {
+async function applyMeetingTranscript(db, mt, text, srcLabel, audioUrl) {
   if (!mt || mt.transcriptStatus === 'done') return false;
   text = String(text || '').trim(); if (!text) return false;
   const lead = (db.leads || []).find(l => l.id === mt.leadId); if (!lead) return false;
   lead.transcripts = lead.transcripts || [];
   const kindRu = { call: 'Созвон', video: 'Видео-встреча', tour: 'Показ' }[mt.kind] || 'Встреча';
-  lead.transcripts.push({ id: store.nextId('tr'), at: Date.now(), label: kindRu + (srcLabel ? ' (' + srcLabel + ')' : ' (авто-запись)'), text: text.slice(0, 40000), audio: null, meetingId: mt.id });
+  const trId = store.nextId('tr');
+  lead.transcripts.push({ id: trId, at: Date.now(), label: kindRu + (srcLabel ? ' (' + srcLabel + ')' : ' (авто-запись)'), text: text.slice(0, 40000), audio: audioUrl || null, meetingId: mt.id });
+  /* аудио-запись разговора (только звук) — отдельно в voiceNotes, чтобы слушать прямо в карточке */
+  if (audioUrl) { lead.voiceNotes = lead.voiceNotes || []; lead.voiceNotes.unshift({ id: crypto.randomBytes(4).toString('hex'), url: audioUrl, dur: (mt.dur || 0) * 60, transcript: text.slice(0, 4000), who: kindRu, at: Date.now(), meetingId: mt.id }); }
+  if (audioUrl) mt.audio = audioUrl;
   mt.transcript = text.slice(0, 40000); mt.transcriptStatus = 'done'; mt.transcriptAt = Date.now();
   ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Транскрипт встречи готов (${kindRu}) — в карточке лида` });
   store.save();
@@ -3482,6 +3486,27 @@ async function ingestMeetingTranscript(db, mt) {
   const r = await meetingBot.fetchTranscript(mt.botId);
   if (!r.ok || !r.text) return false;
   return applyMeetingTranscript(db, mt, r.text, 'авто-запись');
+}
+/* ключи для АВТО-привязки звонка к карточке (Zoom-номер + Google Meet-код из ссылки встречи) */
+function meetingMatchKeys(mt) {
+  const keys = [];
+  if (mt.zoomMeetingId) keys.push(String(mt.zoomMeetingId).replace(/\s/g, ''));
+  const link = String(mt.link || '');
+  const zm = link.match(/zoom\.us\/j\/(\d+)/i); if (zm) keys.push(zm[1]);
+  const gm = link.match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i); if (gm) keys.push(gm[1].toLowerCase());
+  return keys;
+}
+/* видео-встречи брокера (или всего тенанта, если broker пуст) в окне now-6ч..+12ч — повестка нотетейкера */
+function notetakerAgendaItems(db, broker) {
+  const now = Date.now(), WIN_BACK = 6 * 3600e3, WIN_FWD = 12 * 3600e3;
+  return (db.meetings || [])
+    .filter(m => m.kind === 'video' && m.transcriptStatus !== 'done' && m.status !== 'cancelled' && (m.at || 0) > now - WIN_BACK && (m.at || 0) < now + WIN_FWD && (!broker || m.brokerId === broker))
+    .sort((a, c) => (a.at || 0) - (c.at || 0))
+    .map(m => { const l = (db.leads || []).find(x => x.id === m.leadId) || {}; const end = (m.at || 0) + (m.dur || 60) * 60e3;
+      const plat = /zoom\.us/i.test(m.link || '') ? 'zoom' : /meet\.google\.com/i.test(m.link || '') ? 'meet' : /teams/i.test(m.link || '') ? 'teams' : 'other';
+      return { meetingId: m.id, zoomMeetingId: m.zoomMeetingId || '', matchKeys: meetingMatchKeys(m), platform: plat,
+        leadId: m.leadId, leadName: l.name || '—', phone: l.phone || '', at: m.at || 0, dur: m.dur || 60,
+        live: now >= (m.at || 0) - 10 * 60e3 && now <= end + 20 * 60e3, topic: m.note || '', joinUrl: m.link || '', transcriptStatus: m.transcriptStatus || '' }; });
 }
 /* добрать транскрипт Zoom-native встречи (если вебхук /hooks/zoom не дошёл ИЛИ в аккаунте выключен авто-транскрипт).
    Сначала бесплатный VTT Zoom; если его нет — дешёвый свой STT (Whisper ~$0.36/ч) по аудио. */
@@ -5068,7 +5093,48 @@ const server = http.createServer(async (req, res) => {
       let mt = b.meetingId ? (db.meetings || []).find(m => m.id === b.meetingId || String(m.zoomMeetingId || '') === String(b.meetingId)) : null;
       if (!mt) mt = (db.meetings || []).filter(m => m.leadId === lead.id && m.transcriptStatus !== 'done').sort((a, c) => (c.at || 0) - (a.at || 0))[0] || null;
       if (!mt) { mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: lead.broker || null, at: +b.startedAt || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, +b.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' }; db.meetings = db.meetings || []; db.meetings.push(mt); }
-      const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись');
+      const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись', b.audio || null);
+      return json(res, ok ? 200 : 409, { ok, leadId: lead.id, meetingId: mt.id });
+    }
+    /* Загрузка АУДИО-записи разговора (только звук) от нотетейкера → URL для прикрепления к карточке.
+       Тело: { data: "data:audio/...;base64,..." }. ?key=<hooks.secret>. */
+    if (p === '/hooks/notetaker-audio' && req.method === 'POST') {
+      const key = u.searchParams.get('key') || '';
+      if (!key || !db.settings.hooks || db.settings.hooks.secret !== key) { secOnDeny(req, 401, p); return json(res, 401, { error: 'bad key' }); }
+      const b = await readBody(req);
+      const mm = String((b && b.data) || '').match(/^data:audio\/(m4a|mp4|mpeg|mp3|ogg|webm|wav|x-m4a|aac);base64,(.*)$/i);
+      if (!mm) return json(res, 400, { error: 'нужен аудио data-URL (m4a/mp3/ogg/wav)' });
+      const buf = Buffer.from(mm[2], 'base64');
+      if (!buf.length || buf.length > 200 * 1024 * 1024) return json(res, 400, { error: 'файл до 200 МБ' });
+      try { fs.mkdirSync(CREATIVES_DIR, { recursive: true }); } catch (_) {}
+      const ext = mm[1].replace('x-m4a', 'm4a').replace('mpeg', 'mp3');
+      const fn = 'call-' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.' + ext;
+      try { fs.writeFileSync(path.join(CREATIVES_DIR, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
+      return json(res, 200, { url: (callBase() ? callBase() : '') + '/creatives/' + fn, path: '/creatives/' + fn });
+    }
+    /* ── Нотетейкер, session-режим (приложение логинится реальным аккаунтом → САМО понимает, кто вошёл) ── */
+    if (p === '/api/notetaker/me' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const name = R.role === 'broker' ? ((db.brokers.find(b => b.id === R.brokerId) || {}).name || 'Брокер') : ((db.settings.agency && db.settings.agency.managerName) || 'Руководитель');
+      return json(res, 200, { role: R.role, brokerId: R.brokerId || null, name, agency: (db.settings.agency && db.settings.agency.name) || 'Lumen', tenant: store.currentTid() });
+    }
+    if (p === '/api/notetaker/agenda' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const broker = R.role === 'broker' ? R.brokerId : (u.searchParams.get('broker') || '');   /* брокер видит только своё; руководитель — всё или по фильтру */
+      return json(res, 200, { now: Date.now(), role: R.role, meetings: notetakerAgendaItems(db, broker) });
+    }
+    if (p === '/api/notetaker/ingest' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const text = String(b.text || '').trim(); if (!text) return json(res, 400, { error: 'нет текста' });
+      let lead = b.leadId ? (db.leads || []).find(l => l.id === b.leadId) : null;
+      if (!lead && b.phone) { const d = String(b.phone).replace(/\D/g, ''); if (d.length >= 7) lead = (db.leads || []).find(l => l.phone && l.phone.replace(/\D/g, '').endsWith(d.slice(-9))); }
+      if (!lead) return json(res, 404, { error: 'лид не найден' });
+      if (!canSeeLead(lead)) { audit(db, req, 'нотетейкер: чужой лид', { leadId: lead.id }); return json(res, 403, { error: 'чужой лид' }); }
+      let mt = b.meetingId ? (db.meetings || []).find(m => m.id === b.meetingId || String(m.zoomMeetingId || '') === String(b.meetingId)) : null;
+      if (!mt) mt = (db.meetings || []).filter(m => m.leadId === lead.id && m.transcriptStatus !== 'done').sort((a, c) => (c.at || 0) - (a.at || 0))[0] || null;
+      if (!mt) { mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: (R.role === 'broker' ? R.brokerId : lead.broker) || null, at: +b.startedAt || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, +b.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' }; db.meetings = db.meetings || []; db.meetings.push(mt); }
+      const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись', b.audio || null);
       return json(res, ok ? 200 : 409, { ok, leadId: lead.id, meetingId: mt.id });
     }
     /* Повестка нотетейкера: что у брокера сейчас/скоро по видео-встречам — ground truth для АВТО-привязки
