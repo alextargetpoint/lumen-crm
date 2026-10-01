@@ -5051,6 +5051,26 @@ const server = http.createServer(async (req, res) => {
       }
       return json(res, 200, { received: true });
     }
+    /* Приёмник транскрипта от ЛОКАЛЬНОГО нотетейкера (фоновое приложение на маке брокера: пишет системный
+       звук+микрофон локально, транскрибирует, шлёт сюда готовый текст). Клиент НЕ видит плашку записи —
+       Zoom/Meet ничего не пишут, бот в звонок не заходит. Авторизация: ?key=<hooks.secret> (роут в тенант).
+       Тело: { leadId? | phone?, meetingId?, text, label?, startedAt?, dur? }. */
+    if (p === '/hooks/notetaker' && req.method === 'POST') {
+      const key = u.searchParams.get('key') || '';
+      if (!key || !db.settings.hooks || db.settings.hooks.secret !== key) { secOnDeny(req, 401, p); return json(res, 401, { error: 'bad key' }); }
+      const b = await readBody(req);
+      const text = String(b.text || '').trim();
+      if (!text) return json(res, 400, { error: 'нет текста' });
+      let lead = b.leadId ? (db.leads || []).find(l => l.id === b.leadId) : null;
+      if (!lead && b.phone) { const d = String(b.phone).replace(/\D/g, ''); if (d.length >= 7) lead = (db.leads || []).find(l => l.phone && l.phone.replace(/\D/g, '').endsWith(d.slice(-9))); }
+      if (!lead) return json(res, 404, { error: 'лид не найден (нужен leadId или телефон)' });
+      /* существующая запланированная встреча (сматчим по meetingId/zoomMeetingId, иначе — последняя незакрытая этого лида) */
+      let mt = b.meetingId ? (db.meetings || []).find(m => m.id === b.meetingId || String(m.zoomMeetingId || '') === String(b.meetingId)) : null;
+      if (!mt) mt = (db.meetings || []).filter(m => m.leadId === lead.id && m.transcriptStatus !== 'done').sort((a, c) => (c.at || 0) - (a.at || 0))[0] || null;
+      if (!mt) { mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: lead.broker || null, at: +b.startedAt || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, +b.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' }; db.meetings = db.meetings || []; db.meetings.push(mt); }
+      const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись');
+      return json(res, ok ? 200 : 409, { ok, leadId: lead.id, meetingId: mt.id });
+    }
     /* Вебхук Zoom — Zoom сам пишет встречу в облако и сам делает транскрипт (ДЁШЕВО/бесплатно, без бота Recall).
        endpoint.url_validation — отвечаем HMAC-токеном; события recording.* — забираем ГОТОВЫЙ VTT (бесплатно).
        STT-фолбэк (если авто-транскрипт в аккаунте выключен) — в meetingBotTick, не здесь. */
