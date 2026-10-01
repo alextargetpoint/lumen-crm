@@ -3496,6 +3496,11 @@ function meetingMatchKeys(mt) {
   const gm = link.match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i); if (gm) keys.push(gm[1].toLowerCase());
   return keys;
 }
+/* найти встречу по ЛЮБОМУ ключу: внутренний id, Zoom-номер или Google Meet-код (приложение шлёт то, что прочитало) */
+function findMeetingByKey(db, key) {
+  const k = String(key || '').trim().toLowerCase(); if (!k) return null;
+  return (db.meetings || []).find(m => m.id === key || String(m.zoomMeetingId || '').toLowerCase() === k || meetingMatchKeys(m).some(x => x.toLowerCase() === k)) || null;
+}
 /* видео-встречи брокера (или всего тенанта, если broker пуст) в окне now-6ч..+12ч — повестка нотетейкера */
 function notetakerAgendaItems(db, broker) {
   const now = Date.now(), WIN_BACK = 6 * 3600e3, WIN_FWD = 12 * 3600e3;
@@ -5087,11 +5092,12 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const text = String(b.text || '').trim();
       if (!text) return json(res, 400, { error: 'нет текста' });
-      let lead = b.leadId ? (db.leads || []).find(l => l.id === b.leadId) : null;
+      /* сначала встреча по meetingId/zoom-номеру/meet-коду → лид берём ИЗ неё (главный сценарий приложения) */
+      let mt = b.meetingId ? findMeetingByKey(db, b.meetingId) : null;
+      let lead = mt ? (db.leads || []).find(l => l.id === mt.leadId) : null;
+      if (!lead && b.leadId) lead = (db.leads || []).find(l => l.id === b.leadId);
       if (!lead && b.phone) { const d = String(b.phone).replace(/\D/g, ''); if (d.length >= 7) lead = (db.leads || []).find(l => l.phone && l.phone.replace(/\D/g, '').endsWith(d.slice(-9))); }
-      if (!lead) return json(res, 404, { error: 'лид не найден (нужен leadId или телефон)' });
-      /* существующая запланированная встреча (сматчим по meetingId/zoomMeetingId, иначе — последняя незакрытая этого лида) */
-      let mt = b.meetingId ? (db.meetings || []).find(m => m.id === b.meetingId || String(m.zoomMeetingId || '') === String(b.meetingId)) : null;
+      if (!lead) return json(res, 404, { error: 'лид не найден (нужен meetingId, leadId или телефон)' });
       if (!mt) mt = (db.meetings || []).filter(m => m.leadId === lead.id && m.transcriptStatus !== 'done').sort((a, c) => (c.at || 0) - (a.at || 0))[0] || null;
       if (!mt) { mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: lead.broker || null, at: +b.startedAt || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, +b.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' }; db.meetings = db.meetings || []; db.meetings.push(mt); }
       const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись', b.audio || null);
@@ -5128,11 +5134,12 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const b = await readBody(req);
       const text = String(b.text || '').trim(); if (!text) return json(res, 400, { error: 'нет текста' });
-      let lead = b.leadId ? (db.leads || []).find(l => l.id === b.leadId) : null;
+      let mt = b.meetingId ? findMeetingByKey(db, b.meetingId) : null;
+      let lead = mt ? (db.leads || []).find(l => l.id === mt.leadId) : null;
+      if (!lead && b.leadId) lead = (db.leads || []).find(l => l.id === b.leadId);
       if (!lead && b.phone) { const d = String(b.phone).replace(/\D/g, ''); if (d.length >= 7) lead = (db.leads || []).find(l => l.phone && l.phone.replace(/\D/g, '').endsWith(d.slice(-9))); }
       if (!lead) return json(res, 404, { error: 'лид не найден' });
       if (R.role === 'broker' && lead.broker !== R.brokerId) { audit(db, req, 'нотетейкер: чужой лид', { leadId: lead.id }); return json(res, 403, { error: 'чужой лид' }); }   /* брокер пишет только в своих лидов (canSeeLead определён ниже — TDZ, проверяем ролью напрямую) */
-      let mt = b.meetingId ? (db.meetings || []).find(m => m.id === b.meetingId || String(m.zoomMeetingId || '') === String(b.meetingId)) : null;
       if (!mt) mt = (db.meetings || []).filter(m => m.leadId === lead.id && m.transcriptStatus !== 'done').sort((a, c) => (c.at || 0) - (a.at || 0))[0] || null;
       if (!mt) { mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: (R.role === 'broker' ? R.brokerId : lead.broker) || null, at: +b.startedAt || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, +b.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' }; db.meetings = db.meetings || []; db.meetings.push(mt); }
       const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись', b.audio || null);
