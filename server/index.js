@@ -15527,14 +15527,14 @@ ${px.video ? `<h2 class="sec">${curLang === 'ru' ? 'Видео' : 'Video'}</h2><
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=120' });
         res.end(sub); return;
       }
-      const HR = (H.rows || []);   /* скрытые строки таблицы (ключи) */
-      const rowsAll = [['price', T.price, x => money(x.priceFrom, x.currency), pxUsd, 'min'], ['area', T.area, x => esc2(x.area) || '—'], ['dev', T.dev, x => esc2(x.developer) || '—'], ['type', T.type, x => esc2(x.type) || '—'], ['roi', T.roi, x => esc2(x.roi) || '—', x => num(x.roi), 'max'], ['apprec', T.apprec, x => esc2(x.appreciation) || '—', x => num(x.appreciation), 'max'], ['ho', T.ho, x => esc2(x.handover) || '—'], ['units', T.units, x => x.units || '—', x => +x.units || null, 'max'], ['market', T.market, x => x.market === 'secondary' ? T.sec : T.prim]];
-      const rows = rowsAll.filter(r => editMode || !HR.includes(r[0]));
-      const bestI = (vf, dir) => { if (!vf || !dir || it.length < 2) return -1; const vals = it.map(vf); const has = vals.filter(v => v != null); if (has.length < 2) return -1; let bi = -1, bv = null; vals.forEach((v, i) => { if (v == null) return; if (bv == null || (dir === 'min' ? v < bv : v > bv)) { bv = v; bi = i; } }); return vals.filter(v => v === bv).length === it.length ? -1 : bi; };
       const editMode = u.searchParams.get('edit') === rec.token;   /* брокер редактирует текст клиенту */
       const H = rec.hidden || {};   /* блоки, скрытые брокером перед отправкой */
       const HP = (H.projects || []);   /* проекты, исключённые из сравнения */
       if (!editMode && HP.length) it = it.filter(x => !HP.includes(x.id));   /* клиент не видит исключённые проекты */
+      const HR = (H.rows || []);   /* скрытые строки таблицы (ключи) */
+      const rowsAll = [['price', T.price, x => money(x.priceFrom, x.currency), pxUsd, 'min'], ['area', T.area, x => esc2(x.area) || '—'], ['dev', T.dev, x => esc2(x.developer) || '—'], ['type', T.type, x => esc2(x.type) || '—'], ['roi', T.roi, x => esc2(x.roi) || '—', x => num(x.roi), 'max'], ['apprec', T.apprec, x => esc2(x.appreciation) || '—', x => num(x.appreciation), 'max'], ['ho', T.ho, x => esc2(x.handover) || '—'], ['units', T.units, x => x.units || '—', x => +x.units || null, 'max'], ['market', T.market, x => x.market === 'secondary' ? T.sec : T.prim]];
+      const rows = rowsAll.filter(r => editMode || !HR.includes(r[0]));
+      const bestI = (vf, dir) => { if (!vf || !dir || it.length < 2) return -1; const vals = it.map(vf); const has = vals.filter(v => v != null); if (has.length < 2) return -1; let bi = -1, bv = null; vals.forEach((v, i) => { if (v == null) return; if (bv == null || (dir === 'min' ? v < bv : v > bv)) { bv = v; bi = i; } }); return vals.filter(v => v === bv).length === it.length ? -1 : bi; };
       const verd = (a.verdicts || []).map((v, i) => (H.verdicts && H.verdicts.includes(i) && !editMode) ? '' : `<div class="v${(H.verdicts && H.verdicts.includes(i)) ? ' is-hid' : ''}" data-vcard="${i}">${editMode ? `<button class="delx" data-del="verdict:${i}" title="Убрать у клиента">×</button>` : ''}<b>${esc2(v.name)}</b><div class="fw">${esc2(v.forWhom)}</div><ul class="pros">${(v.pros || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul><ul class="cons">${(v.cons || []).map(x => `<li>${esc2(x)}</li>`).join('')}</ul></div>`).join('');
       const ed = (f) => editMode ? ` contenteditable="true" data-ef="${f}" spellcheck="false"` : '';
       const html = `<!doctype html><html lang="${curLang}"${curLang === 'ar' ? ' dir="rtl"' : ''}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc2(T.title)} · ${esc2(rec.agency)}</title>
