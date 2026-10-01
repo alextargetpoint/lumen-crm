@@ -8575,6 +8575,31 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, r);
     }
     /* Синк списка шаблонов из WABA (имя/статус модерации/категория/язык) */
+    /* ДИАГНОСТИКА WABA: находит ВСЕ WABA, доступные токену (debug_token granular_scopes), и показывает шаблоны в каждом —
+       чтобы понять, в каком WABA реальные поданные шаблоны (текущий wabaId мог указывать на тестовый/песочный). */
+    if (p === '/api/wa/diag' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role === 'broker') return json(res, 403, { error: 'только владелец' });
+      const wa = db.settings.wa || {}; const GR = 'https://graph.facebook.com/v21.0';
+      if (!wa.token) return json(res, 200, { ok: false, error: 'нет токена' });
+      const out = { ok: true, currentWabaId: wa.wabaId || null, phoneId: wa.phoneId || null, verifiedName: wa.verifiedName || null, mode: wa.mode, wabas: [] };
+      const gg = async (path, params) => { const u2 = new URLSearchParams(Object.assign({ access_token: wa.token }, params || {})); const r = await fetch(`${GR}/${path}?${u2}`); return r.json().catch(() => ({})); };
+      try {
+        const dbg = await gg('debug_token', { input_token: wa.token });
+        const scopes = (dbg.data && dbg.data.granular_scopes) || [];
+        out.appId = dbg.data && dbg.data.app_id;
+        const wabaIds = new Set();
+        for (const s of scopes) if (/whatsapp_business_(management|messaging)/.test(s.scope || '')) for (const t of (s.target_ids || [])) wabaIds.add(String(t));
+        if (wa.wabaId) wabaIds.add(String(wa.wabaId));
+        out.tokenWabaIds = [...wabaIds];
+        for (const wid of [...wabaIds].slice(0, 10)) {
+          let info = { wabaId: wid, isCurrent: wid === String(wa.wabaId) };
+          try { const meta = await gg(wid, { fields: 'name,timezone_id,message_template_namespace' }); info.name = meta.name || null; info.err = meta.error && meta.error.message; } catch (e) { info.err = e.message; }
+          try { const tt = await gg(wid + '/message_templates', { fields: 'name,status,category', limit: 100 }); info.templates = (tt.data || []).map(x => `${x.name}[${x.status}/${x.category}]`); info.count = (tt.data || []).length; } catch (e) { info.tplErr = e.message; }
+          out.wabas.push(info);
+        }
+      } catch (e) { out.ok = false; out.error = e.message; }
+      return json(res, 200, out);
+    }
     if (p === '/api/wa/templates' && req.method === 'GET') {
       try { const t = await wa.listTemplates(db); return json(res, 200, { ok: true, templates: t.map(x => ({ name: x.name, status: x.status, category: x.category, language: x.language })) }); }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
