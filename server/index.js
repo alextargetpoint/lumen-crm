@@ -810,6 +810,18 @@ function adsInScope(db, cid) {
 /* qualMode выбранного подрядчика (peak|current|undefined=peak) — чтобы ВСЕ эндпоинты аналитики
    считали квалы одинаково (раньше только /compare учитывал ct.qualMode, остальные были peak) */
 function scopeQualMode(db, cid) { return ((db.mpContractors || []).find(c => c.id === cid) || {}).qualMode; }
+/* ⭐ Идемпотентность входящих по message-id (per-tenant, in-memory ring) — вебхуки ретраятся (Meta не
+   получил быстрый 200 / Baileys реконнект) → один и тот же msg обрабатывался дважды = дубль лид/ответ.
+   Возвращает true, если id УЖЕ видели (значит — пропустить). Память, не диск (рестарт обнуляет — ок). */
+const _seenInbound = new Map();   // tid -> {set:Set, order:[]}
+function seenInboundMsg(tid, id) {
+  if (!id) return false;
+  let e = _seenInbound.get(tid); if (!e) { e = { set: new Set(), order: [] }; _seenInbound.set(tid, e); }
+  if (e.set.has(id)) return true;
+  e.set.add(id); e.order.push(id);
+  if (e.order.length > 3000) { const old = e.order.shift(); e.set.delete(old); }
+  return false;
+}
 
 /* ⭐ Квал по «максимально достигнутой стадии» (high-water mark), а НЕ по текущей.
    Для аналитики трафик-подрядчиков/кампаний/источников: лид, который был квалифицирован, а потом
@@ -4452,6 +4464,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (wa.applyStatuses(db, changes)) store.save();
         const wam = changes?.messages?.[0];
+        if (wam && wam.id && seenInboundMsg(store.currentTid(), 'wa:' + wam.id)) { json(res, 200, { ok: true, dup: true }); return; }   /* SEC/robustness: дубль ретрая Meta — быстрый 200, не обрабатываем повторно */
         /* нажатие кнопки шаблона: «Отписаться» → тихий opt-out (вместо жалобы), прочие кнопки → как ответ */
         if (wam && (wam.type === 'button' || wam.type === 'interactive')) {
           const btnText = (wam.button && wam.button.text) || (wam.interactive && wam.interactive.button_reply && wam.interactive.button_reply.title) || '';
@@ -9886,6 +9899,7 @@ const server = http.createServer(async (req, res) => {
             return;
           }
           if (!fromDigits || !text) return;
+          if (r.messageId && seenInboundMsg(tid, 'vb:' + r.messageId)) return;   /* дубль ретрая Infobip */
           const phone = '+' + fromDigits;
           let lead = (tdb.leads || []).find(l => (l.phone || '').replace(/\D/g, '') === fromDigits);
           if (!lead) {
@@ -12392,7 +12406,7 @@ ${SCR}
     /* ИИ-аналитик рынка: сравнение 2-3 объектов для клиента */
     if (p === '/api/properties/compare' && req.method === 'POST') {
       const b = await readBody(req).catch(() => ({}));
-      const ids = Array.isArray(b.ids) ? b.ids.slice(0, 3) : [];
+      const ids = Array.isArray(b.ids) ? [...new Set(b.ids.map(String))].slice(0, 3) : [];   /* дедуп id — иначе дубль одного объекта рисовал 2 одинаковые карточки */
       const items = ids.map(id => (db.properties || []).find(x => x.id === id)).filter(Boolean);
       if (items.length < 2) return json(res, 400, { error: 'нужно минимум 2 объекта' });
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
