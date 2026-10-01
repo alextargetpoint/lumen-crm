@@ -327,19 +327,20 @@ ${String(transcript || '').slice(0, 12000)}`;
   };
 }
 
-/* транскрибация звонка/Zoom: OpenAI Whisper ($0.006/мин) */
-async function transcribe(buf, filename) {
-  if (!OKEY) throw new Error('нет OPENAI_API_KEY для Whisper');
+/* транскрибация звонка/Zoom. Приоритет: Groq whisper-large-v3-turbo (~$0.04/ч, дёшево+быстро),
+   иначе OpenAI Whisper ($0.006/мин). Ключ Groq — платформенный (opts.groqKey из registry или env GROQ_API_KEY). */
+async function transcribe(buf, filename, opts = {}) {
+  const groqKey = opts.groqKey || process.env.GROQ_API_KEY || '';
+  const useGroq = !!groqKey;
+  if (!useGroq && !OKEY) throw new Error('нет ключа STT (GROQ_API_KEY или OPENAI_API_KEY)');
+  const url = useGroq ? 'https://api.groq.com/openai/v1/audio/transcriptions' : 'https://api.openai.com/v1/audio/transcriptions';
   const fd = new FormData();
   fd.append('file', new Blob([buf]), filename || 'call.m4a');
-  fd.append('model', 'whisper-1');
-  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${OKEY}` },
-    body: fd,
-  });
-  const j = await r.json();
-  if (!r.ok) throw new Error('whisper ' + r.status + ': ' + (j.error?.message || ''));
+  fd.append('model', useGroq ? (opts.model || 'whisper-large-v3-turbo') : 'whisper-1');
+  if (opts.lang) fd.append('language', opts.lang);
+  const r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${useGroq ? groqKey : OKEY}` }, body: fd });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((useGroq ? 'groq' : 'whisper') + ' ' + r.status + ': ' + (j.error?.message || ''));
   return (j.text || '').trim();
 }
 

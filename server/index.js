@@ -3505,6 +3505,19 @@ function meetingMatchKeys(mt) {
   const gm = link.match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i); if (gm) keys.push(gm[1].toLowerCase());
   return keys;
 }
+/* платформенный ключ STT (Groq): env или registry (положен админом, не в git) */
+function platformGroqKey() { try { return process.env.GROQ_API_KEY || (store.getRegistry().platformStt || {}).groqKey || ''; } catch (_) { return process.env.GROQ_API_KEY || ''; } }
+/* серверная расшифровка аудио нотетейкера: по URL /creatives/... читаем файл с диска и транскрибируем (Groq).
+   Нужно, чтобы приложение брокера НЕ хранило STT-ключ — только пишет звук и шлёт, расшифровка на сервере. */
+async function transcribeNotetakerAudio(audioUrl) {
+  try {
+    const m = String(audioUrl || '').match(/\/creatives\/([A-Za-z0-9._-]+)$/); if (!m) return '';
+    const f = path.join(CREATIVES_DIR, m[1]); if (!fs.existsSync(f)) return '';
+    const buf = fs.readFileSync(f);
+    const gk = platformGroqKey(); if (!gk && !process.env.OPENAI_API_KEY) return '';
+    return await llm.transcribe(buf, m[1], { groqKey: gk, lang: 'ru' });
+  } catch (e) { console.error('[notetaker stt]', e.message); return ''; }
+}
 /* найти встречу по ЛЮБОМУ ключу: внутренний id, Zoom-номер или Google Meet-код (приложение шлёт то, что прочитало).
    ⚠️ Zoom Personal Meeting ID переиспользуется на каждом звонке → один код = много встреч во времени.
    Поэтому приоритет: лид ЖИВ > ещё не завершена > самая свежая. Иначе матчились сироты (удалённый лид → «лид не найден»). */
@@ -5105,8 +5118,9 @@ const server = http.createServer(async (req, res) => {
       const key = u.searchParams.get('key') || '';
       if (!key || !db.settings.hooks || db.settings.hooks.secret !== key) { secOnDeny(req, 401, p); return json(res, 401, { error: 'bad key' }); }
       const b = await readBody(req);
-      const text = String(b.text || '').trim();
-      if (!text) return json(res, 400, { error: 'нет текста' });
+      let text = String(b.text || '').trim();
+      if (!text && b.audio) text = await transcribeNotetakerAudio(b.audio);   /* приложение прислало только звук → расшифровка на сервере */
+      if (!text) return json(res, 400, { error: 'нет текста (и не удалось расшифровать аудио)' });
       /* сначала встреча по meetingId/zoom-номеру/meet-коду → лид берём ИЗ неё (главный сценарий приложения) */
       let mt = b.meetingId ? findMeetingByKey(db, b.meetingId) : null;
       let lead = mt ? (db.leads || []).find(l => l.id === mt.leadId) : null;
@@ -5162,7 +5176,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/notetaker/ingest' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const b = await readBody(req);
-      const text = String(b.text || '').trim(); if (!text) return json(res, 400, { error: 'нет текста' });
+      let text = String(b.text || '').trim();
+      if (!text && b.audio) text = await transcribeNotetakerAudio(b.audio);   /* звук без текста → расшифровка на сервере (ключ не нужен в приложении) */
+      if (!text) return json(res, 400, { error: 'нет текста (и не удалось расшифровать аудио)' });
       let mt = b.meetingId ? findMeetingByKey(db, b.meetingId) : null;
       let lead = mt ? (db.leads || []).find(l => l.id === mt.leadId) : null;
       if (!lead && b.leadId) lead = (db.leads || []).find(l => l.id === b.leadId);
@@ -6513,6 +6529,14 @@ const server = http.createServer(async (req, res) => {
     /* ---------------- API супер-админа платформы (isPlatformAdmin, над тенантами) ---------------- */
     if (p.startsWith('/api/admin/') && p !== '/api/admin/import-db') {
       if (!isPlatformAdmin(req)) { secOnDeny(req, 403, p); secSignal('admin_api_denied', 'warn', { ip: clientIp(req), path: p, msg: 'запрос к /api/admin/ без прав супер-админа' }); return json(res, 403, { error: 'нет доступа' }); }
+      /* платформенный STT-ключ (Groq) — хранится в registry (НЕ в git), используется для серверной расшифровки записей нотетейкера */
+      if (p === '/api/admin/platform-stt' && req.method === 'POST') {
+        const b = await readBody(req); const rg = store.getRegistry();
+        rg.platformStt = rg.platformStt || {};
+        if (typeof b.groqKey === 'string') rg.platformStt.groqKey = b.groqKey.trim();
+        store.saveRegistry();
+        return json(res, 200, { ok: true, groqKeySet: !!(rg.platformStt.groqKey) });
+      }
       const reg = store.getRegistry();
       let am;
       const tenantStat = (tid) => store.runInTenant(tid, () => {
