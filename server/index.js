@@ -1191,7 +1191,7 @@ async function sendMail(key, toEmail, vars, lang, recipient) {
     if (meta && !meta.essential && recipient) {
       if (!mailer.canReceive(key, recipient, recipient.prefs || {})) return { ok: false, skipped: 'unsubscribed' };
     }
-    const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
+    const base = callBase() || ('http://localhost:' + (process.env.PORT || 5077)).replace(/\/$/, '');
     const v = Object.assign({ manageUrl: base + '/email-preferences.html' }, vars || {});
     if (v.link && String(v.link)[0] === '/') v.link = base + v.link;
     const r = mailer.renderTemplate(reg, key, v, lang || 'ru');
@@ -5781,7 +5781,7 @@ const server = http.createServer(async (req, res) => {
       reg.invites[token] = { tid, brokerId: br.id, email, at: Date.now() };
       reg.byEmail[email] = tid;
       store.saveRegistry(); store.save();
-      const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
+      const base = callBase() || ('http://localhost:' + (process.env.PORT || 5077)).replace(/\/$/, '');
       const link = base + '/invite?token=' + token;
       let mailed = false, mailErr = '';
       try {
@@ -5865,7 +5865,7 @@ const server = http.createServer(async (req, res) => {
         const token = crypto.randomBytes(16).toString('hex');
         reg.resets[token] = { tid: rtid, email, at: Date.now() };
         store.saveRegistry();
-        const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
+        const base = callBase() || ('http://localhost:' + (process.env.PORT || 5077)).replace(/\/$/, '');
         const link = base + '/reset?token=' + token;
         /* Atelier-шаблон сброса пароля: сперва платформенный Resend, иначе — per-tenant ключ агентства */
         try {
