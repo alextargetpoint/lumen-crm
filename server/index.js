@@ -3480,7 +3480,7 @@ async function meetingBotTick() {
       await store.runInTenant(tid, async () => {
         const db = store.get(); const now = Date.now();
         const pend = (db.meetings || []).filter(mt => mt.botId && mt.transcriptStatus === 'scheduled' && (mt.at + (mt.dur || 60) * 60e3 + 3 * 60e3) < now);
-        for (const mt of pend.slice(0, 5)) await ingestMeetingTranscript(db, mt).catch(() => {});
+        for (const mt of pend.slice(0, 25)) await ingestMeetingTranscript(db, mt).catch(() => {});   /* фолбэк к вебхуку /hooks/recall; 25/тенант/цикл с запасом под масштаб */
       });
     } catch (_) {}
   }
@@ -5020,6 +5020,27 @@ const server = http.createServer(async (req, res) => {
         billing.markInvoicePaid(db, (o.metadata && o.metadata.invId) || o.client_reference_id || null);
       }
       return json(res, 200, { received: true });
+    }
+    /* Вебхук Recall.ai — МГНОВЕННЫЙ приём транскриптов (параллельно, сколько бы встреч ни завершилось разом).
+       Платформенный (один URL на все агентства): маршрутизируем по metadata.tid, который проставили при заказе бота.
+       Поллинг (meetingBotTick) остаётся фолбэком, если вебхук не дошёл. */
+    if (p === '/hooks/recall' && req.method === 'POST') {
+      const b = await readBody(req);
+      const sec = process.env.RECALL_WEBHOOK_SECRET || '';
+      if (sec && (u.searchParams.get('key') || '') !== sec) return json(res, 401, { error: 'bad key' });
+      const data = (b && b.data) || b || {};
+      const botId = data.bot_id || (data.bot && data.bot.id) || b.bot_id || '';
+      const meta = (data.bot && data.bot.metadata) || data.metadata || b.metadata || {};
+      const evt = String(b.event || data.event || '').toLowerCase();
+      if (!botId) return json(res, 200, { ok: true, skip: 'no bot id' });
+      /* пропускаем ранние статусы (joining/in_call) — транскрипта ещё нет; действуем на завершении/готовности */
+      if (evt && /join|in_call|recording|start|ready_to/.test(evt) && !/done|complet|end|transcript|analysis|fail/.test(evt)) return json(res, 200, { ok: true, skip: evt });
+      const act = async (tid) => { await store.runInTenant(tid, async () => { const db = store.get(); const mt = (db.meetings || []).find(m => m.botId === botId); if (mt) await ingestMeetingTranscript(db, mt).catch(() => {}); }); };
+      try {
+        if (meta.tid) await act(meta.tid);
+        else { for (const tid of store.listTenants()) { let found = false; await store.runInTenant(tid, () => { found = (store.get().meetings || []).some(m => m.botId === botId); }); if (found) { await act(tid); break; } } }
+      } catch (e) { console.error('[recall hook]', e.message); }
+      return json(res, 200, { ok: true });
     }
     if (p === '/hooks/lead' && req.method === 'POST') {
       if (!rateHit('hooklead:' + clientIp(req), 30, 60000)) return json(res, 429, { error: 'rate limit' });
