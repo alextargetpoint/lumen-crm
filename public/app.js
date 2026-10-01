@@ -1472,6 +1472,48 @@ window.openGrayConsent = function (kind, cb) {
   return bd;
 };
 
+/* ИИ-генерация «О себе» для WhatsApp-профиля */
+window.genWaAbout = async function (nameVal, onText, btn) {
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '…'; }
+  try { const r = await api.post('/wa/gray/gen-about', { name: nameVal || '' }); if (r.about) { onText(r.about); toast('Описание сгенерировано', null, true); } }
+  catch (e) { toast('Не вышло', e.message, false); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
+};
+/* выбор фото → кроп в круге (drag + zoom, без библиотек) → загрузка → onUrl(path). Квадрат уходит в WhatsApp. */
+window.avatarPickCropUpload = function (onUrl) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp';
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (!f) return; if (f.size > 12 * 1024 * 1024) { toast('Файл большой', 'до 12 МБ', false); return; } const rd = new FileReader(); rd.onload = () => _openAvatarCrop(rd.result, onUrl); rd.readAsDataURL(f); };
+  inp.click();
+};
+function _openAvatarCrop(src, onUrl) {
+  const img = new Image();
+  img.onload = () => {
+    const S = 280; let minS = Math.max(S / img.width, S / img.height), scale = minS, ox = (S - img.width * scale) / 2, oy = (S - img.height * scale) / 2;
+    const bd = modal({ title: 'Обрежьте фото', sub: 'Перетащите и приблизьте — кружок уйдёт в WhatsApp', body: `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div id="crWrap" style="width:${S}px;height:${S}px;border-radius:50%;overflow:hidden;position:relative;cursor:grab;background:#111;box-shadow:0 0 0 3px var(--accent,#2563eb) inset;touch-action:none"><canvas id="crCv" width="${S}" height="${S}" style="display:block"></canvas></div>
+        <div style="display:flex;align-items:center;gap:10px;width:${S}px">${ic(I.image || I.eye)}<input id="crZoom" type="range" min="1" max="3.2" step="0.01" value="1" style="flex:1"></div>
+      </div>`,
+      actions: [{ label: 'Применить и загрузить', cls: 'btn-accent', onClick: async (b) => {
+        const out = document.createElement('canvas'); out.width = 512; out.height = 512; const oc = out.getContext('2d'); const k = 512 / S;
+        oc.fillStyle = '#fff'; oc.fillRect(0, 0, 512, 512); oc.drawImage(img, ox * k, oy * k, img.width * scale * k, img.height * scale * k);
+        const data = out.toDataURL('image/jpeg', 0.86);
+        try { const r = await api.post('/wa/gray/avatar-upload', { data }); onUrl(r.path || r.url); toast('Фото загружено и применится в WhatsApp', null, true); } catch (e) { toast('Ошибка загрузки', e.message, false); return false; }
+      } }, { label: 'Отмена' }] });
+    if (!bd) return;
+    const cv = bd.querySelector('#crCv'), ctx = cv.getContext('2d'), zoom = bd.querySelector('#crZoom'), wrap = bd.querySelector('#crWrap');
+    const clamp = () => { const w = img.width * scale, h = img.height * scale; ox = Math.min(0, Math.max(S - w, ox)); oy = Math.min(0, Math.max(S - h, oy)); };
+    const draw = () => { ctx.clearRect(0, 0, S, S); ctx.drawImage(img, ox, oy, img.width * scale, img.height * scale); };
+    clamp(); draw();
+    zoom.oninput = () => { const ns = minS * (+zoom.value), cx = S / 2, cy = S / 2; ox = cx - (cx - ox) * (ns / scale); oy = cy - (cy - oy) * (ns / scale); scale = ns; clamp(); draw(); };
+    let drag = null;
+    wrap.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, ox, oy }; try { wrap.setPointerCapture(e.pointerId); } catch (_) {} });
+    wrap.addEventListener('pointermove', e => { if (!drag) return; ox = drag.ox + (e.clientX - drag.x); oy = drag.oy + (e.clientY - drag.y); clamp(); draw(); });
+    wrap.addEventListener('pointerup', () => { drag = null; });
+  };
+  img.src = src;
+}
 /* профиль серого WhatsApp-номера (имя/описание/аватар → синк в реальный WhatsApp) */
 window.openWaPersona = function (phone, n) {
   const p = (n && n.persona) || {};
@@ -1489,8 +1531,8 @@ window.openWaPersona = function (phone, n) {
       </div>
       ${conn ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер не на связи — профиль сохранится и применится после подключения по QR.</span></div>`}
       <div class="form-row"><label>Имя (видит лид, до 25 симв.)</label><input id="wapName" maxlength="25" value="${esc(p.name || '')}" placeholder="напр. Анна · TargetPoint"></div>
-      <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><input id="wapAbout" maxlength="139" value="${esc(p.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10–20"></div>
-      <div class="form-row"><label>Аватар (URL картинки)</label><input id="wapAvatar" value="${esc(p.avatar || '')}" placeholder="https://…/photo.jpg"></div>
+      <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><div style="display:flex;gap:6px"><input id="wapAbout" maxlength="139" value="${esc(p.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10–20" style="flex:1"><button type="button" class="btn btn-sm" id="wapGen" title="Сгенерировать через ИИ">${ic(I.spark)}ИИ</button></div></div>
+      <div class="form-row"><label>Аватар</label><div style="display:flex;gap:6px"><input id="wapAvatar" value="${esc(p.avatar || '')}" placeholder="URL картинки или загрузите фото →" style="flex:1"><button type="button" class="btn btn-sm" id="wapUpload" title="Загрузить и обрезать фото">${ic(I.image || I.plus)}Фото</button></div></div>
       <div style="display:flex;gap:10px">
         <div class="form-row" style="flex:1"><label>Режим номера</label><select id="wapMode">
           <option value="qualifier" ${(p.mode === 'broker') ? '' : 'selected'}>Шаблонная от агентства (пул, без закрепа)</option>
@@ -1520,6 +1562,8 @@ window.openWaPersona = function (phone, n) {
     if (ava) { let img = ava.querySelector('img'); if (av) { if (!img) { img = document.createElement('img'); img.style.cssText = 'width:100%;height:100%;object-fit:cover'; ava.insertBefore(img, ava.firstChild); } img.onerror = () => { img.style.display = 'none'; if (tx) tx.style.display = ''; }; img.src = av; img.style.display = ''; if (tx) tx.style.display = 'none'; } else { if (img) img.style.display = 'none'; if (tx) tx.style.display = ''; } }
   };
   ['wapName', 'wapAbout', 'wapAvatar'].forEach(id => { const el = $('#' + id, bd); if (el) el.addEventListener('input', updWa); });
+  { const g = $('#wapGen', bd); if (g) g.addEventListener('click', () => genWaAbout(($('#wapName', bd) || {}).value, (t) => { const a = $('#wapAbout', bd); if (a) { a.value = t; updWa(); } }, g)); }
+  { const u = $('#wapUpload', bd); if (u) u.addEventListener('click', () => avatarPickCropUpload((url) => { const a = $('#wapAvatar', bd); if (a) { a.value = url; updWa(); } })); }
   { const wm = $('#wapMode', bd), wb = $('#wapBroker', bd); const syncWm = () => { if (wb) { const tmpl = (wm || {}).value !== 'broker'; wb.disabled = tmpl; wb.style.opacity = tmpl ? '.5' : '1'; } }; if (wm) wm.addEventListener('change', syncWm); syncWm(); }
 };
 
@@ -6605,8 +6649,8 @@ PAGES.waProfile = async (root) => {
         ${!n ? `<div class="lc-hint warn"><span>${ic(I.shield)}За вами пока не закреплён WhatsApp-номер. Попросите руководителя закрепить номер за вами (Номера → выбрать вас) — и здесь появится оформление профиля.</span></div>`
           : `<div class="wapf-status ${n.connected ? 'on' : ''}">${ic(n.connected ? I.check : I.shield)}<span>${n.connected ? 'Номер на связи · +' + esc(n.phone) : (n.workerReady ? 'Номер не на связи — профиль сохранится и применится после подключения по QR' : 'Профиль сохранится и применится, когда номер подключат')}</span></div>
           <div class="form-row"><label>Имя (видит лид, до 25 симв.)</label><input id="wmName" maxlength="25" value="${esc(pr.name || '')}" placeholder="напр. Анна · ${esc(STATE.settings.agency.name)}"></div>
-          <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><input id="wmAbout" maxlength="139" value="${esc(pr.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10:00–20:00"></div>
-          <div class="form-row"><label>Аватар (ссылка на картинку)</label><input id="wmAvatar" value="${esc(pr.avatar || '')}" placeholder="https://…/photo.jpg"></div>
+          <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><div style="display:flex;gap:6px"><input id="wmAbout" maxlength="139" value="${esc(pr.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10:00–20:00" style="flex:1"><button type="button" class="btn btn-sm" id="wmGen" title="Сгенерировать через ИИ">${ic(I.spark)}ИИ</button></div></div>
+          <div class="form-row"><label>Аватар</label><div style="display:flex;gap:6px"><input id="wmAvatar" value="${esc(pr.avatar || '')}" placeholder="URL или загрузите фото →" style="flex:1"><button type="button" class="btn btn-sm" id="wmUpload" title="Загрузить и обрезать фото">${ic(I.image || I.plus)}Фото</button></div></div>
           <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-accent" id="wmSave">${ic(I.check)}Сохранить и применить</button></div>
           <div id="wmOut" class="muted" style="font-size:11.5px;margin-top:8px"></div>`}
       </div>
@@ -6633,6 +6677,8 @@ PAGES.waProfile = async (root) => {
     if (ava) { let img = ava.querySelector('img'); if (av) { if (!img) { img = document.createElement('img'); ava.insertBefore(img, ava.firstChild); } img.onerror = () => { img.style.display = 'none'; if (tx) tx.style.display = ''; }; img.src = av; img.style.display = ''; if (tx) tx.style.display = 'none'; } else { if (img) img.style.display = 'none'; if (tx) tx.style.display = ''; } }
   };
   ['wmName', 'wmAbout', 'wmAvatar'].forEach(id => { const e = $('#' + id, root); if (e) e.addEventListener('input', upd); });
+  { const g = $('#wmGen', root); if (g) g.addEventListener('click', () => genWaAbout(($('#wmName', root) || {}).value, (t) => { const a = $('#wmAbout', root); if (a) { a.value = t; upd(); } }, g)); }
+  { const u = $('#wmUpload', root); if (u) u.addEventListener('click', () => avatarPickCropUpload((url) => { const a = $('#wmAvatar', root); if (a) { a.value = url; upd(); } })); }
   $('#wmSave', root)?.addEventListener('click', async () => {
     const out = $('#wmOut', root); if (out) out.textContent = 'Сохраняю и синкаю в WhatsApp…';
     try {

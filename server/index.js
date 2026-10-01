@@ -6053,7 +6053,7 @@ const server = http.createServer(async (req, res) => {
     const canControl = () => !!ROLE && (!IS_BROKER || isControlDelegate);
     const CONTROL_PATH = /^\/api\/(control-center|control-analytics|control-settings)$/.test(p) || /^\/api\/brokers\/[^/]+\/offboard$/.test(p) || p === '/api/leads/merge' || /^\/api\/leads\/[^/]+\/commission$/.test(p);
     /* брокеру РАЗРЕШЕНО редактировать ТОЛЬКО свой закреплённый WhatsApp-профиль (проверка владения — внутри роутов) */
-    const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona' || p === '/api/brokers/my-phone';   /* самообслуживание брокера: свой WA-профиль + свой телефон для звонков */
+    const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona' || p === '/api/brokers/my-phone' || p === '/api/wa/gray/gen-about' || p === '/api/wa/gray/avatar-upload';   /* самообслуживание брокера: свой WA-профиль + телефон + ИИ-«о себе» + аватар */
     if (IS_BROKER && p.startsWith('/api/') && !brokerSelfWaOk && !(isControlDelegate && CONTROL_PATH) && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
     /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
     const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length)) ? MEMBER.leadFilter : null;
@@ -9220,6 +9220,33 @@ const server = http.createServer(async (req, res) => {
       rec.brokerId = b.brokerId || null;
       store.save();
       return json(res, 200, { ok: true, phone, brokerId: rec.brokerId });
+    }
+    /* ИИ-генерация «О себе» для WhatsApp-профиля (≤139 симв.) — владелец или брокер (своё) */
+    if (p === '/api/wa/gray/gen-about' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключа)' });
+      const ag = db.settings.agency || {}; const b = await readBody(req).catch(() => ({}));
+      const nm = String(b.name || '').trim();
+      try {
+        let about = await llm.composeAgencyAbout(ag.name || 'агентство', ag.geos || []);
+        about = String(about || '').replace(/\s*\n+\s*/g, ' · ').replace(/\s{2,}/g, ' ').trim();
+        /* ужимаем в лимит WhatsApp (139), не рвём слово */
+        if (about.length > 139) { about = about.slice(0, 139); about = about.replace(/[\s·,.;:—-]+\S*$/, '').trim(); }
+        return json(res, 200, { about });
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
+    /* загрузка аватара (обрезанная картинка dataURL) → диск (том Railway, отдаётся /creatives) → URL для синка в WhatsApp */
+    if (p === '/api/wa/gray/avatar-upload' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const mm = String((b && b.data) || '').match(/^data:image\/(png|jpe?g|webp);base64,(.*)$/);
+      if (!mm) return json(res, 400, { error: 'нужен PNG/JPG/WebP' });
+      const buf = Buffer.from(mm[2], 'base64');
+      if (!buf.length || buf.length > 6 * 1024 * 1024) return json(res, 400, { error: 'файл до 6 МБ' });
+      try { fs.mkdirSync(CREATIVES_DIR, { recursive: true }); } catch (_) {}
+      const fn = 'avatar-' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.jpg';
+      try { fs.writeFileSync(path.join(CREATIVES_DIR, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
+      return json(res, 200, { url: (callBase() ? callBase() : '') + '/creatives/' + fn, path: '/creatives/' + fn });
     }
     /* профиль серого WhatsApp-номера (имя/описание/аватар) → синк в РЕАЛЬНЫЙ WhatsApp */
     if (p === '/api/wa/gray/persona' && req.method === 'POST') {
