@@ -143,6 +143,7 @@ const farmSvc = require('./farm'); /* ⭐ ферма номеров WhatsApp+Tel
 const farmProv = require('./farm-provision'); /* Р2: конвейер провижна (eSIM-адаптер + задания фарм-хост-агенту) */
 const farmWarm = require('./farm-warmup');    /* Р3: движок прогрева номеров (расписание + тик) */
 const meetingBot = require('./meetingbot');   /* авто-запись+транскрипция Zoom/Meet встреч (Recall.ai) */
+const zoom = require('./zoom');   /* генерация Zoom-ссылок (SaaS: платформенный Server-to-Server OAuth аккаунт) */
 let XLSX = null; try { XLSX = require('xlsx'); } catch (_) {}   /* парс Excel-прайсов застройщиков (наличие юнитов) */
 const farmMail = require('./farm-email');     /* Р2+: email-адаптер для Telegram (catch-all + авто-код) */
 const invoicepdf = require('./invoicepdf');
@@ -3408,6 +3409,20 @@ async function farmReclaimFromTenant(prevTid, phone) {
    SaaS-модель: ОДИН платформенный ключ (env RECALL_API_KEY) → работает для ВСЕХ агентств
    автоматически, настраивать ничего не надо. Бронь встречи с Zoom/Meet-ссылкой → бот сам
    заходит → транскрипт+ИИ-резюме в карточку. Стоимость — расходник платформы. */
+/* ссылка на видео-встречу: Zoom (если заданы платформенные/агентские ключи — её умеет писать бот
+   Recall → авто-запись+транскрипт), иначе бесплатный Jitsi (работает в браузере, но бот его НЕ пишет) */
+async function genMeetingLink(db, kind, lead, atMs, durMin) {
+  if (kind !== 'video') return null;
+  if (zoom.ready()) {
+    try {
+      const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
+      const r = await zoom.createMeeting({ topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id });
+      if (r && r.ok && r.joinUrl) return r.joinUrl;
+      console.error('[zoom] создать встречу не вышло:', r && r.error);
+    } catch (e) { console.error('[zoom]', e.message); }
+  }
+  return `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}`;
+}
 async function maybeScheduleMeetingBot(db, mt) {
   try {
     if ((db.settings.meetingBot || {}).enabled === false) return;
@@ -3430,7 +3445,29 @@ async function ingestMeetingTranscript(db, mt) {
   mt.transcript = r.text.slice(0, 40000); mt.transcriptStatus = 'done'; mt.transcriptAt = Date.now();
   ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Транскрипт встречи готов (${kindRu}) — в карточке лида` });
   store.save();
-  if (llm.available()) { try { const sum = await llm.summarize(db, lead); if (sum) { lead.summary = sum; lead.summaryAt = Date.now(); store.save(); } } catch (_) {} }
+  if (llm.available()) {
+    try { const sum = await llm.summarize(db, lead); if (sum) { lead.summary = sum; lead.summaryAt = Date.now(); store.save(); } } catch (_) {}
+    /* разбор транскрипта по полям карточки: заполняем ТОЛЬКО пустые квалы (не затираем проставленное человеком) */
+    try {
+      const ex = await llm.extractQuals(db, lead, r.text);
+      if (ex) {
+        lead.quals = lead.quals || {};
+        for (const k of ['purpose', 'timeline', 'type']) {
+          const cur = lead.quals[k];
+          if (ex[k] && !(cur && cur.value)) lead.quals[k] = { value: ex[k], by: 'ai', src: 'meeting', at: Date.now() };
+        }
+        if (ex.budget && !(lead.quals.budget && lead.quals.budget.value)) {
+          lead.quals.budget = { value: ex.budget, by: 'ai', src: 'meeting', at: Date.now() };
+          if (ex.budgetNum) lead.quals.budget.num = ex.budgetNum;
+        }
+        if (ex.tags.length) { lead.tags = lead.tags || []; for (const t of ex.tags) if (!lead.tags.includes(t)) lead.tags.push(t); }
+        if (ex.nextAction && !(lead.nextAction && lead.nextAction.text)) lead.nextAction = { text: ex.nextAction, at: null, by: 'ai' };
+        lead.qualAt = Date.now();
+        ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `ИИ разложил встречу по полям карточки (${['purpose', 'timeline', 'budget', 'type'].filter(k => ex[k]).length} квала заполнено)` });
+        store.save();
+      }
+    } catch (_) {}
+  }
   return true;
 }
 /* поллинг-фолбэк: добрать транскрипты завершившихся встреч, если вебхук не пришёл */
@@ -4830,9 +4867,10 @@ const server = http.createServer(async (req, res) => {
           id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: abroker.id,
           at: +b.at || Date.now() + 24 * 3600e3, kind: ['call', 'video', 'tour'].includes(b.kind) ? b.kind : 'call',
           dur: Math.max(15, Math.min(240, +b.dur || 60)), note: String(b.note || '').slice(0, 400), status: 'scheduled', createdAt: Date.now(),
-          link: b.kind === 'video' ? `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}` : null,
+          link: b.kind === 'video' ? await genMeetingLink(db, 'video', lead, (+b.at || Date.now() + 24 * 3600e3), Math.max(15, Math.min(240, +b.dur || 60))) : null,
         };
         db.meetings = db.meetings || []; db.meetings.push(mt);
+        await maybeScheduleMeetingBot(db, mt);   /* авто-бот на Zoom-ссылку → транскрипт в карточку */
         if (b.confirm !== false) {
           const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
           const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
@@ -9698,9 +9736,9 @@ const server = http.createServer(async (req, res) => {
         at: +b.at || Date.now() + 24 * 3600e3, kind: b.kind || 'call',
         dur: Math.max(15, Math.min(240, +b.dur || 60)),
         note: b.note || '', status: 'scheduled', createdAt: Date.now(),
-        /* видео-встреча: своя комната из коробки (Jitsi, работает в браузере без аккаунтов);
-           Zoom API подключается сюда же при наличии кредов */
-        link: b.link || (b.kind === 'video' ? `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}` : null),
+        /* видео-встреча: Zoom (платформенный SaaS-аккаунт, если заданы ключи → бот Recall её пишет),
+           иначе бесплатный Jitsi из коробки (браузер, без аккаунтов, но бот его НЕ пишет) */
+        link: b.link || (b.kind === 'video' ? await genMeetingLink(db, 'video', lead, (+b.at || Date.now() + 24 * 3600e3), Math.max(15, Math.min(240, +b.dur || 60))) : null),
         hideJoin: !!b.hideJoin,   /* версия страницы БЕЗ кнопки «Подключиться» — брокер сам пришлёт ссылку в переписке */
       };
       db.meetings = db.meetings || [];

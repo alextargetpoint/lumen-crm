@@ -294,6 +294,39 @@ async function summarize(db, lead) {
   return out.summary.trim().slice(0, 900);
 }
 
+/* Разбор транскрипта встречи/звонка → структурные поля карточки (квалы/теги/след. шаг).
+   Возвращает { purpose, timeline, budget, budgetNum, type, tags[], nextAction } — любое поле
+   может быть пустым, если в разговоре этого не прозвучало (НЕ выдумываем). Вызывающий код
+   заполняет только ПУСТЫЕ квалы, не затирая уже проставленные человеком. */
+async function extractQuals(db, lead, transcript) {
+  const geo = (db.settings.geoNames && db.settings.geoNames[lead.geo]) || lead.geo || '';
+  const prompt = `Ты — ассистент CRM агентства недвижимости. Ниже транскрипт встречи/звонка с клиентом по имени ${lead.name} (направление: ${geo}). Извлеки факты СТРОГО из сказанного — ничего не додумывай. Если чего-то в разговоре не было, оставь поле пустым ("").
+
+Верни строго JSON:
+{
+ "purpose": "цель покупки одним словом/фразой: для жизни / инвестиция / аренда / перепродажа / зимовка — или \\"\\"",
+ "timeline": "срок выхода на сделку: сейчас / 1-3 мес / 3-6 мес / полгода+ / думает — или \\"\\"",
+ "budget": "бюджет как сказал клиент (с валютой, напр. \\"до 300к $\\" или \\"150-200к €\\") — или \\"\\"",
+ "type": "тип объекта: студия / 1-спальня / 2-спальни / вилла / таунхаус / участок / коммерция — или \\"\\"",
+ "tags": ["до 3 коротких тега-пометки: напр. \\"срочно\\", \\"ипотека\\", \\"с детьми\\", \\"у моря\\" — только если явно прозвучало"],
+ "nextAction": "конкретный следующий шаг, о котором договорились (напр. \\"отправить подборку вилл до пятницы\\") — или \\"\\""
+}
+
+ТРАНСКРИПТ:
+${String(transcript || '').slice(0, 12000)}`;
+  const out = await callGemini(prompt, 12000, 600);
+  if (!out || typeof out !== 'object') return null;
+  const clean = s => String(s || '').trim().slice(0, 200);
+  const budget = clean(out.budget);
+  const num = budget ? parseInt(budget.replace(/[^\d]/g, ''), 10) : 0;
+  return {
+    purpose: clean(out.purpose), timeline: clean(out.timeline), type: clean(out.type),
+    budget, budgetNum: num > 0 ? num : 0,
+    tags: Array.isArray(out.tags) ? out.tags.map(clean).filter(Boolean).slice(0, 3) : [],
+    nextAction: clean(out.nextAction),
+  };
+}
+
 /* транскрибация звонка/Zoom: OpenAI Whisper ($0.006/мин) */
 async function transcribe(buf, filename) {
   if (!OKEY) throw new Error('нет OPENAI_API_KEY для Whisper');
@@ -1393,6 +1426,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
