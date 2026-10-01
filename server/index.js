@@ -6086,7 +6086,7 @@ const server = http.createServer(async (req, res) => {
     const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject|contractor-fill|comment)$/.test(p) && (u.searchParams.get('key') === db.settings.hooks.secret || !!u.searchParams.get('t'));
     /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
     /* Сравнение: правка/рерайт текста брокером со страницы /cmp?edit=токен — авторизация токеном ?t= */
-    const cmpEditOk = /^\/api\/properties\/compare\/cmp_[a-z0-9]+\/(edit|rewrite)$/.test(p) && !!u.searchParams.get('t');
+    const cmpEditOk = /^\/api\/properties\/compare\/cmp_[a-z0-9]+\/(edit|rewrite|publish|unpublish)$/.test(p) && !!u.searchParams.get('t');
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
     const farmEmailOk = p === '/api/farm/email-inbound' && req.method === 'POST';  /* вебхук входящей почты фермы (Telegram-коды), секрет внутри */
@@ -12175,11 +12175,11 @@ ${SCR}
           whyRent: (p.whyRent || []).slice(0, 4).map(x => String(x).slice(0, 300)),
           district: p.district && (p.district.blurb || (p.district.times || []).length) ? { name: String(p.district.name || p.area || '').slice(0, 60), blurb: String(p.district.blurb || '').slice(0, 500), times: (p.district.times || []).slice(0, 6).map(t => ({ min: +t.min || 0, place: String(t.place || '').slice(0, 60) })) } : null,
           payment: String(p.payment || '').slice(0, 200), hookTitle: String(p.hookTitle || '').slice(0, 160), video: (p.videos || [])[0] || '' }));
-        const rec = { id: 'cmp_' + crypto.randomBytes(6).toString('hex'), token: crypto.randomBytes(8).toString('hex'), items: snap, analysis: an, lang: b.lang || 'ru', agency: (db.settings.agency && db.settings.agency.name) || 'Lumen', createdAt: Date.now() };
+        const rec = { id: 'cmp_' + crypto.randomBytes(6).toString('hex'), token: crypto.randomBytes(8).toString('hex'), items: snap, analysis: an, lang: b.lang || 'ru', agency: (db.settings.agency && db.settings.agency.name) || 'Lumen', createdAt: Date.now(), status: 'draft' };   /* ЧЕРНОВИК: клиент не видит, пока брокер не опубликует */
         db.compares.unshift(rec); db.compares = db.compares.slice(0, 200); store.save();
         const host = req.headers.host && !/localhost|127\.0\.0\.1|railway/.test(req.headers.host) ? 'https://' + req.headers.host : (global.LUMEN_BASE || 'https://app.lumen247.com');
         const surl = `${host.replace(/\/$/, '')}/cmp/${rec.id}`;
-        return json(res, 200, { ok: true, analysis: an, shareUrl: surl, editUrl: `${surl}?edit=${rec.token}`, id: rec.id });
+        return json(res, 200, { ok: true, analysis: an, shareUrl: surl, editUrl: `${surl}?edit=${rec.token}`, id: rec.id, status: 'draft' });
       }
       return json(res, 200, { ok: true, analysis: an });
     }
@@ -12212,6 +12212,15 @@ ${SCR}
       return json(res, 200, { ok: true, items });
     }
     /* ⭐ ПРАВКА/РЕРАЙТ текста сравнения брокером (со страницы /cmp?edit=токен, авторизация ?t=токен) */
+    /* draft→publish: клиент видит /cmp только после публикации; до — «подборка готовится» */
+    if ((m = p.match(/^\/api\/properties\/compare\/(cmp_[a-z0-9]+)\/(publish|unpublish)$/)) && req.method === 'POST') {
+      const rec = (db.compares || []).find(x => x.id === m[1]); if (!rec) return json(res, 404, { error: 'not found' });
+      if (u.searchParams.get('t') !== rec.token && !getSession(req)) return json(res, 403, { error: 'bad token' });
+      rec.status = m[2] === 'publish' ? 'published' : 'draft';
+      if (m[2] === 'publish') rec.publishedAt = Date.now();
+      store.save();
+      return json(res, 200, { ok: true, status: rec.status });
+    }
     if ((m = p.match(/^\/api\/properties\/compare\/(cmp_[a-z0-9]+)\/(edit|rewrite)$/)) && req.method === 'POST') {
       const rec = (db.compares || []).find(x => x.id === m[1]); if (!rec) return json(res, 404, { error: 'not found' });
       if (u.searchParams.get('t') !== rec.token && !getSession(req)) return json(res, 403, { error: 'bad token' });
@@ -15371,6 +15380,9 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     if (req.method === 'GET' && (m = p.match(/^\/cmp\/(cmp_[a-z0-9]+)$/))) {
       const rec = (db.compares || []).find(x => x.id === m[1]);
       if (!rec) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<h2 style="font-family:sans-serif;text-align:center;margin-top:60px">Сравнение не найдено</h2>'); return; }
+      /* draft→publish gate: клиент (без edit-токена и без сессии) видит страницу ТОЛЬКО опубликованной */
+      const _canSee = rec.status === 'published' || u.searchParams.get('edit') === rec.token || !!getSession(req);
+      if (!_canSee) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Подборка готовится</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Manrope:wght@500;700&display=swap" rel="stylesheet"><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Manrope,sans-serif;background:#f7f3ea;color:#221f1a;text-align:center;padding:24px}h1{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:600;margin:0 0 10px}p{color:#8a8378;font-size:15px;max-width:420px}.d{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#b8863c,#8a6320);display:grid;place-items:center;color:#fff;font-size:20px;margin:0 auto 20px}</style></head><body><div><div class="d">✦</div><h1>Подборка готовится</h1><p>${(rec.agency || 'Агентство').replace(/[<>&]/g, '')} скоро пришлёт вам персональную подборку объектов. Загляните чуть позже.</p></div></body></html>`); return; }
       const esc2 = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
       const sym = (c) => ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£', IDR: 'Rp ' }[String(c || '').toUpperCase()] || '$');
       const money = (v, c) => v ? sym(c) + Math.round(v).toLocaleString('ru-RU') : '—';
@@ -15509,13 +15521,18 @@ ${rows.map(([l, fn, vf, dir]) => { const bi = bestI(vf, dir); return `<div class
 ${((a.summary || verd || editMode) && (!H.ai || editMode)) ? `<div class="ai${H.ai ? ' is-hid' : ''}" data-blk="ai"><h2><span class="d">✦</span>${esc2(T.ai)}${editMode ? '<button class="delx" data-del="ai" title="Убрать весь блок у клиента">×</button>' : ''}</h2>${((a.summary || editMode) && (!H.summary || editMode)) ? `<div class="sum${H.summary ? ' is-hid' : ''}" data-blk="summary">${editMode ? '<button class="delx" data-del="summary" title="Убрать у клиента">×</button>' : ''}<span${ed('summary')}>${esc2(a.summary)}</span></div>` : ''}<div class="vgrid">${verd}</div>
 ${(a.bestFor && (!H.best || editMode)) ? `<div class="best${H.best ? ' is-hid' : ''}" data-blk="best">${editMode ? '<button class="delx" data-del="best" title="Убрать у клиента">×</button>' : ''}<span>💎 ${esc2(T.invest)}: <b>${esc2(a.bestFor.investment)}</b></span><span>🏡 ${esc2(T.living)}: <b>${esc2(a.bestFor.living)}</b></span><span>💰 ${esc2(T.budget)}: <b>${esc2(a.bestFor.budget)}</b></span></div>` : ''}
 ${((a.analystNote || editMode) && (!H.note || editMode)) ? `<div class="note${H.note ? ' is-hid' : ''}" data-blk="note">${editMode ? '<button class="delx" data-del="note" title="Убрать у клиента">×</button>' : ''}<span${ed('analystNote')}>${esc2(a.analystNote)}</span></div>` : ''}</div>` : ''}
-${editMode ? `<div class="edbar"><div class="edbar-h">✎ Режим редактирования (видите только вы). Текст меняйте прямо на странице.</div><div class="edbar-row"><span>Рерайт вступления:</span><button data-rw="premium">Премиум</button><button data-rw="short">Короче</button><button data-rw="long">Подробнее</button><button data-rw="warm">Теплее</button></div><button class="edsave" id="edSave">Сохранить изменения</button><span id="edStatus"></span></div>
+${editMode ? `<div class="edbar"><div class="edbar-h">✎ Режим редактирования (видите только вы). Текст меняйте прямо на странице.</div><div class="edbar-row"><span>Рерайт вступления:</span><button data-rw="premium">Премиум</button><button data-rw="short">Короче</button><button data-rw="long">Подробнее</button><button data-rw="warm">Теплее</button></div><button class="edsave" id="edSave">Сохранить изменения</button><span id="edStatus"></span>
+<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span id="edPubSt" style="font-size:12.5px;font-weight:700;color:${rec.status === 'published' ? '#8fcf7a' : '#c9a25a'}">${rec.status === 'published' ? '● Опубликовано — клиент видит' : '○ Черновик — клиент НЕ видит'}</span><button class="edsave" id="edPub" style="background:${rec.status === 'published' ? '#8a8378' : 'linear-gradient(180deg,#6d8a4f,#4f6e39)'}">${rec.status === 'published' ? 'Снять с публикации' : '✓ Опубликовать для клиента'}</button></div>
+<div id="edLinkWrap" style="margin-top:10px;${rec.status === 'published' ? '' : 'display:none'}"><div style="font-size:12px;color:#c9a25a;margin-bottom:5px">Ссылка для клиента (без доступа к правкам):</div><div style="display:flex;gap:8px"><input id="edLink" readonly onclick="this.select()" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#efe7d7;border-radius:9px;padding:9px 12px;font-size:12.5px"><button class="edsave" id="edCopy" style="flex:0 0 auto">Копировать</button></div></div></div>
 <script>(function(){var id=${JSON.stringify(rec.id)},tok=${JSON.stringify(rec.token)};var S=document.getElementById('edStatus');
 var hidden=${JSON.stringify(rec.hidden || {})};hidden.verdicts=hidden.verdicts||[];
 function g(f){var e=document.querySelector('[data-ef="'+f+'"]');return e?e.innerText.trim():'';}
 /* «×» — убрать конкретный момент у клиента (скрыть блок/вердикт), сохраняется вместе с правками */
 document.querySelectorAll('.delx').forEach(function(b){b.onclick=function(){var d=b.dataset.del;if(d.indexOf('verdict:')===0){var i=+d.split(':')[1];if(hidden.verdicts.indexOf(i)<0)hidden.verdicts.push(i);var c=document.querySelector('[data-vcard="'+i+'"]');if(c)c.classList.add('is-hid');}else{hidden[d]=true;var el2=document.querySelector('[data-blk="'+d+'"]');if(el2)el2.classList.add('is-hid');}S.textContent='Убрано (нажмите «Сохранить»)';}});
 document.getElementById('edSave').onclick=function(){S.textContent='Сохраняю…';fetch('/api/properties/compare/'+id+'/edit?t='+tok,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({summary:g('summary'),analystNote:g('analystNote'),hidden:hidden})}).then(function(r){return r.json()}).then(function(j){S.textContent=j.ok?'Сохранено ✓':(j.error||'ошибка')}).catch(function(){S.textContent='ошибка сети'})};
+var clientLink=location.origin+'/cmp/'+id;var LI=document.getElementById('edLink');if(LI)LI.value=clientLink;
+var PB=document.getElementById('edPub');if(PB)PB.onclick=function(){var pub=PB.textContent.indexOf('Опубликовать')>=0;S.textContent='…';fetch('/api/properties/compare/'+id+'/'+(pub?'publish':'unpublish')+'?t='+tok,{method:'POST'}).then(function(r){return r.json()}).then(function(j){if(j.ok){location.reload()}else{S.textContent=j.error||'ошибка'}}).catch(function(){S.textContent='ошибка сети'})};
+var CP=document.getElementById('edCopy');if(CP)CP.onclick=function(){navigator.clipboard.writeText(clientLink);CP.textContent='Скопировано ✓';setTimeout(function(){CP.textContent='Копировать'},1500)};
 document.querySelectorAll('[data-rw]').forEach(function(b){b.onclick=function(){var sum=document.querySelector('[data-ef="summary"]');if(!sum)return;S.textContent='ИИ переписывает…';b.disabled=true;fetch('/api/properties/compare/'+id+'/rewrite?t='+tok,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({style:b.dataset.rw,field:'summary'})}).then(function(r){return r.json()}).then(function(j){b.disabled=false;if(j.text){sum.innerText=j.text;S.textContent='Готово — не забудьте «Сохранить»'}else{S.textContent=j.error||'ошибка'}}).catch(function(){b.disabled=false;S.textContent='ошибка сети'})}});
 })();</script>` : ''}
 <div class="ft">${esc2(T.ft)} · ${esc2(rec.agency)}</div></div></body></html>`;

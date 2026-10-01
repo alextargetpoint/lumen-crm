@@ -8086,8 +8086,9 @@ function openCompareModal(list) {
     const cLang = ($('#cmpLang', md) && $('#cmpLang', md).value) || LANG;   /* язык клиента выбран ЗАРАНЕЕ в CRM, не на клиентской странице */
     const r = await api.post('/properties/compare', { ids: list.map(p => p.id), lang: cLang, share: true }).catch(() => ({ error: 'сеть' }));
     if (r.error || !r.shareUrl) { out.innerHTML = '<div style="color:var(--bad);font-size:13px;padding:8px 0">' + esc(r.error || 'не вышло') + '</div>'; btn.disabled = false; return; }
-    out.innerHTML = `<div class="cmp-share-ok"><span>Ссылка для клиента готова:</span><div class="cmp-share-row"><input readonly value="${esc(r.shareUrl)}" onclick="this.select()"><button class="btn btn-sm btn-accent" id="cmpCopy">Копировать</button><a class="btn btn-sm" href="${esc(r.shareUrl)}" target="_blank">Открыть</a></div>${r.editUrl ? `<div style="margin-top:7px;font-size:11.5px"><a class="link" href="${esc(r.editUrl)}" target="_blank">✎ Редактировать текст для клиента (рерайт, правки — только вы)</a></div>` : ''}</div>`;
-    $('#cmpCopy', md).addEventListener('click', () => { navigator.clipboard.writeText(r.shareUrl).then(() => toast('Скопировано', 'Отправьте клиенту', true)); });
+    out.innerHTML = `<div class="cmp-share-ok"><span>✦ Черновик собран. Соберите/почистите и <b>опубликуйте</b> — только после этого клиент увидит страницу.</span>
+      <div class="cmp-share-row" style="margin-top:8px"><a class="btn btn-sm btn-accent" href="${esc(r.editUrl)}" target="_blank" style="flex:1;justify-content:center">✎ Открыть конструктор и опубликовать</a></div>
+      <div style="margin-top:9px;font-size:11.5px;color:var(--muted)">Ссылка клиенту (активна <b>после публикации</b>): <span style="user-select:all">${esc(r.shareUrl)}</span></div></div>`;
     btn.style.display = 'none';
   });
   $('#cmpAiGo', md).addEventListener('click', async (e) => {
