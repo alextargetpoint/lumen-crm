@@ -1010,6 +1010,11 @@ function inbound(db, lead, text, opts = {}) {
       const fresh = store.get();
       const l2 = fresh.leads.find(x => x.id === lead.id);
       if (!l2 || l2.lastDir !== 'in') return;
+      /* in-flight лок: всплеск входящих армит несколько таймеров — иначе оба зовут llm.reply и шлют 2 ответа.
+         Ставим флаг СИНХРОННО до await; второй таймер его видит и выходит. 60с — защита от залипшего лока. */
+      l2.ai = l2.ai || {};
+      if (l2.ai._replying && (Date.now() - l2.ai._replying) < 60000) return;
+      l2.ai._replying = Date.now(); store.save();
       let out = null;
       if (useLlm) {
         try { out = await llm.reply(fresh, l2); } catch (e) { console.error('[llm]', e.message); }
@@ -1020,7 +1025,7 @@ function inbound(db, lead, text, opts = {}) {
         return fresh.messages.filter(x => x.leadId === l2.id && x.dir === 'out').slice(-3).some(x => norm(x.text) === norm(txt));
       };
       if (!out && dupGuard(reply.text)) {
-        l2.ai.enabled = false;
+        l2.ai.enabled = false; delete l2.ai._replying;
         l2.tags = [...new Set([...(l2.tags || []), 'нужен человек'])];
         ai.pushEvent(fresh, { type: 'ai_off', leadId: l2.id, text: `${l2.name}: ИИ зациклился (повтор реплики) — автопилот на паузе, лид ждёт менеджера` });
         store.save();
@@ -1050,6 +1055,7 @@ function inbound(db, lead, text, opts = {}) {
       if (reply.kind === 'handover_offer') {
         for (const cmp of fresh.campaigns) if (cmp.recipients.includes(l2.id)) cmp.stats.qualified += 1;
       }
+      delete l2.ai._replying;   /* снимаем in-flight лок */
       store.save();
     }, 4000 + Math.random() * 5000); // человеческий тайминг ответа
   }
