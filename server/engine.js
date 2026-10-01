@@ -1223,15 +1223,11 @@ function startLoop() {
       try {
         store.runInTenant(tid, () => {
           const db = store.get();
-          tickChains(db);
-          tickCampaigns(db);
-          tickMeetings(db);
-          tickSla(db);
-          tickRotation(db);
-          tickReports(db);
-          tickSimulator(db);
-          tickControl(db);
-          tickScheduled(db);
+          /* per-tick изоляция: сломанный подмодуль (битые данные одного тенанта) не должен
+             голодить остальные тики этого же тенанта и не должен терять store.save() */
+          for (const [nm, fn] of [['chains', tickChains], ['campaigns', tickCampaigns], ['meetings', tickMeetings], ['sla', tickSla], ['rotation', tickRotation], ['reports', tickReports], ['simulator', tickSimulator], ['control', tickControl], ['scheduled', tickScheduled]]) {
+            try { fn(db); } catch (e) { console.error('[engine]', tid, nm, e); }
+          }
           store.save();
         });
       } catch (e) { console.error('[engine]', tid, e); }
