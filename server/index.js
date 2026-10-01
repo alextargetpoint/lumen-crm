@@ -9230,9 +9230,14 @@ const server = http.createServer(async (req, res) => {
       try {
         const r = await llm.composeAgencyAbout(ag.name || 'агентство', ag.geos || []);
         let about = String((r && (r.intro || r.freeNote)) || '').replace(/\s*\n+\s*/g, ' · ').replace(/\s{2,}/g, ' ').trim();   /* composeAgencyAbout возвращает {intro,bullets,…} — берём intro */
-        /* ужимаем в лимит WhatsApp (139), не рвём слово */
-        if (about.length > 139) { about = about.slice(0, 139); about = about.replace(/[\s·,.;:—-]+\S*$/, '').trim(); }
-        return json(res, 200, { about });
+        about = about.replace(/^мен[яе]\s+зовут\s+[^,.—-]+[,.—-]?\s*/i, '');   /* «Меня зовут Анна, …» — для WA-«о себе» имя лишнее */
+        about = about.charAt(0).toUpperCase() + about.slice(1);
+        /* ужимаем в лимит WhatsApp (139) — по целому предложению, иначе по слову */
+        if (about.length > 139) {
+          const cut = about.slice(0, 139); const lastDot = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+          about = lastDot > 40 ? cut.slice(0, lastDot + 1) : cut.replace(/[\s·,;:—-]+\S*$/, '').replace(/[.…]*$/, '') + '…';
+        }
+        return json(res, 200, { about: about.trim() });
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
     }
     /* загрузка аватара (обрезанная картинка dataURL) → диск (том Railway, отдаётся /creatives) → URL для синка в WhatsApp */
