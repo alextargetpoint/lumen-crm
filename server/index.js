@@ -3331,6 +3331,12 @@ function runBillingTick() {
         if (JSON.stringify(next) !== JSON.stringify(db.settings.billingGate || null)) { db.settings.billingGate = next; store.saveNow(); }
       });
     }
+    /* фактическое списание расходников Group A (ИИ/телефония/STT) с баланса — по ВСЕМ тенантам, вкл. primary */
+    for (const tid of store.listTenants()) {
+      store.runInTenant(tid, () => {
+        try { const db = store.get(); if (db.settings && db.settings.billing) { const r = billing.settleUsage(db); if (r && (r.charged > 0 || r.baseline != null)) store.saveNow(); } } catch (_) {}
+      });
+    }
   } catch (_) {}
 }
 setInterval(runBillingTick, 6 * 60 * 60e3);   /* каждые 6 ч */
@@ -11083,7 +11089,7 @@ const server = http.createServer(async (req, res) => {
       const tos = plans.map(m => m.period && m.period.to).filter(Boolean).sort();
       const gFrom = froms[0] || '', gTo = tos[tos.length - 1] || '';
       const dayOf = (ts) => { try { return new Date(ts).toISOString().slice(0, 10); } catch { return ''; } };
-      const inPer = (l) => { const s = dayOf(l.createdAt); return s && (!gFrom || s >= gFrom) && (!gTo || s <= gTo); };
+      const inPer = (l) => { const s = l.createdAt ? new Date(l.createdAt + (((+l.tz) || 4) * 3600000)).toISOString().slice(0, 10) : ''; return s && (!gFrom || s >= gFrom) && (!gTo || s <= gTo); };   /* FIX: локальный день лида по его tz, не UTC */
       const crmLeadsGeo = (g) => (db.leads || []).filter(l => l.geo === g && inPer(l)).length;
       /* CRM-факт по ПОДРЯДЧИКУ (надёжно — по lead.vendorId, назначенному вручную/из вебхука ?vendor=) */
       const QSTAGES = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
@@ -11558,7 +11564,7 @@ ${SCR}
     if (p === '/api/ads/compare' && req.method === 'GET') {
       for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);
       const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
-      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
+      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt + (((+l.tz) || 4) * 3600000)).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
       const idx = buildLeadAdIndex(db);
       const cts = db.mpContractors || [];
       const acctToCt = {}; for (const c of cts) for (const acc of (c.adAccounts || [])) acctToCt[metaads.acctId(acc)] = c.id;
@@ -11583,7 +11589,7 @@ ${SCR}
     if (p === '/api/ads' && req.method === 'GET') {
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
       const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
-      const inR = (l) => { if (!from && !to) return true; const d = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && d < from) return false; if (to && d > to) return false; return true; };
+      const inR = (l) => { if (!from && !to) return true; const d = l.createdAt ? new Date(l.createdAt + (((+l.tz) || 4) * 3600000)).toISOString().slice(0, 10) : ''; if (from && d < from) return false; if (to && d > to) return false; return true; };
       const hasIn = (lid) => db.messages.some(x => x.leadId === lid && x.dir === 'in');
       const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
       const _leadIdx = buildLeadAdIndex(db);                                    /* атрибуция по adId + фолбэк по именам */
@@ -11723,7 +11729,7 @@ ${SCR}
       const platformOf = (ad) => ad.platform || (/google|gads|search|pmax/i.test((ad.campaignName || '') + (ad.source || '')) ? 'google' : 'meta');
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
       const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
-      const inR = (l) => { if (!from && !to) return true; const d = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && d < from) return false; if (to && d > to) return false; return true; };
+      const inR = (l) => { if (!from && !to) return true; const d = l.createdAt ? new Date(l.createdAt + (((+l.tz) || 4) * 3600000)).toISOString().slice(0, 10) : ''; if (from && d < from) return false; if (to && d > to) return false; return true; };
       const dailyIn = (arr) => (from || to) ? (arr || []).filter(p => (!from || p.d >= from) && (!to || p.d <= to)) : (arr || []);
       const mk = () => ({ spend: 0, leads: 0, leadsCRM: 0, quals: 0, clicks: 0, impr: 0, dmap: {} });
       const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; for (const p of (x.dailyR || [])) m.dmap[p.d] = (m.dmap[p.d] || 0) + (p.spend || 0); };
@@ -11756,7 +11762,7 @@ ${SCR}
       const ids = (u.searchParams.get('adIds') || '').split(',').map(s => s.trim()).filter(Boolean);
       const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
       const idset = new Set(ids.map(String));
-      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
+      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt + (((+l.tz) || 4) * 3600000)).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
       const namesCfg = (db.settings.stagesCfg && db.settings.stagesCfg.names) || {};
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
       const leads = db.leads.filter(l => l.ads && idset.has(String(l.ads.adId)) && inR(l))
@@ -11775,7 +11781,7 @@ ${SCR}
       const namesCfg = (db.settings.stagesCfg && db.settings.stagesCfg.names) || {};
       const campMap = db.settings.adCampaignMap || {}; const langMap = db.settings.adCampaignLangMap || {};
       const dirs = db.settings.adDirections || []; const dirName = (k) => (dirs.find(d => d.key === k) || {}).name || 'Прочее (вне плана)';
-      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
+      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt + (((+l.tz) || 4) * 3600000)).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
       const isQual = (l) => everReachedQual(db, l, scopeQualMode(db, u.searchParams.get("contractorId")));   /* high-water mark для качества трафика */
       /* страна → флаг (ручная карта → ISO-2 → словарь имён → 🌐) */
       const FMAP = { 'UAE': '🇦🇪', 'United Arab Emirates': '🇦🇪', 'Эмираты': '🇦🇪', 'ОАЭ': '🇦🇪', 'Saudi Arabia': '🇸🇦', 'Саудовская Аравия': '🇸🇦', 'Russia': '🇷🇺', 'Россия': '🇷🇺', 'United Kingdom': '🇬🇧', 'Великобритания': '🇬🇧', 'United States': '🇺🇸', 'США': '🇺🇸', 'Canada': '🇨🇦', 'Канада': '🇨🇦', 'Australia': '🇦🇺', 'Австралия': '🇦🇺', 'Germany': '🇩🇪', 'Германия': '🇩🇪', 'France': '🇫🇷', 'Франция': '🇫🇷', 'Italy': '🇮🇹', 'Италия': '🇮🇹', 'Spain': '🇪🇸', 'Испания': '🇪🇸', 'Turkey': '🇹🇷', 'Турция': '🇹🇷', 'Thailand': '🇹🇭', 'Таиланд': '🇹🇭', 'Indonesia': '🇮🇩', 'Индонезия': '🇮🇩', 'India': '🇮🇳', 'Индия': '🇮🇳', 'Ukraine': '🇺🇦', 'Украина': '🇺🇦', 'Kazakhstan': '🇰🇿', 'Казахстан': '🇰🇿', 'Israel': '🇮🇱', 'Израиль': '🇮🇱', 'Qatar': '🇶🇦', 'Катар': '🇶🇦' };

@@ -192,6 +192,23 @@ function usageEstimate(db) {
   };
 }
 
+/* ⭐ ФАКТИЧЕСКОЕ списание расходников Group A (ИИ/телефония/STT) с баланса — forward-only.
+   Раньше usageEstimate только ПОКАЗЫВАЛ «к списанию», но баланс не уменьшался (разрыв заявлено↔факт).
+   На первом прогоне фиксируем baseline (НЕ ретро-списываем накопленное до внедрения); далее списываем
+   прирост. chargedUsd продвигаем только на реально списанное (при нехватке баланса долг ждёт пополнения). */
+function settleUsage(db) {
+  const b = db.settings && db.settings.billing; if (!b) return { ok: true, charged: 0 };
+  b.usage = b.usage || { periodStart: Date.now() };
+  let total = 0;
+  try { total = usageEstimate(db).usageTotal || 0; } catch (_) { return { ok: true, charged: 0 }; }
+  if (b.usage.chargedUsd == null) { b.usage.chargedUsd = total; return { ok: true, charged: 0, baseline: total }; }   /* baseline: прошлое не трогаем */
+  const delta = +(total - b.usage.chargedUsd).toFixed(2);
+  if (delta <= 0.009) return { ok: true, charged: 0 };
+  const r = chargeBalance(db, delta, 'Расходники: ИИ / телефония / транскрибация');
+  if (r.ok) { b.usage.chargedUsd = +(b.usage.chargedUsd + r.charged).toFixed(2); return { ok: true, charged: r.charged, balance: r.balance }; }
+  return { ok: false, error: r.error, owed: delta, balance: r.balance };   /* нехватка баланса → долг висит, спишется при пополнении */
+}
+
 /* ---- полный вид кабинета для фронта ---- */
 function view(db) {
   const b = db.settings.billing;
@@ -411,4 +428,4 @@ function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
   b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
   store.save();
 }
-module.exports = { PRICES, ADDONS, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage, creditTopup, chargeBalance, confirmSubscriptionCrypto };
+module.exports = { PRICES, ADDONS, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, settleUsage, setRates, addUsage, creditTopup, chargeBalance, confirmSubscriptionCrypto };
