@@ -1086,6 +1086,8 @@ function publicTenantFor(p) {
   if ((m = p.match(/^\/e\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => !!(store.get().emailMedia && store.get().emailMedia[id])); }
   /* отписка от рассылок /u/:token */
   if ((m = p.match(/^\/u\/([a-zA-Z0-9]+)/))) { const tok = m[1]; return findTenant(() => (store.get().leads || []).some(l => l.unsubToken === tok)); }
+  /* HR: публичная форма отклика /apply/:token (+ /submit) — резолвим тенанта по hr.formToken (иначе уходило в PRIMARY → форма сломана у всех SaaS-агентств) */
+  if ((m = p.match(/^\/apply\/([a-zA-Z0-9]+)/))) { const tok = m[1]; return findTenant(() => { const H = store.get().settings.hr; return !!(H && H.formToken === tok); }); }
   return null;
 }
 /* короткий отпечаток устройства из UA (без внешних либ): платформа + браузер */
@@ -5620,7 +5622,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/tgbridge' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
-      if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC: иначе брокер мог подменить бот моста и угнать канал */
+      if (((sessionRole(req) || {}).role) === 'broker') return json(res, 403, { error: 'только владелец' }); /* SEC: иначе брокер мог подменить бот моста (IS_BROKER тут в TDZ — объявлен ниже → был 500) */
       const b = await readBody(req);
       const tb = db.settings.tgBridge;
       if (typeof b.enabled === 'boolean') tb.enabled = b.enabled;
@@ -5631,7 +5633,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/tgbridge/setup' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
-      if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC */
+      if (((sessionRole(req) || {}).role) === 'broker') return json(res, 403, { error: 'только владелец' }); /* SEC (IS_BROKER тут в TDZ) */
       /* Telegram нужен ПУБЛИЧНЫЙ адрес: туннель приоритетнее, чем Host запроса
          (иначе клик из localhost прописал бы webhook на localhost — Telegram туда не достучится) */
       const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE;
@@ -5672,7 +5674,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/tgbridge/regen-owner' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
-      if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC */
+      if (((sessionRole(req) || {}).role) === 'broker') return json(res, 403, { error: 'только владелец' }); /* SEC (IS_BROKER тут в TDZ) */
       db.settings.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex');
       store.save();
       return json(res, 200, { ok: true, ownerTgCode: db.settings.ownerTgCode });
