@@ -8076,7 +8076,7 @@ const server = http.createServer(async (req, res) => {
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
       /* SEC: «Все разделы · разработка» может включать только аккаунт основателя/демо, не клиент */
       if (b.agency && ('betaAll' in b.agency) && !isDevTenant(db)) delete b.agency.betaAll;
-      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) Object.assign(db.settings[k], b[k]);   /* SEC/robustness: только plain-object, иначе Object.assign(obj,"строка") засоряет настройки числовыми ключами */
       if (b.baseCurrency) db.settings.baseCurrency = String(b.baseCurrency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);   /* базовая валюта кабинета для показа «≈ в моей валюте» */
       /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */
       if (b.geoNames && typeof b.geoNames === 'object') { db.settings.geoNames = db.settings.geoNames || {}; for (const [gk, gv] of Object.entries(b.geoNames)) { const key = String(gk).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24); const nm = String(gv || '').trim().slice(0, 60); if (key && nm) db.settings.geoNames[key] = nm; } }
