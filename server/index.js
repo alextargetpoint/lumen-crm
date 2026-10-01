@@ -5136,6 +5136,20 @@ const server = http.createServer(async (req, res) => {
       const broker = R.role === 'broker' ? R.brokerId : (u.searchParams.get('broker') || '');   /* брокер видит только своё; руководитель — всё или по фильтру */
       return json(res, 200, { now: Date.now(), role: R.role, meetings: notetakerAgendaItems(db, broker) });
     }
+    /* загрузка аудио-записи (session): data-URL → файл → обычный URL (чтобы НЕ хранить base64 в БД тенанта) */
+    if (p === '/api/notetaker/audio' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const mm = String((b && b.data) || '').match(/^data:audio\/(m4a|mp4|mpeg|mp3|ogg|webm|wav|x-m4a|aac);base64,(.*)$/i);
+      if (!mm) return json(res, 400, { error: 'нужен аудио data-URL' });
+      const buf = Buffer.from(mm[2], 'base64');
+      if (!buf.length || buf.length > 200 * 1024 * 1024) return json(res, 400, { error: 'файл до 200 МБ' });
+      try { fs.mkdirSync(CREATIVES_DIR, { recursive: true }); } catch (_) {}
+      const ext = mm[1].replace('x-m4a', 'm4a').replace('mpeg', 'mp3');
+      const fn = 'call-' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.' + ext;
+      try { fs.writeFileSync(path.join(CREATIVES_DIR, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
+      return json(res, 200, { url: (callBase() ? callBase() : '') + '/creatives/' + fn, path: '/creatives/' + fn });
+    }
     if (p === '/api/notetaker/ingest' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const b = await readBody(req);
