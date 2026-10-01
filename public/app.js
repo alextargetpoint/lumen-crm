@@ -2595,7 +2595,11 @@ function applyRoleUi() {
       const bn = el(`<div id="previewBanner">${ic(I.eye)}<span>Просмотр кабинета: <b>${esc(me.name || 'брокер')}</b></span><button id="previewExit">Выйти из просмотра</button></div>`);
       document.body.appendChild(bn);
       document.body.classList.add('has-preview');
-      $('#previewExit', bn).addEventListener('click', async () => { try { await api.post('/preview', {}); } catch (e) {} location.reload(); });
+      $('#previewExit', bn).addEventListener('click', async (ev) => {
+        const btn = ev.currentTarget; if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Выхожу…';
+        try { const r = await api.post('/preview', {}); if (r && r.previewAs) throw new Error('не очистилось'); location.reload(); }
+        catch (e) { btn.disabled = false; btn.textContent = 'Выйти из просмотра'; toast('Не удалось выйти', e.message || 'повторите', false); }
+      });
     }
   } else if (existing) { existing.remove(); document.body.classList.remove('has-preview'); }
   $$('.nav-label').forEach(lb => { /* прячем осиротевшие заголовки групп */
@@ -15706,8 +15710,12 @@ PAGES.brokers = async (root) => {
     });
     eb.querySelector('[data-brcancel]').addEventListener('click', () => { PAGE_STATE.brokerEdit = null; render(); });
     eb.querySelector('[data-brdel]').addEventListener('click', async () => {
+      const _b = (STATE.brokers || []).find(x => x.id === eb.dataset.bredit) || {};
+      /* удаление брокера НЕОБРАТИМО (доступ к CRM закроется) — обязательное подтверждение, иначе случайный ✕ сносит сотрудника */
+      if (!await uiConfirm('Удалить брокера?', `«${esc(_b.name || 'сотрудник')}» потеряет доступ к CRM, его закрепление за лидами снимется. Это действие необратимо. Для передачи лидов преемнику используйте «Передать дела».`, { ok: 'Удалить брокера', danger: true })) return;
       const r = await fetch('/api/brokers/' + eb.dataset.bredit, { method: 'DELETE' });
-      if (!r.ok) toast('Нельзя удалить', (await r.json()).error);
+      if (!r.ok) { toast('Нельзя удалить', (await r.json()).error); return; }
+      toast('Брокер удалён', null, true);
       PAGE_STATE.brokerEdit = null;
       await loadState(); render();
     });

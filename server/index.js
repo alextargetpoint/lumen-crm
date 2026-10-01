@@ -5915,7 +5915,7 @@ const server = http.createServer(async (req, res) => {
       const s = db.settings.auth.sessions[rr.sid];
       if (b.brokerId && db.brokers.some(x => x.id === b.brokerId)) s.previewAs = b.brokerId;
       else delete s.previewAs;
-      store.save();
+      store.saveNow();   /* немедленно на диск — иначе reload мог прочитать старое previewAs (выход «не с первого раза») */
       return json(res, 200, { ok: true, previewAs: s.previewAs || null });
     }
     if (p === '/auth/password' && req.method === 'POST') {
