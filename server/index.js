@@ -6047,7 +6047,7 @@ const server = http.createServer(async (req, res) => {
     const canControl = () => !!ROLE && (!IS_BROKER || isControlDelegate);
     const CONTROL_PATH = /^\/api\/(control-center|control-analytics|control-settings)$/.test(p) || /^\/api\/brokers\/[^/]+\/offboard$/.test(p) || p === '/api/leads/merge' || /^\/api\/leads\/[^/]+\/commission$/.test(p);
     /* брокеру РАЗРЕШЕНО редактировать ТОЛЬКО свой закреплённый WhatsApp-профиль (проверка владения — внутри роутов) */
-    const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona';
+    const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona' || p === '/api/brokers/my-phone';   /* самообслуживание брокера: свой WA-профиль + свой телефон для звонков */
     if (IS_BROKER && p.startsWith('/api/') && !brokerSelfWaOk && !(isControlDelegate && CONTROL_PATH) && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
     /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
     const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length)) ? MEMBER.leadFilter : null;
