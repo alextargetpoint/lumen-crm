@@ -6587,6 +6587,15 @@ PAGES.waProfile = async (root) => {
   root.innerHTML = `
     <div class="plo-h1" style="display:flex;align-items:center;gap:9px;margin-bottom:4px">${ic(I.chat)}Мой WhatsApp</div>
     <div class="muted" style="font-size:13px;margin-bottom:18px">Ваше имя, фото и описание — как вас увидит клиент в WhatsApp. Меняете сами, синкается в реальный аккаунт.</div>
+    <div class="glass card" style="max-width:860px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.phone || I.chat)}Телефон для входящих звонков</div>
+      <div class="muted" style="font-size:12px;margin-bottom:10px;line-height:1.5">На этот номер телефония направит входящий звонок по вашему лиду (click-to-call). Можно изменить в любой момент.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="wmPhone" type="tel" value="${esc(data.myPhone || '')}" placeholder="+66…" style="max-width:260px">
+        <button class="btn btn-accent btn-sm" id="wmPhoneSave">${ic(I.check)}Сохранить номер</button>
+        <span id="wmPhoneOut" class="muted" style="font-size:11.5px"></span>
+      </div>
+    </div>
     <div class="two-col wapf" style="grid-template-columns:1.2fr 1fr;max-width:860px;align-items:start">
       <div class="glass card">
         ${!n ? `<div class="lc-hint warn"><span>${ic(I.shield)}За вами пока не закреплён WhatsApp-номер. Попросите руководителя закрепить номер за вами (Номера → выбрать вас) — и здесь появится оформление профиля.</span></div>`
@@ -6606,6 +6615,11 @@ PAGES.waProfile = async (root) => {
         </div>
       </div>` : ''}
     </div>`;
+  { const pb = $('#wmPhoneSave', root); if (pb) pb.addEventListener('click', async () => {
+      const ph = ($('#wmPhone', root) || {}).value.trim(); const out = $('#wmPhoneOut', root);
+      try { const r = await api.post('/brokers/my-phone', { phone: ph }); if (out) { out.textContent = r.phone ? '✓ сохранён' : '✓ очищен'; out.style.color = 'var(--ok,#1E7A64)'; } toast('Телефон сохранён', ph || 'номер очищен', true); }
+      catch (e) { if (out) { out.textContent = e.message; out.style.color = 'var(--bad,#C0392B)'; } }
+    }); }
   if (!n) return;
   const upd = () => {
     const nm = ($('#wmName', root) || {}).value || '', ab = ($('#wmAbout', root) || {}).value || '', av = ($('#wmAvatar', root) || {}).value || '';
@@ -15582,13 +15596,14 @@ PAGES.brokers = async (root) => {
     modal({ title: 'Пригласить брокера по e-mail', body: `
       <div class="form-row"><label>Имя</label><input id="invNm" placeholder="Имя брокера"></div>
       <div class="form-row"><label>E-mail</label><input id="invEm" type="email" placeholder="broker@email.com"></div>
-      <div id="invOut" class="muted" style="margin-top:6px;font-size:12.5px">Брокер получит ссылку, задаст свой пароль и войдёт в рабочее место — увидит только назначенных ему лидов.</div>`,
+      <div class="form-row"><label>Телефон <span class="muted" style="font-weight:400">— необязательно, для входящих звонков телефонии</span></label><input id="invPh" type="tel" placeholder="+66…"></div>
+      <div id="invOut" class="muted" style="margin-top:6px;font-size:12.5px">Брокер получит ссылку, задаст свой пароль и войдёт в рабочее место — увидит только назначенных ему лидов. Телефон можно не указывать — брокер потом сам добавит его в своём аккаунте.</div>`,
       actions: [
         { label: 'Создать приглашение', cls: 'btn-accent', onClick: async (bd) => {
-          const email = $('#invEm', bd).value.trim(), name = $('#invNm', bd).value.trim();
+          const email = $('#invEm', bd).value.trim(), name = $('#invNm', bd).value.trim(), phone = $('#invPh', bd).value.trim();
           if (!email) { $('#invOut', bd).textContent = 'Введите e-mail'; return false; }
           try {
-            const r = await api.post('/brokers/invite', { email, name });
+            const r = await api.post('/brokers/invite', { email, name, phone });
             $('#invOut', bd).innerHTML = `Готово${r.mailed ? ' — письмо отправлено' : ''}. Ссылка-приглашение (скопируйте и отправьте брокеру):<br><input readonly value="${esc(r.link)}" style="width:100%;margin-top:6px" onclick="this.select()">`;
           } catch (e) { $('#invOut', bd).textContent = e.message || 'Не удалось'; }
           return false; /* держим модалку открытой, чтобы показать ссылку */

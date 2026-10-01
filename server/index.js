@@ -5763,6 +5763,7 @@ const server = http.createServer(async (req, res) => {
       const bb = await readBody(req);
       const email = String(bb.email || '').trim().toLowerCase();
       const name = String(bb.name || '').trim().slice(0, 80);
+      const phone = String(bb.phone || '').trim().slice(0, 32);   /* опц. телефон брокера — на него телефония шлёт входящий звонок */
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json(res, 400, { error: 'нужен корректный e-mail' });
       const reg = store.getRegistry();
       const tid = store.currentTid();
@@ -5775,6 +5776,7 @@ const server = http.createServer(async (req, res) => {
         br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now(), langs: [], geo: ((db.settings.agency && db.settings.agency.geos) || [])[0] || '', load: 0, capacity: 20, schedule: { days: [], perDay: {} }, busyBlocks: [] }; db.brokers = db.brokers || []; db.brokers.push(br);   /* полные дефолты — иначе рендер раздела «Брокеры» падал на b.langs.map */
       }
       else if (name) br.name = name;
+      if (phone) br.phone = phone;   /* телефон задан при приглашении (или обновлён) */
       const token = crypto.randomBytes(16).toString('hex');
       reg.invites[token] = { tid, brokerId: br.id, email, at: Date.now() };
       reg.byEmail[email] = tid;
@@ -9237,10 +9239,20 @@ const server = http.createServer(async (req, res) => {
       const bid = R.role === 'owner' ? (u.searchParams.get('brokerId') || null) : R.brokerId;
       const nums = ((db.settings.waGray || {}).numbers) || [];
       const rec = bid ? nums.find(n => n.brokerId === bid) : null;
-      if (!rec) return json(res, 200, { number: null });
+      const myPhone = (bid ? ((db.brokers || []).find(b => b.id === bid) || {}).phone : '') || '';   /* телефон брокера для входящих звонков (независим от WA-номера) */
+      if (!rec) return json(res, 200, { number: null, myPhone });
       let live = null;
       if (waWorkerReady(db)) { try { const s = await waGrayApi(db, 'GET', '/sessions'); const arr = s.sessions || s || []; const me2 = arr.find(x => String(x.phone || '').replace(/\D/g, '') === rec.phone); live = me2 ? me2.status : null; } catch (_) {} }
-      return json(res, 200, { number: { phone: rec.phone, label: rec.label || '', persona: rec.persona || {}, brokerId: rec.brokerId, connected: live === 'connected', live, workerReady: waWorkerReady(db) } });
+      return json(res, 200, { number: { phone: rec.phone, label: rec.label || '', persona: rec.persona || {}, brokerId: rec.brokerId, connected: live === 'connected', live, workerReady: waWorkerReady(db) }, myPhone });
+    }
+    /* брокер сам меняет СВОЙ телефон для входящих звонков (владелец правит в карточке «Брокеры») */
+    if (p === '/api/brokers/my-phone' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const bid = R.role === 'broker' ? R.brokerId : (R.role === 'owner' ? null : null);
+      if (!bid) return json(res, 403, { error: 'только брокер меняет свой номер' });
+      const br = (db.brokers || []).find(b => b.id === bid); if (!br) return json(res, 404, { error: 'broker not found' });
+      const b = await readBody(req); br.phone = String(b.phone || '').trim().slice(0, 40); store.save();
+      return json(res, 200, { ok: true, phone: br.phone });
     }
     if (p === '/api/wa/gray/my-persona' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
