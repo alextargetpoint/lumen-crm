@@ -5071,6 +5071,31 @@ const server = http.createServer(async (req, res) => {
       const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись');
       return json(res, ok ? 200 : 409, { ok, leadId: lead.id, meetingId: mt.id });
     }
+    /* Повестка нотетейкера: что у брокера сейчас/скоро по видео-встречам — ground truth для АВТО-привязки
+       звонка к карточке (матч по zoomMeetingId, иначе по «идёт сейчас» времени). ?key=<hooks.secret>&broker=<id> */
+    if (p === '/hooks/notetaker-agenda' && req.method === 'GET') {
+      const key = u.searchParams.get('key') || '';
+      if (!key || !db.settings.hooks || db.settings.hooks.secret !== key) { secOnDeny(req, 401, p); return json(res, 401, { error: 'bad key' }); }
+      const broker = u.searchParams.get('broker') || '';
+      const now = Date.now(); const WIN_BACK = 6 * 3600e3, WIN_FWD = 12 * 3600e3;
+      const items = (db.meetings || [])
+        .filter(m => m.kind === 'video' && m.transcriptStatus !== 'done' && !['cancelled'].includes(m.status) && (m.at || 0) > now - WIN_BACK && (m.at || 0) < now + WIN_FWD && (!broker || m.brokerId === broker))
+        .sort((a, c) => (a.at || 0) - (c.at || 0))
+        .map(m => { const l = (db.leads || []).find(x => x.id === m.leadId) || {}; const end = (m.at || 0) + (m.dur || 60) * 60e3;
+          return { meetingId: m.id, zoomMeetingId: m.zoomMeetingId || '', leadId: m.leadId, leadName: l.name || '—', phone: l.phone || '', at: m.at || 0, dur: m.dur || 60,
+            live: now >= (m.at || 0) - 10 * 60e3 && now <= end + 20 * 60e3, topic: m.note || '', joinUrl: m.link || '', transcriptStatus: m.transcriptStatus || '' }; });
+      return json(res, 200, { now, brokers: (db.brokers || []).map(b => ({ id: b.id, name: b.name })), meetings: items });
+    }
+    /* Поиск лида для ad-hoc звонка (не из расписания): ?key=&q= */
+    if (p === '/hooks/notetaker-leads' && req.method === 'GET') {
+      const key = u.searchParams.get('key') || '';
+      if (!key || !db.settings.hooks || db.settings.hooks.secret !== key) { secOnDeny(req, 401, p); return json(res, 401, { error: 'bad key' }); }
+      const q = String(u.searchParams.get('q') || '').toLowerCase().trim();
+      const list = (db.leads || []).filter(l => !q || (l.name || '').toLowerCase().includes(q) || (l.phone || '').includes(q))
+        .sort((a, c) => (c.lastMsgAt || c.createdAt || 0) - (a.lastMsgAt || a.createdAt || 0)).slice(0, 20)
+        .map(l => ({ id: l.id, name: l.name || '—', phone: l.phone || '', stage: l.stage || '' }));
+      return json(res, 200, { leads: list });
+    }
     /* Вебхук Zoom — Zoom сам пишет встречу в облако и сам делает транскрипт (ДЁШЕВО/бесплатно, без бота Recall).
        endpoint.url_validation — отвечаем HMAC-токеном; события recording.* — забираем ГОТОВЫЙ VTT (бесплатно).
        STT-фолбэк (если авто-транскрипт в аккаунте выключен) — в meetingBotTick, не здесь. */
