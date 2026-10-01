@@ -5130,7 +5130,7 @@ const server = http.createServer(async (req, res) => {
       let lead = b.leadId ? (db.leads || []).find(l => l.id === b.leadId) : null;
       if (!lead && b.phone) { const d = String(b.phone).replace(/\D/g, ''); if (d.length >= 7) lead = (db.leads || []).find(l => l.phone && l.phone.replace(/\D/g, '').endsWith(d.slice(-9))); }
       if (!lead) return json(res, 404, { error: 'лид не найден' });
-      if (!canSeeLead(lead)) { audit(db, req, 'нотетейкер: чужой лид', { leadId: lead.id }); return json(res, 403, { error: 'чужой лид' }); }
+      if (R.role === 'broker' && lead.broker !== R.brokerId) { audit(db, req, 'нотетейкер: чужой лид', { leadId: lead.id }); return json(res, 403, { error: 'чужой лид' }); }   /* брокер пишет только в своих лидов (canSeeLead определён ниже — TDZ, проверяем ролью напрямую) */
       let mt = b.meetingId ? (db.meetings || []).find(m => m.id === b.meetingId || String(m.zoomMeetingId || '') === String(b.meetingId)) : null;
       if (!mt) mt = (db.meetings || []).filter(m => m.leadId === lead.id && m.transcriptStatus !== 'done').sort((a, c) => (c.at || 0) - (a.at || 0))[0] || null;
       if (!mt) { mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: (R.role === 'broker' ? R.brokerId : lead.broker) || null, at: +b.startedAt || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, +b.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' }; db.meetings = db.meetings || []; db.meetings.push(mt); }
