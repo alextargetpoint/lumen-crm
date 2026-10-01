@@ -15531,7 +15531,7 @@ PAGES.brokers = async (root) => {
                 </div></div>` : ''}
             </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
-              <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
+              <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...(b.langs || [])])].map(lg => `<button type="button" class="chip-t lang-chip ${(b.langs || []).includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
                 <span class="chip-add"><input id="langAddInp" placeholder="+ язык" style="width:76px"><button class="chip-plus" id="langAddBtn">${ic(I.plus)}</button></span>
               </div></div>
           </div>
@@ -15556,7 +15556,7 @@ PAGES.brokers = async (root) => {
       return `<div class="glass br2-card ${b.active === false ? 'off' : ''}" data-brok="${b.id}" title="Клик — редактировать">
         <div class="br2-top">
           <div class="ava br2-ava">${b.photo ? `<img src="${esc(b.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : esc(b.avatar)}</div>
-          <div class="br2-id"><div class="br2-name">${esc(b.name)}</div><div class="br2-sub">${st.geoNames[b.geo]} · ${b.langs.map(langName).join(' / ')}</div></div>
+          <div class="br2-id"><div class="br2-name">${esc(b.name)}</div><div class="br2-sub">${(b.geo && st.geoNames[b.geo]) || 'Без направления'}${(b.langs || []).length ? ' · ' + (b.langs || []).map(langName).join(' / ') : ''}</div></div>
           <span class="br2-shift ${isOnShift(b) ? 'on' : ''}"><i></i>${isOnShift(b) ? 'на смене' : 'вне смен'}</span>
         </div>
         <div class="br2-load"><div class="br2-bar ${pct >= 90 ? 'full' : ''}"><i style="width:${pct}%"></i></div><b>${b.load}/${b.capacity}</b></div>

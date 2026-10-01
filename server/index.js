@@ -395,6 +395,8 @@ function ensureTenantDefaults(db) {
   if (!s.ownerTgCode) s.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex');   /* код привязки владельца к TG-боту (аналитика с телефона) — раньше был только у primary */
   /* все верхнеуровневые коллекции, которые код ждёт как массивы (seed даёт лишь часть) — чтобы новый тенант не падал ни на одной фиче */
   for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates', 'debugReports']) if (!Array.isArray(db[k])) db[k] = [];
+  /* брокеры: массивы, которые рендер раздела «Брокеры» .map-ит без защиты (приглашённые создавались неполными → краш b.langs.map) */
+  for (const b of db.brokers) { if (!Array.isArray(b.langs)) b.langs = []; if (!b.schedule || typeof b.schedule !== 'object') b.schedule = { days: [], perDay: {} }; if (!Array.isArray(b.busyBlocks)) b.busyBlocks = []; }
   /* БЭКФИЛЛ: уже провиженные брокеры (email+PIN+active) должны быть в reg.byEmail, иначе /auth/login не найдёт их тенанта.
      Пишем только когда отсутствует (после первого раза — без записей). Не клобберим чужой маппинг. */
   try {
@@ -5770,7 +5772,7 @@ const server = http.createServer(async (req, res) => {
         const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
         const lim = _beta ? 9999 : effectivePlan(db).maxBrokers;
         if ((db.brokers || []).filter(x => x.active !== false).length >= lim) return json(res, 402, { error: `Лимит брокеров на вашем тарифе — ${lim}. Обновите тариф, чтобы добавить больше.` });
-        br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now() }; db.brokers = db.brokers || []; db.brokers.push(br);
+        br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now(), langs: [], geo: ((db.settings.agency && db.settings.agency.geos) || [])[0] || '', load: 0, capacity: 20, schedule: { days: [], perDay: {} }, busyBlocks: [] }; db.brokers = db.brokers || []; db.brokers.push(br);   /* полные дефолты — иначе рендер раздела «Брокеры» падал на b.langs.map */
       }
       else if (name) br.name = name;
       const token = crypto.randomBytes(16).toString('hex');
