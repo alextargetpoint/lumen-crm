@@ -12315,6 +12315,7 @@ ${SCR}
           if (Array.isArray(b.hidden.rows)) rec.hidden.rows = b.hidden.rows.map(String).slice(0, 20);
           if (Array.isArray(b.hidden.projects)) rec.hidden.projects = b.hidden.projects.map(String).slice(0, 10);
         }
+        if (Array.isArray(b.order)) { rec.order = b.order.map(String).slice(0, 10); store.save(); return json(res, 200, { ok: true }); }   /* DnD-порядок проектов (быстрый путь) */
         rec.langs = {};   /* сброс кэша переводов — переведётся заново с правками */
         store.save();
         return json(res, 200, { ok: true });
@@ -15551,6 +15552,7 @@ ${px.video ? `<h2 class="sec">${curLang === 'ru' ? 'Видео' : 'Video'}</h2><
       const H = rec.hidden || {};   /* блоки, скрытые брокером перед отправкой */
       const HP = (H.projects || []);   /* проекты, исключённые из сравнения */
       if (!editMode && HP.length) it = it.filter(x => !HP.includes(x.id));   /* клиент не видит исключённые проекты */
+      if (rec.order && rec.order.length) { const ord = rec.order; it = it.slice().sort((a, b) => (ord.indexOf(a.id) < 0 ? 999 : ord.indexOf(a.id)) - (ord.indexOf(b.id) < 0 ? 999 : ord.indexOf(b.id))); }   /* порядок проектов (DnD в конструкторе) */
       const HR = (H.rows || []);   /* скрытые строки таблицы (ключи) */
       const rowsAll = [['price', T.price, x => money(x.priceFrom, x.currency), pxUsd, 'min'], ['area', T.area, x => esc2(x.area) || '—'], ['dev', T.dev, x => esc2(x.developer) || '—'], ['type', T.type, x => esc2(x.type) || '—'], ['roi', T.roi, x => esc2(x.roi) || '—', x => num(x.roi), 'max'], ['apprec', T.apprec, x => esc2(x.appreciation) || '—', x => num(x.appreciation), 'max'], ['ho', T.ho, x => esc2(x.handover) || '—'], ['units', T.units, x => x.units || '—', x => +x.units || null, 'max'], ['market', T.market, x => x.market === 'secondary' ? T.sec : T.prim]];
       const rows = rowsAll.filter(r => editMode || !HR.includes(r[0]));
@@ -15588,6 +15590,7 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 .delx{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(180,85,58,.92);color:#fff;font-size:15px;line-height:20px;text-align:center;cursor:pointer;z-index:3;padding:0}.delx:hover{background:#b4553a}
 .card{position:relative}
 .delx-row{position:static;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;font-size:12px;line-height:1;margin-right:6px;vertical-align:middle}
+.card.draggable{cursor:grab}.card.draggable:active{cursor:grabbing}.draghint{position:absolute;bottom:8px;right:10px;z-index:3;color:#fff;opacity:.7;font-size:16px;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
 .is-hid{opacity:.42;outline:1.5px dashed #b4553a;outline-offset:2px}
 .edbar{position:sticky;bottom:0;margin-top:22px;background:#1c1710;color:#efe7d7;border:1px solid rgba(201,162,90,.4);border-radius:16px;padding:14px 18px;box-shadow:0 -10px 40px -14px rgba(0,0,0,.5)}
 .edbar-h{font-size:12.5px;color:#c9a25a;font-weight:700;margin-bottom:10px}
@@ -15599,7 +15602,7 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 <div class="top"><div class="top-in"><div class="brand">${esc2(rec.agency)}</div>${rec.showLangSwitcher ? `<div class="langs">${LANGS.map(([c, n]) => `<a href="?lang=${c}" class="${c === curLang ? 'on' : ''}">${n}</a>`).join('')}</div>` : ''}</div></div>
 <div class="wrap">
 <div class="hero"><div class="k">${esc2(rec.agency)}</div><h1>${esc2(T.title)}</h1><div class="sub">${esc2(T.sub)}</div></div>
-<div class="cards">${it.map(x => `<a class="card${HP.includes(x.id) ? ' is-hid' : ''}" data-projid="${esc2(x.id)}" href="/cmp/${rec.id}?p=${encodeURIComponent(x.id)}${curLang !== (rec.lang || 'ru') ? '&lang=' + curLang : ''}" style="text-decoration:none;color:inherit;display:block">${editMode ? `<button class="delx" data-del="proj:${esc2(x.id)}" title="Убрать проект из сравнения" onclick="return false">×</button>` : ''}<div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}<span class="more">${curLang === 'ru' ? 'подробнее →' : 'details →'}</span></div></a>`).join('')}</div>
+<div class="cards">${it.map(x => `<a class="card${HP.includes(x.id) ? ' is-hid' : ''}${editMode ? ' draggable' : ''}" data-projid="${esc2(x.id)}"${editMode ? ' draggable="true"' : ''} href="/cmp/${rec.id}?p=${encodeURIComponent(x.id)}${curLang !== (rec.lang || 'ru') ? '&lang=' + curLang : ''}" style="text-decoration:none;color:inherit;display:block">${editMode ? `<button class="delx" data-del="proj:${esc2(x.id)}" title="Убрать проект из сравнения" onclick="return false">×</button><span class="draghint" title="Перетащите для порядка">⠿</span>` : ''}<div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}<span class="more">${curLang === 'ru' ? 'подробнее →' : 'details →'}</span></div></a>`).join('')}</div>
 <div class="grid"><div class="lbl"></div>${it.map(() => '<div class="lbl"></div>').join('')}
 ${rows.map(([k, l, fn, vf, dir]) => { const bi = bestI(vf, dir); const rh = HR.includes(k); return `<div class="lbl${rh ? ' is-hid' : ''}" data-rowk="${k}">${editMode ? `<button class="delx delx-row" data-del="row:${k}" title="Убрать строку у клиента">×</button>` : ''}${esc2(l)}</div>${it.map((x, i) => `<div class="val${i === bi ? ' win' : ''}${rh ? ' is-hid' : ''}">${fn(x)}${i === bi ? `<span class="st" title="${esc2(T.best)}">★</span>` : ''}</div>`).join('')}`; }).join('')}</div>
 ${((a.summary || verd || editMode) && (!H.ai || editMode)) ? `<div class="ai${H.ai ? ' is-hid' : ''}" data-blk="ai"><h2><span class="d">✦</span>${esc2(T.ai)}${editMode ? '<button class="delx" data-del="ai" title="Убрать весь блок у клиента">×</button>' : ''}</h2>${((a.summary || editMode) && (!H.summary || editMode)) ? `<div class="sum${H.summary ? ' is-hid' : ''}" data-blk="summary">${editMode ? '<button class="delx" data-del="summary" title="Убрать у клиента">×</button>' : ''}<span${ed('summary')}>${esc2(a.summary)}</span></div>` : ''}<div class="vgrid">${verd}</div>
@@ -15618,6 +15621,15 @@ var clientLink=location.origin+'/cmp/'+id;var LI=document.getElementById('edLink
 var PB=document.getElementById('edPub');if(PB)PB.onclick=function(){var pub=PB.textContent.indexOf('Опубликовать')>=0;S.textContent='…';fetch('/api/properties/compare/'+id+'/'+(pub?'publish':'unpublish')+'?t='+tok,{method:'POST'}).then(function(r){return r.json()}).then(function(j){if(j.ok){location.reload()}else{S.textContent=j.error||'ошибка'}}).catch(function(){S.textContent='ошибка сети'})};
 var CP=document.getElementById('edCopy');if(CP)CP.onclick=function(){navigator.clipboard.writeText(clientLink);CP.textContent='Скопировано ✓';setTimeout(function(){CP.textContent='Копировать'},1500)};
 document.querySelectorAll('[data-rw]').forEach(function(b){b.onclick=function(){var sum=document.querySelector('[data-ef="summary"]');if(!sum)return;S.textContent='ИИ переписывает…';b.disabled=true;fetch('/api/properties/compare/'+id+'/rewrite?t='+tok,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({style:b.dataset.rw,field:'summary'})}).then(function(r){return r.json()}).then(function(j){b.disabled=false;if(j.text){sum.innerText=j.text;S.textContent='Готово — не забудьте «Сохранить»'}else{S.textContent=j.error||'ошибка'}}).catch(function(){b.disabled=false;S.textContent='ошибка сети'})}});
+/* DnD-перестановка порядка проектов: тащим карточку → сохраняем rec.order → перезагружаем (синхрон таблицы) */
+(function(){var cont=document.querySelector('.cards');if(!cont)return;var dg=null;
+cont.querySelectorAll('.card').forEach(function(c){
+c.addEventListener('dragstart',function(e){dg=c;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','x')}catch(_){}c.style.opacity='.4'});
+c.addEventListener('dragend',function(){c.style.opacity=''});
+c.addEventListener('click',function(e){if(c.dataset.dragged){e.preventDefault();c.dataset.dragged=''}});});
+cont.addEventListener('dragover',function(e){e.preventDefault();if(!dg)return;var t=e.target.closest('.card');if(!t||t===dg)return;var r=t.getBoundingClientRect();cont.insertBefore(dg,(e.clientX-r.left)<r.width/2?t:t.nextSibling)});
+cont.addEventListener('drop',function(e){e.preventDefault();if(!dg)return;dg.dataset.dragged='1';var ids=[].map.call(cont.querySelectorAll('.card'),function(c){return c.dataset.projid});S.textContent='Сохраняю порядок…';fetch('/api/properties/compare/'+id+'/edit?t='+tok,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:ids})}).then(function(r){return r.json()}).then(function(){S.textContent='Порядок сохранён ✓ — обновляю…';setTimeout(function(){location.reload()},500)}).catch(function(){S.textContent='ошибка сети'});dg=null});
+})();
 })();</script>` : ''}
 <div class="ft">${esc2(T.ft)} · ${esc2(rec.agency)}</div></div></body></html>`;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=120' });
