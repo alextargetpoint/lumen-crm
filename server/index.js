@@ -9228,8 +9228,8 @@ const server = http.createServer(async (req, res) => {
       const ag = db.settings.agency || {}; const b = await readBody(req).catch(() => ({}));
       const nm = String(b.name || '').trim();
       try {
-        let about = await llm.composeAgencyAbout(ag.name || 'агентство', ag.geos || []);
-        about = String(about || '').replace(/\s*\n+\s*/g, ' · ').replace(/\s{2,}/g, ' ').trim();
+        const r = await llm.composeAgencyAbout(ag.name || 'агентство', ag.geos || []);
+        let about = String((r && (r.intro || r.freeNote)) || '').replace(/\s*\n+\s*/g, ' · ').replace(/\s{2,}/g, ' ').trim();   /* composeAgencyAbout возвращает {intro,bullets,…} — берём intro */
         /* ужимаем в лимит WhatsApp (139), не рвём слово */
         if (about.length > 139) { about = about.slice(0, 139); about = about.replace(/[\s·,.;:—-]+\S*$/, '').trim(); }
         return json(res, 200, { about });
