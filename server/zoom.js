@@ -21,6 +21,9 @@ function cfg() {
     accountId: process.env.ZOOM_ACCOUNT_ID || s.accountId || '',
     clientId: process.env.ZOOM_CLIENT_ID || s.clientId || '',
     clientSecret: process.env.ZOOM_CLIENT_SECRET || s.clientSecret || '',
+    /* хост встречи: у S2S OAuth 'me' работает не всегда — Zoom хочет email/ID. По умолчанию 'me',
+       но лучше задать ZOOM_USER_ID = email владельца Zoom-аккаунта (см. гайд). */
+    userId: process.env.ZOOM_USER_ID || s.userId || 'me',
     /* true, если ссылки создаются под аккаунтом самого агентства (а не платформенного) */
     perTenant: !process.env.ZOOM_ACCOUNT_ID && !!(s.accountId && s.clientId && s.clientSecret),
   };
@@ -63,7 +66,7 @@ async function createMeeting({ topic, startAtMs, durationMin, tid, leadId }) {
       agenda: ('CRM lead ' + (leadId || '') + ' · tenant ' + (tid || '')).slice(0, 2000),
       tracking_fields: [{ field: 'tid', value: String(tid || '') }, { field: 'leadId', value: String(leadId || '') }],
     };
-    const r = await fetch('https://api.zoom.us/v2/users/me/meetings', {
+    const r = await fetch('https://api.zoom.us/v2/users/' + encodeURIComponent(c.userId) + '/meetings', {
       method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
