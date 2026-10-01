@@ -4006,7 +4006,8 @@ function ssrfBlocked(hostname) {
   const h = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
   if (!h) return true;
   if (/^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|::1$|::$|fe80:|fc00:|fd00:)/i.test(h)) return true;
-  if (/(^|:)(:ffff:)?(127\.\d|10\.\d|192\.168\.|169\.254\.)/i.test(h)) return true;                 /* IPv4-mapped IPv6 */
+  if (/(^|:)(:ffff:)?(127\.\d|10\.\d|192\.168\.|169\.254\.)/i.test(h)) return true;                 /* IPv4-mapped IPv6 (decimal) */
+  if (/^::ffff:/i.test(h) || /^::(\d|$)/.test(h) || /^64:ff9b:/i.test(h)) return true;               /* IPv4-mapped IPv6 в HEX-форме (WHATWG URL нормализует [::ffff:127.0.0.1]→[::ffff:7f00:1]) + ::0 + NAT64 */
   const dec = Number(h); if (Number.isInteger(dec) && dec >= 0 && dec <= 0xffffffff) return true;      /* десятичный IPv4 (напр. 2130706433=127.0.0.1) */
   if (/^0x[0-9a-f]+$/i.test(h) || /^0[0-7]+$/.test(h)) return true;                                    /* hex/octal */
   if (h === '0.0.0.0' || h.endsWith('.local') || h.endsWith('.internal')) return true;
@@ -4142,7 +4143,7 @@ async function downloadImageToAsset(url) {
     let _u; try { _u = new URL(url); } catch (_) { return null; }
     if (!/^https?:$/.test(_u.protocol) || ssrfBlocked(_u.hostname)) return null;   /* SEC(#6): не лезем на internal/metadata-хосты */
     const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
-    let r; try { r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } }); } finally { clearTimeout(to); }
+    let r; try { r = (await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } })).rr; } finally { clearTimeout(to); }   /* SEC(SSRF): пере-проверка каждого редиректа */
     if (!r.ok) return null;
     const ct = r.headers.get('content-type') || '';
     if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;   /* только растровые фото, не svg/gif */
@@ -4164,7 +4165,7 @@ async function downloadCover(url) {
     let _u; try { _u = new URL(url); } catch (_) { return null; }
     if (!/^https?:$/.test(_u.protocol) || ssrfBlocked(_u.hostname)) return null;
     const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
-    let r; try { r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } }); } finally { clearTimeout(to); }
+    let r; try { r = (await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } })).rr; } finally { clearTimeout(to); }   /* SEC(SSRF): пере-проверка каждого редиректа */
     if (!r.ok) return null;
     const ct = r.headers.get('content-type') || '';
     if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;
@@ -11893,6 +11894,7 @@ ${SCR}
     if (p === '/api/properties/from-url' && req.method === 'POST') {
       const b = await readBody(req); const url = String(b.url || '').trim();
       if (!/^https?:\/\//i.test(url)) return json(res, 400, { error: 'нужна ссылка http(s) на объект' });
+      { let _uh; try { _uh = new URL(url).hostname; } catch (_) { _uh = ''; } if (!_uh || ssrfBlocked(_uh)) return json(res, 400, { error: 'ссылка недоступна' }); }   /* SEC(SSRF): не лезем на internal/metadata-хосты по пользовательскому URL */
       const absUrl = (u2) => { try { return new URL(u2, url).href; } catch (_) { return ''; } };
       /* авто-детект дубля: готовая карточка с этой ссылкой уже есть → спрашиваем (обновить/копия),
          НЕ тратя рендер+ИИ. Стаб из каталога дополняем тихо. force: 'update'|'new' — из подтверждения. */
@@ -11902,8 +11904,8 @@ ${SCR}
       }
       let html = '';
       try {
-        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
-        html = await r.text();
+        const { rr } = await guardedFetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' } });   /* SEC(SSRF): пере-проверяет КАЖДЫЙ редирект */
+        html = await rr.text();
       } catch (e) { return json(res, 400, { error: 'не удалось открыть ссылку: ' + e.message }); }
       const og = (prop) => { const mm = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']og:' + prop + '["\'][^>]+content=["\']([^"\']+)', 'i')); return mm ? mm[1] : ''; };
       const ogTitle = og('title'), ogImg = og('image'), ogDesc = og('description');
@@ -12072,10 +12074,11 @@ ${SCR}
       const sharedSrc = src && (db.properties || []).filter(x => x.sourceUrl === src).length >= 3;
       const srcIsList = sharedSrc || /[?&](view=search|search_view=|page=\d)|\/(search|catalog|listing|results)(\/|\?|$)/i.test(src);
       let scrapedSource = false;
-      if (src && /^https?:\/\//i.test(src) && !srcIsList) {   /* 1) собственная страница КОНКРЕТНОГО объекта */
+      let _srcHost = ''; try { _srcHost = new URL(src).hostname; } catch (_) {}
+      if (src && /^https?:\/\//i.test(src) && !srcIsList && _srcHost && !ssrfBlocked(_srcHost)) {   /* 1) собственная страница объекта (SEC: не internal-хост) */
         try {
-          const r = await fetch(src, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
-          const html = await r.text();
+          const { rr } = await guardedFetch(src, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' } });   /* SEC(SSRF): пере-проверка редиректов */
+          const html = await rr.text();
           scrapeImagesFromHtml(html, src).forEach(u => { if (okImg(u)) cand.push(u); });
           if (cand.length < 3 && renderReady()) { const rp = await renderPage(src); if (rp && rp.html) scrapeImagesFromHtml(rp.html, src).forEach(u => { if (okImg(u)) cand.push(u); }); }
           scrapedSource = true;
@@ -12111,7 +12114,7 @@ ${SCR}
           const srcUrls = [...new Set((sr && sr.sources || []).map(s => s && s.url).filter(Boolean))].slice(0, 4);
           for (const su of srcUrls) {   /* плайн-фетч (Node fetch, БЕСПЛАТНО) */
             if (cand.length >= 16) break;
-            try { const rr = await fetch(su, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' }); const html = await rr.text(); scrapeImagesFromHtml(html, su).forEach(u => { if (okImg(u)) cand.push(u); }); } catch (_) {}
+            try { let _sh = ''; try { _sh = new URL(su).hostname; } catch (_) {} if (!_sh || ssrfBlocked(_sh)) continue; const { rr } = await guardedFetch(su, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' } }); const html = await rr.text(); scrapeImagesFromHtml(html, su).forEach(u => { if (okImg(u)) cand.push(u); }); } catch (_) {}
           }
           if (cand.length < 3 && renderReady() && srcUrls[0]) { try { const rp = await renderPage(srcUrls[0]); if (rp && rp.html) { scrapeImagesFromHtml(rp.html, srcUrls[0]).forEach(u => { if (okImg(u)) cand.push(u); }); srcPages++; } } catch (_) {} }
           via = via ? via + '+web' : 'web';
