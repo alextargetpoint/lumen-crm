@@ -15386,9 +15386,41 @@ const RBAC_DEFHIDE = {
 };
 const RBAC_SECTIONS = ['funnel', 'inbox', 'properties', 'collections', 'qualifier', 'sequences', 'wake', 'meetings', 'tasks', 'automations', 'playbook', 'academy', 'callReview', 'ads', 'mediaplan', 'comments', 'social', 'parlo', 'analytics'];
 const RBAC_SOURCES = [['ad_comment', 'Комментарии рекламы'], ['wa_inbound', 'Прямые (WhatsApp)'], ['import', 'Импорт / выгрузка'], ['broker_card', 'От брокера']];
+/* эффективный шаблон скрытых разделов роли: настроенный владельцем (settings.roleTemplates) или дефолт */
+function roleTplHide(rt) { const t = (STATE.settings && STATE.settings.roleTemplates && STATE.settings.roleTemplates[rt]); return (t && Array.isArray(t.hidePages)) ? t.hidePages : (RBAC_DEFHIDE[rt] || []); }
+/* Карточка «Шаблоны прав по ролям»: один раз настраиваешь доступ роли — новые сотрудники наследуют */
+function rbacTemplatesCardHtml() {
+  const roles = ['broker', 'assistant', 'marketer', 'analyst', 'manager'];
+  return `<div class="glass card rbac-card" style="margin-top:14px">
+    <div class="rbac-hd">${ic(I.gear || I.users)}Шаблоны прав по ролям<span>настрой доступ роли один раз — новые сотрудники получат его сразу</span></div>
+    <div class="rbac-list">${roles.map(rt => {
+      const hide = roleTplHide(rt);
+      return `<div class="rbac-row" data-tplrole="${rt}" style="padding:10px 12px">
+        <div style="font-weight:600;margin-bottom:8px">${RBAC_ROLES[rt]} <span class="muted" style="font-weight:400;font-size:12px">· ${RBAC_SECTIONS.length - hide.length}/${RBAC_SECTIONS.length} разделов открыто</span></div>
+        <div class="rbac-secs">${RBAC_SECTIONS.map(s => `<button class="rbac-sec ${hide.includes(s) ? 'off' : 'on'}" data-tplsec="${s}">${esc((NAV[s] || {}).name || s)}</button>`).join('')}</div>
+      </div>`;
+    }).join('')}</div>
+    <div class="rbac-note" style="margin-top:8px">Клик по разделу — открыть/скрыть его для всей роли. Изменение применяется к НОВЫМ сотрудникам этой роли; у текущих индивидуальные правки сохраняются.</div>
+  </div>`;
+}
+function wireRbacTemplates(root) {
+  $$('[data-tplrole]', root).forEach(rowEl => {
+    const rt = rowEl.dataset.tplrole;
+    rowEl.querySelectorAll('.rbac-sec').forEach(chip => chip.addEventListener('click', async () => {
+      const hide = new Set(roleTplHide(rt)); const s = chip.dataset.tplsec;
+      if (hide.has(s)) hide.delete(s); else hide.add(s);
+      const arr = [...hide]; chip.classList.toggle('off'); chip.classList.toggle('on');
+      try {
+        await api.patch('/settings', { roleTemplates: { [rt]: { hidePages: arr } } });
+        STATE.settings.roleTemplates = STATE.settings.roleTemplates || {};
+        STATE.settings.roleTemplates[rt] = { hidePages: arr };
+      } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
+    }));
+  });
+}
 function rbacRowHtml(b) {
   const inits = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-  const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = RBAC_DEFHIDE[rt] || [];
+  const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = roleTplHide(rt);
   const shown = RBAC_SECTIONS.filter(s => !defHide.includes(s) && !ind.includes(s)).length;
   return `<div class="rbac-row" data-rbacid="${b.id}" data-name="${esc((b.name || '').toLowerCase())}">
     <button class="rbac-main" data-rbactoggle><span class="rbac-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><span class="rbac-nm"><b>${esc(b.name || 'Сотрудник')}</b><i>${RBAC_ROLES[rt]} · ${shown}/${RBAC_SECTIONS.length} разделов</i></span><span class="rbac-chev">${ic(I.chev)}</span></button>
@@ -16981,8 +17013,10 @@ PAGES.roles = async (root) => {
       </div>
     </div>
     ${rbacCardHtml()}
+    ${rbacTemplatesCardHtml()}
     ${brokerHiddenFieldsCardHtml()}`;
   wireRbac(root);
+  wireRbacTemplates(root);
   wireBrokerHiddenFields(root);
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
 };

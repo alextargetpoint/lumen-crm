@@ -1285,6 +1285,13 @@ const ROLE_DEFAULT_HIDE = {
   analyst: ['inbox', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],
   manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
 };
+/* Шаблон скрытых разделов для роли: редактируемый settings.roleTemplates[role].hidePages переопределяет
+   дефолт ROLE_DEFAULT_HIDE. Так владелец один раз настраивает доступ по роли, и новые сотрудники наследуют. */
+function roleHide(db, roleType) {
+  const tpl = db && db.settings && db.settings.roleTemplates && db.settings.roleTemplates[roleType];
+  if (tpl && Array.isArray(tpl.hidePages)) return tpl.hidePages;
+  return ROLE_DEFAULT_HIDE[roleType] || [];
+}
 /* заблокирован ли путь для НЕ-владельца с данным набором грантов.
    ⚠️ При granted=[] воспроизводит ТОЧНО прежнее поведение брокера (не сломать доступы). */
 function nonOwnerBlocked(p, method, granted) {
@@ -7055,7 +7062,7 @@ const server = http.createServer(async (req, res) => {
         sequences: IS_BROKER ? db.sequences.filter(sq => !sq.ownerId || sq.ownerId === ROLE.brokerId || sq.visibility === 'agency' || (sq.sharedWith || []).includes(ROLE.brokerId)) : db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}),
-        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
+        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...roleHide(db, MEMBER.roleType), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
     }
     /* гейт баланса: клиент (владелец/маркетолог) сообщает основателю об оплате расходников */
@@ -7809,6 +7816,8 @@ const server = http.createServer(async (req, res) => {
         schedule: { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' },
       };
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: создать сотрудника сразу с ролью */
+      /* применяем ШАБЛОН ПРАВ роли: новый сотрудник сразу наследует настроенный владельцем доступ (не настраиваем на каждого) */
+      { const tpl = db.settings.roleTemplates && db.settings.roleTemplates[br.roleType]; if (tpl && Array.isArray(tpl.hidePages)) br.hidePages = [...tpl.hidePages]; }
       if (b.phone) br.phone = String(b.phone).slice(0, 40);
       if (b.email) br.email = String(b.email).slice(0, 120);
       db.brokers.push(br); store.save();
@@ -8506,6 +8515,14 @@ const server = http.createServer(async (req, res) => {
       if (b.customFields) { const CF_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'phone', 'url', 'email', 'select', 'multiselect', 'bool', 'rating']; db.settings.customFields = b.customFields.slice(0, 40).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: CF_TYPES.includes(f.type) ? f.type : 'text', options: (f.options || []).slice(0, 30).map(v => String(v).slice(0, 60)).filter(Boolean), unit: String(f.unit || '').slice(0, 12) })).filter(f => f.key && f.label); }
       /* какие поля лида СКРЫТЬ от брокеров (гибкая приватность: подрядчик/источник/путь рекламы/доп-поля) */
       if (Array.isArray(b.brokerHiddenFields)) db.settings.brokerHiddenFields = b.brokerHiddenFields.map(x => String(x).slice(0, 60)).slice(0, 80);
+      /* ШАБЛОНЫ ПРАВ ПО РОЛЯМ: { broker:{hidePages:[...]}, assistant:{...} } — применяются к новым сотрудникам */
+      if (b.roleTemplates && typeof b.roleTemplates === 'object') {
+        db.settings.roleTemplates = db.settings.roleTemplates || {};
+        for (const role of Object.keys(b.roleTemplates).slice(0, 12)) {
+          const v = b.roleTemplates[role]; if (!v || typeof v !== 'object') continue;
+          db.settings.roleTemplates[role] = { hidePages: Array.isArray(v.hidePages) ? v.hidePages.map(x => String(x).slice(0, 40)).slice(0, 60) : [] };
+        }
+      }
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
       if (b.stopWords) db.settings.stopWords = b.stopWords;
@@ -15067,6 +15084,26 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
       const cust = c.custom || {};
       const blocks = collBlocks(c);
       const lead = db.leads.find(l => l.id === c.leadId);
+      /* ВИЗИТКА БРОКЕРА: если подборка привязана к лиду с брокером и у брокера заполнены контакты —
+         покажем его персональную карточку на финальной странице (каждый брокер = своя визитка на своих подборках). */
+      const vBroker = (lead && lead.broker) ? (db.brokers || []).find(x => x.id === lead.broker) : null;
+      const brokerCard = (vBroker && (vBroker.phone || vBroker.email || vBroker.title || vBroker.bio)) ? (() => {
+        const ini = (vBroker.name || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+        const ph = (vBroker.phone || '').replace(/\D/g, '');
+        return `<div class="bvcard" style="margin-top:22px;display:flex;gap:16px;align-items:center;max-width:460px;margin-left:auto;margin-right:auto;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:16px;padding:16px 18px;text-align:left">
+          <div style="width:64px;height:64px;border-radius:50%;flex:0 0 64px;background:${vBroker.photo ? `url('${esc(vBroker.photo)}') center/cover` : 'rgba(255,255,255,.18)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#fff">${vBroker.photo ? '' : esc(ini)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:16px">${esc(vBroker.name || '')}</div>
+            ${vBroker.title ? `<div style="opacity:.85;font-size:13px;margin-top:1px">${esc(vBroker.title)}</div>` : ''}
+            ${vBroker.bio ? `<div style="opacity:.75;font-size:12px;margin-top:5px;line-height:1.4">${esc(String(vBroker.bio).slice(0, 160))}</div>` : ''}
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+              ${ph ? `<a href="https://wa.me/${ph}" style="color:#fff;font-size:12.5px;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:5px 12px">WhatsApp</a>` : ''}
+              ${vBroker.phone ? `<a href="tel:${esc(vBroker.phone)}" style="color:#fff;font-size:12.5px;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:5px 12px">Позвонить</a>` : ''}
+              ${vBroker.email ? `<a href="mailto:${esc(vBroker.email)}" style="color:#fff;font-size:12.5px;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:5px 12px">E-mail</a>` : ''}
+            </div>
+          </div>
+        </div>`;
+      })() : '';
       const mgr = db.settings.agency.manager || {};
       const about = db.settings.agency.about || {};
       const AG = db.settings.agency.name;
@@ -15380,7 +15417,7 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
 </section>`;
         },
         final(b) {
-          return `<section class="final blue"><div class="brand">${star}<span${be(b.id, 'brandName')}>${esc(b.data.brandName || AG)}</span></div>${b.data.note || isEdit ? `<p class="fnote"${be(b.id, 'note')}>${esc(b.data.note || '')}</p>` : ''}</section>`;
+          return `<section class="final blue"><div class="brand">${star}<span${be(b.id, 'brandName')}>${esc(b.data.brandName || AG)}</span></div>${b.data.note || isEdit ? `<p class="fnote"${be(b.id, 'note')}>${esc(b.data.note || '')}</p>` : ''}${brokerCard}</section>`;
         },
       };
 
@@ -15838,6 +15875,7 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 .card .nm{position:absolute;left:12px;right:12px;bottom:9px;z-index:2;color:#fff;font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;line-height:1.1;text-shadow:0 1px 6px rgba(0,0,0,.5)}
 .card .pr{padding:11px 14px;font-size:17px;font-weight:800;color:var(--gold)}
 .card{transition:transform .15s,box-shadow .15s}.card:hover{transform:translateY(-3px);box-shadow:0 22px 54px -18px rgba(40,32,15,.42)}.card .pr .more{float:right;font-size:11.5px;font-weight:700;color:var(--mut)}
+.gridhd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:26px 2px 11px;flex-wrap:wrap}.gridhd>span{font-family:'Cormorant Garamond',serif;font-size:23px;font-weight:700}.gridhd .leg{font-size:11.5px;color:var(--mut);font-style:normal;display:inline-flex;align-items:center;gap:6px}.gridhd .legdot{width:11px;height:11px;border-radius:3px;background:color-mix(in srgb,#6d8a4f 22%,transparent);display:inline-block}
 .grid{display:grid;grid-template-columns:140px repeat(${it.length},1fr);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 14px 44px -16px rgba(40,32,15,.24)}
 .grid>div{padding:12px 14px;border-bottom:1px solid var(--line);font-size:13.5px}.grid>div:nth-last-child(-n+${it.length + 1}){border-bottom:0}
 .lbl{font-size:11.5px;color:var(--mut);font-weight:700}.val{font-weight:600}.win{background:color-mix(in srgb,#6d8a4f 13%,transparent);color:#3f6b2f;font-weight:800}.win .st{color:#cda34a;margin-left:5px}
@@ -15866,6 +15904,7 @@ body{margin:0;font-family:Manrope,-apple-system,Segoe UI,sans-serif;background:v
 <div class="wrap">
 <div class="hero"><div class="k">${esc2(rec.agency)}</div><h1>${esc2(T.title)}</h1><div class="sub">${esc2(T.sub)}</div></div>
 <div class="cards">${it.map(x => `<a class="card${HP.includes(x.id) ? ' is-hid' : ''}${editMode ? ' draggable' : ''}" data-projid="${esc2(x.id)}"${editMode ? ' draggable="true"' : ''} href="/cmp/${rec.id}?p=${encodeURIComponent(x.id)}${curLang !== (rec.lang || 'ru') ? '&lang=' + curLang : ''}" style="text-decoration:none;color:inherit;display:block">${editMode ? `<button class="delx" data-del="proj:${esc2(x.id)}" title="Убрать проект из сравнения" onclick="return false">×</button><span class="draghint" title="Перетащите для порядка">⠿</span>` : ''}<div class="ph" style="background-image:url('${esc2(x.image)}')"><div class="nm">${esc2(x.name)}</div></div><div class="pr">${money(x.priceFrom, x.currency)}<span class="more">${curLang === 'ru' ? 'подробнее →' : 'details →'}</span></div></a>`).join('')}</div>
+<div class="gridhd"><span>${curLang === 'ru' ? 'Сравнение по параметрам' : curLang === 'en' ? 'Side-by-side comparison' : esc2(T.sub)}</span><i class="leg"><span class="legdot"></span>${curLang === 'ru' ? 'зелёным — лучшее значение' : 'green — best value'} ★</i></div>
 <div class="grid"><div class="lbl"></div>${it.map(() => '<div class="lbl"></div>').join('')}
 ${rows.map(([k, l, fn, vf, dir]) => { const bi = bestI(vf, dir); const rh = HR.includes(k); return `<div class="lbl${rh ? ' is-hid' : ''}" data-rowk="${k}">${editMode ? `<button class="delx delx-row" data-del="row:${k}" title="Убрать строку у клиента">×</button>` : ''}${esc2(l)}</div>${it.map((x, i) => `<div class="val${i === bi ? ' win' : ''}${rh ? ' is-hid' : ''}">${fn(x)}${i === bi ? `<span class="st" title="${esc2(T.best)}">★</span>` : ''}</div>`).join('')}`; }).join('')}</div>
 ${((a.summary || verd || editMode) && (!H.ai || editMode)) ? `<div class="ai${H.ai ? ' is-hid' : ''}" data-blk="ai"><h2><span class="d">✦</span>${esc2(T.ai)}${editMode ? '<button class="delx" data-del="ai" title="Убрать весь блок у клиента">×</button>' : ''}</h2>${((a.summary || editMode) && (!H.summary || editMode)) ? `<div class="sum${H.summary ? ' is-hid' : ''}" data-blk="summary">${editMode ? '<button class="delx" data-del="summary" title="Убрать у клиента">×</button>' : ''}<span${ed('summary')}>${esc2(a.summary)}</span></div>` : ''}<div class="vgrid">${verd}</div>
