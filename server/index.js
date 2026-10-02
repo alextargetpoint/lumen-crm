@@ -6714,6 +6714,14 @@ const server = http.createServer(async (req, res) => {
         try { const r = await b2backup.runAndVerify(store); return json(res, 200, { ...r, ...st }); }
         catch (e) { return json(res, 200, { ok: false, ...st, error: e.message }); }
       }
+      /* БЭКАП МЕДИА ВРУЧНУЮ: инкрементально выгрузить все файлы (картинки/логотипы/аватары/файлы лида/аудио) в B2.
+         Возвращает сколько новых залито / пропущено (уже в B2) / ошибок — проверяемый результат. */
+      if (p === '/api/admin/backup/media' && (req.method === 'POST' || req.method === 'GET')) {
+        const st = { enabled: b2backup.enabled(), bucket: b2backup.CFG.bucket, encrypted: !!b2backup.CFG.encKey };
+        if (!st.enabled) return json(res, 200, { ok: false, ...st, error: 'B2 выключен' });
+        try { const r = await b2backup.syncMedia(); return json(res, 200, { ...r, ...st }); }
+        catch (e) { return json(res, 200, { ok: false, ...st, error: e.message }); }
+      }
       /* СВЕРКА КРИПТО-ПЛАТЕЖЕЙ вручную: тянем ончейн (TRC20+ERC20) и зачисляем ЛЮБУЮ незачтённую заявку,
          совпавшую по точной сумме, ИГНОРИРУЯ окно 24ч (вывод с биржи может идти сутками). Идемпотентно по txid.
          Плюс ручной режим: {manual:{tid, amountUsd, chain, txid, purpose}} — если заявки в системе уже нет. */
