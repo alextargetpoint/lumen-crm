@@ -1237,6 +1237,8 @@ function modal({ title, sub, body, actions, wide }) {
   });
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) closeModal(); });
   document.body.appendChild(bd);
+  /* Кнопка «Назад» браузера/мыши закрывает модалку, а не всю CRM: кладём запись в историю */
+  try { history.pushState({ lumenOverlay: 'modal' }, ''); } catch (_) {}
   enhanceControls(bd);
   wireAiWand(bd);
   wireDictate(bd);
@@ -1244,7 +1246,15 @@ function modal({ title, sub, body, actions, wide }) {
   requestAnimationFrame(() => bd.classList.add('show'));
   return bd;
 }
-function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
+let _popGuard = false;   /* защита от зацикливания popstate ↔ history.back */
+function closeModal() {
+  const bd = $('.modal-bd'); if (!bd) return;
+  bd.classList.remove('show'); setTimeout(() => bd.remove(), 180);
+  /* если закрыли сами (крестик/фон) — снимаем нашу запись истории, чтобы «Назад» не упиралась в пустой шаг */
+  if (!_popGuard && history.state && history.state.lumenOverlay === 'modal') {
+    _popGuard = true; try { history.back(); } catch (_) {} setTimeout(() => { _popGuard = false; }, 60);
+  }
+}
 
 /* ---------- Данные и приватность (GDPR: экспорт / документы / удаление) ---------- */
 window.openDataPrivacy = function () {
@@ -4965,6 +4975,7 @@ PAGES.funnel = async (root) => {
   const db = $('#dupesBtn');
   if (db) db.addEventListener('click', async () => openDupesModal(await api.get('/duplicates')));
   wireKanbanDrag(root);
+  wireKanbanScroll(root);
   /* --- контрол цепочек касаний --- */
   root.querySelector('[data-cctoggle]')?.addEventListener('click', (e) => {
     PAGE_STATE.funnelChainOpen = !PAGE_STATE.funnelChainOpen;
@@ -5071,6 +5082,25 @@ function wireShelfDrag(root, itemSel, onDrop) {
 
 /* ---------- канбан: перетаскивание на pointer-событиях (HTML5 DnD глючит) ---------- */
 const DRAG = { moved: false, active: false };
+/* Горизонтальный скролл канбана на WINDOWS: мышь даёт только вертикальный deltaY, а доска скроллится вбок →
+   off-screen стадии недостижимы (на Mac трекпад даёт deltaX сам). Транслируем колесо в scrollLeft + боковые кнопки. */
+function wireKanbanScroll(root) {
+  const board = $('.kanban', root);
+  if (!board) return;
+  const scrollable = () => board.scrollWidth > board.clientWidth + 4;
+  board.addEventListener('wheel', (e) => {
+    if (!scrollable()) return;
+    if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;   /* уже горизонтальный жест (трекпад) — не мешаем */
+    board.scrollLeft += e.deltaY;
+    e.preventDefault();   /* иначе страница прыгает вертикально вместо прокрутки доски */
+  }, { passive: false });
+  /* боковые кнопки-стрелки (видны только когда есть куда скроллить) */
+  if (!scrollable() || board.parentElement.querySelector('.kb-navbtn')) return;
+  const mk = (dir) => { const b = el(`<button class="kb-navbtn kb-nav-${dir < 0 ? 'l' : 'r'}" title="Листать стадии" style="position:absolute;top:50%;transform:translateY(-50%);${dir < 0 ? 'left:2px' : 'right:2px'};z-index:5;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;font-size:17px;line-height:1;opacity:.92">${dir < 0 ? '‹' : '›'}</button>`); b.addEventListener('click', () => board.scrollBy({ left: dir * Math.round(board.clientWidth * 0.8), behavior: 'smooth' })); return b; };
+  const wrap = board.parentElement;
+  if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+  wrap.appendChild(mk(-1)); wrap.appendChild(mk(1));
+}
 function wireKanbanDrag(root) {
   const board = $('.kanban', root);
   if (!board) return;
@@ -5365,7 +5395,10 @@ PAGES.meetings = async (root) => {
       title: 'Встреча · ' + new Date(day + 'T12:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + hh + ':' + mm,
       sub: 'Клиент получит WhatsApp-подтверждение (для видео — со ссылкой на комнату)',
       body: `
-        <div class="form-row"><label>Лид</label><select id="csLead">${leads.map(l => `<option value="${l.id}">${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Лид</label>
+          <input id="csLeadQ" placeholder="🔍 поиск по имени или телефону…" style="margin-bottom:6px">
+          <select id="csLead" size="6" style="height:auto">${leads.map((l, i) => `<option value="${l.id}" data-s="${esc(((l.name || '') + ' ' + (l.phone || '')).toLowerCase())}" ${i === 0 ? 'selected' : ''}>${esc(l.name)}${l.phone ? ' · ' + esc(l.phone) : ''} · ${esc(l.geoName || '')}</option>`).join('')}</select>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
           <div class="form-row"><label>Тип</label><select id="csKind"><option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option></select></div>
           <div class="form-row"><label>Время</label><input id="csTime" type="time" step="900" value="${hh}:${mm}"></div>
@@ -5383,6 +5416,14 @@ PAGES.meetings = async (root) => {
     });
     const paintTz = () => { const l = leads.find(x => x.id === $('#csLead', md).value); const h = $('#csTzHint', md); if (h && l) h.innerHTML = tzHintHtml(day, $('#csTime', md).value, l.tz, l.geoName); };
     $('#csLead', md).addEventListener('change', paintTz); $('#csTime', md).addEventListener('input', paintTz); paintTz();
+    /* поиск лида по имени/телефону (при базе 100+ листать неудобно) */
+    const csQ = $('#csLeadQ', md);
+    if (csQ) csQ.addEventListener('input', () => {
+      const q = csQ.value.toLowerCase().trim();
+      const sel = $('#csLead', md); let firstVisible = null;
+      $$('#csLead option', md).forEach(o => { const hit = !q || (o.dataset.s || '').includes(q); o.style.display = hit ? '' : 'none'; if (hit && !firstVisible) firstVisible = o; });
+      if (firstVisible && (sel.selectedOptions[0] || {}).style?.display === 'none') { firstVisible.selected = true; paintTz(); }
+    });
   }));
 };
 
@@ -6779,6 +6820,7 @@ PAGES.qualifier = async (root) => {
           ['Фирменный тон и запреты', 'Общая манера всех героев + чего ваш ИИ не делает никогда'],
           ['Приоритет', 'Эти знания выше общих правил, но жёсткие запреты (не выдумывать) остаются']])}</div>
         <div class="sd" style="margin-bottom:12px">Заполните — и первая линия начнёт говорить фактами вашего агентства, а не общими фразами. Пусто — ИИ работает на базовых правилах.</div>
+        <div class="form-row"><label>🎯 Цель диалога <span class="sd" style="display:inline">(к чему ИИ ведёт каждого лида)</span></label><textarea id="trGoal" rows="2" placeholder="По умолчанию: вывести клиента на видео-созвон (Zoom/Meet) минимумом сообщений — дать краткую инфу и предложить удобное время, не продавая всё в переписке. Можно переопределить под себя.">${esc(tr.goal || '')}</textarea></div>
         <div class="form-row"><label>О нас / позиционирование</label><textarea id="trAbout" rows="3" placeholder="Кто вы, чем лучше конкурентов, для кого работаете. Пример: «Мы — бутиковое агентство по Дубаю, 8 лет, только проверенные застройщики, сопровождаем сделку под ключ.»">${esc(tr.about || '')}</textarea></div>
         <div class="form-row"><label>Проверенные факты ✅ <span class="sd" style="display:inline">(эти цифры ИИ называть МОЖНО)</span></label><textarea id="trFacts" rows="4" placeholder="Реальные объекты, цены, условия, доходность — то, что подтверждено и что ИИ может озвучивать клиенту. Пример: «Studio в Downtown от 950k AED, рассрочка 40/60, сдача Q3 2027, доходность 7-8% годовых.»">${esc(tr.facts || '')}</textarea></div>
         <div class="form-row"><label>Фирменный тон</label><input id="trTone" value="${esc(tr.tone || '')}" placeholder="Напр.: спокойный, уверенный, без давления; на «вы»"></div>
@@ -6791,7 +6833,7 @@ PAGES.qualifier = async (root) => {
     const training = {
       about: $('#trAbout', root).value.trim(), facts: $('#trFacts', root).value.trim(),
       tone: $('#trTone', root).value.trim(), scripts: $('#trScripts', root).value.trim(),
-      forbidden: $('#trForbidden', root).value.trim()
+      forbidden: $('#trForbidden', root).value.trim(), goal: $('#trGoal', root).value.trim()
     };
     const btn = $('#saveTrain', root); btn.disabled = true;
     await api.patch('/settings', { ai: { training } });
@@ -7007,8 +7049,8 @@ PAGES.sequences = async (root) => {
   const save = async (patch) => { await api.patch('/sequences/' + seq.id, patch || { steps: seq.steps }); };
   const geoName = (g) => g === 'all' ? 'Все гео' : STATE.settings.geoNames[g] || g;
   /* убираем дрейф float в day (напр. 1.0035 → 1): для показа снапим к целому, если рядом */
-  const fmtDay = (d) => { const r = Math.round(d); return Math.abs(d - r) < 0.05 ? r : +d.toFixed(1); };
-  const dayLabel = (d) => d < 0.02 ? 'сразу' : d < 1 ? '~' + Math.round(d * 24) + ' ч' : 'день ' + fmtDay(d);
+  const fmtDay = (d) => Math.max(1, Math.round(d));   /* целые дни — без дробных «1.2/2.2», которые читались как «1-2, 2-2» */
+  const dayLabel = (d) => d < 0.02 ? 'сразу' : d < 1 ? 'через ' + Math.round(d * 24) + ' ч' : 'День ' + fmtDay(d);
   /* ---- ТАРГЕТИНГ цепочки: на какие лиды распространяется ---- */
   const SEQ_SOURCES = [['meta_form', 'Lead-форма Meta'], ['ctwa', 'Click-to-WhatsApp'], ['ig_direct', 'Instagram Direct'], ['ad_comment', 'Комментарии рекламы'], ['landing', 'Лендинг'], ['site', 'Сайт'], ['meta_api', 'Meta API'], ['wa_inbound', 'Входящий WhatsApp'], ['wa_gray', 'WhatsApp (серый)'], ['viber', 'Viber'], ['import', 'Импорт'], ['broker_card', 'От брокера']];
   const SEQ_CHANNELS = [['wa', 'WhatsApp'], ['ig', 'Instagram'], ['tg', 'Telegram'], ['viber', 'Viber'], ['email', 'E-mail']];
@@ -7346,13 +7388,13 @@ PAGES.sequences = async (root) => {
   }
   /* спокойный интерактив: вся цепочка видна сразу, шкала дней сверху —
      клик по дню плавно листает телефон к сообщению и подсвечивает его */
-  const dayTxt = (st) => st.day < 0.02 ? 'сразу' : st.day < 1 ? '~' + Math.round(st.day * 24) + ' ч' : 'день ' + fmtDay(st.day);
+  const dayTxt = (st) => st.day < 0.02 ? 'сразу' : st.day < 1 ? 'через ' + Math.round(st.day * 24) + ' ч' : 'День ' + fmtDay(st.day);
   const renderWa = () => {
     const body = $('#waBody', root);
     const scrub = $('#waScrub', root);
     if (!body) return;
     body.innerHTML = waSteps.map((st, i) => `
-      <div class="wa-day" style="--wi:${i}">${st.day < 0.02 ? 'сразу после заявки' : st.day < 1 ? 'через ~' + Math.round(st.day * 24) + ' ч' : 'день ' + fmtDay(st.day)}</div>
+      <div class="wa-day" style="--wi:${i}">${st.day < 0.02 ? 'сразу после заявки' : st.day < 1 ? 'через ~' + Math.round(st.day * 24) + ' ч' : 'День ' + fmtDay(st.day)}</div>
       <div class="wa-msg out calm" style="--wi:${i}" data-wamsg="${i}">
         ${st.channel === 'voice' ? '<span class="wa-voice">▶ голосовое 0:24</span>' : esc(waPreview(st)).replace(/\n/g, '<br>')}
         <span class="wa-time">${st.day === 0 ? '12:0' + (i % 10) : '11:1' + (i % 10)} ✓✓</span>
@@ -8121,8 +8163,12 @@ PAGES.properties = async (root) => {
   if (PAGE_STATE.propView) {
     const pr = props.find(x => x.id === PAGE_STATE.propView);
     if (!pr) { PAGE_STATE.propView = null; return PAGES.properties(root); }
+    /* кладём запись в историю при ВХОДЕ в объект → браузерная «Назад» вернёт к списку, а не выкинет из CRM */
+    if (_lastPropView !== PAGE_STATE.propView) { try { history.pushState({ lumenOverlay: 'prop' }, ''); } catch (_) {} _lastPropView = PAGE_STATE.propView; }
     const MD = PAGE_STATE.marketData || (PAGE_STATE.marketData = await api.get('/marketdata'));
     const geoMD = MD[pr.geo] || MD.dubai;
+    /* таблица «Юниты» (остаток off-plan) — под Дубай; для агентств других локаций прячем, если данных ещё нет */
+    const showUnits = ((STATE.settings.agency && STATE.settings.agency.geos) || []).includes('dubai') || pr.geo === 'dubai' || (pr.units && pr.units.length);
     const upd = async (patch) => { await api.patch('/properties/' + pr.id, patch); Object.assign(pr, patch); };
     /* combo: справочник + «своё значение» */
     const combo = (field, options, val, ph) => `<select class="gi-sel" data-cf2="${field}">
@@ -8146,7 +8192,7 @@ PAGES.properties = async (root) => {
           <div class="pd2-shade"></div>
           <div class="pd2-in">
             <div class="pd2-top">
-              <button class="btn btn-sm pd2-ghost" id="prBack">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Все объекты'}</button>
+              <button class="btn btn-sm" id="prBack" style="background:#fff;color:#111;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.25)">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Ко всем объектам'}</button>
               ${editMode ? `<span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>` : ''}
               <span class="tb-spacer"></span>
               <button class="btn btn-sm ${editMode ? 'btn-accent' : 'pd2-ghost'}" id="pdEditToggle" title="${editMode ? 'Вернуться к просмотру' : 'Открыть поля для правок'}">${ic(editMode ? I.check : I.edit || I.gear)}${editMode ? 'Готово' : 'Редактировать'}</button>
@@ -8229,7 +8275,7 @@ PAGES.properties = async (root) => {
           <button class="btn btn-sm" id="prowAdd" style="margin-top:10px">${ic(I.plus)}Этап оплаты</button>
         </div>
 
-        <div class="pds">
+        ${showUnits ? `<div class="pds">
           <div class="pds-hd"><span class="pds-ic">${ic(I.grid)}</span><div><b>Юниты</b><i>попадают таблицей в подборку и PDF</i></div><span class="tb-spacer"></span><button class="btn btn-sm" id="uReconcile" title="Вставьте прайс/сообщение застройщика или файл — ИИ обновит наличие">${ic(I.spark)}Обновить наличие</button></div>
           ${propUnitsBlock(pr)}
           <div class="lc-note-row" style="margin-top:10px;flex-wrap:wrap">
@@ -8239,7 +8285,7 @@ PAGES.properties = async (root) => {
           </div>
           ${(pr.history && pr.history.length) ? `<details class="pd-hist"><summary>${ic(I.clock || I.doc)}Журнал карточки (${pr.history.length})</summary>
             <div class="pd-hist-list">${pr.history.slice(0, 30).map(h => `<div class="pd-hist-row"><span class="pd-hist-at">${new Date(h.at).toLocaleDateString('ru', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span class="pd-hist-ac">${esc(h.action || '')}</span>${(h.sources && h.sources.length) ? `<span class="pd-hist-src">${h.sources.slice(0, 3).map(s => `<a href="${esc(s.url)}" target="_blank" class="link">источник</a>`).join(' · ')}</span>` : ''}</div>`).join('')}</div></details>` : ''}
-        </div>
+        </div>` : ''}
 
         
           </div>
@@ -8281,6 +8327,7 @@ PAGES.properties = async (root) => {
               <label class="lc-lbl">Документы и материалы</label>
               ${(pr.materials || []).map((m2, ix) => `<div class="lc-contact"><span class="badge">${esc(m2.label)}</span><a class="lc-cv link" href="${esc(m2.url)}" target="_blank">${esc(m2.url.slice(0, 40))}…</a><button class="btn-ghost lc-cx" data-matdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Брошюры, прайсы, видео — ссылками</div>'}
               <div class="lc-note-row" style="margin-top:8px"><input id="pdMatLabel" placeholder="Брошюра" style="width:110px;flex:0 0 110px"><input id="pdMatUrl" placeholder="https://…"><button class="btn btn-sm" id="pdMatAdd">${ic(I.plus)}</button></div>
+              <div class="lc-note-row" style="margin-top:8px"><label class="btn btn-sm" style="cursor:pointer">${ic(I.doc)}Догрузить PDF в карточку<input type="file" id="pdPdfFile" accept=".pdf,application/pdf" hidden></label><span id="pdPdfName" class="muted" style="font-size:11.5px;align-self:center"></span></div>
             </div>
             <div>
               <label class="lc-lbl">Видео-рендеры и обзоры</label>
@@ -8293,7 +8340,15 @@ PAGES.properties = async (root) => {
         </div>
       </div>`;
 
-    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; PAGE_STATE.propEditMode = false; if (PAGE_STATE.propFrom === 'map') PAGE_STATE.propMap = true; PAGE_STATE.propFrom = null; render(); });
+    $('#prBack').addEventListener('click', async () => {
+      /* пустой черновик (создан по «+», но ничего не заполнено) — не копим мусор: удаляем при выходе */
+      const untouched = ['Новый объект', 'Объект', ''].includes((pr.name || '').trim())
+        && !pr.priceFrom && !(pr.images || []).length && !((pr.description || '').trim())
+        && !(pr.units || []).length && !(pr.paymentRows || []).length && !pr.developer && !pr.area && !(pr.layouts || []).length;
+      if (untouched) { try { await fetch('/api/properties/' + pr.id, { method: 'DELETE' }); } catch (_) {} }
+      PAGE_STATE.propView = null; PAGE_STATE.propEditMode = false; _lastPropView = null;
+      if (PAGE_STATE.propFrom === 'map') PAGE_STATE.propMap = true; PAGE_STATE.propFrom = null; render();
+    });
     $('#pdEditToggle')?.addEventListener('click', () => { PAGE_STATE.propEditMode = !PAGE_STATE.propEditMode; render(); });
     $$('.gi', root).forEach(inp => inp.addEventListener('change', async () => {
       const f = inp.dataset.f;
@@ -8377,15 +8432,29 @@ PAGES.properties = async (root) => {
     $('#pdLayAdd').addEventListener('click', async () => { const u = $('#pdLayUrl').value.trim(); if (!u) return; await upd({ layouts: [...(pr.layouts || []), { label: $('#pdLayLabel').value || 'Планировка', url: u }] }); render(); });
     $$('[data-laydel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ layouts: pr.layouts.filter((_, ix) => ix !== +b.dataset.laydel) }); render(); }));
     $('#pdMatAdd').addEventListener('click', async () => { const u = $('#pdMatUrl').value.trim(); if (!u) return; await upd({ materials: [...(pr.materials || []), { label: $('#pdMatLabel').value || 'Материал', url: u }] }); render(); });
+    $('#pdPdfFile')?.addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const nm = $('#pdPdfName'); if (nm) nm.textContent = 'Читаю ' + f.name + '…';
+      const rd = new FileReader();
+      rd.onload = async () => {
+        showLoader('ИИ разбирает PDF и дополняет карточку…', 'web');
+        const r = await api.post('/properties/from-pdf', { fileB64: String(rd.result).replace(/^data:[^,]*,/, ''), fileName: f.name, targetId: pr.id, geo: pr.geo }).catch(er => ({ error: er.message || 'сеть' }));
+        hideLoader();
+        if (r.error) { if (nm) nm.textContent = ''; return toast('Не вышло', r.error); }
+        toast('Карточка дополнена из PDF', `${r.imagesSaved ? '+' + r.imagesSaved + ' фото · ' : ''}юнитов: ${r.units}`, true);
+        PAGES.properties(root);
+      };
+      rd.readAsDataURL(f);
+    });
     $$('[data-matdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ materials: pr.materials.filter((_, ix) => ix !== +b.dataset.matdel) }); render(); }));
     $('#pdVidAdd')?.addEventListener('click', async () => { const u = $('#pdVidUrl').value.trim(); if (!/^https?:\/\//.test(u)) return; await upd({ videos: [...new Set([...(pr.videos || []), u])] }); render(); });
     $$('[data-viddel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ videos: (pr.videos || []).filter((_, ix) => ix !== +b.dataset.viddel) }); render(); }));
-    $('#uAdd').addEventListener('click', async () => {
+    $('#uAdd')?.addEventListener('click', async () => {
       await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: numRaw($('#uPrice').value) }] });
       render();
     });
     $$('[data-unitdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ units: pr.units.filter((_, ix) => ix !== +b.dataset.unitdel) }); render(); }));
-    $('#uReconcile').addEventListener('click', () => {
+    $('#uReconcile')?.addEventListener('click', () => {
       const md = modal({ title: 'Обновить наличие юнитов', sub: 'Вставьте прайс/сообщение застройщика (WhatsApp/Telegram) ИЛИ загрузите файл (Excel/CSV). ИИ сверит с текущими: новые добавит, пропавшие пометит проданными.', wide: true, body: `
         <textarea id="recText" style="min-height:120px;font-size:12.5px" placeholder="Вставьте текст: «Проданы 701, 703, 710. В наличии: студия 45м² 4.7M, 2BR 62м² 12.2M…»"></textarea>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
@@ -8452,7 +8521,8 @@ PAGES.properties = async (root) => {
         const fmtV = (v) => Array.isArray(v) ? v.join(' · ') : String(v);
         const gap = new Set(r.gapFields || []);
         const rows = Object.entries(r.proposed || {}).sort((a, b) => (gap.has(b[0]) ? 1 : 0) - (gap.has(a[0]) ? 1 : 0)).map(([k, v]) => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${FLD[k] || k}${gap.has(k) ? ' <span class="enr-gap">пусто в карточке</span>' : ''}</div><div class="sd">${esc(fmtV(v)).slice(0, 240)}</div></div><input type="checkbox" class="enr-ck" data-k="${k}" checked style="width:20px;height:20px"></label>`).join('');
-        const mediaRow = (media.photos || media.videos) ? `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Медиа из сети ${ic(I.image || I.camera || I.eye, 2)}</div><div class="sd">${media.photos ? media.photos + ' фото (хай-рес)' : ''}${media.photos && media.videos ? ' · ' : ''}${media.videos ? media.videos + ' видео-рендеров' : ''}</div></div><input type="checkbox" id="enrMedia" checked style="width:20px;height:20px"></label>` : '';
+        const thumbs = (media.images || []).slice(0, 16).map((u) => `<img src="${esc(u)}" loading="lazy" class="enr-thumb" onerror="this.style.display='none'" style="width:76px;height:56px;object-fit:cover;border-radius:7px;border:1px solid var(--stroke)">`).join('');
+        const mediaRow = (media.photos || media.videos) ? `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Медиа из сети ${ic(I.image || I.camera || I.eye, 2)}</div><div class="sd">${media.photos ? media.photos + ' фото (хай-рес)' : ''}${media.photos && media.videos ? ' · ' : ''}${media.videos ? media.videos + ' видео-рендеров' : ''}</div></div><input type="checkbox" id="enrMedia" checked style="width:20px;height:20px"></label>${thumbs ? `<div class="muted" style="font-size:11px;margin:8px 2px 4px">Предпросмотр фото, которые будут добавлены:</div><div id="enrThumbs" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${thumbs}</div>` : ''}` : '';
         const src = (r.sources || []).slice(0, 4).map(s => `<a href="${esc(s.url)}" target="_blank" class="link" style="font-size:11px">${esc((s.title || s.url).slice(0, 40))}</a>`).join(' · ');
         out.innerHTML = `<div style="font-size:12px;margin-bottom:8px">Найдено (уверенность: <b>${esc(r.confidence || 'medium')}</b>). Отметьте, что добавить:</div>${rows}${mediaRow}<div class="muted" style="font-size:11px;margin-top:10px">Источники: ${src || '—'}</div><button class="btn btn-accent" id="enrApply" style="width:100%;justify-content:center;margin-top:12px">Добавить выбранное в карточку</button>`;
         $('#enrApply', md).addEventListener('click', async (ev) => {
@@ -9265,11 +9335,13 @@ PAGES.automations = async (root) => {
     <div class="auto-grid" id="autoGrid">
         <div class="glass card mb" data-ag="dist">
           <div class="card-title">${ic(I.users)}Распределение по брокерам</div>
-          ${swRow('Режим распределения', 'Кому уходит квалифицированный лид нужного гео', `<select data-auto-sel="assignMode" style="width:190px">
+          <div class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5">Как это работает по умолчанию: новый лид попадает в <b>общий пул</b>, ИИ-первая линия ведёт его по цепочке касаний, а брокер закрепляется <b>в момент квалификации</b> (4 оси) или вручную. Хотите, чтобы брокер видел лида <b>сразу с первой секунды</b> — включите «Закреплять сразу при входе» ниже.</div>
+          ${swRow('Режим распределения', 'Кому уходит лид нужного гео (при квалификации и при закреплении на входе)', `<select data-auto-sel="assignMode" style="width:190px">
             <option value="load" ${a.assignMode === 'load' ? 'selected' : ''}>По загрузке (меньше — берёт)</option>
             <option value="roundrobin" ${a.assignMode === 'roundrobin' ? 'selected' : ''}>По очереди</option>
             <option value="shift" ${a.assignMode === 'shift' ? 'selected' : ''}>По сменам + загрузке</option>
           </select>`, { v: 'right', hue: '#C05B8C' })}
+          ${swRow('Закреплять брокера сразу при входе', 'Новый лид сразу виден закреплённому брокеру (с первой секунды), а ИИ продолжает вести цепочку. Выкл — лид до квалификации в общем пуле', sw('assignOnNew', a.assignOnNew))}
           ${swRow('Авто-передача при квалификации', '4 оси закрыты → лид сам уходит брокеру с саммари и слотом, без ручного клика', sw('autoHandover', a.autoHandover))}
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
         </div>
@@ -17671,6 +17743,20 @@ window.addEventListener('hashchange', () => {
   const p = location.hash.slice(1);
   if (NAV[p] && p !== CUR) go(p);
   else if (!NAV[p]) history.replaceState(null, '', '#' + CUR);
+});
+
+/* «Назад» (кнопка браузера/мыши) закрывает открытую карточку/модалку/деталь объекта, а не выкидывает из CRM.
+   Раньше SPA держала одну запись истории → любой Back уводил с сайта и ронял весь интерфейс. */
+let _lastPropView = null;
+window.addEventListener('popstate', () => {
+  if (_popGuard) return;
+  const bd = $('.modal-bd');
+  if (bd) { _popGuard = true; closeModal(); setTimeout(() => { _popGuard = false; }, 60); return; }
+  if (typeof PAGE_STATE !== 'undefined' && PAGE_STATE && PAGE_STATE.propView) {
+    PAGE_STATE.propView = null; PAGE_STATE.propEditMode = false; _lastPropView = null;
+    try { render(); } catch (_) {}
+    return;
+  }
 });
 
 (async () => {

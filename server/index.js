@@ -402,7 +402,7 @@ function ensureTenantDefaults(db) {
   if (!s.hooks) s.hooks = { secret: crypto.randomBytes(12).toString('hex') };
   /* ⚠️ЭТИ ДЕФОЛТЫ РАНЬШЕ СИДЕЛИ В СТАРТОВОМ БЛОКЕ (только PRIMARY) → тенанты-агентства их НЕ получали:
      automations отсутствовал → PATCH настроек не мог сохранить autoHandover/assignMode/напоминания (Object.assign не за что цеплять). */
-  if (!s.automations) s.automations = { assignMode: 'load', autoHandover: false, meetingReminderHrs: 3, noShowMessage: true, rrCursor: 0, rotation: { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false } };
+  if (!s.automations) s.automations = { assignMode: 'load', autoHandover: false, assignOnNew: false, meetingReminderHrs: 3, noShowMessage: true, rrCursor: 0, rotation: { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false } };
   if (!s.automations.rotation) s.automations.rotation = { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false };
   s.ai = s.ai || {};
   if (!s.ai.autoOff) s.ai.autoOff = { onHumanReply: true, onHumanRequest: true, onEscalation: true };
@@ -461,6 +461,7 @@ function ensureTenantDefaults(db) {
   if (!db.settings.automations) db.settings.automations = {
     assignMode: 'load',        // load | roundrobin | shift
     autoHandover: false,       // 4/4 закрыто → авто-передача брокеру
+    assignOnNew: false,        // закреплять брокера СРАЗУ при входе лида (видимость с первой секунды; ИИ продолжает цепочку)
     meetingReminderHrs: 3,     // напоминание клиенту за N часов (0 = выкл)
     noShowMessage: true,       // «не пришёл» → мягкое сообщение + вернуть ИИ
     rrCursor: 0,
@@ -8181,7 +8182,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       /* брокер создаёт ЛИЧНУЮ цепочку (ownerId=он, visibility=private); владелец — агентскую (base) */
       const owned = IS_BROKER ? ROLE.brokerId : null;
-      const seq = { id: store.nextId('seq'), name: String(b.name || (IS_BROKER ? 'Моя цепочка' : 'Новая цепочка')).slice(0, 80), geo: b.geo || 'all', active: false, ownerId: owned, visibility: owned ? 'private' : 'base', sharedWith: [], steps: b.steps || [{ day: 0, channel: 'wa', mode: 'personalize', text: 'Здравствуйте, {name}! Это {agency} — вы оставляли заявку по {creative}. Подобрать актуальные варианты под ваш запрос?', label: 'Первое касание (ИИ-персонализация)', active: true }] };
+      const seq = { id: store.nextId('seq'), name: String(b.name || (IS_BROKER ? 'Моя цепочка' : 'Новая цепочка')).slice(0, 80), geo: b.geo || 'all', active: false, ownerId: owned, visibility: owned ? 'private' : 'base', sharedWith: [], steps: b.steps || [{ day: 0, channel: 'wa', mode: 'personalize', text: 'Здравствуйте, {name}! Это {agency} — вы оставляли заявку по креативу выше. Подобрать актуальные варианты под ваш запрос?', label: 'Первое касание (ИИ-персонализация)', active: true }] };
       db.sequences.push(seq); store.save();
       return json(res, 200, seq);
     }
@@ -12182,6 +12183,25 @@ ${SCR}
           dl.filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, 12 - saved.length).forEach(g => saved.push(g.url));
         } catch (_) {}
       }
+      /* targetId → ДОПОЛНИТЬ существующий объект (кнопка «догрузить PDF» в карточке), а не создавать новый */
+      if (b.targetId) {
+        const ex = (db.properties || []).find(x => x.id === b.targetId);
+        if (!ex) return json(res, 404, { error: 'объект не найден' });
+        const curX = ex.currency || fixMoneyCurrency(ex.geo, ext.priceFrom, ext.currency);
+        const setIf = (k, v) => { v = String(v || '').trim(); if (v && (!ex[k] || ex[k] === '—')) ex[k] = v.slice(0, 120); };
+        setIf('developer', ext.developer); setIf('area', ext.area || ext.city); setIf('handover', ext.handover); setIf('roi', ext.roi); setIf('appreciation', ext.appreciation);
+        if (!(ex.description || '').trim() && ext.description) ex.description = String(ext.description).slice(0, 900);
+        if (!ex.priceFrom && +ext.priceFrom) { ex.priceFrom = +ext.priceFrom; ex.currency = curX; }
+        if (Array.isArray(ext.amenities) && ext.amenities.length) ex.amenities = [...new Set([...(ex.amenities || []), ...ext.amenities.map(x => String(x).slice(0, 60))])].slice(0, 24);
+        if (Array.isArray(ext.investmentHighlights) && ext.investmentHighlights.length) ex.investmentHighlights = [...new Set([...(ex.investmentHighlights || []), ...ext.investmentHighlights.map(x => String(x).slice(0, 200))])].slice(0, 8);
+        if (!(ex.paymentRows || []).length && Array.isArray(ext.paymentPlan)) ex.paymentRows = ext.paymentPlan.slice(0, 6).map(r => ({ pct: String(r.pct || '').slice(0, 10), label: String(r.label || '').slice(0, 80) }));
+        const newUnits = (Array.isArray(ext.units) ? ext.units : []).slice(0, 400).map(u => { const t = String(u.type || '').slice(0, 20); return { unitNo: '', type: t, plan: t, beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, currency: (String(u.currency || curX).toUpperCase().match(/USD|EUR|AED|THB/) || [curX])[0], view: String(u.view || '').slice(0, 40), status: 'available' }; });
+        if (newUnits.length) ex.units = [...(ex.units || []), ...newUnits].slice(0, 600);
+        if (saved.length) ex.images = [...new Set([...(ex.images || []), ...saved])].slice(0, 20);
+        ex.history = [...(ex.history || []), { at: Date.now(), action: 'Дополнено из PDF' + (saved.length ? ` · фото +${saved.length}` : '') + (newUnits.length ? ` · юнитов +${newUnits.length}` : '') }];
+        store.save();
+        return json(res, 200, { ok: true, property: ex, imagesSaved: saved.length, units: (ex.units || []).length, merged: true });
+      }
       const cur = fixMoneyCurrency(b.geo, ext.priceFrom, ext.currency);
       const pr = {
         id: store.nextId('pr'), name: String(ext.name || b.fileName || 'Объект из PDF').slice(0, 120),
@@ -12366,7 +12386,7 @@ ${SCR}
       /* медиа из открытых источников: новые фото (не дубли) + видео-рендеры */
       const webImgs = (sr.images || []).filter(u => !(pr.images || []).includes(u));
       const webVids = (sr.videos || []).filter(u => !(pr.videos || []).includes(u));
-      const media = { photos: webImgs.length, videos: webVids.length };
+      const media = { photos: webImgs.length, videos: webVids.length, images: webImgs.slice(0, 16), videoList: webVids.slice(0, 6) };
       if (!b.apply) return json(res, 200, { ok: true, proposed, gapFields, confidence: ext.confidence || 'medium', sources: sr.sources, media });
       const fields = Array.isArray(b.fields) && b.fields.length ? b.fields : Object.keys(proposed);
       const applied = fields.filter(k => mergeEnrich(k, proposed[k]));

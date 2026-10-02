@@ -501,14 +501,14 @@ function tickChains(db) {
               lead.ai[ck] = (out && out.message) || '';
               if (isEmail && out && out.subject) lead.ai._ptEmailSubj = out.subject;
             } catch (e) {
-              lead.ai[ck] = fillVars(db, lead, step.text || '{name}, здравствуйте! Вы оставляли заявку на {creative} — подобрать актуальные варианты под ваш запрос?');
+              lead.ai[ck] = fillVars(db, lead, step.text || '{name}, здравствуйте! Вы оставляли заявку по креативу выше — подобрать актуальные варианты под ваш запрос?');
               ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `ИИ-персонализация ${isEmail ? 'e-mail' : 'касания'} не удалась (${lead.name}): ${e.message} — ушёл запасной текст` });
             } finally { lead.ai['_g' + ck] = false; store.save(); }
           })();
         }
         continue;   /* генерация идёт — ждём следующего тика (текст ещё не готов) */
       } else {
-        text = fillVars(db, lead, step.text || '{name}, здравствуйте! Подобрать варианты по вашей заявке на {creative}?');   /* нет LLM — запасной шаблон */
+        text = fillVars(db, lead, step.text || '{name}, здравствуйте! Подобрать варианты по вашей заявке (креатив выше)?');   /* нет LLM — запасной шаблон */
       }
     } else if (step.mode === 'text' || step.mode === 'creative') {
       text = step.text ? fillVars(db, lead, step.text) : '';   /* для «Креатив из рекламы» текст = подпись (необязательна) */
@@ -784,6 +784,23 @@ function tickRotation(db) {
     l.rotatedAt = nowT; l.rotations = done + 1;
     l.ai = l.ai || {}; l.ai.chainStep = 0; l.ai.nextTouchAt = nowT + 30e3;    // новый начинает касания заново
     ai.pushEvent(db, { type: 'handover', leadId: l.id, text: `🔄 Ротация: ${l.name} не прожат — переназначен на ${nb.name}${nb.roleType === 'qualifier' ? ' (квалификатор)' : ''}` });
+  }
+}
+
+/* Авто-присвоение брокера СРАЗУ при входе нового лида (опция automations.assignOnNew, по умолчанию выкл).
+   Даёт брокеру видеть лида с первой секунды (владелец хотел «чтобы кто-то сразу следил»), при этом стадия
+   остаётся new/touch — ИИ-цепочка продолжает работать. Без опции — поведение прежнее (лид в общем пуле до квалификации). */
+function tickAssignNew(db) {
+  if (!(db.settings.automations || {}).assignOnNew) return;
+  for (const l of db.leads) {
+    if (l.broker) continue;
+    if (!['new', 'touch'].includes(l.stage)) continue;
+    if (l.marketingOptOut) continue;
+    const b = pickBroker(db, l);
+    if (!b) continue;
+    control.recordOwner(db, l, b.id, 'auto', 'авто-присвоение при входе (assignOnNew)');
+    l.broker = b.id; b.load = (b.load || 0) + 1;
+    ai.pushEvent(db, { type: 'handover', leadId: l.id, text: `👤 Новый лид ${l.name} сразу закреплён за ${b.name} — брокер видит его с первой секунды` });
   }
 }
 
@@ -1231,7 +1248,7 @@ function startLoop() {
           const db = store.get();
           /* per-tick изоляция: сломанный подмодуль (битые данные одного тенанта) не должен
              голодить остальные тики этого же тенанта и не должен терять store.save() */
-          for (const [nm, fn] of [['chains', tickChains], ['campaigns', tickCampaigns], ['meetings', tickMeetings], ['sla', tickSla], ['rotation', tickRotation], ['reports', tickReports], ['simulator', tickSimulator], ['control', tickControl], ['scheduled', tickScheduled]]) {
+          for (const [nm, fn] of [['chains', tickChains], ['campaigns', tickCampaigns], ['meetings', tickMeetings], ['sla', tickSla], ['assignNew', tickAssignNew], ['rotation', tickRotation], ['reports', tickReports], ['simulator', tickSimulator], ['control', tickControl], ['scheduled', tickScheduled]]) {
             try { fn(db); } catch (e) { console.error('[engine]', tid, nm, e); }
           }
           store.save();
