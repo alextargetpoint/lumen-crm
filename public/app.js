@@ -15395,7 +15395,7 @@ function rbacTemplatesCardHtml() {
     <div class="rbac-hd">${ic(I.gear || I.users)}Шаблоны прав по ролям<span>настрой доступ роли один раз — новые сотрудники получат его сразу</span></div>
     <div class="rbac-list">${roles.map(rt => {
       const hide = roleTplHide(rt);
-      return `<div class="rbac-row" data-tplrole="${rt}" style="padding:10px 12px">
+      return `<div class="rbac-tplrow" data-tplrole="${rt}" style="padding:12px 14px;border-bottom:1px solid var(--stroke,#eee)">
         <div style="font-weight:600;margin-bottom:8px">${RBAC_ROLES[rt]} <span class="muted" style="font-weight:400;font-size:12px">· ${RBAC_SECTIONS.length - hide.length}/${RBAC_SECTIONS.length} разделов открыто</span></div>
         <div class="rbac-secs">${RBAC_SECTIONS.map(s => `<button class="rbac-sec ${hide.includes(s) ? 'off' : 'on'}" data-tplsec="${s}">${esc((NAV[s] || {}).name || s)}</button>`).join('')}</div>
       </div>`;
@@ -15464,7 +15464,8 @@ function rbacCardHtml() {
 function wireRbac(root) {
   $$('.rbac-row', root).forEach(rowEl => {
     const id = rowEl.dataset.rbacid;
-    rowEl.querySelector('[data-rbactoggle]').addEventListener('click', () => { const bd = rowEl.querySelector('.rbac-body'); bd.hidden = !bd.hidden; rowEl.classList.toggle('open', !bd.hidden); });
+    const tgl = rowEl.querySelector('[data-rbactoggle]'); if (!tgl) return;   /* строки шаблонов ролей (data-tplrole) — не члены команды, их обрабатывает wireRbacTemplates */
+    tgl.addEventListener('click', () => { const bd = rowEl.querySelector('.rbac-body'); bd.hidden = !bd.hidden; rowEl.classList.toggle('open', !bd.hidden); });
     const sel = rowEl.querySelector('.rbac-roleSel');
     if (sel) sel.addEventListener('change', async () => { try { await api.patch('/brokers/' + id, { roleType: sel.value }); toast('Роль обновлена', RBAC_ROLES[sel.value] || '', true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); } });
     rowEl.querySelectorAll('.rbac-sec:not(.locked)').forEach(chip => chip.addEventListener('click', async () => {
