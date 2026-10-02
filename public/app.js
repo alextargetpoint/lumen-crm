@@ -5426,11 +5426,15 @@ function openMeetingModal(lead, after) {
         <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
       </select></div>
       <div class="form-row" id="mtLinkRow" style="display:none"><label>Ссылка Zoom / Google Meet <span class="muted" style="font-weight:400">(необязательно)</span></label><input id="mtLink" placeholder="https://zoom.us/j/… или https://meet.google.com/…">
-        ${((STATE.settings.zoom && STATE.settings.zoom.connected))
-          ? '<div class="muted" style="font-size:11px;margin-top:4px">Оставьте пусто — ссылку создадим автоматически под вашим Zoom' + (STATE.settings.zoom.email ? ' (' + esc(STATE.settings.zoom.email) + ')' : '') + ', встречу запишем и расшифруем в карточку. Или вставьте свою ссылку Zoom/Meet.</div>'
-          : (STATE.settings.meetingBot && STATE.settings.meetingBot.ready)
-            ? '<div class="muted" style="font-size:11px;margin-top:4px">Вставьте ссылку Zoom/Meet — встречу автоматически запишем и расшифруем в карточку. Пусто — используем нашу видео-комнату (без записи). <span style="opacity:.8">Подключите свой Zoom в «Подключениях» — ссылки будут создаваться сами.</span></div>'
-            : '<div class="muted" style="font-size:11px;margin-top:4px">Пусто — используем нашу видео-комнату. (Авто-Zoom и запись подключаются в «Подключениях».)</div>'}</div>
+        ${(() => {
+          const z = STATE.settings.zoom || {}, g = STATE.settings.gmeet || {};
+          const prov = z.connected ? ('Zoom' + (z.email ? ' (' + esc(z.email) + ')' : '')) : g.connected ? ('Google Meet' + (g.email ? ' (' + esc(g.email) + ')' : '')) : null;
+          const hint = prov
+            ? 'Оставьте пусто — ссылку создадим автоматически под вашим <b>' + prov + '</b>. Или вставьте свою.'
+            : 'Пусто — используем нашу видео-комнату (Jitsi). Для авто-ссылок подключите Zoom или Google Meet в «Подключениях».';
+          return '<div class="muted" style="font-size:11px;margin-top:4px">' + hint + '</div>'
+            + '<div style="font-size:11px;margin-top:6px;padding:7px 9px;background:rgba(201,168,106,.10);border:1px solid rgba(201,168,106,.25);border-radius:8px;color:var(--ink-2)">⚠️ Запись и расшифровка работают только на <b>компьютере с запущенным приложением Lumen Notetaker</b>. Созвон с телефона или без открытого приложения <b>не записывается</b>.</div>';
+        })()}</div>
       <div class="form-row"><label>Эксперт</label><select id="mtBroker">${brokers.map(b => `<option value="${b.id}">${esc(b.name)} · ${STATE.settings.geoNames[b.geo]}</option>`).join('')}</select></div>
       <div class="form-row"><label>Заметка (видна только команде)</label><input id="mtNote" placeholder="например: подготовить 3 варианта под $172k"></div>
       <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Кнопка «Подключиться» на странице встречи</div><div class="sd">Выкл — на странице не будет кнопки подключения; эксперт сам пришлёт ссылку в переписке</div></div><label class="switch"><input type="checkbox" id="mtShowJoin" checked><span class="tr"></span><span class="th"></span></label></div>`,
@@ -17242,6 +17246,14 @@ PAGES.settings = async (root) => {
          <button class="btn btn-sm" id="zoomDisconnect" style="margin-top:8px">Отключить Zoom</button>`
       : `<div class="muted" style="font-size:12.3px;line-height:1.6;margin-bottom:10px">Подключите свой Zoom — тогда при назначении видео-встречи ссылка создастся автоматически <b>под вашим аккаунтом</b> (ваш хост, ваш брендинг), а встречу запишем и расшифруем в карточку. Без подключения используем бесплатную комнату Jitsi (без записи).</div>
          <button class="btn btn-accent" id="zoomConnect" style="width:100%;justify-content:center">${ic(I.chat || I.spark)}Подключить мой Zoom</button>`;
+  const gm = s.gmeet || {};
+  const gmeetForm = !gm.appReady
+    ? `<div class="muted" style="font-size:12px;line-height:1.6">Авто-создание Google Meet-ссылок подключается платформой (OAuth-приложение Google). Пока не настроено.</div>`
+    : gm.connected
+      ? `<div class="set-row"><div class="sp"><div class="sl">Подключён Google${gm.email ? ': <b>' + esc(gm.email) + '</b>' : ''}</div><div class="sd">Видео-встречи автоматически создаются как Google Meet под вашим аккаунтом. Запись и расшифровка — через приложение Lumen Notetaker на компьютере.</div></div><span class="badge ok">подключён</span></div>
+         <button class="btn btn-sm" id="gmeetDisconnect" style="margin-top:8px">Отключить Google Meet</button>`
+      : `<div class="muted" style="font-size:12.3px;line-height:1.6;margin-bottom:10px">Подключите свой Google — при назначении видео-встречи ссылка Meet создастся автоматически <b>под вашим аккаунтом</b>. Без подключения используем бесплатную комнату Jitsi.</div>
+         <button class="btn btn-accent" id="gmeetConnect" style="width:100%;justify-content:center">${ic(I.cal || I.spark)}Подключить Google Meet</button>`;
   root.innerHTML = `
     <div class="set-sec-h">${ic(I.users)}Аккаунт и команда</div>
     ${linkCard('data-ovgo="roles"', I.users, 'Роли и доступы', 'Кто из команды что видит и какие карточки лидов — права на сервере', `${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}`)}
@@ -17254,6 +17266,7 @@ PAGES.settings = async (root) => {
     ${coll(`${ic(I.send)}Мост Telegram — брокеры отвечают с телефона`, tgBridgeForm, { open: false })}
     ${coll(`${ic(I.phone)}Телефония — звонки в карточку`, telForm, { open: false })}
     ${coll(`${ic(I.cal || I.chat)}Zoom — авто-ссылки и запись встреч`, zoomForm, { open: false })}
+    ${coll(`${ic(I.cal || I.chat)}Google Meet — авто-ссылки встреч`, gmeetForm, { open: false })}
 
     <div class="set-sec-h">${ic(I.spark)}ИИ и автоматизация</div>
     ${coll(`${ic(I.spark)}Движок ИИ`, aiForm, { open: false })}
@@ -17401,6 +17414,15 @@ PAGES.settings = async (root) => {
   $('#zoomDisconnect')?.addEventListener('click', async () => {
     if (!await uiConfirm('Отключить Zoom?', 'Новые видео-встречи будут использовать бесплатную комнату Jitsi (без авто-записи), пока не подключите снова.')) return;
     try { await api.post('/zoom/disconnect', {}); toast('Zoom отключён', null, true); await loadState(); PAGES.settings(root); }
+    catch (e) { toast('Ошибка', e.message); }
+  });
+  $('#gmeetConnect')?.addEventListener('click', async () => {
+    try { const r = await api.get('/gmeet/connect'); if (r.url) location.href = r.url; }
+    catch (e) { toast('Не удалось начать подключение', e.message); }
+  });
+  $('#gmeetDisconnect')?.addEventListener('click', async () => {
+    if (!await uiConfirm('Отключить Google Meet?', 'Новые видео-встречи будут использовать бесплатную комнату Jitsi, пока не подключите снова.')) return;
+    try { await api.post('/gmeet/disconnect', {}); toast('Google Meet отключён', null, true); await loadState(); PAGES.settings(root); }
     catch (e) { toast('Ошибка', e.message); }
   });
   $('#vSave').addEventListener('click', async () => {
@@ -17673,7 +17695,9 @@ window.addEventListener('hashchange', () => {
     const qp = new URLSearchParams(location.search);
     if (qp.get('zoom') === 'connected') { toast('Zoom подключён', 'Видео-встречи теперь создаются под вашим аккаунтом и пишутся в карточку', true); }
     else if (qp.get('zoom') === 'error') { toast('Zoom не подключён', 'Согласие не получено или истёк срок — попробуйте ещё раз в «Подключениях»'); }
-    if (qp.has('zoom')) history.replaceState(null, '', location.pathname + location.hash);
+    if (qp.get('gmeet') === 'connected') { toast('Google Meet подключён', 'Видео-встречи теперь создаются как Meet под вашим аккаунтом', true); }
+    else if (qp.get('gmeet') === 'error') { toast('Google Meet не подключён', 'Согласие не получено — попробуйте ещё раз в «Подключениях»'); }
+    if (qp.has('zoom') || qp.has('gmeet')) history.replaceState(null, '', location.pathname + location.hash);
   } catch (_) {}
   mountFab();
   watchVersion();   /* SPA-вкладка живёт долго → мягко сообщаем о новом деплое (частая путаница «вижу старую версию») */

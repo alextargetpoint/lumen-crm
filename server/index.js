@@ -144,6 +144,7 @@ const farmProv = require('./farm-provision'); /* Р2: конвейер пров�
 const farmWarm = require('./farm-warmup');    /* Р3: движок прогрева номеров (расписание + тик) */
 const meetingBot = require('./meetingbot');   /* авто-запись+транскрипция Zoom/Meet встреч (Recall.ai) */
 const zoom = require('./zoom');   /* генерация Zoom-ссылок (SaaS: платформенный Server-to-Server OAuth аккаунт) */
+const gmeet = require('./gmeet');   /* генерация Google Meet-ссылок (SaaS: per-tenant Google OAuth) */
 let XLSX = null; try { XLSX = require('xlsx'); } catch (_) {}   /* парс Excel-прайсов застройщиков (наличие юнитов) */
 const farmMail = require('./farm-email');     /* Р2+: email-адаптер для Telegram (catch-all + авто-код) */
 const invoicepdf = require('./invoicepdf');
@@ -1480,8 +1481,9 @@ function publicSettings(db) {
   if (s.wa.appSecret) { s.wa.appSecretSet = true; delete s.wa.appSecret; }
   if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
   { s.meetingBot = s.meetingBot || { enabled: true }; if (s.meetingBot.key) { s.meetingBot.keySet = true; delete s.meetingBot.key; } s.meetingBot.platform = !!process.env.RECALL_API_KEY; s.meetingBot.ready = meetingBot.ready(); }  /* авто-транскрипция встреч: платформенный ключ → агентству настраивать нечего */
-  /* SEC: Zoom-токены агентства (access/refresh) — секрет, НИКОГДА наружу. Отдаём только безопасный статус подключения. */
+  /* SEC: Zoom/Google-токены агентства (access/refresh) — секрет, НИКОГДА наружу. Отдаём только безопасный статус. */
   delete s.zoom; s.zoom = zoom.status(db);
+  delete s.gmeet; s.gmeet = gmeet.status(db);
   if (s.voice && s.voice.key) { s.voice.keySet = true; delete s.voice.key; }
   if (s.channels) {
     for (const k of ['tg', 'viber', 'email']) {
@@ -3448,6 +3450,14 @@ async function genMeetingLink(db, kind, lead, atMs, durMin) {
       console.error('[zoom] создать встречу не вышло:', r && r.error);
     } catch (e) { console.error('[zoom]', e.message); }
   }
+  if (gmeet.ready(db)) {
+    try {
+      const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
+      const r = await gmeet.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id });
+      if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: '' };   /* matchKeys распарсит Meet-код из ссылки */
+      console.error('[gmeet] создать встречу не вышло:', r && r.error);
+    } catch (e) { console.error('[gmeet]', e.message); }
+  }
   return { url: `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}`, zoomMeetingId: '' };
 }
 async function maybeScheduleMeetingBot(db, mt) {
@@ -5164,6 +5174,19 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { url: (callBase() ? callBase() : '') + '/creatives/' + fn, path: '/creatives/' + fn });
     }
     /* ── Нотетейкер, session-режим (приложение логинится реальным аккаунтом → САМО понимает, кто вошёл) ── */
+    /* heartbeat десктоп-приложения: отмечаем, что у этого пользователя нотетейкер ЗАПУЩЕН (для предупреждения брокеру) */
+    if (p === '/api/notetaker/heartbeat' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      db.settings.notetakerSeen = db.settings.notetakerSeen || {};
+      db.settings.notetakerSeen[R.brokerId || 'owner'] = Date.now();
+      store.save(); return json(res, 200, { ok: true });
+    }
+    /* статус нотетейкера текущего пользователя: запущен ли на его ПК (heartbeat за последние 90с) */
+    if (p === '/api/notetaker/status' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const seen = (db.settings.notetakerSeen || {})[R.brokerId || 'owner'] || 0;
+      return json(res, 200, { active: Date.now() - seen < 90e3, lastSeen: seen });
+    }
     if (p === '/api/notetaker/me' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const name = R.role === 'broker' ? ((db.brokers.find(b => b.id === R.brokerId) || {}).name || 'Брокер') : ((db.settings.agency && db.settings.agency.managerName) || 'Руководитель');
@@ -5481,6 +5504,20 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/zoom/status' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       return json(res, 200, zoom.status(db));
+    }
+    /* ---------- Google Meet: подключение СВОЕГО Google-аккаунта агентства (только владелец) ---------- */
+    if (p === '/api/gmeet/connect' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!gmeet.appConfigured()) return json(res, 400, { error: 'на платформе не настроено Google-приложение (GOOGLE_OAUTH_CLIENT_ID/SECRET + PUBLIC_BASE_URL)' });
+      return json(res, 200, { url: gmeet.startAuth(store.currentTid()) });
+    }
+    if (p === '/api/gmeet/disconnect' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      gmeet.disconnect(db); return json(res, 200, { ok: true });
+    }
+    if (p === '/api/gmeet/status' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      return json(res, 200, gmeet.status(db));
     }
     /* ---------- АДМИНКА листа ожидания (только владелец) ---------- */
     if (p === '/api/waitlist/list' && req.method === 'GET') {
@@ -5990,6 +6027,16 @@ const server = http.createServer(async (req, res) => {
         await store.runInTenant(tid, async () => { const tdb = store.get(); await zoom.exchangeCode(tdb, code); });
         res.writeHead(302, { Location: '/?zoom=connected' }); return res.end();
       } catch (e) { console.error('[zoom callback]', e.message); res.writeHead(302, { Location: '/?zoom=error' }); return res.end(); }
+    }
+    if (p === '/auth/gmeet/callback' && req.method === 'GET') {
+      const code = u.searchParams.get('code') || '';
+      const err = u.searchParams.get('error') || '';
+      const tid = gmeet.consumeState(u.searchParams.get('state') || '');
+      if (err || !code || !tid) { res.writeHead(302, { Location: '/?gmeet=error' }); return res.end(); }
+      try {
+        await store.runInTenant(tid, async () => { const tdb = store.get(); await gmeet.exchangeCode(tdb, code); });
+        res.writeHead(302, { Location: '/?gmeet=connected' }); return res.end();
+      } catch (e) { console.error('[gmeet callback]', e.message); res.writeHead(302, { Location: '/?gmeet=error' }); return res.end(); }
     }
     /* ---------------- Супер-админ платформы (основатель) ---------------- */
     if (p === '/auth/admin-login' && req.method === 'POST') {
