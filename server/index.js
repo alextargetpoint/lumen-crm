@@ -116,6 +116,21 @@ const CREATIVES_DIR = path.join(DATA_DIR, 'creatives');
    Раздаются через /media/* (см. роут ниже). Иначе фото карточек 404 после редеплоя Railway. */
 const MEDIA_DIR = path.join(DATA_DIR, 'media');
 function saveMedia(sub, filename, buf) { const dir = path.join(MEDIA_DIR, sub); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, filename), buf); return '/media/' + sub + '/' + filename; }
+/* ── ПЕРСИСТЕНТНОЕ хранилище ЗАГРУЗОК /assets (логотипы, аватары, мудборды, файлы лида, карусели, кейсы) ──
+   Исторически эти загрузки писались в public/assets. Но public/ на Railway ЭФЕМЕРНА: при каждом деплое
+   контейнер пересобирается из git и всё незакоммиченное СТИРАЕТСЯ — так пропал логотип Trust Phuket.
+   Фикс: ЗАГРУЗКИ пишем в UPLOADS_DIR на томе (переживает деплой), а раздача /assets/* смотрит СНАЧАЛА на том,
+   потом фолбэк на коммитнутую статику public/assets (демо-картинки, лендинг — они в git, всегда свежие).
+   URL остаются прежними (/assets/...), менять ссылки в БД/карточках не нужно. */
+const UPLOADS_DIR = path.join(DATA_DIR, 'assets');
+try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (_) {}
+/* резолв /assets/<rel>: приоритет тому (загрузки), иначе коммитнутая статика public/assets */
+function resolveAsset(rel) {
+  const clean = String(rel).replace(/^\/+/, '').replace(/^assets\//, '');
+  const onVol = path.join(UPLOADS_DIR, clean);
+  if (onVol.startsWith(UPLOADS_DIR) && fs.existsSync(onVol)) return onVol;
+  return path.join(PUBLIC, 'assets', clean);
+}
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon',
   /* аудио/видео/документы — нужны для медиа-моста WhatsApp⇄Telegram (голосовые .oga и пр. Cloud API качает по ссылке и проверяет Content-Type) */
   '.oga': 'audio/ogg', '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.amr': 'audio/amr', '.wav': 'audio/wav',
@@ -2937,12 +2952,15 @@ function rateHit(key, max, windowMs) {
   if (e.n >= max) return false; e.n++; return true;
 }
 
-/* SEC: безопасный путь к ассету — резолвим и проверяем, что он ВНУТРИ PUBLIC/assets (защита от ../ traversal) */
+/* SEC: безопасный путь к ассету — резолвим и проверяем, что он ВНУТРИ assets (защита от ../ traversal).
+   Загрузки лежат на томе (UPLOADS_DIR) → сперва проверяем том, иначе коммитнутую статику public/assets. */
 function assetPathSafe(webPath) {
   const rel = String(webPath || '').replace(/^\/+/, '');
-  const abs = path.resolve(PUBLIC, rel);
-  const base = path.resolve(PUBLIC, 'assets');
-  return (abs === base || abs.startsWith(base + path.sep)) ? abs : null;
+  for (const base of [UPLOADS_DIR, path.resolve(PUBLIC, 'assets')]) {
+    const abs = path.resolve(base, rel.replace(/^assets\//, ''));
+    if ((abs === base || abs.startsWith(base + path.sep)) && fs.existsSync(abs)) return abs;
+  }
+  return null;
 }
 
 /* --- запись звонка → скачать → Whisper → транскрипт в карточку лида (общая для всех провайдеров) --- */
@@ -4352,9 +4370,9 @@ async function genCarouselPhotos(need, opts = {}) {
   const out = await Promise.all(prompts.map(async (p) => {
     try {
       const buf = await llm.generateImage(p, { size: '1024x1024', quality: 'medium' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'lib'), { recursive: true });
       const fn = `lib/gen-${crypto.randomBytes(4).toString('hex')}.png`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fn), buf);
+      fs.writeFileSync(path.join(UPLOADS_DIR, fn), buf);
       return '/assets/' + fn;
     } catch (e) { console.error('[genCarouselPhotos] ' + e.message); return null; }
   }));
@@ -4912,9 +4930,9 @@ const server = http.createServer(async (req, res) => {
           }
           try {
             const buf = await llm.generateImage(prompt, isSticker ? { size: '1024x1024', quality: 'high', background: 'transparent', output_format: 'png' } : { size: '1024x1024', quality: 'medium' });
-            fs.mkdirSync(path.join(PUBLIC, 'assets', 'mood'), { recursive: true });
+            fs.mkdirSync(path.join(UPLOADS_DIR, 'mood'), { recursive: true });
             const fname = `mood/${crypto.randomBytes(6).toString('hex')}.png`;
-            fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+            fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
             db.moodboard = db.moodboard || {}; db.moodboard[_mbUid] = db.moodboard[_mbUid] || [];
             const n = db.moodboard[_mbUid].length;
             const item = { id: crypto.randomBytes(5).toString('hex'), type: isSticker ? 'sticker' : 'image', url: '/assets/' + fname, caption: cap, ...(txt ? { txt } : {}), x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
@@ -5433,7 +5451,7 @@ const server = http.createServer(async (req, res) => {
       const buf = Buffer.from(mm[2], 'base64');
       if (!buf.length || buf.length > 10 * 1024 * 1024) return json(res, 400, { error: 'файл до 10 МБ' });
       const ext = mm[1] === 'jpeg' ? 'jpg' : mm[1];
-      const dir = path.join(PUBLIC, 'assets', 'briefs'); try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      const dir = path.join(UPLOADS_DIR, 'briefs'); try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
       const fn = 'b_' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.' + ext;
       try { fs.writeFileSync(path.join(dir, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
       return json(res, 200, { url: '/assets/briefs/' + fn });
@@ -5631,7 +5649,7 @@ const server = http.createServer(async (req, res) => {
       const ct = req.headers['content-type'] || '';
       const ext = ct.includes('svg') ? 'svg' : ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
       const fname = 'agency-logo.' + ext;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       db.settings.agency.logo = '/assets/' + fname + '?v=' + Date.now();
       store.save();
       return json(res, 200, { logo: db.settings.agency.logo });
@@ -5770,9 +5788,9 @@ const server = http.createServer(async (req, res) => {
         });
         if (!r2.ok) throw new Error('elevenlabs ' + r2.status + ': ' + (await r2.text()).slice(0, 140));
         const buf = Buffer.from(await r2.arrayBuffer());
-        fs.mkdirSync(path.join(PUBLIC, 'assets', 'voice'), { recursive: true });
+        fs.mkdirSync(path.join(UPLOADS_DIR, 'voice'), { recursive: true });
         const fname = 'voice/tts-' + Date.now() + '.mp3';
-        fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+        fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
         return json(res, 200, { url: '/assets/' + fname });
       } catch (e) { return json(res, 500, { error: e.message }); }
     }
@@ -7453,7 +7471,7 @@ const server = http.createServer(async (req, res) => {
       const chunks = []; let size = 0;
       await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 25e6) req.destroy(); else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
       if (!size || size > 25e6) return json(res, 400, { error: 'файл до 25 МБ' });
-      const dir = path.join(PUBLIC, 'assets', 'leadfiles'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const dir = path.join(UPLOADS_DIR, 'leadfiles'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const name = `${lead.id}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
       fs.writeFileSync(path.join(dir, name), Buffer.concat(chunks));
       lead.attachments = lead.attachments || [];
@@ -7479,7 +7497,7 @@ const server = http.createServer(async (req, res) => {
       await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 24e6) req.destroy(); else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
       if (!size || size > 24e6) return json(res, 400, { error: 'запись до 24 МБ' });
       const buf = Buffer.concat(chunks);
-      const dir = path.join(PUBLIC, 'assets', 'leadfiles'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const dir = path.join(UPLOADS_DIR, 'leadfiles'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const name = `${lead.id}-voice-${crypto.randomBytes(4).toString('hex')}.${ext}`;
       fs.writeFileSync(path.join(dir, name), buf);
       let transcript = '';
@@ -7619,9 +7637,9 @@ const server = http.createServer(async (req, res) => {
       const chunks = []; let size = 0;
       await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 12e6) req.destroy(); else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
       if (!size || size > 12e6) return json(res, 400, { error: 'файл до 12 МБ' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'creatives'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'creatives'), { recursive: true });
       const fname = `creatives/${lead.id}-${crypto.randomBytes(3).toString('hex')}.${extM[1].toLowerCase()}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       lead.creativeUrl = '/assets/' + fname;
       store.save();
       return json(res, 200, { url: lead.creativeUrl });
@@ -7634,9 +7652,9 @@ const server = http.createServer(async (req, res) => {
       await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 120e6) { over = true; req.destroy(); resolve(); } else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
       if (over) return json(res, 400, { error: 'запись до 120 МБ — сократите или снизьте качество' });
       if (!size) return json(res, 400, { error: 'пустая запись' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'studio'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'studio'), { recursive: true });
       const fname = `studio/${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}.${extM[1].toLowerCase()}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       return json(res, 200, { url: '/assets/' + fname, size });
     }
 
@@ -7850,7 +7868,7 @@ const server = http.createServer(async (req, res) => {
       if (!size || size > 3e6) return json(res, 400, { error: 'файл до 3 МБ (JPG/PNG/WebP)' });
       const ct = req.headers['content-type'] || '';
       const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
-      const dir = path.join(PUBLIC, 'assets', 'brokers');
+      const dir = path.join(UPLOADS_DIR, 'brokers');
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, br.id + '.' + ext), Buffer.concat(chunks));
       br.photo = '/assets/brokers/' + br.id + '.' + ext + '?v=' + Date.now();
@@ -8219,10 +8237,10 @@ const server = http.createServer(async (req, res) => {
       await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 12e6) { over = true; req.destroy(); resolve(); } else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
       if (over) return json(res, 400, { error: 'файл до 12 МБ — фото сжимается автоматически, видео сократите' });
       if (!size) return json(res, 400, { error: 'пустой файл' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'creatives'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'creatives'), { recursive: true });
       const ext = extM[1].toLowerCase().replace('jpeg', 'jpg');
       const fname = `creatives/seq-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       return json(res, 200, { url: '/assets/' + fname, type: ext === 'pdf' ? 'pdf' : /(mp4|webm|mov)/.test(ext) ? 'video' : 'image', compressed: /(png|jpg|webp)/.test(ext) });
     }
     if ((m = p.match(/^\/api\/sequences\/([^/]+)\/ai-draft$/)) && req.method === 'POST') {
@@ -10377,9 +10395,9 @@ const server = http.createServer(async (req, res) => {
       } else {
         try { tgtBuf = await studio.visualTarget(brief, { quality: b.quality || 'high' }); }
         catch (e) { return json(res, 500, { error: 'target: ' + e.message }); }
-        fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+        fs.mkdirSync(path.join(UPLOADS_DIR, 'lib'), { recursive: true });
         const tname = `lib/tgt-${crypto.randomBytes(5).toString('hex')}.png`;
-        fs.writeFileSync(path.join(PUBLIC, 'assets', tname), tgtBuf);
+        fs.writeFileSync(path.join(UPLOADS_DIR, tname), tgtBuf);
         targetUrl = '/assets/' + tname;
       }
       let sg;
@@ -10425,9 +10443,9 @@ const server = http.createServer(async (req, res) => {
       const chunks = []; let size = 0;
       await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 25e6) req.destroy(); else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
       if (!size || size > 25e6) return json(res, 400, { error: 'файл до 25 МБ' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'car'), { recursive: true });
       const fname = `car/${c.id}-${crypto.randomBytes(4).toString('hex')}.${extM[1].toLowerCase()}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       return json(res, 200, { url: '/assets/' + fname });
     }
     /* ИИ-картинка фона слайда (переиспользуем генератор) */
@@ -10439,9 +10457,9 @@ const server = http.createServer(async (req, res) => {
       if (!pr) return json(res, 400, { error: 'опишите фон' });
       try {
         const buf = await llm.generateImage(pr + ', premium real-estate social media background, cinematic, elegant, no text, no watermark', { size: '1024x1024', quality: 'medium' });
-        fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+        fs.mkdirSync(path.join(UPLOADS_DIR, 'lib'), { recursive: true });
         const fname = `lib/car-${crypto.randomBytes(5).toString('hex')}.png`;
-        fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+        fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
         return json(res, 200, { url: '/assets/' + fname });
       } catch (e) { return json(res, 500, { error: e.message }); }
     }
@@ -10659,9 +10677,9 @@ const server = http.createServer(async (req, res) => {
       const extM = String(u.searchParams.get('filename') || '').match(/\.(jpe?g|png|webp|gif|mp4|webm)$/i); if (!extM) return json(res, 400, { error: 'формат: jpg/png/webp/gif/mp4/webm' });
       const chunks = []; let size = 0; await new Promise((rs) => { req.on('data', ch => { size += ch.length; if (size > 30e6) req.destroy(); else chunks.push(ch); }); req.on('end', rs); req.on('close', rs); });
       if (!size || size > 30e6) return json(res, 400, { error: 'файл до 30 МБ' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'feed'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'feed'), { recursive: true });
       const fname = `feed/${crypto.randomBytes(5).toString('hex')}.${extM[1].toLowerCase()}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       return json(res, 200, { url: '/assets/' + fname, kind: /mp4|webm/i.test(extM[1]) ? 'video' : 'image' });
     }
 
@@ -10743,9 +10761,9 @@ const server = http.createServer(async (req, res) => {
           const buf = await llm.generateImage(prompt, isSticker
             ? { size: '1024x1024', quality: 'high', background: 'transparent', output_format: 'png' }   /* вырезанный стикер на прозрачном фоне */
             : { size: '1024x1024', quality: 'medium' });
-          fs.mkdirSync(path.join(PUBLIC, 'assets', 'mood'), { recursive: true });
+          fs.mkdirSync(path.join(UPLOADS_DIR, 'mood'), { recursive: true });
           const fname = `mood/${crypto.randomBytes(6).toString('hex')}.png`;
-          fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+          fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
           db.moodboard = db.moodboard || {}; db.moodboard[uid] = db.moodboard[uid] || [];
           const n = db.moodboard[uid].length;
           const item = { id: crypto.randomBytes(5).toString('hex'), type: b.style === 'sticker' ? 'sticker' : 'image', url: '/assets/' + fname, caption: cap, ...(txt ? { txt } : {}), x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
@@ -11035,7 +11053,7 @@ const server = http.createServer(async (req, res) => {
         const chunks = []; let size = 0;
         await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 20e6) req.destroy(); else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
         if (!size || size > 20e6) return json(res, 400, { error: 'файл до 20 МБ' });
-        const dir = path.join(PUBLIC, 'assets', 'tasks'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const dir = path.join(UPLOADS_DIR, 'tasks'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         const name = `${t.id}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
         fs.writeFileSync(path.join(dir, name), Buffer.concat(chunks));
         t.attachments = t.attachments || [];
@@ -13053,9 +13071,9 @@ ${SCR}
         req.on('end', resolve); req.on('close', resolve);
       });
       if (!size || size > 25e6) return json(res, 400, { error: 'файл до 25 МБ' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'coll'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'coll'), { recursive: true });
       const fname = `coll/${c.id}-${crypto.randomBytes(4).toString('hex')}.${extM[1].toLowerCase()}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       return json(res, 200, { url: '/assets/' + fname });
     }
     /* конструктор v2: ИИ-генерация картинки (OpenAI gpt-image-1) → сохраняем в общую библиотеку */
@@ -13069,9 +13087,9 @@ ${SCR}
       const style = b.raw ? '' : ', premium real-estate photography, cinematic natural light, elegant, high-end, photoreal, no text, no watermark, no logo';
       try {
         const buf = await llm.generateImage(pr + style, { size: b.size || '1536x1024', quality: b.quality || 'medium' });
-        fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+        fs.mkdirSync(path.join(UPLOADS_DIR, 'lib'), { recursive: true });
         const fname = `lib/ai-${crypto.randomBytes(5).toString('hex')}.png`;
-        fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+        fs.writeFileSync(path.join(UPLOADS_DIR, fname), buf);
         return json(res, 200, { url: '/assets/' + fname });
       } catch (e) { return json(res, 500, { error: 'ИИ-картинка не удалась: ' + e.message }); }
     }
@@ -13669,9 +13687,9 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;ma
       const extM = String(u.searchParams.get('filename') || '').match(/\.(mp4|webm|mov|m4v)$/i); if (!extM) return json(res, 400, { error: 'формат: mp4/webm/mov' });
       const chunks = []; let size = 0; await new Promise((rs) => { req.on('data', ch => { size += ch.length; if (size > 200e6) req.destroy(); else chunks.push(ch); }); req.on('end', rs); req.on('close', rs); });
       if (!size || size > 200e6) return json(res, 400, { error: 'видео до 200 МБ' });
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'cases'), { recursive: true });
+      fs.mkdirSync(path.join(UPLOADS_DIR, 'cases'), { recursive: true });
       const fname = `cases/${crypto.randomBytes(6).toString('hex')}.${extM[1].toLowerCase()}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      fs.writeFileSync(path.join(UPLOADS_DIR, fname), Buffer.concat(chunks));
       kase.videoUrl = '/assets/' + fname; kase.videoSize = size; store.save();
       return json(res, 200, { videoUrl: kase.videoUrl, size, transcribable: size <= 24e6 });
     }
@@ -15661,7 +15679,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         icons: AMEN_ICONS,
         types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
         props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
-        lib: (() => { try { return fs.readdirSync(path.join(PUBLIC, 'assets', 'lib')).filter(f => /\.(jpe?g|png|webp)$/i.test(f)).map(f => '/assets/lib/' + f); } catch (e) { return []; } })(),
+        lib: (() => { const seen = new Set(); for (const d of [path.join(UPLOADS_DIR, 'lib'), path.join(PUBLIC, 'assets', 'lib')]) { try { for (const f of fs.readdirSync(d)) if (/\.(jpe?g|png|webp)$/i.test(f)) seen.add(f); } catch (e) {} } return [...seen].map(f => '/assets/lib/' + f); })(),
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
@@ -15888,8 +15906,9 @@ cont.addEventListener('drop',function(e){e.preventDefault();if(!dg)return;dg.dat
     /* ---------------- статика ---------------- */
     let file = p === '/' ? '/index.html' : p === '/landing' ? '/landing.html' : p;
     file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
-    const full = path.join(PUBLIC, file);
-    if (!full.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
+    /* ЗАГРУЗКИ /assets/* — сперва с тома (переживают деплой), иначе коммитнутая статика public/assets */
+    const full = file.startsWith('/assets/') ? resolveAsset(file) : path.join(PUBLIC, file);
+    if (!full.startsWith(PUBLIC) && !full.startsWith(UPLOADS_DIR)) { res.writeHead(403); res.end(); return; }
     /* SEC(#7): документы лида и входящие WA-медиа (паспорта/ВНЖ и пр.) — ТОЛЬКО под валидной сессией,
        иначе любая утечка URL = вечный доступ постороннего к чувствительному файлу.
        SEC(изоляция тенантов): плюс проверяем, что файл принадлежит ТЕКУЩЕМУ тенанту (его БД ссылается
@@ -15937,7 +15956,7 @@ server.listen(PORT, () => {
   else console.log('[admin] Панель основателя: /admin.html · ключ из env PLATFORM_ADMIN_KEY');
   /* БЭКАПЫ: снимок всех тенантов при старте + каждые 6 часов (data/backups/<tid>/, последние 40) */
   try { store.backupAll('startup'); console.log('[backup] стартовый снимок всех агентств готов'); } catch (e) {}
-  setInterval(() => { try { store.backupAll('auto'); } catch (e) {} }, 3600e3);        /* авто-снимок КАЖДЫЙ ЧАС (последние 40 ≈ 40ч истории) — «очень частые» бэкапы */
+  setInterval(() => { try { store.backupAll('auto'); } catch (e) {} }, 1800e3);        /* авто-снимок КАЖДЫЕ 30 МИН (последние 40 ≈ 20ч истории) — «очень частые» бэкапы данных */
   setInterval(() => { try { store.backupAll('daily'); } catch (e) {} }, 24 * 3600e3);  /* суточный снимок (хранится 30, не выпиливается) */
   /* офф-сайт: если задан BACKUP_WEBHOOK_URL — раз в сутки шлём снимки наружу (защита от сбоя самого тома) */
   if (process.env.BACKUP_WEBHOOK_URL) setInterval(() => { try { offsiteBackup(); } catch (e) {} }, 24 * 3600e3);

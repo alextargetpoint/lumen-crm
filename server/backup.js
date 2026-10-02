@@ -22,6 +22,14 @@
  */
 const zlib = require('zlib');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+/* Директории МЕДИА на томе (те же, что в server/index.js): загруженные файлы — картинки/аватары/
+   логотипы/мудборды/файлы лида/аудио звонков. Снимок БД (snapshotOnce) хранит ТОЛЬКО JSON — файлы
+   надо бэкапить ОТДЕЛЬНО, иначе гибель тома = потеря всех картинок клиентов. */
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const MEDIA_DIRS = ['creatives', 'media', 'assets'].map(d => path.join(DATA_DIR, d));
 
 const CFG = {
   keyId: process.env.BACKUP_B2_KEY_ID || '',
@@ -148,6 +156,64 @@ async function snapshotOnce(store, label) {
   } finally { _running = false; }
 }
 
+/* ── ИНКРЕМЕНТАЛЬНАЯ ВЫГРУЗКА МЕДИА-ФАЙЛОВ В B2 ──────────────────────────────────────────
+   snapshotOnce хранит только БД-JSON. Файлы (логотипы/фото/аватары/мудборды/файлы лида/аудио)
+   бэкапим отдельно. Инкрементально: берём список уже лежащих в B2 (префикс media/), заливаем ТОЛЬКО
+   новые → файл уходит один раз, egress/запись минимальны. Чувствительные (leadfiles/wa-media) шифруем. */
+let _mediaRunning = false;
+async function listB2Names(prefix) {
+  const a = await b2Auth(); const have = new Set(); let startName = undefined;
+  do {
+    const r = await fetch(a.apiUrl + '/b2api/v3/b2_list_file_names', {
+      method: 'POST', headers: { Authorization: a.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bucketId: CFG.bucketId, prefix, maxFileCount: 10000, startFileName: startName }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) break;
+    const j = await r.json();
+    for (const f of (j.files || [])) have.add(f.fileName);
+    startName = j.nextFileName || undefined;
+  } while (startName);
+  return have;
+}
+async function syncMedia() {
+  if (!enabled() || _mediaRunning) return { ok: false, skipped: true };
+  _mediaRunning = true;
+  try {
+    const have = await listB2Names('media/');
+    let uploaded = 0, skipped = 0, bytes = 0, failed = 0;
+    const toSend = [];
+    for (const dir of MEDIA_DIRS) {
+      const sub = path.basename(dir);
+      (function walk(d, rel) {
+        let names; try { names = fs.readdirSync(d); } catch (_) { return; }
+        for (const n of names) {
+          const fp = path.join(d, n); let s; try { s = fs.statSync(fp); } catch (_) { continue; }
+          if (s.isDirectory()) { walk(fp, rel + n + '/'); continue; }
+          const sensitive = /(^|\/)(leadfiles|wa-media)\//.test(sub + '/' + rel);
+          const name = 'media/' + sub + '/' + rel + n + (sensitive && CFG.encKey ? '.enc' : '');
+          if (have.has(name)) { skipped++; continue; }
+          if (s.size > 300 * 1024 * 1024) { skipped++; continue; }   // >300МБ — пропускаем (страховка)
+          toSend.push({ fp, name, sensitive, size: s.size });
+        }
+      })(dir, '');
+    }
+    for (const it of toSend) {
+      try {
+        let buf = fs.readFileSync(it.fp);
+        if (it.sensitive && CFG.encKey) buf = encrypt(buf);
+        await b2Upload(it.name, buf);
+        uploaded++; bytes += it.size;
+      } catch (e) { failed++; }
+    }
+    if (uploaded || failed) console.log(`[b2backup] медиа: +${uploaded} новых (${(bytes / 1048576).toFixed(1)}МБ), пропущено ${skipped}, ошибок ${failed}`);
+    return { ok: true, uploaded, skipped, failed, bytes };
+  } catch (e) {
+    console.warn('[b2backup] медиа-синк ошибка:', e.message);
+    return { ok: false, error: e.message };
+  } finally { _mediaRunning = false; }
+}
+
 /* СКВОЗНАЯ ПРОВЕРКА: снять снимок → выгрузить → скачать обратно → расшифровать → распаковать →
    распарсить → сверить число агентств. Доказывает, что бэкап реально пригоден к восстановлению. */
 async function runAndVerify(store) {
@@ -176,6 +242,10 @@ function start(store) {
   setTimeout(() => snapshotOnce(store, 'hourly'), 15000); // стартовый (через 15с после подъёма)
   setInterval(() => snapshotOnce(store, 'hourly'), CFG.hourlyMin * 60e3);
   setInterval(() => snapshotOnce(store, 'daily'), CFG.dailyHours * 3600e3);
+  /* МЕДИА-ФАЙЛЫ (картинки/аватары/логотипы/аудио) — инкрементально, отдельно от БД. Раз в сутки + стартовый
+     прогон через 60с. Инкрементально → в обычный день почти нулевой трафик (заливаются только новые файлы). */
+  setTimeout(() => syncMedia(), 60000);
+  setInterval(() => syncMedia(), CFG.dailyHours * 3600e3);
 }
 
-module.exports = { start, snapshotOnce, runAndVerify, decrypt, enabled, CFG };
+module.exports = { start, snapshotOnce, syncMedia, runAndVerify, decrypt, enabled, CFG };
