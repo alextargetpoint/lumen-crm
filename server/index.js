@@ -2885,6 +2885,20 @@ function collBlocks(c) {
   return b;
 }
 
+/* санитайз выбора юнитов подборки: {pid: [индексы]} — только валидные pid, целые индексы ≥0, дедуп */
+function sanitizeUnitSel(raw, propertyIds) {
+  if (!raw || typeof raw !== 'object') return {};
+  const allow = new Set(propertyIds || []);
+  const out = {};
+  for (const pid of Object.keys(raw)) {
+    if (!allow.has(pid)) continue;
+    const arr = Array.isArray(raw[pid]) ? raw[pid] : [];
+    const idx = [...new Set(arr.map(n => parseInt(n, 10)).filter(n => Number.isInteger(n) && n >= 0 && n < 400))].slice(0, 120);
+    if (idx.length) out[pid] = idx;   /* пустой выбор = все юниты, ключ не храним */
+  }
+  return out;
+}
+
 /* санитайз blocks при сохранении из редактора */
 function sanitizeBlocks(raw) {
   if (!Array.isArray(raw)) return null;
@@ -12964,6 +12978,7 @@ ${SCR}
       const b = await readBody(req);
       if (b.folderId !== undefined) c.folderId = b.folderId || null;
       if (b.title) c.title = String(b.title).slice(0, 200);
+      if (b.unitSel && typeof b.unitSel === 'object') c.unitSel = sanitizeUnitSel(b.unitSel, c.propertyIds);
       /* Ф1: оси дизайна документа (Style/Art-Dir/Density/Image-Dom/Data-Depth/Brand) + seed арт-директора */
       if (b.design && typeof b.design === 'object') {
         const AX = design.AXES; const d = c.design || {};
@@ -13007,10 +13022,12 @@ ${SCR}
     if (p === '/api/collections' && req.method === 'POST') {
       const b = await readBody(req);
       const c = { id: crypto.randomBytes(5).toString('hex'), leadId: b.leadId || null, title: b.title || 'Подборка', intro: String(b.intro || '').slice(0, 1500), propertyIds: (b.propertyIds || []).slice(0, 30), createdAt: Date.now(), views: 0 };
+      if (b.singleProject) c.singleProject = true;   /* документ по одному объекту (PDF объекта) */
+      c.unitSel = sanitizeUnitSel(b.unitSel, c.propertyIds);   /* выбор юнитов на уровне подборки */
       /* Ф1: оси дизайна документа (по умолчанию всё auto) */
-      { const AX = design.AXES; const d = {}; if (b.design && typeof b.design === 'object') { for (const k of Object.keys(AX)) { if (b.design[k] != null && AX[k].opts.some(o => o[0] === b.design[k])) d[k] = b.design[k]; } } c.design = d; }
+      { const AX = design.AXES; const d = {}; if (b.design && typeof b.design === 'object') { for (const k of Object.keys(AX)) { if (b.design[k] != null && AX[k].opts.some(o => o[0] === b.design[k])) d[k] = b.design[k]; } if (b.design.auto) d.auto = true; } c.design = d; }
       db.collections.unshift(c); store.save();
-      return json(res, 200, c);
+      return json(res, 200, Object.assign({}, c, { editKey: editKeyFor(req) }));
     }
     /* Ф1/Ф3: «Другой вариант / Перекомпоновать» — новый seed → арт-директор строит ДРУГОЙ макет.
        Ф3: перебираем сиды и выбираем тот, чья сигнатура плана И обложка отличаются от недавних. */
@@ -15132,7 +15149,7 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
       const mgr = db.settings.agency.manager || {};
       const about = db.settings.agency.about || {};
       const AG = db.settings.agency.name;
-      const prById = (pid) => db.properties.find(x => x.id === pid);
+      const prById = (pid) => design.applyUnitSel(c, db.properties.find(x => x.id === pid));
       const projBlocks = blocks.filter(b => b.t === 'proj' && prById(b.data.pid));
       const fmt = (n, cur) => (cur === 'EUR' ? '€' : '$') + (n || 0).toLocaleString('ru-RU');
       const minPrice = Math.min(...projBlocks.map(b => prById(b.data.pid).priceFrom || Infinity));

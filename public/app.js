@@ -8261,6 +8261,7 @@ PAGES.properties = async (root) => {
               <div class="pd2-lang" id="pdLangDD"><select id="pdLang" title="Язык карточки — перевод для просмотра и шеринга клиенту">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm ${(PAGE_STATE.compare || []).includes(pr.id) ? 'btn-accent' : 'pd2-ghost'}" id="pdCompare" title="Добавить в сравнение (до 3 объектов)">${ic(I.grid || I.layers)}${(PAGE_STATE.compare || []).includes(pr.id) ? 'В сравнении ✓' : 'Сравнить'}</button>
+              <button class="btn btn-sm pd2-ghost" id="pdObjPdf" title="Собрать премиум арт-PDF по этому объекту (журнальный разворот) — редактируемый">${ic(I.doc)}PDF объекта</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
             </div>
@@ -8562,6 +8563,16 @@ PAGES.properties = async (root) => {
       render();   /* обновит подпись кнопки + панель сравнения (глобальная, из render) */
     });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
+    $('#pdObjPdf')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Собираю…';
+      try {
+        const r = await api.post('/collections', { title: pr.name, propertyIds: [pr.id], singleProject: true, design: { auto: true } });
+        const key = r.editKey ? '&edit=1&key=' + encodeURIComponent(r.editKey) : '';
+        window.open(`/p/${r.id}?design=1${key}`, '_blank');
+        toast('Арт-PDF объекта готов', 'в новой вкладке — правь и «Скачать PDF»', true);
+      } catch (err) { toast('Не вышло', err.message); }
+      btn.disabled = false; btn.innerHTML = old;
+    });
     $('#pdLang')?.addEventListener('change', async (e) => {   /* штатный select → enhanceControls рисует атольерный дропдаун (openPop: fixed-слой, скролл, поверх всего) */
       const lang = e.target.value; CARD_LANG = lang;
       if (lang === LANG || (pr.i18n && pr.i18n[lang])) return render();   /* оригинал/язык интерфейса или уже переведено */
@@ -9078,12 +9089,19 @@ PAGES.collections = async (root) => {
             <div class="ds-note">Движок сам решит композицию под данные объектов и запрос лида. Точная настройка — на карточке подборки.</div>
           </div></div>
         </div>
+        <label class="cl-premium"><input type="checkbox" id="clPremium" checked><span class="cl-chk"></span><span style="flex:1">${ic(I.spark)}<b>Премиум арт-документ</b> <span class="muted" style="font-size:11px">— авто-дизайн уровня студии (журнальный разворот, не «CRM-PDF»)</span></span></label>
         <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
         <div class="cl-props">
-          ${ordered.map(pr => `<label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
+          ${ordered.map(pr => { const us = (pr.units || []).filter(Boolean); const uLbl = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area)) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`; return `<div class="cl-prow">
+            <label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
             <span class="cl-chk"></span>
             <span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area)} · ${esc(pr.type)} · от ${fmt(pr)}</span></span>
-            ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>`).join('')}
+            ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>
+            ${us.length ? `<div class="cl-units" data-ppid="${pr.id}">
+              <button type="button" class="cl-units-tg" data-uall="${us.length}">${ic(I.grid)}юниты: <b class="cl-usum">все ${us.length}</b><span class="cl-ucar">${ic(I.chev)}</span></button>
+              <div class="cl-units-list" hidden>${us.map((u, i) => `<label class="cl-unit ${u.status === 'sold' ? 'sold' : ''}"><input type="checkbox" data-uidx="${i}" ${u.status === 'sold' ? '' : 'checked'}><span>${uLbl(u)}</span></label>`).join('')}</div>
+            </div>` : ''}
+          </div>`; }).join('')}
         </div>
         <button class="btn btn-accent" id="clCreate" style="margin-top:14px;width:100%;justify-content:center">${ic(I.plus)}Создать подборку</button>
       </div>
@@ -9113,6 +9131,7 @@ PAGES.collections = async (root) => {
             ${c.analytics ? `<div class="cl2-analytics ${c.analytics.maxDepth >= 75 ? 'hot' : ''}"><div class="cl2-bar"><i style="width:${c.analytics.maxDepth}%"></i></div><span>изучил ${c.analytics.maxDepth}%${c.analytics.deepSessions ? ' · глубоких ' + c.analytics.deepSessions : ''}</span></div>` : ''}
             <div class="cl2-acts">
               <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
+              <a class="btn btn-sm" href="/p/${c.id}?design=1&key=${c.editKey}" target="_blank" title="Премиум арт-документ (журнальный разворот) → из него «Скачать PDF»">${ic(I.spark)}Арт-PDF</a>
               <button class="btn btn-sm" data-act="share" title="Поделиться">${ic(I.send)}Поделиться</button>
               <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть классический вид">${ic(I.eye)}</a>
               <span class="tb-spacer"></span>
@@ -9136,10 +9155,22 @@ PAGES.collections = async (root) => {
   wireCollSelect(root);
   $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
   const dsT = $('#clDsToggle'); if (dsT) dsT.addEventListener('click', () => { PAGE_STATE.collDsOpen = !PAGE_STATE.collDsOpen; dsT.closest('.ds-fold').classList.toggle('open', PAGE_STATE.collDsOpen); });
+  /* выбор юнитов: раскрытие списка + живой счётчик «N из M» */
+  const updUSum = (box) => { const all = $$('.cl-unit input', box); const n = all.filter(x => x.checked).length; const sum = $('.cl-usum', box); if (sum) sum.textContent = (n === all.length ? 'все ' + all.length : n + ' из ' + all.length); };
+  $$('.cl-units', root).forEach(box => {
+    const tg = $('.cl-units-tg', box), list = $('.cl-units-list', box);
+    tg?.addEventListener('click', () => { list.hidden = !list.hidden; box.classList.toggle('open', !list.hidden); });
+    $$('.cl-unit input', box).forEach(ch => ch.addEventListener('change', () => updUSum(box)));
+    updUSum(box);
+  });
+  const collectUnitSel = (ids) => { const sel = {}; $$('.cl-units', root).forEach(box => { const pid = box.dataset.ppid; if (!ids.includes(pid)) return; const all = $$('.cl-unit input', box); const checked = all.filter(x => x.checked); if (checked.length && checked.length < all.length) sel[pid] = checked.map(x => +x.dataset.uidx); }); return sel; };
   $('#clCreate').addEventListener('click', async () => {
     const ids = $$('.cl-prop input:checked', root).map(x => x.value);
     if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
-    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids, design: dsCollect('clDs') });
+    const premium = !!($('#clPremium', root) && $('#clPremium', root).checked);
+    const design = dsCollect('clDs'); if (premium) design.auto = true;
+    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids, unitSel: collectUnitSel(ids), design });
+    toast('Подборка собрана', premium ? 'премиум арт-документ — откройте «Арт-PDF»' : null, true);
     render();
   });
   $$('[data-cl]', root).forEach(card => card.addEventListener('click', async (e) => {

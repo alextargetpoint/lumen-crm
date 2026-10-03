@@ -498,7 +498,7 @@ function blockOp(db, c, proj, action) {
   const d = c.design;
   d.locks = d.locks || {};
   d.pseed = d.pseed || {};
-  const props = (c.propertyIds || []).map(pid => db.properties.find(x => x.id === pid)).filter(Boolean);
+  const props = (c.propertyIds || []).map(pid => applyUnitSel(c, db.properties.find(x => x.id === pid))).filter(Boolean);
   if (!props.some(p => p.id === proj)) return { error: 'no such project in collection' };
   const lead = c.leadId ? (db.leads || []).find(l => l.id === c.leadId) : null;
   const seed = (d.seed || hashStr(c.id)) >>> 0;
@@ -541,7 +541,7 @@ function renderDesignDoc(db, c, opts) {
   const about = (S.agency && S.agency.about) || {};
   const logo = S.agency && S.agency.logo;
   const geoNames = S.geoNames || {};
-  const prById = (pid) => db.properties.find(x => x.id === pid);
+  const prById = (pid) => applyUnitSel(c, db.properties.find(x => x.id === pid));
   const props = (c.propertyIds || []).map(prById).filter(Boolean);
   const lead = c.leadId ? db.leads.find(l => l.id === c.leadId) : null;
   /* Ф4 · агент, подготовивший подборку: назначенный брокер лида → иначе реальный менеджер агентства.
@@ -1684,4 +1684,15 @@ document.addEventListener('click',function(ev){var t=ev.target.closest('[data-ba
 
 function plural(n) { n = +n; return n % 10 === 1 && n % 100 !== 11 ? 'проект' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'проекта' : 'проектов'; }
 
-module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES };
+/* Выбор юнитов на уровне подборки: c.unitSel[pid] = массив индексов в pr.units[].
+   Пусто/нет ключа → все юниты (обратная совместимость). Клонируем pr, чтобы не мутировать базу. */
+function applyUnitSel(c, pr) {
+  if (!pr) return pr;
+  const sel = c && c.unitSel && c.unitSel[pr.id];
+  if (!Array.isArray(sel) || !sel.length) return pr;
+  const units = (pr.units || []).filter((_, i) => sel.includes(i));
+  if (!units.length) return pr;   /* защита: если выбор «промахнулся» (юниты пересобрали) — показываем все */
+  return { ...pr, units };
+}
+
+module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES, applyUnitSel };
