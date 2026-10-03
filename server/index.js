@@ -12426,18 +12426,20 @@ ${SCR}
       /* медиа из открытых источников: новые фото (не дубли) + видео-рендеры */
       const webImgs = (sr.images || []).filter(u => !(pr.images || []).includes(u));
       const webVids = (sr.videos || []).filter(u => !(pr.videos || []).includes(u));
-      const media = { photos: webImgs.length, videos: webVids.length, images: webImgs.slice(0, 16), videoList: webVids.slice(0, 6) };
+      const media = { photos: webImgs.length, videos: webVids.length, images: webImgs.slice(0, 40), videoList: webVids.slice(0, 6) };
       if (!b.apply) return json(res, 200, { ok: true, proposed, gapFields, confidence: ext.confidence || 'medium', sources: sr.sources, media });
       const fields = Array.isArray(b.fields) && b.fields.length ? b.fields : Object.keys(proposed);
       const applied = fields.filter(k => mergeEnrich(k, proposed[k]));
-      /* скачиваем свежие фото продающего качества (встроенный хи-рес фильтр), добираем карточку до ~16 */
+      /* скачиваем фото: если клиент прислал ВЫБОР (b.images) — грузим ровно их (брокер отобрал в превью), иначе все найденные */
       let photosAdded = 0, videosAdded = 0, unitsAdded = 0;
-      if (b.media !== false && webImgs.length) {
-        const need = Math.max(0, 15 - (pr.images || []).length);   /* лимит 15 фото на объект (60 не нужно) */
+      const CAP = 30;   /* лимит фото на объект */
+      const pickImgs = (Array.isArray(b.images) && b.images.length) ? b.images.filter(u => webImgs.includes(u)) : webImgs;
+      if (b.media !== false && pickImgs.length) {
+        const need = Math.max(0, CAP - (pr.images || []).length);
         if (need > 0) {
-          const dl = await Promise.all(webImgs.slice(0, 40).map(u => downloadImageToAsset(upgradeCdnUrl(u)).catch(() => downloadImageToAsset(u).catch(() => null))));   /* поднимаем миниатюры до полноразмера (CDN-параметры), фолбэк на оригинал; многие low-res отсеются */
+          const dl = await Promise.all(pickImgs.slice(0, 40).map(u => downloadImageToAsset(upgradeCdnUrl(u)).catch(() => downloadImageToAsset(u).catch(() => null))));
           const good = dl.filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
-          if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); photosAdded = good.length; }
+          if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, CAP); photosAdded = good.length; }
         }
       }
       if (b.media !== false && webVids.length) { pr.videos = [...new Set([...(pr.videos || []), ...webVids])].slice(0, 12); videosAdded = webVids.length; }

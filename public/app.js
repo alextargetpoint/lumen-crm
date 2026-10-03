@@ -6861,20 +6861,38 @@ PAGES.qualifier = async (root) => {
           ['Фирменный тон и запреты', 'Общая манера всех героев + чего ваш ИИ не делает никогда'],
           ['Приоритет', 'Эти знания выше общих правил, но жёсткие запреты (не выдумывать) остаются']])}</div>
         <div class="sd" style="margin-bottom:12px">Заполните — и первая линия начнёт говорить фактами вашего агентства, а не общими фразами. Пусто — ИИ работает на базовых правилах.</div>
-        <div class="form-row"><label>🎯 Цель диалога <span class="sd" style="display:inline">(к чему ИИ ведёт каждого лида)</span></label><textarea id="trGoal" rows="2" placeholder="По умолчанию: вывести клиента на видео-созвон (Zoom/Meet) минимумом сообщений — дать краткую инфу и предложить удобное время, не продавая всё в переписке. Можно переопределить под себя.">${esc(tr.goal || '')}</textarea></div>
+        ${(() => { const GOALS = [
+            'Вывести клиента на видео-созвон (Zoom/Meet) минимумом сообщений',
+            'Записать на показ объекта',
+            'Квалифицировать (бюджет, срок, цель, тип) и передать брокеру',
+            'Собрать и отправить персональную подборку → затем созвон',
+            'Пригласить на онлайн-презентацию проекта',
+            'Прогреть и записать на звонок с экспертом',
+            'Довести до брони/депозита',
+            'Вернуть «спящего» лида в живой диалог',
+          ]; return `<div class="form-row"><label>🎯 Цель диалога <span class="sd" style="display:inline">(к чему ИИ ведёт каждого лида · выбери готовую или впиши свою)</span></label>
+          <div class="brief-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px">${GOALS.map(g => `<button type="button" class="brief-chip" data-goalset="${esc(g)}">${esc(g)}</button>`).join('')}</div>
+          <textarea id="trGoal" rows="2" placeholder="По умолчанию: вывести клиента на видео-созвон (Zoom/Meet) минимумом сообщений — дать краткую инфу и предложить удобное время, не продавая всё в переписке.">${esc(tr.goal || '')}</textarea></div>`; })()}
+        <div class="set-row" style="cursor:default;margin-bottom:12px"><div class="sp"><div class="sl">Скрывать название проекта и застройщика в переписке</div><div class="sd">Лучшая практика продаж: не называть ЖК/застройщика в сообщениях, раскрывать только на созвоне. ИИ ссылается на сильные стороны и район. Выкл — ИИ может называть проект.</div></div><label class="switch"><input type="checkbox" id="trHideNames" ${(tr.hideNames !== false) ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
         <div class="form-row"><label>О нас / позиционирование</label><textarea id="trAbout" rows="3" placeholder="Кто вы, чем лучше конкурентов, для кого работаете. Пример: «Мы — бутиковое агентство по Дубаю, 8 лет, только проверенные застройщики, сопровождаем сделку под ключ.»">${esc(tr.about || '')}</textarea></div>
         <div class="form-row"><label>Проверенные факты ✅ <span class="sd" style="display:inline">(эти цифры ИИ называть МОЖНО)</span></label><textarea id="trFacts" rows="4" placeholder="Реальные объекты, цены, условия, доходность — то, что подтверждено и что ИИ может озвучивать клиенту. Пример: «Studio в Downtown от 950k AED, рассрочка 40/60, сдача Q3 2027, доходность 7-8% годовых.»">${esc(tr.facts || '')}</textarea></div>
-        <div class="form-row"><label>Фирменный тон</label><input id="trTone" value="${esc(tr.tone || '')}" placeholder="Напр.: спокойный, уверенный, без давления; на «вы»"></div>
+        ${(() => { const TONES = ['Спокойный, уверенный, без давления; на «вы»','Тёплый, дружелюбный; на «ты»','Экспертный, премиальный, лаконичный','Энергичный, с лёгким юмором','Деловой, по делу, без воды']; return `<div class="form-row"><label>Фирменный тон <span class="sd" style="display:inline">(выбери или впиши свой)</span></label>
+          <div class="brief-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px">${TONES.map(t => `<button type="button" class="brief-chip" data-toneset="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+          <input id="trTone" value="${esc(tr.tone || '')}" placeholder="Напр.: спокойный, уверенный, без давления; на «вы»"></div>`; })()}
         <div class="form-row"><label>Фирменные формулировки</label><textarea id="trScripts" rows="2" placeholder="Готовые фразы вашего агентства, которые ИИ вплетает уместно">${esc(tr.scripts || '')}</textarea></div>
         <div class="form-row"><label>Доп. запреты</label><textarea id="trForbidden" rows="2" placeholder="Чего ИИ не делает никогда. Пример: «Не обсуждать конкретных застройщиков-конкурентов, не давать прогнозов курса валют.»">${esc(tr.forbidden || '')}</textarea></div>
         <button class="btn btn-accent" id="saveTrain" style="width:100%;justify-content:center">Обучить ИИ</button>
       </div>`; })()}
     </div>`;
+  /* бриф-пресеты: клик — подставить готовый вариант в поле */
+  $$('[data-goalset]', root).forEach(ch => ch.addEventListener('click', () => { const t = $('#trGoal', root); if (t) { t.value = ch.dataset.goalset; t.focus(); } }));
+  $$('[data-toneset]', root).forEach(ch => ch.addEventListener('click', () => { const t = $('#trTone', root); if (t) { t.value = ch.dataset.toneset; t.focus(); } }));
   $('#saveTrain')?.addEventListener('click', async () => {
     const training = {
       about: $('#trAbout', root).value.trim(), facts: $('#trFacts', root).value.trim(),
       tone: $('#trTone', root).value.trim(), scripts: $('#trScripts', root).value.trim(),
-      forbidden: $('#trForbidden', root).value.trim(), goal: $('#trGoal', root).value.trim()
+      forbidden: $('#trForbidden', root).value.trim(), goal: $('#trGoal', root).value.trim(),
+      hideNames: !!($('#trHideNames', root) && $('#trHideNames', root).checked)
     };
     const btn = $('#saveTrain', root); btn.disabled = true;
     await api.patch('/settings', { ai: { training } });
@@ -7162,6 +7180,7 @@ PAGES.sequences = async (root) => {
   const delayLabel = (st, i) => { const d = stepDelayParts(st, i); return d.val === 0 ? 'сразу' : `через ${d.val} ${d.unit === 'min' ? 'мин' : d.unit === 'hour' ? 'ч' : 'дн'}`; };
   const stepNode = (st, i) => {
     const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы', personalize: 'ИИ-персонализация' }[st.mode] || st.mode;
+    const nameModeOn = ((((STATE.settings || {}).ai || {}).training || {}).hideNames) !== false;   /* скрывать название проекта/застройщика до созвона (по умолчанию да) */
     const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : st.mode === 'creative' ? ('🎬 Креатив, по которому пришёл лид' + (st.text ? ' + подпись' : '')) : st.mode === 'personalize' ? '✨ ИИ соберёт персональное касание с отсылкой на объявление' : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
     const _d = stepDelayParts(st, i);
     if (editIx === i) {
@@ -7199,17 +7218,17 @@ PAGES.sequences = async (root) => {
           <textarea data-se="prompt" class="se2-full se2-ta" placeholder="Что сказать ИИ. Напр.: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»" style="${st.mode === 'ai' ? '' : 'display:none'}">${esc(st.prompt || '')}</textarea>
           <textarea data-se="text" class="se2-full se2-ta" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : st.mode === 'personalize' ? 'Запасной текст, если ИИ недоступен (необязательно)…' : 'Текст сообщения…'}" style="${st.mode === 'text' || st.mode === 'creative' || st.mode === 'personalize' ? '' : 'display:none'}">${esc(st.text || '')}</textarea>
           <div data-se-pers style="margin-top:8px;display:${st.mode === 'personalize' ? 'block' : 'none'}">
-            <div class="muted" style="font-size:11.8px;line-height:1.55;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:10px;padding:11px 13px;display:flex;gap:8px;align-items:flex-start">${ic(I.spark)}<span><b>ИИ соберёт персональное касание сам</b> — как кнопка «Персонализировать» в карточке лида: с отсылкой на объявление, по которому пришёл лид, сильные стороны проекта и критерии из заявки. Если канал шага — <b>E-mail</b>, текст будет в официальном тоне и с темой письма. Идеально для <b>первого касания</b>.</span></div>
-            <div style="font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin:12px 2px 5px">Пример — так это выглядит для лида с объявления «Evgenia Laya Resort», бюджет $500k, инвестиции:</div>
+            <div class="muted" style="font-size:11.8px;line-height:1.55;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:10px;padding:11px 13px;display:flex;gap:8px;align-items:flex-start">${ic(I.spark)}<span><b>ИИ соберёт персональное касание сам</b> — как кнопка «Персонализировать» в карточке лида: ссылается на <b>сильные стороны проекта</b> (а не на дословное рекламное название), на район и критерии из заявки. ${nameModeOn ? '<b>Название проекта и застройщика по умолчанию НЕ раскрывается</b> в переписке — только на созвоне.' : 'Название проекта разрешено упоминать (переключатель выше).'} Если канал — <b>E-mail</b>, текст в официальном тоне с темой. Идеально для <b>первого касания</b>.</span></div>
+            <div style="font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin:12px 2px 5px">Пример — лид с рекламы, бюджет $500k, инвестиции${nameModeOn ? ' (название проекта скрыто — раскроется на созвоне)' : ''}:</div>
             <div style="display:grid;gap:8px">
               <div style="border:1px solid var(--stroke,rgba(20,19,17,.1));border-radius:12px;padding:10px 12px;background:var(--paper,#fff)">
                 <div style="font-size:10px;font-weight:700;color:#25D366;display:flex;align-items:center;gap:5px;margin-bottom:5px">${ic(I.chat)}WHATSAPP / TELEGRAM (живой тон)</div>
-                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Приветствую, Евгения! Отличный выбор — <b>Evgenia Laya Resort</b> сейчас на слуху у тех, кто планирует Пхукет всерьёз.<br><br>Проект в тихом районе, до моря 10 минут пешком, первая очередь уже работает — управляющая компания берёт аренду на себя.<br><br>Подсказать, какие свободные юниты подходят под инвестиции в вашей вилке? 🌴</div>
+                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Приветствую, Евгения! Отличный выбор — ${nameModeOn ? 'проект, по которому вы оставили заявку, у тех, кто планирует Пхукет всерьёз, сейчас в топе' : '<b>Evgenia Laya Resort</b> сейчас на слуху'}.<br><br>Тихий район у моря, до пляжа ~10 минут, первая очередь уже работает — управляющая компания берёт аренду на себя.<br><br>Подсказать, какие свободные юниты подходят под инвестиции в вашей вилке? 🌴</div>
               </div>
               <div style="border:1px solid var(--stroke,rgba(20,19,17,.1));border-radius:12px;padding:10px 12px;background:var(--paper,#fff)">
                 <div style="font-size:10px;font-weight:700;color:var(--accent,#2563eb);display:flex;align-items:center;gap:5px;margin-bottom:5px">${ic(I.link)}E-MAIL (официальный тон + тема)</div>
-                <div style="font-size:11.5px;color:var(--ink-3,#8b8983);margin-bottom:6px"><b style="color:var(--ink)">Тема:</b> Evgenia Laya Resort — подобрал варианты под вашу заявку</div>
-                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Здравствуйте, Евгения!<br><br>Благодарю за интерес к <b>Evgenia Laya Resort</b> — действительно сильный проект для жизни и инвестиций на Пхукете. Закрытая территория, до пляжа ~10 минут, первая очередь уже приносит владельцам доход.<br><br>Готов прислать актуальные планировки и расчёт по рассрочке под ваш бюджет. Подобрать?<br><br><span style="color:var(--ink-3,#8b8983)">С уважением,<br>эксперт агентства</span></div>
+                <div style="font-size:11.5px;color:var(--ink-3,#8b8983);margin-bottom:6px"><b style="color:var(--ink)">Тема:</b> ${nameModeOn ? 'Подобрал варианты под вашу заявку' : 'Evgenia Laya Resort — подобрал варианты под вашу заявку'}</div>
+                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Здравствуйте, Евгения!<br><br>Благодарю за интерес — ${nameModeOn ? 'проект, который вы смотрели, действительно сильный' : '<b>Evgenia Laya Resort</b> — действительно сильный проект'} для жизни и инвестиций на Пхукете. Закрытая территория, до пляжа ~10 минут, первая очередь уже приносит владельцам доход.<br><br>Готов прислать актуальные планировки и расчёт по рассрочке под ваш бюджет. Подобрать?<br><br><span style="color:var(--ink-3,#8b8983)">С уважением,<br>эксперт агентства</span></div>
               </div>
             </div>
             <div class="muted" style="font-size:10.5px;margin-top:6px;font-style:italic">Это иллюстрация стиля — реальный текст ИИ генерит под каждого лида отдельно (его имя, объявление, бюджет, цель).</div>
@@ -8229,11 +8248,11 @@ PAGES.properties = async (root) => {
     const editMode = !!PAGE_STATE.propEditMode;   /* по умолчанию — красивый просмотр; форма правок — по кнопке «Редактировать» */
     root.innerHTML = `
       <div class="pd2 ${editMode ? 'is-edit' : 'is-read'}">
+        <button class="pd2-back" id="prBack">${ic(I.chev)}${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Ко всем объектам'}</button>
         <div class="pd2-hero" ${heroImg ? `style="background-image:url('${esc(heroImg)}')"` : ''}>
           <div class="pd2-shade"></div>
           <div class="pd2-in">
             <div class="pd2-top">
-              <button class="btn btn-sm" id="prBack" style="background:#fff;color:#111;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.25)">← ${PAGE_STATE.propFrom === 'map' ? 'На карту' : 'Ко всем объектам'}</button>
               ${editMode ? `<span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>` : ''}
               <span class="tb-spacer"></span>
               <button class="btn btn-sm ${editMode ? 'btn-accent' : 'pd2-ghost'}" id="pdEditToggle" title="${editMode ? 'Вернуться к просмотру' : 'Открыть поля для правок'}">${ic(editMode ? I.check : I.edit || I.gear)}${editMode ? 'Готово' : 'Редактировать'}</button>
@@ -8372,7 +8391,7 @@ PAGES.properties = async (root) => {
             </div>
             <div>
               <label class="lc-lbl">Видео-рендеры и обзоры</label>
-              ${(pr.videos || []).map((v2, ix) => `<div class="lc-contact"><span class="badge acc">${/youtu/i.test(v2) ? 'YouTube' : /vimeo/i.test(v2) ? 'Vimeo' : 'MP4'}</span><a class="lc-cv link" href="${esc(v2)}" target="_blank">${esc(String(v2).replace(/^https?:\/\/(www\.)?/, '').slice(0, 38))}…</a><button class="btn-ghost lc-cx" data-viddel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Видео-туры/рендеры — ссылками (или «Дополнить из сети»)</div>'}
+              ${(() => { const vs = pr.videos || []; if (!vs.length) return '<div class="muted" style="font-size:12px;margin-bottom:6px">Видео-туры/рендеры — ссылками (или «Дополнить из сети»)</div>'; const SHOW = 4; const rows = vs.map((v2, ix) => `<div class="lc-contact${ix >= SHOW ? ' more-item' : ''}"><span class="badge acc">${/youtu/i.test(v2) ? 'YouTube' : /vimeo/i.test(v2) ? 'Vimeo' : 'MP4'}</span><a class="lc-cv link" href="${esc(v2)}" target="_blank">${esc(String(v2).replace(/^https?:\/\/(www\.)?/, '').slice(0, 38))}…</a><button class="btn-ghost lc-cx" data-viddel="${ix}">${ic(I.x)}</button></div>`).join(''); return `<div class="morelist${vs.length > SHOW ? ' collapsed' : ''}" data-morelist>${rows}${vs.length > SHOW ? `<button type="button" class="morelist-btn" data-moretoggle data-morehidden="${vs.length - SHOW}">Показать ещё ${vs.length - SHOW}</button>` : ''}</div>`; })()}
               <div class="lc-note-row" style="margin-top:8px"><input id="pdVidUrl" placeholder="https://youtube.com/… или …mp4"><button class="btn btn-sm" id="pdVidAdd">${ic(I.plus)}</button></div>
             </div>
           </div>
@@ -8490,6 +8509,7 @@ PAGES.properties = async (root) => {
     $$('[data-matdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ materials: pr.materials.filter((_, ix) => ix !== +b.dataset.matdel) }); render(); }));
     $('#pdVidAdd')?.addEventListener('click', async () => { const u = $('#pdVidUrl').value.trim(); if (!/^https?:\/\//.test(u)) return; await upd({ videos: [...new Set([...(pr.videos || []), u])] }); render(); });
     $$('[data-viddel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ videos: (pr.videos || []).filter((_, ix) => ix !== +b.dataset.viddel) }); render(); }));
+    $$('[data-moretoggle]', root).forEach(b => b.addEventListener('click', () => { const box = b.closest('[data-morelist]'); if (!box) return; const was = box.classList.toggle('collapsed'); b.textContent = was ? ('Показать ещё ' + b.dataset.morehidden) : 'Свернуть'; }));
     $('#uAdd')?.addEventListener('click', async () => {
       await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: numRaw($('#uPrice').value) }] });
       render();
@@ -8562,19 +8582,32 @@ PAGES.properties = async (root) => {
         const fmtV = (v) => Array.isArray(v) ? v.join(' · ') : String(v);
         const gap = new Set(r.gapFields || []);
         const rows = Object.entries(r.proposed || {}).sort((a, b) => (gap.has(b[0]) ? 1 : 0) - (gap.has(a[0]) ? 1 : 0)).map(([k, v]) => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${FLD[k] || k}${gap.has(k) ? ' <span class="enr-gap">пусто в карточке</span>' : ''}</div><div class="sd">${esc(fmtV(v)).slice(0, 240)}</div></div><input type="checkbox" class="enr-ck" data-k="${k}" checked style="width:20px;height:20px"></label>`).join('');
-        const thumbs = (media.images || []).slice(0, 16).map((u) => `<img src="${esc(u)}" loading="lazy" class="enr-thumb" onerror="this.style.display='none'" style="width:76px;height:56px;object-fit:cover;border-radius:7px;border:1px solid var(--stroke)">`).join('');
-        const mediaRow = (media.photos || media.videos) ? `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Медиа из сети ${ic(I.image || I.camera || I.eye, 2)}</div><div class="sd">${media.photos ? media.photos + ' фото (хай-рес)' : ''}${media.photos && media.videos ? ' · ' : ''}${media.videos ? media.videos + ' видео-рендеров' : ''}</div></div><input type="checkbox" id="enrMedia" checked style="width:20px;height:20px"></label>${thumbs ? `<div class="muted" style="font-size:11px;margin:8px 2px 4px">Предпросмотр фото, которые будут добавлены:</div><div id="enrThumbs" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${thumbs}</div>` : ''}` : '';
+        const allImgs = media.images || [];
+        const kinds = media.kinds || {};   /* url → тип (если распознано) */
+        const thumbsHtml = allImgs.map((u, i) => `<div class="enr-th on" data-ethumb="${i}" data-url="${esc(u)}"><img src="${esc(u)}" loading="lazy" onerror="this.closest('.enr-th').style.display='none'"><span class="enr-tick">✓</span><span class="enr-zoom" data-ezoom="${i}">⛶</span>${kinds[u] ? `<span class="enr-kind">${esc(kinds[u])}</span>` : ''}</div>`).join('');
+        const mediaRow = (media.photos || media.videos) ? `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Медиа из сети ${ic(I.image || I.camera || I.eye, 2)}</div><div class="sd">${media.photos ? media.photos + ' фото (хай-рес)' : ''}${media.photos && media.videos ? ' · ' : ''}${media.videos ? media.videos + ' видео-рендеров' : ''}</div></div><input type="checkbox" id="enrMedia" checked style="width:20px;height:20px"></label>${allImgs.length ? `<div class="muted" style="font-size:11.5px;margin:9px 2px 4px">Нажми фото, чтобы <b>исключить</b> · ⛶ — увеличить. Выбрано <b id="enrSelN">${allImgs.length}</b> из ${media.photos}${allImgs.length < media.photos ? ' (показаны первые ' + allImgs.length + ')' : ''}.</div><div class="enr-thumbs" id="enrThumbs">${thumbsHtml}</div><label class="set-row" style="cursor:pointer;margin-top:2px"><div class="sp"><div class="sl">Распознать типы фото (ИИ)</div><div class="sd">интерьер / экстерьер / планировка — разложит по карточке правильно</div></div><input type="checkbox" id="enrClassify" style="width:20px;height:20px"></label>` : ''}` : '';
         const src = (r.sources || []).slice(0, 4).map(s => `<a href="${esc(s.url)}" target="_blank" class="link" style="font-size:11px">${esc((s.title || s.url).slice(0, 40))}</a>`).join(' · ');
         out.innerHTML = `<div style="font-size:12px;margin-bottom:8px">Найдено (уверенность: <b>${esc(r.confidence || 'medium')}</b>). Отметьте, что добавить:</div>${rows}${mediaRow}<div class="muted" style="font-size:11px;margin-top:10px">Источники: ${src || '—'}</div><button class="btn btn-accent" id="enrApply" style="width:100%;justify-content:center;margin-top:12px">Добавить выбранное в карточку</button>`;
+        /* выбор/исключение фото + зум */
+        const updSel = () => { const n = $('#enrSelN', md); if (n) n.textContent = $$('.enr-th.on', md).length; };
+        $$('.enr-th', md).forEach(th => th.addEventListener('click', (e) => {
+          if (e.target.closest('[data-ezoom]')) { e.stopPropagation(); const i = +e.target.closest('[data-ezoom]').dataset.ezoom; return lumenGallery(allImgs, i); }
+          th.classList.toggle('on'); th.classList.toggle('off'); updSel();
+        }));
         $('#enrApply', md).addEventListener('click', async (ev) => {
           const fields = $$('.enr-ck', md).filter(c => c.checked).map(c => c.dataset.k);
           const withMedia = !!($('#enrMedia', md) && $('#enrMedia', md).checked);
+          const selImgs = $$('.enr-th.on', md).map(e => e.dataset.url);
+          const classify = !!($('#enrClassify', md) && $('#enrClassify', md).checked);
           if (!fields.length && !withMedia) return toast('Ничего не выбрано');
+          if (withMedia && allImgs.length && !selImgs.length) return toast('Все фото исключены', 'Выбери хотя бы одно или сними галочку «Медиа из сети»');
           const bt = ev.target; bt.disabled = true; bt.innerHTML = '<span class="enr-spin"></span>Дополняю…';
-          const rr = await api.post('/properties/' + pr.id + '/enrich', { apply: true, fields, values: r.proposed, media: withMedia, units: withMedia });
+          const rr = await api.post('/properties/' + pr.id + '/enrich', { apply: true, fields, values: r.proposed, media: withMedia, images: withMedia ? selImgs : [], units: withMedia });
           if (rr.error) { bt.disabled = false; bt.textContent = 'Добавить выбранное в карточку'; return toast('Не вышло', rr.error); }
+          let classified = false;
+          if (classify && withMedia && rr.photosAdded) { bt.innerHTML = '<span class="enr-spin"></span>Распознаю типы фото…'; try { const cr = await api.post('/properties/' + pr.id + '/curate-photos', {}); classified = !cr.error; } catch (_) {} }
           const done = [...(rr.applied || [])]; if (rr.photosAdded) done.push(rr.photosAdded + ' фото'); if (rr.videosAdded) done.push(rr.videosAdded + ' видео'); if (rr.unitsAdded) done.push(rr.unitsAdded + ' юнитов');
-          toast('Карточка дополнена', 'Добавлено: ' + (done.join(', ') || '—'), true); closeModal(); PAGES.properties(root);
+          toast('Карточка дополнена', 'Добавлено: ' + (done.join(', ') || '—') + (classified ? ' · типы распознаны' : ''), true); closeModal(); PAGES.properties(root);
         });
       } catch (e) { $('#enrOut', md).innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
     });

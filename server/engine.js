@@ -600,9 +600,13 @@ function fillVars(db, lead, text) {
   const q = lead.quals || {};
   const qv = x => (x && typeof x === 'object') ? (x.value || '') : (x || '');
   const district = (adRec && (adRec.area || adRec.district)) || '';
-  /* ⛔ НЕ подставляем дословное рекламное название ({creative}/{project}) — оно техническое (с именами/метками)
-     и в сообщении клиенту выглядит странно. Ссылаемся нейтрально/по сути (район), без имени из рекламы. */
-  const creativeRef = district ? ('проекту в ' + district) : 'проекту, который вы смотрели';
+  const hideNames = ((((db.settings || {}).ai || {}).training || {}).hideNames) !== false;
+  const projName = (adRec && (adRec.project || adRec.projectName)) || '';
+  /* {creative}/{project}: в режиме «скрывать названия» (по умолчанию) — нейтрально/по сути (район), без имени из рекламы.
+     Дословное рекламное название ({adName}) не подставляем никогда — оно техническое (с именами/метками). */
+  const creativeRef = (!hideNames && projName)
+    ? projName
+    : (district ? ('проекту в ' + district) : 'проекту, который вы смотрели');
   return t
     .replace(/\{ad\}/g, adRef)
     .replace(/\{creative\}/g, creativeRef)
