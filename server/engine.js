@@ -599,12 +599,14 @@ function fillVars(db, lead, text) {
      quals могут быть как {budget:{value,quote}}, так и плоскими {budget:'...'} — берём .value если это объект. */
   const q = lead.quals || {};
   const qv = x => (x && typeof x === 'object') ? (x.value || '') : (x || '');
-  const creative = (lead.ads && (lead.ads.adName || lead.ads.headline)) || '';
   const district = (adRec && (adRec.area || adRec.district)) || '';
+  /* ⛔ НЕ подставляем дословное рекламное название ({creative}/{project}) — оно техническое (с именами/метками)
+     и в сообщении клиенту выглядит странно. Ссылаемся нейтрально/по сути (район), без имени из рекламы. */
+  const creativeRef = district ? ('проекту в ' + district) : 'проекту, который вы смотрели';
   return t
     .replace(/\{ad\}/g, adRef)
-    .replace(/\{creative\}/g, creative || 'ваш запрос')
-    .replace(/\{project\}/g, creative || 'проект по вашему запросу')
+    .replace(/\{creative\}/g, creativeRef)
+    .replace(/\{project\}/g, creativeRef)
     .replace(/\{district\}/g, district || (db.settings.geoNames[lead.geo] || lead.geo))
     .replace(/\{budget\}/g, qv(q.budget) || price || 'ваш бюджет')
     .replace(/\{purpose\}/g, qv(q.purpose) || 'вашей цели')
