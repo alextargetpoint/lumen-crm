@@ -7179,7 +7179,7 @@ PAGES.sequences = async (root) => {
   };
   const delayLabel = (st, i) => { const d = stepDelayParts(st, i); return d.val === 0 ? 'сразу' : `через ${d.val} ${d.unit === 'min' ? 'мин' : d.unit === 'hour' ? 'ч' : 'дн'}`; };
   const stepNode = (st, i) => {
-    const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы', personalize: 'ИИ-персонализация' }[st.mode] || st.mode;
+    const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы', personalize: 'Персонализация под объявление' }[st.mode] || st.mode;
     const nameModeOn = ((((STATE.settings || {}).ai || {}).training || {}).hideNames) !== false;   /* скрывать название проекта/застройщика до созвона (по умолчанию да) */
     const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : st.mode === 'creative' ? ('🎬 Креатив, по которому пришёл лид' + (st.text ? ' + подпись' : '')) : st.mode === 'personalize' ? '✨ ИИ соберёт персональное касание с отсылкой на объявление' : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
     const _d = stepDelayParts(st, i);
@@ -7189,7 +7189,7 @@ PAGES.sequences = async (root) => {
       const needType = st._needType || '';               /* 'pdf' | 'video' | 'image' */
       const acceptBy = { pdf: 'application/pdf', video: 'video/mp4,video/webm,video/quicktime', image: 'image/png,image/jpeg,image/webp' }[needType] || 'image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime';
       const upLabel = needType === 'pdf' ? 'Загрузить PDF' : needType === 'video' ? 'Загрузить видео' : needType === 'image' ? 'Загрузить фото' : 'Загрузить фото/видео';
-      const MODES = [['personalize', 'ИИ-персонализация', I.spark], ['text', 'Свой текст', I.chat], ['ai', 'ИИ-текст', I.spark], ['template', 'Шаблон', I.doc], ['creative', 'Креатив', I.image]];
+      const MODES = [['personalize', 'Персонализация под объявление', I.spark], ['text', 'Свой текст', I.chat], ['ai', 'ИИ-текст', I.spark], ['template', 'Шаблон', I.doc], ['creative', 'Креатив', I.image]];
       return `
       <div class="fl-node fl-edit se2" data-i="${i}" data-mode="${st.mode || 'text'}">
         <!-- 1. Когда -->
@@ -7218,17 +7218,17 @@ PAGES.sequences = async (root) => {
           <textarea data-se="prompt" class="se2-full se2-ta" placeholder="Что сказать ИИ. Напр.: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»" style="${st.mode === 'ai' ? '' : 'display:none'}">${esc(st.prompt || '')}</textarea>
           <textarea data-se="text" class="se2-full se2-ta" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : st.mode === 'personalize' ? 'Запасной текст, если ИИ недоступен (необязательно)…' : 'Текст сообщения…'}" style="${st.mode === 'text' || st.mode === 'creative' || st.mode === 'personalize' ? '' : 'display:none'}">${esc(st.text || '')}</textarea>
           <div data-se-pers style="margin-top:8px;display:${st.mode === 'personalize' ? 'block' : 'none'}">
-            <div class="muted" style="font-size:11.8px;line-height:1.55;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:10px;padding:11px 13px;display:flex;gap:8px;align-items:flex-start">${ic(I.spark)}<span><b>ИИ соберёт персональное касание сам</b> — как кнопка «Персонализировать» в карточке лида: ссылается на <b>сильные стороны проекта</b> (а не на дословное рекламное название), на район и критерии из заявки. ${nameModeOn ? '<b>Название проекта и застройщика по умолчанию НЕ раскрывается</b> в переписке — только на созвоне.' : 'Название проекта разрешено упоминать (переключатель выше).'} Если канал — <b>E-mail</b>, текст в официальном тоне с темой. Идеально для <b>первого касания</b>.</span></div>
+            <div class="muted" style="font-size:11.8px;line-height:1.55;background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke,rgba(37,99,235,.14));border-radius:10px;padding:11px 13px;display:flex;gap:8px;align-items:flex-start">${ic(I.spark)}<span><b>ИИ соберёт касание под то объявление, по которому пришёл лид</b> (как кнопка «Персонализировать» в карточке лида). Ссылается на <b>сильные стороны именно того креатива/проекта</b> из заявки (а не на дословное рекламное название), на район и критерии лида. ${nameModeOn ? '<b>Название проекта и застройщика по умолчанию НЕ раскрывается</b> в переписке, только на созвоне.' : 'Название проекта разрешено упоминать (переключатель выше).'} Если канал E-mail, текст в официальном тоне с темой. Идеально для <b>первого касания</b>.</span></div>
             <div style="font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin:12px 2px 5px">Пример — лид с рекламы, бюджет $500k, инвестиции${nameModeOn ? ' (название проекта скрыто — раскроется на созвоне)' : ''}:</div>
             <div style="display:grid;gap:8px">
               <div style="border:1px solid var(--stroke,rgba(20,19,17,.1));border-radius:12px;padding:10px 12px;background:var(--paper,#fff)">
                 <div style="font-size:10px;font-weight:700;color:#25D366;display:flex;align-items:center;gap:5px;margin-bottom:5px">${ic(I.chat)}WHATSAPP / TELEGRAM (живой тон)</div>
-                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Приветствую, Евгения! Отличный выбор — ${nameModeOn ? 'проект, по которому вы оставили заявку, у тех, кто планирует Пхукет всерьёз, сейчас в топе' : '<b>Evgenia Laya Resort</b> сейчас на слуху'}.<br><br>Тихий район у моря, до пляжа ~10 минут, первая очередь уже работает — управляющая компания берёт аренду на себя.<br><br>Подсказать, какие свободные юниты подходят под инвестиции в вашей вилке? 🌴</div>
+                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Приветствую, Евгения! Отличный выбор: ${nameModeOn ? 'проект, по которому вы оставили заявку, у тех, кто планирует Пхукет всерьёз, сейчас в топе' : '<b>Evgenia Laya Resort</b> сейчас на слуху'}.<br><br>Тихий район у моря, до пляжа ~10 минут, первая очередь уже работает, управляющая компания берёт аренду на себя.<br><br>Подсказать, какие свободные юниты подходят под инвестиции в вашей вилке? 🌴</div>
               </div>
               <div style="border:1px solid var(--stroke,rgba(20,19,17,.1));border-radius:12px;padding:10px 12px;background:var(--paper,#fff)">
                 <div style="font-size:10px;font-weight:700;color:var(--accent,#2563eb);display:flex;align-items:center;gap:5px;margin-bottom:5px">${ic(I.link)}E-MAIL (официальный тон + тема)</div>
                 <div style="font-size:11.5px;color:var(--ink-3,#8b8983);margin-bottom:6px"><b style="color:var(--ink)">Тема:</b> ${nameModeOn ? 'Подобрал варианты под вашу заявку' : 'Evgenia Laya Resort — подобрал варианты под вашу заявку'}</div>
-                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Здравствуйте, Евгения!<br><br>Благодарю за интерес — ${nameModeOn ? 'проект, который вы смотрели, действительно сильный' : '<b>Evgenia Laya Resort</b> — действительно сильный проект'} для жизни и инвестиций на Пхукете. Закрытая территория, до пляжа ~10 минут, первая очередь уже приносит владельцам доход.<br><br>Готов прислать актуальные планировки и расчёт по рассрочке под ваш бюджет. Подобрать?<br><br><span style="color:var(--ink-3,#8b8983)">С уважением,<br>эксперт агентства</span></div>
+                <div style="font-size:12.5px;line-height:1.5;color:var(--ink,#141311)">Здравствуйте, Евгения!<br><br>Благодарю за интерес: ${nameModeOn ? 'проект, который вы смотрели, действительно сильный' : '<b>Evgenia Laya Resort</b>, действительно сильный проект'} для жизни и инвестиций на Пхукете. Закрытая территория, до пляжа ~10 минут, первая очередь уже приносит владельцам доход.<br><br>Готов прислать актуальные планировки и расчёт по рассрочке под ваш бюджет. Подобрать?<br><br><span style="color:var(--ink-3,#8b8983)">С уважением,<br>эксперт агентства</span></div>
               </div>
             </div>
             <div class="muted" style="font-size:10.5px;margin-top:6px;font-style:italic">Это иллюстрация стиля — реальный текст ИИ генерит под каждого лида отдельно (его имя, объявление, бюджет, цель).</div>
@@ -7797,7 +7797,9 @@ PAGES.sequences = async (root) => {
 /* ---------------- ОБЪЕКТЫ: портальный формат, без попапов ---------------- */
 function propCover(pr, big) {
   const img = (pr.images || [])[0];
-  if (img) return `<div class="prop-cover ${big ? 'big' : ''}" style="background-image:url('${esc(img)}')"></div>`;
+  /* обложка через <img loading=lazy> (а НЕ background-image): браузер не грузит фото вне-экранных
+     карточек → список из сотен объектов открывается легко. hero (big) грузим сразу. */
+  if (img) return `<div class="prop-cover ${big ? 'big' : ''}"><img class="prop-cover-img" src="${esc(img)}" alt="" ${big ? 'decoding="async"' : 'loading="lazy" decoding="async" fetchpriority="low"'}></div>`;
   /* фото нет → тематическая тёмная обложка (регион виден в тексте); ноль чужого синего в любой теме */
   return `<div class="prop-cover ${big ? 'big' : ''}" style="background:linear-gradient(135deg,var(--ov-hero-a),color-mix(in srgb,var(--accent) 30%,var(--ov-hero-c)))">
     <span class="pc-star">${lumenMark()}</span><span>${esc(pr.area || pr.name)}</span></div>`;

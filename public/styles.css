@@ -1426,8 +1426,9 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .prop-card.rich .prop-body { padding: 14px 16px 15px; }
 .prop-cover {
   height: 150px; background-size: cover; background-position: center; position: relative;
-  display: grid; place-items: center;
+  display: grid; place-items: center; background-color: var(--bg-2, #eceae6); overflow: hidden;
 }
+.prop-cover .prop-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; grid-area: 1 / 1; }
 .prop-cover.big { height: 240px; border-radius: var(--r-lg); margin-bottom: 16px; box-shadow: var(--shadow); }
 .prop-cover .pc-star { width: 26px; height: 31px; opacity: .5; position: absolute; top: 14px; left: 16px; }
 .prop-cover span { font-size: 20px; font-weight: 700; color: rgba(255, 255, 255, .85); letter-spacing: .04em; }
@@ -2020,8 +2021,8 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .pd2-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 17, 38, .30) 0%, rgba(6, 17, 38, .52) 42%, rgba(6, 17, 38, .82) 78%, rgba(6, 17, 38, .95) 100%); }
 /* кнопка «назад» — НАД обложкой, на фоне страницы, явная и понятная */
 .pd2-back { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; background: var(--panel, #fff); color: var(--ink, #18181f); border: 1px solid var(--line, #e7e3dd); border-radius: 999px; padding: 8px 15px 8px 11px; font-size: 13.5px; font-weight: 650; cursor: pointer; box-shadow: 0 2px 10px -4px rgba(20,18,28,.25); transition: background .15s, transform .15s, box-shadow .15s; }
-.pd2-back:hover { background: var(--accent, #ec4a66); color: #fff; border-color: transparent; transform: translateX(-2px); box-shadow: 0 6px 18px -6px rgba(236,74,102,.5); }
-.pd2-back svg { width: 16px; height: 16px; transform: rotate(0deg); }
+.pd2-back:hover { border-color: var(--ink, #18181f); transform: translateX(-2px); box-shadow: 0 4px 14px -5px rgba(20,18,28,.32); filter: brightness(.97); }
+.pd2-back svg { width: 16px; height: 16px; transform: rotate(180deg); }
 /* читаемость ВСЕГО хедера на светлой фото-обложке: тень текста + стеклянные светлые контролы/подзаголовок */
 .pd2-in { text-shadow: 0 1px 6px rgba(6, 17, 38, .75), 0 0 2px rgba(6, 17, 38, .5); }
 .pd2-in select, .pd2-selects select, .pd2-sub .gi, .pd2-sub input { background: rgba(255, 255, 255, .15) !important; color: #fff !important; border: 1px solid rgba(255, 255, 255, .3) !important; border-radius: 8px; }
