@@ -6682,7 +6682,7 @@ PAGES.waProfile = async (root) => {
   const n = data.number, pr = (n && n.persona) || {};
   const inits = (String(pr.name || '')).trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '👤';
   root.innerHTML = `
-    <div class="plo-h1" style="display:flex;align-items:center;gap:9px;margin-bottom:4px">${ic(I.chat)}Мой WhatsApp</div>
+    <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Мой WhatsApp</h1>
     <div class="muted" style="font-size:13px;margin-bottom:18px">Ваше имя, фото и описание — как вас увидит клиент в WhatsApp. Меняете сами, синкается в реальный аккаунт.</div>
     <div class="glass card" style="max-width:860px;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.phone || I.chat)}Телефон для входящих звонков</div>
