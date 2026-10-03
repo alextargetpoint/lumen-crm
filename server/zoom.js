@@ -34,22 +34,29 @@ function s2sCreds() {
 }
 function s2sConfigured() { const c = s2sCreds(); return !!(c.accountId && c.clientId && c.clientSecret); }
 
-/* ---------- Состояние подключения тенанта ---------- */
+/* ---------- Состояние подключения: ДЕРЖАТЕЛЬ токенов = агентство (db.settings) ИЛИ брокер (broker) ----------
+   Per-broker: если брокер подключил СВОЙ Zoom (broker.zoom.connected), встречи этого брокера создаются под
+   его аккаунтом (свой хост, параллельные показы, своя запись). Иначе — фолбэк на аккаунт агентства, затем S2S. */
 function conn(db) { return (db && db.settings && db.settings.zoom) || {}; }
-/* готов ли вообще создавать Zoom-ссылки для этого тенанта: подключён свой ИЛИ есть платформенный S2S */
-function ready(db) { const c = conn(db || store.get()); return !!(c.connected && c.refreshToken) || s2sConfigured(); }
-/* публичный статус для UI */
-function status(db) {
-  const c = conn(db);
+function connH(holder) { return (holder && holder.zoom) || {}; }
+function holderConnected(holder) { const c = connH(holder); return !!(c.connected && c.refreshToken); }
+/* выбрать держателя под конкретного брокера: свой Zoom брокера → иначе агентство (db.settings) */
+function holderFor(db, broker) { return (broker && holderConnected(broker)) ? broker : (db && db.settings); }
+/* готов ли создавать Zoom-ссылки: свой у брокера ИЛИ у агентства ИЛИ платформенный S2S */
+function ready(db, broker) { const d = db || store.get(); return holderConnected(broker) || holderConnected(d && d.settings) || s2sConfigured(); }
+/* публичный статус для UI. По умолчанию — агентство (db.settings); для брокера передать его объект как holder. */
+function status(dbOrHolder) {
+  const holder = (dbOrHolder && dbOrHolder.settings) ? dbOrHolder.settings : dbOrHolder;   /* db → его settings; иначе уже holder */
+  const c = connH(holder);
   return { connected: !!(c.connected && c.refreshToken), email: c.email || '', connectedAt: c.connectedAt || 0, appReady: appConfigured(), platformFallback: s2sConfigured() };
 }
 
-/* ---------- OAuth: старт (owner жмёт «Подключить») ---------- */
-const _states = new Map();   /* nonce → { tid, at } (CSRF + маршрут callback→tid), TTL 10 мин */
-function startAuth(tid) {
+/* ---------- OAuth: старт (owner — агентство; брокер — свой аккаунт) ---------- */
+const _states = new Map();   /* nonce → { tid, brokerId, at } (CSRF + маршрут callback→tid/broker), TTL 10 мин */
+function startAuth(tid, brokerId) {
   const a = appCreds();
   const nonce = require('crypto').randomBytes(16).toString('hex');
-  _states.set(nonce, { tid, at: Date.now() });
+  _states.set(nonce, { tid, brokerId: brokerId || null, at: Date.now() });
   for (const [k, v] of _states) if (Date.now() - v.at > 10 * 60e3) _states.delete(k);   /* чистка протухших */
   const p = new URLSearchParams({ response_type: 'code', client_id: a.clientId, redirect_uri: a.redirectUri, state: nonce });
   return 'https://zoom.us/oauth/authorize?' + p.toString();
@@ -57,7 +64,7 @@ function startAuth(tid) {
 function consumeState(nonce) {
   const v = _states.get(nonce); if (!v) return null; _states.delete(nonce);
   if (Date.now() - v.at > 10 * 60e3) return null;
-  return v.tid;
+  return { tid: v.tid, brokerId: v.brokerId || null };
 }
 
 async function _tokenReq(params) {
@@ -72,27 +79,29 @@ async function _tokenReq(params) {
   return j;
 }
 
-/* обмен code→токены на callback. Пишет в db.settings.zoom (вызывать внутри runInTenant). */
-async function exchangeCode(db, code) {
+/* обмен code→токены на callback. Пишет в holder.zoom (агентство=db.settings или брокер). */
+async function exchangeCode(db, code, holder) {
+  holder = holder || db.settings;
   const a = appCreds();
   const j = await _tokenReq({ grant_type: 'authorization_code', code, redirect_uri: a.redirectUri });
-  const z = db.settings.zoom = db.settings.zoom || {};
+  const z = holder.zoom = holder.zoom || {};
   z.accessToken = j.access_token; z.refreshToken = j.refresh_token;
   z.expiresAt = Date.now() + (j.expires_in || 3600) * 1000;
   z.connected = true; z.connectedAt = Date.now();
   /* узнаём, чей аккаунт подключили (email хоста) */
-  try { const me = await apiGet(db, '/users/me'); z.email = (me && (me.email || (me.id && me.id))) || z.email || ''; z.zoomUserId = (me && me.id) || z.zoomUserId || ''; } catch (_) {}
+  try { const me = await apiGet(db, '/users/me', holder); z.email = (me && (me.email || (me.id && me.id))) || z.email || ''; z.zoomUserId = (me && me.id) || z.zoomUserId || ''; } catch (_) {}
   store.save();
   return { ok: true, email: z.email };
 }
 
-/* действующий access-token тенанта (рефрешим при протухании; Zoom РОТИРУЕТ refresh — сохраняем новый) */
-async function accessToken(db) {
-  const z = conn(db);
-  if (!z.refreshToken) throw new Error('zoom не подключён для этого агентства');
+/* действующий access-token держателя (рефрешим при протухании; Zoom РОТИРУЕТ refresh — сохраняем новый) */
+async function accessToken(db, holder) {
+  holder = holder || db.settings;
+  const z = connH(holder);
+  if (!z.refreshToken) throw new Error('zoom не подключён');
   if (z.accessToken && z.expiresAt > Date.now() + 60e3) return z.accessToken;
   const j = await _tokenReq({ grant_type: 'refresh_token', refresh_token: z.refreshToken });
-  const zz = db.settings.zoom;
+  const zz = holder.zoom;
   zz.accessToken = j.access_token;
   if (j.refresh_token) zz.refreshToken = j.refresh_token;   /* ротация */
   zz.expiresAt = Date.now() + (j.expires_in || 3600) * 1000;
@@ -100,14 +109,16 @@ async function accessToken(db) {
   return j.access_token;
 }
 
-async function apiGet(db, path) {
-  const token = await accessToken(db);
+async function apiGet(db, path, holder) {
+  const token = await accessToken(db, holder);
   const r = await fetch('https://api.zoom.us/v2' + path, { headers: { Authorization: 'Bearer ' + token } });
   return r.json().catch(() => ({}));
 }
 
-function disconnect(db) {
-  if (db.settings) db.settings.zoom = { connected: false };
+/* отключить: по умолчанию агентство (db.settings), для брокера передать его объект как holder */
+function disconnect(dbOrHolder) {
+  const holder = (dbOrHolder && dbOrHolder.settings) ? dbOrHolder.settings : dbOrHolder;
+  if (holder) holder.zoom = { connected: false };
   store.save();
 }
 
@@ -127,7 +138,7 @@ async function s2sToken(c) {
 }
 
 /* ---------- Создать встречу: сначала аккаунт агентства, иначе платформенный S2S ---------- */
-async function createMeeting(db, { topic, startAtMs, durationMin, tid, leadId }) {
+async function createMeeting(db, { topic, startAtMs, durationMin, tid, leadId, broker }) {
   const body = {
     topic: String(topic || 'Встреча').slice(0, 200),
     type: 2,
@@ -140,10 +151,10 @@ async function createMeeting(db, { topic, startAtMs, durationMin, tid, leadId })
   };
   try {
     let token, host;
-    const c = conn(db);
-    if (c.connected && c.refreshToken) { token = await accessToken(db); host = 'me'; }   /* аккаунт агентства (user OAuth → me = авторизовавший) */
+    const holder = holderFor(db, broker);   /* свой Zoom брокера → иначе агентство */
+    if (holderConnected(holder)) { token = await accessToken(db, holder); host = 'me'; }   /* user OAuth → me = авторизовавший (брокер или агентство) */
     else if (s2sConfigured()) { const sc = s2sCreds(); token = await s2sToken(sc); host = sc.userId; }   /* платформенный фолбэк */
-    else return { error: 'Zoom не подключён (ни аккаунт агентства, ни платформенный)' };
+    else return { error: 'Zoom не подключён (ни брокер, ни агентство, ни платформенный)' };
     const r = await fetch('https://api.zoom.us/v2/users/' + encodeURIComponent(host) + '/meetings', {
       method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

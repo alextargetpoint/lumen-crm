@@ -3468,18 +3468,21 @@ async function farmReclaimFromTenant(prevTid, phone) {
    - иначе бесплатный Jitsi (браузер, без записи). */
 async function genMeetingLink(db, kind, lead, atMs, durMin) {
   if (kind !== 'video') return { url: null, zoomMeetingId: '' };
-  if (zoom.ready(db)) {
+  /* per-broker: если у брокера лида подключён СВОЙ Zoom/Meet — встреча под его аккаунтом (свой хост,
+     параллельные показы, своя запись); иначе фолбэк на аккаунт агентства. */
+  const broker = lead.broker ? (db.brokers || []).find(b => b.id === lead.broker) : null;
+  if (zoom.ready(db, broker)) {
     try {
       const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
-      const r = await zoom.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id });
+      const r = await zoom.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id, broker });
       if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: r.meetingId || '' };
       console.error('[zoom] создать встречу не вышло:', r && r.error);
     } catch (e) { console.error('[zoom]', e.message); }
   }
-  if (gmeet.ready(db)) {
+  if (gmeet.ready(db, broker)) {
     try {
       const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
-      const r = await gmeet.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id });
+      const r = await gmeet.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id, broker });
       if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: '' };   /* matchKeys распарсит Meet-код из ссылки */
       console.error('[gmeet] создать встречу не вышло:', r && r.error);
     } catch (e) { console.error('[gmeet]', e.message); }
@@ -5518,31 +5521,40 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, count: db.waitlist.length, position: idx + 1 });
     }
     /* ---------- Zoom: подключение СВОЕГО аккаунта агентства (только владелец) ---------- */
+    /* владелец → аккаунт АГЕНТСТВА (db.settings); брокер → СВОЙ аккаунт (broker.*) */
     if (p === '/api/zoom/connect' && req.method === 'GET') {
-      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       if (!zoom.appConfigured()) return json(res, 400, { error: 'на платформе не настроено Zoom-приложение (ZOOM_OAUTH_CLIENT_ID/SECRET + PUBLIC_BASE_URL)' });
-      return json(res, 200, { url: zoom.startAuth(store.currentTid()) });
+      const brokerId = R.role === 'broker' ? R.brokerId : null;
+      return json(res, 200, { url: zoom.startAuth(store.currentTid(), brokerId) });
     }
     if (p === '/api/zoom/disconnect' && req.method === 'POST') {
-      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
-      zoom.disconnect(db); return json(res, 200, { ok: true });
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      if (R.role === 'broker') { const br = db.brokers.find(b => b.id === R.brokerId); if (br) zoom.disconnect(br); }
+      else zoom.disconnect(db);
+      return json(res, 200, { ok: true });
     }
     if (p === '/api/zoom/status' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      if (R.role === 'broker') { const br = db.brokers.find(b => b.id === R.brokerId); const s = zoom.status(br || {}); s.agency = zoom.status(db).connected; return json(res, 200, s); }
       return json(res, 200, zoom.status(db));
     }
-    /* ---------- Google Meet: подключение СВОЕГО Google-аккаунта агентства (только владелец) ---------- */
+    /* ---------- Google Meet: владелец → агентство, брокер → свой Google ---------- */
     if (p === '/api/gmeet/connect' && req.method === 'GET') {
-      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       if (!gmeet.appConfigured()) return json(res, 400, { error: 'на платформе не настроено Google-приложение (GOOGLE_OAUTH_CLIENT_ID/SECRET + PUBLIC_BASE_URL)' });
-      return json(res, 200, { url: gmeet.startAuth(store.currentTid()) });
+      const brokerId = R.role === 'broker' ? R.brokerId : null;
+      return json(res, 200, { url: gmeet.startAuth(store.currentTid(), brokerId) });
     }
     if (p === '/api/gmeet/disconnect' && req.method === 'POST') {
-      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
-      gmeet.disconnect(db); return json(res, 200, { ok: true });
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      if (R.role === 'broker') { const br = db.brokers.find(b => b.id === R.brokerId); if (br) gmeet.disconnect(br); }
+      else gmeet.disconnect(db);
+      return json(res, 200, { ok: true });
     }
     if (p === '/api/gmeet/status' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      if (R.role === 'broker') { const br = db.brokers.find(b => b.id === R.brokerId); const s = gmeet.status(br || {}); s.agency = gmeet.status(db).connected; return json(res, 200, s); }
       return json(res, 200, gmeet.status(db));
     }
     /* ---------- АДМИНКА листа ожидания (только владелец) ---------- */
@@ -6047,20 +6059,20 @@ const server = http.createServer(async (req, res) => {
     if (p === '/auth/zoom/callback' && req.method === 'GET') {
       const code = u.searchParams.get('code') || '';
       const err = u.searchParams.get('error') || '';
-      const tid = zoom.consumeState(u.searchParams.get('state') || '');
-      if (err || !code || !tid) { res.writeHead(302, { Location: '/?zoom=error' }); return res.end(); }
+      const stZ = zoom.consumeState(u.searchParams.get('state') || '');
+      if (err || !code || !stZ || !stZ.tid) { res.writeHead(302, { Location: '/?zoom=error' }); return res.end(); }
       try {
-        await store.runInTenant(tid, async () => { const tdb = store.get(); await zoom.exchangeCode(tdb, code); });
+        await store.runInTenant(stZ.tid, async () => { const tdb = store.get(); const holder = stZ.brokerId ? (tdb.brokers || []).find(b => b.id === stZ.brokerId) : null; await zoom.exchangeCode(tdb, code, holder || tdb.settings); });
         res.writeHead(302, { Location: '/?zoom=connected' }); return res.end();
       } catch (e) { console.error('[zoom callback]', e.message); res.writeHead(302, { Location: '/?zoom=error' }); return res.end(); }
     }
     if (p === '/auth/gmeet/callback' && req.method === 'GET') {
       const code = u.searchParams.get('code') || '';
       const err = u.searchParams.get('error') || '';
-      const tid = gmeet.consumeState(u.searchParams.get('state') || '');
-      if (err || !code || !tid) { res.writeHead(302, { Location: '/?gmeet=error' }); return res.end(); }
+      const stG = gmeet.consumeState(u.searchParams.get('state') || '');
+      if (err || !code || !stG || !stG.tid) { res.writeHead(302, { Location: '/?gmeet=error' }); return res.end(); }
       try {
-        await store.runInTenant(tid, async () => { const tdb = store.get(); await gmeet.exchangeCode(tdb, code); });
+        await store.runInTenant(stG.tid, async () => { const tdb = store.get(); const holder = stG.brokerId ? (tdb.brokers || []).find(b => b.id === stG.brokerId) : null; await gmeet.exchangeCode(tdb, code, holder || tdb.settings); });
         res.writeHead(302, { Location: '/?gmeet=connected' }); return res.end();
       } catch (e) { console.error('[gmeet callback]', e.message); res.writeHead(302, { Location: '/?gmeet=error' }); return res.end(); }
     }
@@ -6457,7 +6469,11 @@ const server = http.createServer(async (req, res) => {
     /* код доступа (pinPlain) виден ТОЛЬКО реальному владельцу (не брокеру, не в режиме preview) */
     const RR_STATE = realRole(req);
     const showSecret = RR_STATE && RR_STATE.role === 'owner' && !RR_STATE.previewAs;
-    const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; if (!showSecret) delete c2.pinPlain; return c2; };
+    const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; if (!showSecret) delete c2.pinPlain;
+      /* SEC: OAuth-токены брокера (Zoom/Google refresh) — секрет, наружу только статус подключения */
+      if (c2.zoom) c2.zoom = { connected: !!(c2.zoom.connected && c2.zoom.refreshToken), email: c2.zoom.email || '', connectedAt: c2.zoom.connectedAt || 0 };
+      if (c2.gmeet) c2.gmeet = { connected: !!(c2.gmeet.connected && c2.gmeet.refreshToken), email: c2.gmeet.email || '', connectedAt: c2.gmeet.connectedAt || 0 };
+      return c2; };
 
     /* ---------------- биллинг подписки (личный кабинет, только владелец) ---------------- */
     if (p.startsWith('/api/billing')) {
@@ -7052,6 +7068,13 @@ const server = http.createServer(async (req, res) => {
         for (const _b of (db.brokers || [])) if (!_b.tgBindCode) { _b.tgBindCode = crypto.randomBytes(3).toString('hex'); _chg = true; }
         if (_chg) store.save(); }
       const pubS = publicSettings(db);
+      /* per-broker Zoom/Meet: брокеру показываем статус ЕГО аккаунта (connect/disconnect уже брокер-скоупные).
+         Поле agency — подключён ли агентский (фолбэк), чтобы в UI пояснить «иначе используется Zoom агентства». */
+      if (IS_BROKER) {
+        const _br = db.brokers.find(b => b.id === ROLE.brokerId) || {};
+        pubS.zoom = Object.assign(zoom.status(_br), { agency: zoom.status(db).connected });
+        pubS.gmeet = Object.assign(gmeet.status(_br), { agency: gmeet.status(db).connected });
+      }
       if (!IS_BROKER) pubS.isPrimary = true; /* платформенную настройку (бот/воркер) даём любому владельцу — пока один оператор */
       if (!IS_BROKER && db.settings.hooks) pubS.hooks = Object.assign({}, pubS.hooks, { secret: db.settings.hooks.secret }); /* только владельцу — реальный секрет для ссылок вебхуков */
       if (!IS_BROKER) pubS.ownerTgCode = db.settings.ownerTgCode; /* только владельцу — код owner-привязки к боту (эскалация broker→owner) */

@@ -16,24 +16,28 @@ function appCreds() {
 }
 function appConfigured() { const a = appCreds(); return !!(a.clientId && a.clientSecret && /^https:\/\//.test(a.redirectUri)); }
 function conn(db) { return (db && db.settings && db.settings.gmeet) || {}; }
-function ready(db) { const c = conn(db || store.get()); return !!(c.connected && c.refreshToken); }
-function status(db) {
-  const c = conn(db);
+function connH(holder) { return (holder && holder.gmeet) || {}; }
+function holderConnected(holder) { const c = connH(holder); return !!(c.connected && c.refreshToken); }
+function holderFor(db, broker) { return (broker && holderConnected(broker)) ? broker : (db && db.settings); }
+function ready(db, broker) { const d = db || store.get(); return holderConnected(broker) || holderConnected(d && d.settings); }
+function status(dbOrHolder) {
+  const holder = (dbOrHolder && dbOrHolder.settings) ? dbOrHolder.settings : dbOrHolder;
+  const c = connH(holder);
   return { connected: !!(c.connected && c.refreshToken), email: c.email || '', connectedAt: c.connectedAt || 0, appReady: appConfigured() };
 }
 
 const SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email';
 const _states = new Map();
-function startAuth(tid) {
+function startAuth(tid, brokerId) {
   const a = appCreds();
   const nonce = crypto.randomBytes(16).toString('hex');
-  _states.set(nonce, { tid, at: Date.now() });
+  _states.set(nonce, { tid, brokerId: brokerId || null, at: Date.now() });
   for (const [k, v] of _states) if (Date.now() - v.at > 10 * 60e3) _states.delete(k);
   const p = new URLSearchParams({ client_id: a.clientId, redirect_uri: a.redirectUri, response_type: 'code',
     scope: SCOPE, access_type: 'offline', prompt: 'consent', state: nonce });
   return 'https://accounts.google.com/o/oauth2/v2/auth?' + p.toString();
 }
-function consumeState(nonce) { const v = _states.get(nonce); if (!v) return null; _states.delete(nonce); return (Date.now() - v.at > 10 * 60e3) ? null : v.tid; }
+function consumeState(nonce) { const v = _states.get(nonce); if (!v) return null; _states.delete(nonce); return (Date.now() - v.at > 10 * 60e3) ? null : { tid: v.tid, brokerId: v.brokerId || null }; }
 
 async function _tokenReq(params) {
   const a = appCreds();
@@ -45,36 +49,39 @@ async function _tokenReq(params) {
   if (!r.ok || !j.access_token) throw new Error('google token ' + r.status + ': ' + (j.error_description || j.error || ''));
   return j;
 }
-async function exchangeCode(db, code) {
+async function exchangeCode(db, code, holder) {
+  holder = holder || db.settings;
   const a = appCreds();
   const j = await _tokenReq({ grant_type: 'authorization_code', code, redirect_uri: a.redirectUri });
-  const g = db.settings.gmeet = db.settings.gmeet || {};
+  const g = holder.gmeet = holder.gmeet || {};
   g.accessToken = j.access_token; if (j.refresh_token) g.refreshToken = j.refresh_token;
   g.expiresAt = Date.now() + (j.expires_in || 3600) * 1000; g.connected = true; g.connectedAt = Date.now();
-  try { const me = await apiGet(db, 'https://www.googleapis.com/oauth2/v2/userinfo'); g.email = (me && me.email) || g.email || ''; } catch (_) {}
+  try { const me = await apiGet(db, 'https://www.googleapis.com/oauth2/v2/userinfo', holder); g.email = (me && me.email) || g.email || ''; } catch (_) {}
   store.save(); return { ok: true, email: g.email };
 }
-async function accessToken(db) {
-  const g = conn(db);
-  if (!g.refreshToken) throw new Error('Google Meet не подключён для этого агентства');
+async function accessToken(db, holder) {
+  holder = holder || db.settings;
+  const g = connH(holder);
+  if (!g.refreshToken) throw new Error('Google Meet не подключён');
   if (g.accessToken && g.expiresAt > Date.now() + 60e3) return g.accessToken;
   const j = await _tokenReq({ grant_type: 'refresh_token', refresh_token: g.refreshToken });
-  const gg = db.settings.gmeet; gg.accessToken = j.access_token; if (j.refresh_token) gg.refreshToken = j.refresh_token;
+  const gg = holder.gmeet; gg.accessToken = j.access_token; if (j.refresh_token) gg.refreshToken = j.refresh_token;
   gg.expiresAt = Date.now() + (j.expires_in || 3600) * 1000; store.save();
   return j.access_token;
 }
-async function apiGet(db, url) {
-  const t = await accessToken(db);
+async function apiGet(db, url, holder) {
+  const t = await accessToken(db, holder);
   const r = await fetch(url, { headers: { Authorization: 'Bearer ' + t } });
   return r.json().catch(() => ({}));
 }
-function disconnect(db) { if (db.settings) db.settings.gmeet = { connected: false }; store.save(); }
+function disconnect(dbOrHolder) { const holder = (dbOrHolder && dbOrHolder.settings) ? dbOrHolder.settings : dbOrHolder; if (holder) holder.gmeet = { connected: false }; store.save(); }
 
 /* создать событие Google Calendar с Meet-ссылкой. Возвращает { ok, joinUrl, eventId } */
-async function createMeeting(db, { topic, startAtMs, durationMin, tid, leadId }) {
-  if (!ready(db)) return { error: 'Google Meet не подключён' };
+async function createMeeting(db, { topic, startAtMs, durationMin, tid, leadId, broker }) {
+  const holder = holderFor(db, broker);   /* свой Google брокера → иначе агентство */
+  if (!holderConnected(holder)) return { error: 'Google Meet не подключён' };
   try {
-    const t = await accessToken(db);
+    const t = await accessToken(db, holder);
     const start = new Date(Math.max(Date.now(), startAtMs || Date.now()));
     const end = new Date(start.getTime() + Math.max(15, Math.min(240, durationMin || 60)) * 60e3);
     const body = {

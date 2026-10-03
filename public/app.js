@@ -6693,6 +6693,27 @@ PAGES.waProfile = async (root) => {
         <span id="wmPhoneOut" class="muted" style="font-size:11.5px"></span>
       </div>
     </div>
+    ${(() => { const zo = STATE.settings.zoom || {}, go2 = STATE.settings.gmeet || {};
+      const zBtn = !zo.appReady ? '<span class="muted" style="font-size:11.5px">Авто-ссылки Zoom настраивает платформа — пока недоступно</span>'
+        : zo.connected ? `<span class="badge ok">подключён${zo.email ? ' · ' + esc(zo.email) : ''}</span> <button class="btn btn-sm" id="myZoomDisc" style="margin-left:6px">Отключить</button>`
+        : `<button class="btn btn-accent btn-sm" id="myZoomConnect">${ic(I.spark)}Подключить мой Zoom</button>`;
+      const gBtn = !go2.appReady ? '<span class="muted" style="font-size:11.5px">Авто-ссылки Google Meet настраивает платформа — пока недоступно</span>'
+        : go2.connected ? `<span class="badge ok">подключён${go2.email ? ' · ' + esc(go2.email) : ''}</span> <button class="btn btn-sm" id="myGmeetDisc" style="margin-left:6px">Отключить</button>`
+        : `<button class="btn btn-accent btn-sm" id="myGmeetConnect">${ic(I.cal || I.spark)}Подключить мой Google Meet</button>`;
+      const agencyNote = (!zo.connected && zo.agency) || (!go2.connected && go2.agency) ? '<div class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.5">Пока не подключил свой — встречи создаются под аккаунтом агентства (это ок). Свой аккаунт нужен, если хочешь вести созвоны параллельно с коллегами и хранить записи у себя.</div>' : '';
+      return `<div class="glass card" style="max-width:860px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.cal || I.chat)}Мои видео-созвоны (Zoom · Google Meet)</div>
+      <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5">Подключи свой аккаунт — и при назначении видео-встречи ссылка создастся <b>под тобой</b> (твой хост, твоя запись). Это разовая авторизация.</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span style="font-weight:600;min-width:120px">Zoom</span>${zBtn}</div>
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span style="font-weight:600;min-width:120px">Google Meet</span>${gBtn}</div>
+      </div>${agencyNote}
+    </div>
+    <div class="glass card" style="max-width:860px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.send)}Моё приложение в Telegram</div>
+      <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5">Вся твоя работа с телефона: чаты, лиды, задачи, встречи — синхронно с компьютером. Подключаешь сам, код ниже привязывает бота именно к тебе.</div>
+      <div id="myTgBox" class="muted" style="font-size:12.5px">Загружаю код…</div>
+    </div>`; })()}
     <div class="two-col wapf" style="grid-template-columns:1.2fr 1fr;max-width:860px;align-items:start">
       <div class="glass card">
         ${!n ? `<div class="lc-hint warn"><span>${ic(I.shield)}За вами пока не закреплён WhatsApp-номер. Попросите руководителя закрепить номер за вами (Номера → выбрать вас) — и здесь появится оформление профиля.</span></div>`
@@ -6717,6 +6738,26 @@ PAGES.waProfile = async (root) => {
       try { const r = await api.post('/brokers/my-phone', { phone: ph }); if (out) { out.textContent = r.phone ? '✓ сохранён' : '✓ очищен'; out.style.color = 'var(--ok,#1E7A64)'; } toast('Телефон сохранён', ph || 'номер очищен', true); }
       catch (e) { if (out) { out.textContent = e.message; out.style.color = 'var(--bad,#C0392B)'; } }
     }); }
+  /* ── Мои видео-подключения (Zoom/Meet) + Telegram — брокер подключает САМ ── */
+  const connectOAuth = async (svc) => { try { const r = await api.get('/' + svc + '/connect'); if (r.url) location.href = r.url; else toast('Не вышло', r.error || 'нет ссылки'); } catch (e) { toast('Не вышло', e.message); } };
+  const discOAuth = async (svc, label) => { if (!await uiConfirm('Отключить ' + label + '?', 'Новые встречи снова пойдут под аккаунтом агентства.', { ok: 'Отключить', danger: true })) return; try { await api.post('/' + svc + '/disconnect', {}); toast(label + ' отключён', null, true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); } };
+  $('#myZoomConnect', root)?.addEventListener('click', () => connectOAuth('zoom'));
+  $('#myGmeetConnect', root)?.addEventListener('click', () => connectOAuth('gmeet'));
+  $('#myZoomDisc', root)?.addEventListener('click', () => discOAuth('zoom', 'Zoom'));
+  $('#myGmeetDisc', root)?.addEventListener('click', () => discOAuth('gmeet', 'Google Meet'));
+  (async () => { const box = $('#myTgBox', root); if (!box) return;
+    try { const t = await api.get('/tgbridge'); const bot = t.centralBot, code = t.me && t.me.code, bound = t.me && t.me.bound;
+      if (bound) { box.innerHTML = '<span class="badge ok">подключено ✓</span> приложение привязано к твоему Telegram.'; return; }
+      if (!bot || !code) { box.innerHTML = 'Telegram-бот пока не настроен платформой — обратись к руководителю.'; return; }
+      const link = 'https://t.me/' + bot + '?start=' + encodeURIComponent(code);
+      box.innerHTML = `<div style="display:flex;flex-direction:column;gap:9px">
+        <a class="btn btn-accent btn-sm" href="${link}" target="_blank" style="align-self:flex-start">${ic(I.send)}Открыть бота и подключиться</a>
+        <div style="font-size:12px">Или вручную: открой <b>@${esc(bot)}</b> и отправь команду <code class="pill" style="padding:3px 8px;cursor:pointer" id="myTgCode">/start ${esc(code)}</code></div>
+        <div class="muted" style="font-size:11.5px">Код привязывает приложение именно к тебе. Никому не передавай.</div>
+      </div>`;
+      $('#myTgCode', box)?.addEventListener('click', function () { navigator.clipboard.writeText('/start ' + code); toast('Скопировано', 'Вставь боту в Telegram', true); });
+    } catch (e) { box.textContent = 'Не удалось загрузить код: ' + e.message; }
+  })();
   if (!n) return;
   const upd = () => {
     const nm = ($('#wmName', root) || {}).value || '', ab = ($('#wmAbout', root) || {}).value || '', av = ($('#wmAvatar', root) || {}).value || '';
