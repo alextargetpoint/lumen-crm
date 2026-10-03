@@ -9132,6 +9132,7 @@ PAGES.collections = async (root) => {
             <div class="cl2-acts">
               <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
               <a class="btn btn-sm" href="/p/${c.id}?design=1&key=${c.editKey}" target="_blank" title="Премиум арт-документ (журнальный разворот) → из него «Скачать PDF»">${ic(I.spark)}Арт-PDF</a>
+              <button class="btn btn-sm" data-act="compose" title="Изменить объекты и юниты подборки">${ic(I.grid)}Состав</button>
               <button class="btn btn-sm" data-act="share" title="Поделиться">${ic(I.send)}Поделиться</button>
               <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть классический вид">${ic(I.eye)}</a>
               <span class="tb-spacer"></span>
@@ -9164,6 +9165,32 @@ PAGES.collections = async (root) => {
     updUSum(box);
   });
   const collectUnitSel = (ids) => { const sel = {}; $$('.cl-units', root).forEach(box => { const pid = box.dataset.ppid; if (!ids.includes(pid)) return; const all = $$('.cl-unit input', box); const checked = all.filter(x => x.checked); if (checked.length && checked.length < all.length) sel[pid] = checked.map(x => +x.dataset.uidx); }); return sel; };
+  const uLblC = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area)) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`;
+  function openComposeModal(col, allProps) {
+    if (!col) return;
+    const selIds = col.propertyIds || []; const uSel = col.unitSel || {};
+    const ordered = [...allProps].sort((a, b) => (selIds.includes(b.id) ? 1 : 0) - (selIds.includes(a.id) ? 1 : 0));
+    const body = `<div class="cl-props" style="max-height:52vh">${ordered.map(pr => { const us = (pr.units || []).filter(Boolean); const psel = uSel[pr.id]; const inCol = selIds.includes(pr.id); return `<div class="cl-prow">
+      <label class="cl-prop"><input type="checkbox" value="${pr.id}" ${inCol ? 'checked' : ''}><span class="cl-chk"></span><span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area || '')} · ${esc(pr.type || '')}</span></span></label>
+      ${us.length ? `<div class="cl-units ${inCol ? 'open' : ''}" data-ppid="${pr.id}"><button type="button" class="cl-units-tg">${ic(I.grid)}юниты: <b class="cl-usum"></b><span class="cl-ucar">${ic(I.chev)}</span></button>
+        <div class="cl-units-list" ${inCol ? '' : 'hidden'}>${us.map((u, i) => `<label class="cl-unit ${u.status === 'sold' ? 'sold' : ''}"><input type="checkbox" data-uidx="${i}" ${(psel ? psel.includes(i) : (u.status !== 'sold')) ? 'checked' : ''}><span>${uLblC(u)}</span></label>`).join('')}</div></div>` : ''}
+    </div>`; }).join('')}</div>`;
+    const md = modal({ title: 'Состав подборки', sub: 'объекты и юниты, которые войдут в документ', wide: true, body, actions: [
+      { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+        const ids = $$('.cl-prop input:checked', bd).map(x => x.value);
+        if (!ids.length) { toast('Отметьте хотя бы один объект'); return false; }
+        const sel = {}; $$('.cl-units', bd).forEach(box => { const pid = box.dataset.ppid; if (!ids.includes(pid)) return; const all = $$('.cl-unit input', box); const ch = all.filter(x => x.checked); if (ch.length && ch.length < all.length) sel[pid] = ch.map(x => +x.dataset.uidx); });
+        await api.patch('/collections/' + col.id, { propertyIds: ids, unitSel: sel });
+        toast('Состав обновлён', null, true); render();
+      } },
+      { label: 'Отмена' },
+    ] });
+    $$('.cl-units', md).forEach(box => { const tg = $('.cl-units-tg', box), list = $('.cl-units-list', box);
+      const upd = () => { const all = $$('.cl-unit input', box); const n = all.filter(x => x.checked).length; const s = $('.cl-usum', box); if (s) s.textContent = (n === all.length ? 'все ' + all.length : n + ' из ' + all.length); };
+      tg?.addEventListener('click', () => { list.hidden = !list.hidden; box.classList.toggle('open', !list.hidden); });
+      $$('.cl-unit input', box).forEach(ch => ch.addEventListener('change', upd)); upd();
+    });
+  }
   $('#clCreate').addEventListener('click', async () => {
     const ids = $$('.cl-prop input:checked', root).map(x => x.value);
     if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
@@ -9180,6 +9207,7 @@ PAGES.collections = async (root) => {
     if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
     if (act.dataset.act === 'share') { openShareModal(id, card.dataset.cllead, card.dataset.title); return; }
     if (act.dataset.act === 'design') { openDesignModal(id, card.dataset.title); return; }
+    if (act.dataset.act === 'compose') { openComposeModal(cols0.find(x => x.id === id), props); return; }
     if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
     if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
     if (act.dataset.act === 'ren' && !act.dataset.editing) {

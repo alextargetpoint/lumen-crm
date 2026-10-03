@@ -5672,11 +5672,11 @@ html[data-night] .cmp-prev-b { background: rgba(80, 140, 90, .16); border-color:
 .ds-fold-h .ds-caret { margin-left: auto; display: flex; transition: transform .25s var(--ease-spring, ease); transform: rotate(90deg); }
 .ds-fold-h .ds-caret svg { width: 15px; height: 15px; color: var(--ink-3); }
 .ds-fold.open .ds-fold-h .ds-caret { transform: rotate(-90deg); }
-.ds-fold-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s var(--ease-spring, ease); }
-.ds-fold.open .ds-fold-b { grid-template-rows: 1fr; }
-.ds-fold-b > * { min-height: 0; overflow: hidden; }
+/* ⚠️ техника grid-template-rows:0fr НЕ схлопывалась до нуля (резолв в ~14px → просвет СТИЛЬ/АРТ-ДИРЕКШН).
+   Надёжный коллапс: max-height:0 + overflow:hidden (гарантированный 0 в любом браузере). */
+.ds-fold-b { overflow: hidden; max-height: 0; transition: max-height .32s var(--ease-spring, ease); }
+.ds-fold.open .ds-fold-b { max-height: 820px; }
 .ds-fold-b .ds-grid { padding: 4px 14px 10px; }
-.ds-fold.open .ds-fold-b > * { overflow: visible; }
 .ds-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
 .ds-ax label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 5px 2px; }
 .ds-note { padding: 0 14px 14px; font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }

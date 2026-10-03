@@ -12978,7 +12978,6 @@ ${SCR}
       const b = await readBody(req);
       if (b.folderId !== undefined) c.folderId = b.folderId || null;
       if (b.title) c.title = String(b.title).slice(0, 200);
-      if (b.unitSel && typeof b.unitSel === 'object') c.unitSel = sanitizeUnitSel(b.unitSel, c.propertyIds);
       /* Ф1: оси дизайна документа (Style/Art-Dir/Density/Image-Dom/Data-Depth/Brand) + seed арт-директора */
       if (b.design && typeof b.design === 'object') {
         const AX = design.AXES; const d = c.design || {};
@@ -12998,6 +12997,21 @@ ${SCR}
         }
         c.addedCount = add.length;
       }
+      /* замена состава из модалки «Состав»: полный список объектов + синк proj-блоков (убрать удалённые, дописать новые) */
+      if (Array.isArray(b.propertyIds)) {
+        const next = [...new Set(b.propertyIds.filter(id => db.properties.some(p2 => p2.id === id)))].slice(0, 40);
+        if (next.length) {
+          const nextSet = new Set(next);
+          if (Array.isArray(c.blocks) && c.blocks.length) {
+            c.blocks = c.blocks.filter(x => x.t !== 'proj' || (x.data && nextSet.has(x.data.pid)));
+            const have = new Set(c.blocks.filter(x => x.t === 'proj').map(x => x.data && x.data.pid));
+            for (const pid of next) if (!have.has(pid)) c.blocks.push({ id: 'b_p_' + pid + '_' + crypto.randomBytes(2).toString('hex'), t: 'proj', v: 'full', data: { pid } });
+          }
+          c.propertyIds = next;
+        }
+      }
+      /* выбор юнитов — санитайзим против ФИНАЛЬНОГО состава (после возможной замены propertyIds) */
+      if (b.unitSel && typeof b.unitSel === 'object') c.unitSel = sanitizeUnitSel(b.unitSel, c.propertyIds);
       store.save();
       return json(res, 200, c);
     }
@@ -15152,7 +15166,9 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
       const prById = (pid) => design.applyUnitSel(c, db.properties.find(x => x.id === pid));
       const projBlocks = blocks.filter(b => b.t === 'proj' && prById(b.data.pid));
       const fmt = (n, cur) => (cur === 'EUR' ? '€' : '$') + (n || 0).toLocaleString('ru-RU');
-      const minPrice = Math.min(...projBlocks.map(b => prById(b.data.pid).priceFrom || Infinity));
+      /* «от» цена: если юниты объекта отфильтрованы (c.unitSel) — берём мин. цену ВЫБРАННЫХ юнитов, иначе priceFrom */
+      const fromPrice = (pid) => { const pr = prById(pid); if (!pr) return Infinity; if (c.unitSel && c.unitSel[pid]) { const up = (pr.units || []).map(uu => +String(uu.price == null ? '' : uu.price).replace(/[^\d.]/g, '')).filter(n => n > 0); if (up.length) return Math.min(...up); } return pr.priceFrom || Infinity; };
+      const minPrice = Math.min(...projBlocks.map(b => fromPrice(b.data.pid)));
       const heroImg = projBlocks.map(b => ((prById(b.data.pid) || {}).images || [])[0]).find(Boolean) || '';
       const plural = (n) => n % 10 === 1 && n % 100 !== 11 ? 'проект' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'проекта' : 'проектов';
       const nProj = projBlocks.length + ' ' + plural(projBlocks.length);
