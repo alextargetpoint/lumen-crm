@@ -3139,8 +3139,12 @@ function pickGrayNumber(db, lead, live) {
 }
 
 /* Серый транспорт для engine.send: реальная отправка с прогретого номера брокера через Baileys-воркер.
-   Нет подключённого номера ИЛИ серый не настроен → тихий мок (поведение как раньше, ничего не ломаем). */
-engine.setGraySender(async (db, lead, m) => {
+   Нет подключённого номера ИЛИ серый не настроен → тихий мок (поведение как раньше, ничего не ломаем).
+   ⚠️ FIFO ПО ЛИДУ: сообщения лида уходят строго по порядку (видео дожидается отправки → ТОЛЬКО потом текст),
+   иначе лёгкий текст обгонял тяжёлое видео и у клиента приходил раньше. Покрывает и ручное, и цепочку. */
+const _graySeq = {};
+engine.setGraySender((db, lead, m, _opts) => {
+  const _run = async () => {
   const g = db.settings.waGray || {};
   if (!waWorkerReady(db) || !(g.numbers || []).length || !lead.phone) { m.status = 'delivered'; store.save(); return; }   /* FIX: платформенный воркер (env) → g.url/token пусты; раньше тут всё уходило в мок */
   let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) { m.status = 'delivered'; store.save(); return; }
@@ -3170,6 +3174,12 @@ engine.setGraySender(async (db, lead, m) => {
      (отправлено/в пути); 'delivered' выставит реальная квитанция, когда появится grey-receipt-канал. */
   m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'sent';
   store.save();
+  };
+  /* сериализация по лиду: следующее сообщение лида стартует только после завершения предыдущего */
+  const _prev = _graySeq[lead.id] || Promise.resolve();
+  const _p = _prev.then(_run, _run);
+  _graySeq[lead.id] = _p.catch(() => {});   /* цепочка продолжается, даже если это сообщение упало */
+  return _p;
 });
 
 /* Серый TELEGRAM: холодное касание с прогретого TG-аккаунта (первое касание/цепочка), когда каскад дошёл до TG.
@@ -7598,7 +7608,9 @@ const server = http.createServer(async (req, res) => {
            l.adCreative), он уходит первым сообщением — как это делает автопилот на chainStep 0. */
         const cu = b.creativeUrl ? String(b.creativeUrl).slice(0, 500) : '';
         const _ch = ['wa', 'tg', 'viber', 'email'].includes(b.channel) ? b.channel : undefined;   /* явный выбор канала касания */
-        if (cu) engine.send(db, lead, '', 'human', { channel: _ch, media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } });
+        /* ПОРЯДОК: креатив (видео/фото) уходит ПЕРВЫМ и мы ДОЖИДАЕМСЯ его отправки, только потом текст —
+           иначе лёгкий текст обгонял тяжёлое видео (у клиента приходил текст раньше видео). */
+        if (cu) { const cm = engine.send(db, lead, '', 'human', { channel: _ch, media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } }); try { if (cm && cm._sendP) await cm._sendP; } catch (_) {} }
         if (b.text || !cu) engine.send(db, lead, b.text || '', 'human', _ch ? { channel: _ch } : undefined);
         /* «дообучение под брокера»: отправленное из панели первого касания сообщение учим как СТИЛЬ пишущего */
         if (b.learnStyle && b.text) captureTouchStyle(db, IS_BROKER ? ROLE.brokerId : 'owner', b.text, (lead.ads && lead.ads.adName) || '');

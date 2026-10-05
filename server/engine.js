@@ -239,19 +239,21 @@ function send(db, lead, text, via, opts = {}) {
     } else {
       job = tpl && tpl.status === 'approved' ? wa.sendTemplate(db, lead, tpl, text, { phoneId: opts.phoneId }) : wa.sendText(db, lead, text);
     }
-    job.then(res => { m.waId = res.messages?.[0]?.id || null; store.save(); })
+    const jp = job.then(res => { m.waId = res.messages?.[0]?.id || null; store.save(); })
       .catch(err => {
         m.status = 'failed';
         ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Cloud API отказал (${lead.name}): ${err.message}` });
         store.save();
       });
+    Object.defineProperty(m, '_sendP', { value: jp, enumerable: false, configurable: true });   /* awaitable: чтобы следующее сообщение (текст после видео) ушло ПОСЛЕ завершения этого */
   } else if (graySender) {
     /* серый способ: реальная отправка с прогретого номера брокера (или мок, если нет подключённого) */
-    Promise.resolve(graySender(db, lead, m, opts)).catch(err => {
+    const gp = Promise.resolve(graySender(db, lead, m, opts)).catch(err => {
       m.status = 'failed';
       ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Серый номер отказал (${lead.name}): ${err.message}` });
       store.save();
     });
+    Object.defineProperty(m, '_sendP', { value: gp, enumerable: false, configurable: true });   /* awaitable: видео догружается → ТОЛЬКО потом текст (иначе текст обгонял видео у клиента) */
   } else {
     setTimeout(() => { if (m.status === 'sent') m.status = 'delivered'; store.save(); }, 1500); // mock-доставка
   }
