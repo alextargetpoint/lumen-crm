@@ -8559,6 +8559,13 @@ const server = http.createServer(async (req, res) => {
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
       /* SEC: «Все разделы · разработка» может включать только аккаунт основателя/демо, не клиент */
       if (b.agency && ('betaAll' in b.agency) && !isDevTenant(db)) delete b.agency.betaAll;
+      /* ⚠️ ЗАЩИТА НАСТРОЕК: ai.training мержим ГЛУБОКО. Частичный PATCH (напр. {ai:{training:{handoff}}})
+         НЕ должен стирать соседние поля (goal/facts/hideNames/personas) — иначе «сброс обучения ИИ». */
+      if (b.ai && b.ai.training && typeof b.ai.training === 'object' && !Array.isArray(b.ai.training)) {
+        db.settings.ai = db.settings.ai || {};
+        db.settings.ai.training = Object.assign({}, db.settings.ai.training || {}, b.ai.training);
+        delete b.ai.training;
+      }
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) Object.assign(db.settings[k], b[k]);   /* SEC/robustness: только plain-object, иначе Object.assign(obj,"строка") засоряет настройки числовыми ключами */
       if (b.baseCurrency) db.settings.baseCurrency = String(b.baseCurrency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);   /* базовая валюта кабинета для показа «≈ в моей валюте» */
       /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */

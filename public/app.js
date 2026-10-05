@@ -6923,6 +6923,7 @@ PAGES.qualifier = async (root) => {
           <div class="brief-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px">${GOALS.map(g => `<button type="button" class="brief-chip" data-goalset="${esc(g)}">${esc(g)}</button>`).join('')}</div>
           <textarea id="trGoal" rows="2" placeholder="По умолчанию: вывести клиента на видео-созвон (Zoom/Meet) минимумом сообщений — дать краткую инфу и предложить удобное время, не продавая всё в переписке.">${esc(tr.goal || '')}</textarea></div>`; })()}
         <div class="set-row" style="cursor:default;margin-bottom:12px"><div class="sp"><div class="sl">Скрывать название проекта и застройщика в переписке</div><div class="sd">Лучшая практика продаж: не называть ЖК/застройщика в сообщениях, раскрывать только на созвоне. ИИ ссылается на сильные стороны и район. Выкл — ИИ может называть проект.</div></div><label class="switch"><input type="checkbox" id="trHideNames" ${(tr.hideNames !== false) ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+        <div class="set-row" style="cursor:default;margin-bottom:12px"><div class="sp"><div class="sl">Я веду клиента сам (не передавать «эксперту»)</div><div class="sd">Вкл — ИИ пишет ОТ ПЕРВОГО ЛИЦА как ты, брокер: «я покажу», «давайте созвонимся». Не ссылается на отдельного эксперта/коллегу. Включай, если квалификатор не назначен и диалог ведёшь ты. Выкл — ИИ квалифицирует и передаёт эксперту на созвон.</div></div><label class="switch"><input type="checkbox" id="trSolo" ${(tr.handoff === 'self') ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
         <div class="form-row"><label>О нас / позиционирование</label><textarea id="trAbout" rows="3" placeholder="Кто вы, чем лучше конкурентов, для кого работаете. Пример: «Мы — бутиковое агентство по Дубаю, 8 лет, только проверенные застройщики, сопровождаем сделку под ключ.»">${esc(tr.about || '')}</textarea></div>
         <div class="form-row"><label>Проверенные факты ✅ <span class="sd" style="display:inline">(эти цифры ИИ называть МОЖНО)</span></label><textarea id="trFacts" rows="4" placeholder="Реальные объекты, цены, условия, доходность — то, что подтверждено и что ИИ может озвучивать клиенту. Пример: «Studio в Downtown от 950k AED, рассрочка 40/60, сдача Q3 2027, доходность 7-8% годовых.»">${esc(tr.facts || '')}</textarea></div>
         ${(() => { const TONES = ['Спокойный, уверенный, без давления; на «вы»','Тёплый, дружелюбный; на «ты»','Экспертный, премиальный, лаконичный','Энергичный, с лёгким юмором','Деловой, по делу, без воды']; return `<div class="form-row"><label>Фирменный тон <span class="sd" style="display:inline">(выбери или впиши свой)</span></label>
@@ -6941,7 +6942,8 @@ PAGES.qualifier = async (root) => {
       about: $('#trAbout', root).value.trim(), facts: $('#trFacts', root).value.trim(),
       tone: $('#trTone', root).value.trim(), scripts: $('#trScripts', root).value.trim(),
       forbidden: $('#trForbidden', root).value.trim(), goal: $('#trGoal', root).value.trim(),
-      hideNames: !!($('#trHideNames', root) && $('#trHideNames', root).checked)
+      hideNames: !!($('#trHideNames', root) && $('#trHideNames', root).checked),
+      handoff: ($('#trSolo', root) && $('#trSolo', root).checked) ? 'self' : 'expert'
     };
     const btn = $('#saveTrain', root); btn.disabled = true;
     await api.patch('/settings', { ai: { training } });
