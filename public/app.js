@@ -5111,11 +5111,23 @@ function wireKanbanScroll(root) {
   const board = $('.kanban', root);
   if (!board) return;
   const scrollable = () => board.scrollWidth > board.clientWidth + 4;
+  /* высота доски = остаток вьюпорта → колонки (.kb-cards) скроллятся вертикально ВНУТРИ, а не тянут страницу */
+  const fit = () => { const top = board.getBoundingClientRect().top; board.style.height = Math.max(340, window.innerHeight - top - 14) + 'px'; };
+  fit();
+  if (!window._kbFitBound) { window._kbFitBound = true; window.addEventListener('resize', () => { const b = document.querySelector('.kanban'); if (b) { const t = b.getBoundingClientRect().top; b.style.height = Math.max(340, window.innerHeight - t - 14) + 'px'; } }); }
   board.addEventListener('wheel', (e) => {
-    if (!scrollable()) return;
-    if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;   /* уже горизонтальный жест (трекпад) — не мешаем */
-    board.scrollLeft += e.deltaY;
-    e.preventDefault();   /* иначе страница прыгает вертикально вместо прокрутки доски */
+    if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;   /* горизонтальный жест (трекпад) — не мешаем */
+    /* ВАЖНО: если курсор над колонкой, которая ещё может скроллиться вертикально в эту сторону —
+       отдаём вертикальный скролл колонке (раньше ВЕСЬ вертикальный жест уходил в бок → по столбцу не опуститься). */
+    const cards = e.target.closest && e.target.closest('.kb-cards');
+    if (cards) {
+      const canDown = e.deltaY > 0 && cards.scrollTop + cards.clientHeight < cards.scrollHeight - 1;
+      const canUp = e.deltaY < 0 && cards.scrollTop > 0;
+      if (canDown || canUp) return;   /* колонка сама прокрутится вертикально */
+    }
+    if (!scrollable()) return;        /* некуда вести вбок — выходим */
+    board.scrollLeft += e.deltaY;     /* иначе (над шапкой/краем/колонка на пределе) — листаем доску вбок */
+    e.preventDefault();
   }, { passive: false });
   /* боковые кнопки-стрелки (видны только когда есть куда скроллить) */
   if (!scrollable() || board.parentElement.querySelector('.kb-navbtn')) return;
