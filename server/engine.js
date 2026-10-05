@@ -1105,6 +1105,33 @@ function inbound(db, lead, text, opts = {}) {
   return m;
 }
 
+/* ПОДХВАТ ИИ при включении: клиент ответил, пока ИИ был на паузе (ручное первое касание ставит его на паузу).
+   Включили ИИ → он отвечает на УЖЕ пришедшее последнее входящее (не вставляя новое сообщение). */
+async function aiRespondNow(db, lead) {
+  if (!lead || lead.lastDir !== 'in') return false;
+  const lastIn = [...(db.messages || [])].reverse().find(x => x.leadId === lead.id && x.dir === 'in');
+  if (!lastIn) return false;
+  lead.ai = lead.ai || {};
+  if (lead.ai._replying && Date.now() - lead.ai._replying < 60000) return false;
+  let reply = null;
+  try { reply = (ai.onInbound(db, lead, lastIn.text) || {}).reply; } catch (_) {}
+  const prov = (db.settings.ai || {}).provider;
+  const useLlm = llm.available && llm.available() && (prov === 'llm' || prov === 'auto');
+  lead.ai._replying = Date.now(); store.save();
+  let out = null;
+  if (useLlm) { try { out = await llm.reply(db, lead); } catch (e) { console.error('[ai-catchup]', e.message); } }
+  try {
+    if (out) {
+      for (const [axis, v] of Object.entries(out.axes || {})) if (!lead.quals[axis]) lead.quals[axis] = v;
+      try { ai.screen(db, lead); } catch (_) {}
+      send(db, lead, out.text, 'ai');
+    } else if (reply && reply.text) {
+      send(db, lead, reply.text, 'ai');
+    }
+  } finally { delete lead.ai._replying; store.save(); }
+  return true;
+}
+
 /* ---------- отписка от рассылки (кнопка «Отписаться» в шаблоне) ----------
    Тихий opt-out вместо жалобы: снимаем маркетинг, чистим из кампаний, стопаем
    авто-цепочки, подтверждаем в 24ч-окне (клиент только что нажал → окно открыто). */
@@ -1283,4 +1310,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity };

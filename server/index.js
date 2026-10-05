@@ -7357,8 +7357,11 @@ const server = http.createServer(async (req, res) => {
         if (b.geo) lead.geo = b.geo;
         if (b.grayPhone !== undefined) lead.grayPhone = b.grayPhone ? String(b.grayPhone).replace(/\D/g, '') : null;   /* закрепить серый номер отправки за лидом (или сбросить) */
         if (b.ai) {
+          const wasOff = !(lead.ai && lead.ai.enabled);
           if (b.ai.enabled === true) lead.tags = (lead.tags || []).filter(t => t !== 'нужен человек');
           Object.assign(lead.ai, b.ai);
+          /* включили ИИ, а клиент уже ответил (пока ИИ был на паузе) → ИИ сразу подхватывает диалог */
+          if (b.ai.enabled === true && wasOff && lead.lastDir === 'in' && engine.aiRespondNow) { try { engine.aiRespondNow(db, lead).catch(() => {}); } catch (_) {} }
         }
         if (b.name) lead.name = b.name;
         if (b.vendorId !== undefined && !IS_BROKER) { /* ручное назначение подрядчика на лид (не брокер) */
