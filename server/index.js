@@ -10008,7 +10008,10 @@ const server = http.createServer(async (req, res) => {
       await store.runInTenant(tid, async () => {
         const tdb = store.get();
         const g = tdb.settings.waGray || {};
-        if (!g.token || tok !== g.token) return;      /* не тот тенант/токен */
+        /* АВТОРИЗАЦИЯ: тенантский токен ИЛИ платформенный токен воркера (общий воркер шлёт им).
+           Раньше принимался только g.token → у платформенного воркера входящие резались (приём не работал). */
+        const platTok = waWorkerToken(tdb);
+        if (!tok || (tok !== g.token && tok !== platTok)) return;
         okAuth = true;
         /* квитанция доставки grey: повышаем статус исходящего по waId (sent→delivered→read). Честный статус вместо вечного «отправлено». */
         if (b.event === 'status' && b.id) {
