@@ -1791,7 +1791,8 @@ function brokerIcs(db, b) {
   return L.join('\r\n');
 }
 /* ⭐ Занятость брокера для ИИ-планирования: встречи + задачи-с-дедлайном + личный календарь (внешний ICS) */
-const ICS_CACHE = {};   /* brokerId → { intervals:[{s,e}], at } */
+const ICS_CACHE = {};   /* tid:brokerId → { intervals:[{s,e}], at } — КЛЮЧ С ТЕНАНТОМ: сид-брокеры имеют одинаковые id (br_amir…) в разных тенантах → кэш занятости тёк между агентствами */
+const icsKey = (b) => store.currentTid() + ':' + (b && b.id);
 function parseIcsBusy(text) {
   const out = []; const blocks = String(text).split(/BEGIN:VEVENT/i).slice(1);
   const toMs = (v) => { const md = String(v).trim().match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2}))?/); if (!md) return null; const [, Y, Mo, D, H, Mi, S] = md; return H == null ? Date.UTC(+Y, +Mo - 1, +D) : Date.UTC(+Y, +Mo - 1, +D, +H, +Mi, +S || 0); };
@@ -1805,14 +1806,14 @@ function parseIcsBusy(text) {
   return out;
 }
 async function refreshIcsBusy(b) {
-  if (!b || !b.busyIcsUrl) { if (b) delete ICS_CACHE[b.id]; return; }
-  try { const { text } = await safeFetch(b.busyIcsUrl); if (/BEGIN:VCALENDAR/i.test(text)) ICS_CACHE[b.id] = { intervals: parseIcsBusy(text).slice(0, 500), at: Date.now() }; } catch (_) {}
+  if (!b || !b.busyIcsUrl) { if (b) delete ICS_CACHE[icsKey(b)]; return; }
+  try { const { text } = await safeFetch(b.busyIcsUrl); if (/BEGIN:VCALENDAR/i.test(text)) ICS_CACHE[icsKey(b)] = { intervals: parseIcsBusy(text).slice(0, 500), at: Date.now() }; } catch (_) {}
 }
 function brokerBusyIntervals(db, b) {
   const iv = [];
   (db.meetings || []).filter(m => m.brokerId === b.id && m.at).forEach(m => iv.push({ s: m.at, e: m.at + ((+m.dur || +m.durationMin || 30)) * 60000 }));   /* FIX: реальное поле длительности — m.dur (durationMin не существует) → длинные встречи занимали лишь 30мин → риск двойной брони */
   (db.brokerTasks || []).filter(t => t.brokerId === b.id && t.due && t.status !== 'done').forEach(t => iv.push({ s: t.due, e: t.due + 30 * 60000 }));
-  const c = ICS_CACHE[b.id]; if (c) iv.push(...c.intervals);
+  const c = ICS_CACHE[icsKey(b)]; if (c) iv.push(...c.intervals);
   if (b.busyIcsUrl && (!c || Date.now() - c.at > 30 * 60000)) refreshIcsBusy(b);   /* фоновое обновление кэша */
   /* ручные повторяющиеся блоки → конкретные интервалы на 14 дней вперёд (dow 1..7, Пн=1) */
   if (Array.isArray(b.busyBlocks) && b.busyBlocks.length) {

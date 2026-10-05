@@ -8,6 +8,7 @@ const ai = require('./ai');
 const control = require('./control');
 const llm = require('./llm');
 const wa = require('./wa');
+const { isSeedDemoPhone } = require('./seed');
 
 const MIN = 60e3, DAY = 24 * 3600e3;
 
@@ -402,6 +403,7 @@ function tickChains(db) {
   const defaultSeqId = (db.settings.ai && db.settings.ai.defaultSeq) || null;
   for (const lead of db.leads) {
     if (!lead.ai.enabled) continue;
+    if (!db._demoSandbox && (lead._demo || isSeedDemoPhone(lead.phone))) continue;   // 🔒 демо-лиды/зашитые демо-номера НЕ получают авто-касаний у реальных тенантов
     if (lead.marketingOptOut) continue;                             // отписался от рассылки — касания не шлём
     if (!autoOn && !lead.ai.forced) continue;                       // авто off → только ручные
     /* какую цепочку крутить (приоритет): принудительная (ручной запуск) → ЛИЧНАЯ цепочка закреплённого

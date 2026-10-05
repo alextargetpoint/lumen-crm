@@ -65,6 +65,7 @@ function seed() {
     quals: { purpose: null, timeline: null, budget: null, type: null },
     ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null },
     broker: null, summary: null, tags: [], numberId: null,
+    _demo: true,   /* метка демо-лида: движок НЕ шлёт им авто-касания у реальных тенантов (только в demoSandbox) */
   }, o); L.push(l); return l; };
 
   /* ---- Горячий: квалифицирован ИИ, передан брокеру (демо-витрина) ---- */
@@ -273,4 +274,9 @@ function seed() {
   };
 }
 
-module.exports = { seed };
+/* Телефоны демо-сида (нормализованные цифры). Движок никогда не шлёт на них авто-касания у НЕ-сэндбокс
+   тенантов — страховка от авто-рассылки на зашитые реальные номера из любого не-очищенного тенанта. */
+const SEED_DEMO_PHONES = new Set(['34641208846', '37491402287', '380675119033', '393402218804', '41793314207', '420605118327', '420777402118', '4917655218830', '6281339024415', '66611185529', '66924817003', '79031228467', '79114027719', '79162204187', '79178831245', '79213845120', '79258136022', '79267713058', '971523378812', '971585120471', '998901235541']);
+function isSeedDemoPhone(phone) { return SEED_DEMO_PHONES.has(String(phone || '').replace(/\D/g, '')); }
+
+module.exports = { seed, SEED_DEMO_PHONES, isSeedDemoPhone };

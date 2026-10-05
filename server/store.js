@@ -136,8 +136,11 @@ function loadTenant(tid) {
      всех тенантов, кроме явного демо-сэндбокса платформы (registry meta demoSandbox:true). Идемпотентно. */
   try {
     const isSandbox = !!(registry && registry.tenants && registry.tenants[tid] && registry.tenants[tid].demoSandbox);
+    if (db) db._demoSandbox = isSandbox;   /* движок: авто-касания демо-лидам только в сэндбоксе */
     const d = db && db.settings && db.settings.demo;
     if (!isSandbox && d && (d.simulateReplies || d.accelerate)) { d.simulateReplies = false; d.accelerate = false; saveTenantNow(tid); }
+    /* 🔒 пустой hooks.secret = лид-вебхук мог привязаться к ЧУЖОМУ тенанту (findTenant по секрету брал первого с пустым). Генерим. */
+    if (db && db.settings && db.settings.hooks && !db.settings.hooks.secret) { db.settings.hooks.secret = require('crypto').randomBytes(16).toString('hex'); saveTenantNow(tid); }
   } catch (_) {}
   lastLeads[tid] = (tenants.get(tid).leads || []).length;   /* базовая точка для детектора обнуления */
   return db;
