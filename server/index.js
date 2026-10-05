@@ -7358,6 +7358,18 @@ const server = http.createServer(async (req, res) => {
           if (nc && nc.name) lead.tags = [...new Set([...(lead.tags || []), nc.name])];
         }
         if (b.custom) { lead.custom = lead.custom || {}; Object.assign(lead.custom, b.custom); }
+        /* рекламная разметка лида (кампания/адсет/объявление + ответы лид-формы). Для теста/ручной привязки.
+           Матчинг на дерево креативов (сильные стороны) — matchAds при наличии adId. */
+        if (b.ads && typeof b.ads === 'object') {
+          const s = (v, n) => v == null ? undefined : String(v).slice(0, n);
+          lead.ads = Object.assign(lead.ads || {}, {
+            campaignName: s(b.ads.campaignName, 200), adsetName: s(b.ads.adsetName, 200), adName: s(b.ads.adName, 200),
+            adId: s(b.ads.adId, 80) || (lead.ads && lead.ads.adId) || null,
+            projectStage: s(b.ads.projectStage, 80), contactTime: s(b.ads.contactTime, 80), source: s(b.ads.source, 40) || (lead.ads && lead.ads.source),
+          });
+          try { if (typeof healAdNames === 'function') healAdNames(lead.ads); } catch (_) {}
+          try { if (lead.ads.adId && typeof matchAds === 'function') matchAds(db, lead); } catch (_) {}
+        }
         if (b.channels) Object.assign(lead.channels = lead.channels || {}, b.channels);
         if (b.avatarUrl !== undefined) lead.avatarUrl = b.avatarUrl || null;
         if (b.nextAction !== undefined) lead.nextAction = b.nextAction && b.nextAction.text ? { text: String(b.nextAction.text).slice(0, 200), at: +b.nextAction.at || null } : null;
