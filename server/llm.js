@@ -167,6 +167,37 @@ function hasTrainedFacts(db) {
   const t = (db && db.settings && db.settings.ai && db.settings.ai.training) || {};
   return !!(t.facts && t.facts.trim());
 }
+/* ПЕРСОНА БРОКЕРА-ВЛАДЕЛЬЦА ЛИДА: если лид закреплён за брокером и у него есть ИИ-профиль/био —
+   ИИ ведёт диалог ОТ ЕГО ЛИЦА и в его манере. Так каждый брокер персонализирует, как ИИ отвечает ЕГО клиентам. */
+function brokerAiBlock(db, lead) {
+  if (!lead || !lead.broker) return '';
+  const br = (db.brokers || []).find(b => b.id === lead.broker);
+  if (!br) return '';
+  const ap = br.aiProfile || {};
+  if (ap.enabled === false) return '';
+  const bits = [`Этого клиента ведёшь ТЫ — брокер ${br.name}${br.title ? ' (' + br.title + ')' : ''}. Пиши от первого лица как он.`];
+  if (br.bio) bits.push(`Коротко о тебе (используй уместно, НЕ вываливай целиком): ${String(br.bio).slice(0, 400)}`);
+  if (ap.style) bits.push(`Твоя личная манера письма: ${String(ap.style).slice(0, 300)}`);
+  return '\n- 👤 ПЕРСОНА БРОКЕРА: ' + bits.join(' ');
+}
+/* КОНКРЕТНЫЕ СЛОТЫ ДЛЯ СОЗВОНА: реальное время (не «когда удобно»), с учётом часов работы агентства/брокера
+   и пояса лида. Приоритет: личная настройка брокера → кастом агентства → авто по рабочим часам. */
+function meetingSlots(db, lead) {
+  const ai = (db.settings && db.settings.ai) || {};
+  const br = lead && lead.broker && (db.brokers || []).find(b => b.id === lead.broker);
+  const pref = (br && br.aiProfile && br.aiProfile.slotPref) || (ai.slots && ai.slots.mode === 'custom' && ai.slots.custom) || '';
+  if (pref) return String(pref).slice(0, 160);
+  const s = ai.slots || {};
+  const from = Math.min(21, Math.max(6, parseInt(s.from, 10) || 10));
+  const to = Math.min(23, Math.max(from + 2, parseInt(s.to, 10) || 19));
+  const tz = (s.tz != null && s.tz !== '') ? (parseInt(s.tz, 10) || 0) : (typeof (lead && lead.tz) === 'number' ? lead.tz : 3);
+  const now = new Date(Date.now() + tz * 3600e3);
+  const h = now.getUTCHours();
+  const t1 = h + 2;                                  // сегодня, если успеваем в рабочее окно
+  const mid = Math.min(to, from + 5);
+  if (t1 >= from && t1 <= to) return `сегодня в ${t1}:00 или завтра в ${from + 1}:00`;
+  return `завтра в ${from + 1}:00 или в ${mid}:00`;
+}
 function buildPrompt(db, lead, history) {
   const g = db.settings.geoNames[lead.geo] || lead.geo;
   const allGeos = (db.settings.agency.geos || []).map(x => db.settings.geoNames[x] || x).join(', ');
@@ -188,7 +219,8 @@ function buildPrompt(db, lead, history) {
   return `${identity} Агентство работает по направлениям: ${allGeos}. Сейчас клиент интересуется направлением «${g}» — если он назовёт другое из наших направлений, спокойно работай с ним и НЕ говори, что вы только по «${g}». Ты ведёшь WhatsApp-диалог с лидом по имени ${lead.name.split(' ')[0]}.
 
 РЕГЛАМЕНТ:
-- ЦЕЛЬ ДИАЛОГА (главное — к чему ведёшь): ${((db.settings.ai && db.settings.ai.training && db.settings.ai.training.goal) || '').trim() || goalDefault}${SOLO ? '\n- ⚠️ ТЫ ВЕДЁШЬ КЛИЕНТА САМ (ты и есть брокер): НИКОГДА не ссылайся на «эксперта», «коллегу», «специалиста», «нашего менеджера» как на отдельного человека и не обещай «подключить/передать» кого-то. Говори только от первого лица: «я покажу», «я подберу», «давайте созвонимся/встретимся». Созвон/показ проводишь ТЫ.' : ''}
+- ЦЕЛЬ ДИАЛОГА (главное — к чему ведёшь): ${((db.settings.ai && db.settings.ai.training && db.settings.ai.training.goal) || '').trim() || goalDefault}${SOLO ? '\n- ⚠️ ТЫ ВЕДЁШЬ КЛИЕНТА САМ (ты и есть брокер): НИКОГДА не ссылайся на «эксперта», «коллегу», «специалиста», «нашего менеджера» как на отдельного человека и не обещай «подключить/передать» кого-то. Говори только от первого лица: «я покажу», «я подберу», «давайте созвонимся/встретимся». Созвон/показ проводишь ТЫ.' : ''}${brokerAiBlock(db, lead)}
+- КОНКРЕТНОЕ ВРЕМЯ: когда предлагаешь созвон/показ — давай КОНКРЕТНЫЕ варианты времени, не размытое «когда вам удобно». Ориентир (подстрой под ответ клиента, не повторяй дословно каждый раз): ${meetingSlots(db, lead)}.
 - Минимальный бюджет направления: ${crit.budgetMin} ${crit.currency}. Если клиент назвал бюджет ниже — НЕ отказывай, предложи down-sell: ${crit.downsell}
 - Заметки: ${crit.notes || '—'}
 - Тон: живой человеческий, коротко (1-3 предложения), без канцелярита, без эмодзи, один вопрос за раз.
