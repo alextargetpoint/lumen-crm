@@ -7355,6 +7355,7 @@ const server = http.createServer(async (req, res) => {
         if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); }
         if (b.broker !== undefined) { const nb = b.broker || null; if (nb !== lead.broker) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; }
         if (b.geo) lead.geo = b.geo;
+        if (b.grayPhone !== undefined) lead.grayPhone = b.grayPhone ? String(b.grayPhone).replace(/\D/g, '') : null;   /* закрепить серый номер отправки за лидом (или сбросить) */
         if (b.ai) {
           if (b.ai.enabled === true) lead.tags = (lead.tags || []).filter(t => t !== 'нужен человек');
           Object.assign(lead.ai, b.ai);
