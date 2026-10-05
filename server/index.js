@@ -9967,6 +9967,14 @@ const server = http.createServer(async (req, res) => {
         const g = tdb.settings.waGray || {};
         if (!g.token || tok !== g.token) return;      /* не тот тенант/токен */
         okAuth = true;
+        /* квитанция доставки grey: повышаем статус исходящего по waId (sent→delivered→read). Честный статус вместо вечного «отправлено». */
+        if (b.event === 'status' && b.id) {
+          const rank = { sent: 1, delivered: 2, read: 3 };
+          const st = String(b.status || ''); if (!rank[st]) return;
+          const msg = (tdb.messages || []).find(m => m.waId && m.waId === b.id);
+          if (msg && rank[st] > (rank[msg.status] || 0)) { msg.status = st; store.save(); }
+          return;
+        }
         if (b.event !== 'message' || b.fromMe || !b.text) return;
         const senderDigits = String(b.phone || '').replace(/\D/g, '');
         if (!senderDigits) return;

@@ -951,6 +951,7 @@ const PERSONA = {
 };
 
 function tickSimulator(db) {
+  if (!db._demoSandbox) return;   // 🔒 защита: фабрикация ответов/комментариев ТОЛЬКО в демо-сэндбоксе, никогда у клиента (даже если settings.demo.simulateReplies как-то включат)
   if (!db.settings.demo.simulateReplies) return;
   const cands = db.leads.filter(l =>
     l.lastDir === 'out' && l.ai.enabled &&
