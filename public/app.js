@@ -1706,6 +1706,27 @@ window.openGrayManager = async function (jumpPhone) {
   renderMgr();
   if (jumpPhone) { const clean = String(jumpPhone).replace(/[^0-9]/g, ''); if (clean) connectNumber(clean, ''); }
 };
+/* ПЕРЕ-СКАНИРОВАНИЕ номера прямо из карточки: подтверждение → сброс сессии + новый QR (настройки номера сохраняются). */
+window.openGrayRescan = async function (phone) {
+  if (!phone) return;
+  const disp = '+' + String(phone).replace(/[^0-9]/g, '');
+  if (!await uiConfirm('Пересканировать номер?', `${disp}: текущая сессия отключится и появится НОВЫЙ QR для привязки. Настройки номера (закреп за брокером, профиль, прогрев) сохранятся. Делайте при проблемах с доставкой/приёмом сообщений.`, { ok: 'Да, новый QR' })) return;
+  const bd = modal({ title: 'Пере-сканирование ' + disp, sub: 'WhatsApp → Связанные устройства → Привязать устройство → наведите на QR', body: `<div id="rescanQr" style="min-height:270px;display:grid;place-items:center;text-align:center">Сбрасываю сессию, готовлю новый QR…</div>`, actions: [{ label: 'Закрыть' }] });
+  let timer = null; const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+  bd.addEventListener('click', (e) => { if (e.target.closest('.m-actions') || e.target === bd) stop(); });
+  let r0; try { r0 = await api.post('/wa/gray/rescan', { phone }); } catch (e) { const box = $('#rescanQr', bd); if (box) box.innerHTML = `<div style="color:var(--bad)">Не вышло: ${esc(e.message)}</div>`; return; }
+  if (r0 && r0.ok === false) { const box = $('#rescanQr', bd); if (box) box.innerHTML = `<div style="color:var(--bad)">Не вышло: ${esc(r0.error || 'ошибка воркера')}</div>`; return; }
+  timer = setInterval(async () => {
+    if (!document.body.contains(bd)) { stop(); return; }
+    const box = $('#rescanQr', bd); if (!box) { stop(); return; }
+    let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(phone)); } catch (e) { return; }
+    const st = r.session && r.session.status;
+    if (st === 'qr' && r.session.qr) box.innerHTML = `<img src="${r.session.qr}" style="width:250px;height:250px;border-radius:12px;background:#fff;padding:8px" alt="QR">`;
+    else if (st === 'connected') { box.innerHTML = `<div style="font-size:16px;color:var(--good,#2f9d74);font-weight:650">${ic(I.check)} Номер пере-привязан${r.session.phone ? ' · +' + esc(r.session.phone) : ''}</div>`; stop(); setTimeout(() => { closeModal(); if (typeof render === 'function') render(); }, 1600); }
+    else if (st === 'logged_out') { box.innerHTML = '<div style="color:var(--bad)">Вышел из аккаунта — нажмите «Пересканировать» ещё раз.</div>'; stop(); }
+    else box.innerHTML = 'Подключение…';
+  }, 1800);
+};
 /* Покупка серого номера (Yesim): страна + тариф → покупка → OTP → регистрация WhatsApp + QR */
 window.openYesimBuy = async function () {
   if (!grayConsentOk()) return openGrayConsent('wa', () => window.openYesimBuy());
@@ -14281,7 +14302,7 @@ PAGES.numbers = async (root) => {
         <div class="num-actions">
           ${n.source === 'yesim' ? `<button class="btn btn-sm" data-yact="${esc(n.phone)}" title="Гид активации + приём SMS/OTP">${ic(I.spark)}Активация / коды</button>` : ''}
           <button class="btn btn-sm" data-waprofile="${esc(n.phone)}" title="Аватар/имя/описание → синк в WhatsApp">${ic(I.gear)}Профиль</button>
-          ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span>`}
+          ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
         </div>
@@ -14838,6 +14859,7 @@ PAGES.numbers = async (root) => {
   }));
   /* серые карточки: QR-переподключение, закреп за брокером, удаление — прямо со страницы */
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
+  $$('[data-grayrescan]', root).forEach(b => b.addEventListener('click', () => openGrayRescan(b.dataset.grayrescan)));
   $$('[data-waprofile]', root).forEach(b => b.addEventListener('click', () => window.openWaPersona && window.openWaPersona(b.dataset.waprofile, grayNums.find(n => n.phone === b.dataset.waprofile))));
   $$('[data-yact]', root).forEach(b => b.addEventListener('click', () => window.openYesimActivate && window.openYesimActivate(b.dataset.yact)));
   $$('.gn-broker2', root).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));

@@ -9705,6 +9705,21 @@ const server = http.createServer(async (req, res) => {
       catch (e) { return json(res, 200, { ok: false, error: e.message, saved: true }); }
       return json(res, 200, { ok: true, phone, session });
     }
+    /* ПЕРЕСКАНИРОВАТЬ существующий номер: сброс сессии (logout → креды очищены) + старт → НОВЫЙ QR.
+       Номер остаётся в конфиге (закреп за брокером, профиль, label не теряются). Лечит битые Signal-сессии. */
+    if (p === '/api/wa/gray/rescan' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      if (!phone) return json(res, 400, { error: 'нужен номер' });
+      const rec = ((db.settings.waGray || {}).numbers || []).find(n => n.phone === phone);
+      if (!rec) return json(res, 404, { error: 'номер не найден в конфиге' });
+      try {
+        await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/logout').catch(() => {});   /* сброс старой (возможно битой) сессии */
+        const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/start');            /* свежая сессия → новый QR */
+        return json(res, 200, { ok: true, phone, session: r.session });
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
     /* статус одного номера (CRM опрашивает раз в ~1.5с пока status==='qr') */
     if (p === '/api/wa/gray/status' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
