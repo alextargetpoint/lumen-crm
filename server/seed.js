@@ -247,7 +247,7 @@ function seed() {
     settings: {
       agency: { name: 'One Agency', geos: ['dubai', 'bali', 'phuket', 'spain'] },
       wa: { mode: 'mock', phoneId: '', wabaId: '', tokenSet: false, webhookVerifyToken: 'lumen-verify' },
-      ai: { provider: 'mock', autopilot: true, model: '', persona: { name: 'Мария', role: 'специалист отдела подбора' } },
+      ai: { provider: 'auto', autopilot: true, model: '', persona: { name: 'Мария', role: 'специалист отдела подбора' } },   /* 'auto': живой LLM на реальных входящих (тёплый ответ с отсылкой), фолбэк на ядро при сбое. 'mock' оставлял новых клиентов на сухом скрипте — главный источник «палевных» сухих ответов. */
       demo: { accelerate: false, dayMs: 90e3, simulateReplies: false },   /* ПРОД-дефолт OFF: никакой симуляции ответов/ускорения у реальных тенантов (демо-сэндбокс включается registry.demoSandbox) */
       criteria: {
         dubai:  { budgetMin: 130000, currency: 'USD', purposes: ['Инвестиция', 'Переезд', 'ВНЖ'], downsell: 'Ниже $130k — офф-план студии JVC/Dubai South, рассрочка 1%/мес', notes: 'Вторичка-first при бюджете от $250k' },
