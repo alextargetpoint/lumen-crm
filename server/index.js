@@ -7361,7 +7361,7 @@ const server = http.createServer(async (req, res) => {
           if (b.ai.enabled === true) lead.tags = (lead.tags || []).filter(t => t !== 'нужен человек');
           Object.assign(lead.ai, b.ai);
           /* включили ИИ, а клиент уже ответил (пока ИИ был на паузе) → ИИ сразу подхватывает диалог */
-          if (b.ai.enabled === true && wasOff && lead.lastDir === 'in' && engine.aiRespondNow) { try { engine.aiRespondNow(db, lead).catch(() => {}); } catch (_) {} }
+          if (b.ai.enabled === true && wasOff && lead.lastDir === 'in' && engine.aiRespondNow) { try { engine.aiRespondNow(db, lead); } catch (_) {} }
         }
         if (b.name) lead.name = b.name;
         if (b.vendorId !== undefined && !IS_BROKER) { /* ручное назначение подрядчика на лид (не брокер) */

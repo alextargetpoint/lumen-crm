@@ -10,6 +10,17 @@ const llm = require('./llm');
 const wa = require('./wa');
 const { isSeedDemoPhone } = require('./seed');
 
+/* Человеческая задержка ответа ИИ: не «мгновенный бот», а пауза как у живого менеджера.
+   Конфигурируется settings.ai.replyDelayMinSec / replyDelayMaxSec (сек). Дефолт 3–12 мин.
+   demo.accelerate (сэндбокс) → секунды. Короткий текст/вопрос — не мгновенно, но ближе к низу диапазона. */
+function aiReplyDelayMs(db) {
+  const a = (db.settings && db.settings.ai) || {};
+  if (db.settings && db.settings.demo && db.settings.demo.accelerate) return 3000 + Math.random() * 4000;
+  const lo = Math.max(10, Math.round(+a.replyDelayMinSec || 180));
+  const hi = Math.max(lo + 5, Math.round(+a.replyDelayMaxSec || 720));
+  return (lo + Math.random() * (hi - lo)) * 1000;
+}
+
 const MIN = 60e3, DAY = 24 * 3600e3;
 
 /* ---------- омниканал: выбор канала по приоритетам ---------- */
@@ -1099,7 +1110,7 @@ function inbound(db, lead, text, opts = {}) {
       }
       delete l2.ai._replying;   /* снимаем in-flight лок */
       store.save();
-    }, 4000 + Math.random() * 5000); // человеческий тайминг ответа
+    }, aiReplyDelayMs(db)); // человеческая задержка (3–12 мин по умолч.) — не «мгновенный бот»
   }
   store.save();
   return m;
@@ -1107,28 +1118,28 @@ function inbound(db, lead, text, opts = {}) {
 
 /* ПОДХВАТ ИИ при включении: клиент ответил, пока ИИ был на паузе (ручное первое касание ставит его на паузу).
    Включили ИИ → он отвечает на УЖЕ пришедшее последнее входящее (не вставляя новое сообщение). */
-async function aiRespondNow(db, lead) {
+function aiRespondNow(db, lead) {
   if (!lead || lead.lastDir !== 'in') return false;
   const lastIn = [...(db.messages || [])].reverse().find(x => x.leadId === lead.id && x.dir === 'in');
   if (!lastIn) return false;
   lead.ai = lead.ai || {};
   if (lead.ai._replying && Date.now() - lead.ai._replying < 60000) return false;
-  let reply = null;
-  try { reply = (ai.onInbound(db, lead, lastIn.text) || {}).reply; } catch (_) {}
+  lead.ai._replying = Date.now(); store.save();
   const prov = (db.settings.ai || {}).provider;
   const useLlm = llm.available && llm.available() && (prov === 'llm' || prov === 'auto');
-  lead.ai._replying = Date.now(); store.save();
-  let out = null;
-  if (useLlm) { try { out = await llm.reply(db, lead); } catch (e) { console.error('[ai-catchup]', e.message); } }
-  try {
-    if (out) {
-      for (const [axis, v] of Object.entries(out.axes || {})) if (!lead.quals[axis]) lead.quals[axis] = v;
-      try { ai.screen(db, lead); } catch (_) {}
-      send(db, lead, out.text, 'ai');
-    } else if (reply && reply.text) {
-      send(db, lead, reply.text, 'ai');
-    }
-  } finally { delete lead.ai._replying; store.save(); }
+  /* отвечаем с человеческой задержкой (как живой менеджер), а не мгновенно по клику «включить ИИ» */
+  setTimeout(async () => {
+    const fresh = store.get();
+    const l2 = (fresh.leads || []).find(x => x.id === lead.id);
+    if (!l2 || l2.lastDir !== 'in' || !l2.ai || !l2.ai.enabled) { if (l2 && l2.ai) delete l2.ai._replying; store.save(); return; }
+    let reply = null; try { reply = (ai.onInbound(fresh, l2, lastIn.text) || {}).reply; } catch (_) {}
+    let out = null;
+    if (useLlm) { try { out = await llm.reply(fresh, l2); } catch (e) { console.error('[ai-catchup]', e.message); } }
+    try {
+      if (out) { for (const [axis, v] of Object.entries(out.axes || {})) if (!l2.quals[axis]) l2.quals[axis] = v; try { ai.screen(fresh, l2); } catch (_) {} send(fresh, l2, out.text, 'ai'); }
+      else if (reply && reply.text) { send(fresh, l2, reply.text, 'ai'); }
+    } finally { delete l2.ai._replying; store.save(); }
+  }, aiReplyDelayMs(db));
   return true;
 }
 
