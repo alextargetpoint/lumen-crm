@@ -5908,9 +5908,11 @@ async function openLeadModal(id) {
   ].sort((a, b) => b.at - a.at);
 
   const tlItem = (t) => {
-    if (t.kind === 'msg') return `<div class="tl-item" data-f="msg"><div class="tl-dot ${t.m.dir === 'in' ? 'in' : 'out'}">${ic(I.chat)}</div>
-      <div class="tl-body"><div class="tl-head"><b>${t.m.dir === 'in' ? esc(l.name.split(' ')[0]) : ({ ai: 'Lumen AI', chain: 'Цепочка', wake: 'Реанимация', human: 'Менеджер' }[t.m.via] || 'Мы')}</b><span>${tmm(t.at)} · ${new Date(t.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span></div>
-      <div class="tl-text">${esc(t.m.text)}</div></div></div>`;
+    if (t.kind === 'msg') { const inb = t.m.dir === 'in'; const who = inb ? esc(l.name.split(' ')[0]) : ({ ai: 'Lumen AI', chain: 'Цепочка', wake: 'Реанимация', human: 'Менеджер' }[t.m.via] || 'Мы'); return `<div class="tl-item tl-chat ${inb ? 'in' : 'out'}" data-f="msg">
+      <div class="tl-bubble">
+        <div class="tl-bub-head"><b>${who}</b><span>${tmm(t.at)} · ${new Date(t.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span></div>
+        <div class="tl-bub-text">${esc(t.m.text)}</div>
+      </div></div>`; }
     if (t.kind === 'ev') return `<div class="tl-item" data-f="ev"><div class="tl-dot ev">${ic(I.bolt)}</div>
       <div class="tl-body"><div class="tl-text muted">${esc(t.e.text)}</div><div class="tl-head"><span>${ago(t.at)}</span></div></div></div>`;
     if (t.kind === 'note') return `<div class="tl-item" data-f="note"><div class="tl-dot note">${ic(I.edit || I.doc)}</div>
