@@ -1247,11 +1247,13 @@ function modal({ title, sub, body, actions, wide }) {
   return bd;
 }
 let _popGuard = false;   /* защита от зацикливания popstate ↔ history.back */
-function closeModal() {
+function closeModal(silent) {
   const bd = $('.modal-bd'); if (!bd) return;
   bd.classList.remove('show'); setTimeout(() => bd.remove(), 180);
-  /* если закрыли сами (крестик/фон) — снимаем нашу запись истории, чтобы «Назад» не упиралась в пустой шаг */
-  if (!_popGuard && history.state && history.state.lumenOverlay === 'modal') {
+  /* если закрыли сами (крестик/фон) — снимаем нашу запись истории, чтобы «Назад» не упиралась в пустой шаг.
+     silent=true (навигация через go()) — НЕ делаем history.back: go() сам заменит запись истории (replaceState),
+     а гонка back()↔навигация раньше «мигала в диалог и отбрасывала обратно в воронку». */
+  if (!silent && !_popGuard && history.state && history.state.lumenOverlay === 'modal') {
     _popGuard = true; try { history.back(); } catch (_) {} setTimeout(() => { _popGuard = false; }, 60);
   }
 }
@@ -2931,7 +2933,7 @@ function go(page) {
   /* реорг 9→5: прямой заход на свёрнутую страницу открывает её композит + нужную под-вкладку */
   if (FOLDED[page]) { const [comp, idx] = FOLDED[page]; PAGE_STATE[comp + 'Tab'] = idx; page = comp; }
   CUR = page;
-  closeModal();   /* FIX: навигация закрывает открытую модалку (иначе QR-подключение/др. попап висит поверх новой страницы = «глюк/мерцание») */
+  closeModal(true);   /* FIX: навигация закрывает открытую модалку ТИХО (без history.back — иначе гонка откатывала навигацию обратно: «мигнул диалог → вернулся в воронку») */
   document.getElementById('bulkBar')?.remove();   /* FIX: снять панель массовых действий при уходе со страницы (не висеть сиротой поверх других разделов) */
   navProgress();
   /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
@@ -6007,6 +6009,7 @@ async function openLeadModal(id) {
             <div class="lc-ai-sub">${l.ai.enabled ? 'Ведёт диалог сам. Напишете вручную — встанет на паузу.' : (l.tags || []).includes('нужен человек') ? 'Отключился сам: клиент попросил человека.' : 'На паузе — лид на менеджере.'}</div>
           </div>
           ${coll('Первое касание', `
+            ${(() => { const aiS = STATE.settings.ai || {}; const autoOn = aiS.autoChains !== false; const seqs = (STATE.sequences || []).filter(s => s.active); if (!autoOn || !seqs.length) return ''; const def = aiS.defaultSeq && seqs.find(s => s.id === aiS.defaultSeq); const nm = def ? '«' + esc(def.name) + '»' : 'по направлению'; return `<div class="lc-ft-chainbar">${ic(I.chain)}<div class="lc-ft-cb-t"><b>Активна авто-цепочка ${nm}</b><span>Новым лидам первое касание и follow-up уходят по цепочке автоматически. Поле ниже — для РУЧНОЙ отправки или когда авто-цепочка выключена.</span></div><button type="button" class="lc-ft-cb-go" data-goseq>${ic(I.chain)}К цепочке</button></div>`; })()}
             <div class="lc-ft2" style="margin-top:6px">
               <div class="lc-ft-chips" id="lcFtChips">${ftChipsHtml(l)}</div>
               <div class="lc-ft-grid">
@@ -6260,6 +6263,7 @@ async function openLeadModal(id) {
     } catch (e) { toast('Звонок не пошёл', e.message); }
     setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
   });
+  $('[data-goseq]', bd)?.addEventListener('click', () => go('sequences'));   /* из «Первого касания» → к цепочкам касаний */
   if (l.call && l.call.status && l.call.status !== 'ended' && (Date.now() - (l.call.at || 0)) < 120000) startCallWatch(l.id);   /* карточка открыта во время активного звонка → сразу показываем статус */
   $('#lcCallFile', bd).addEventListener('change', async (e) => {
     const f = e.target.files[0];
@@ -6526,6 +6530,8 @@ async function renderChat(id, rebuild) {
       <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
       <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
       <span class="badge acc">${stageName(l.stage)}</span>
+      <button class="btn btn-sm" id="chatCall" title="Позвонить клиенту через телефонию (запись + транскрипт лягут в карточку)">${ic(I.phone)}Позвонить</button>
+      <button class="btn btn-sm" id="chatOpenLead" title="Открыть полную карточку лида">${ic(I.user || I.doc)}Карточка</button>
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
@@ -6551,6 +6557,14 @@ async function renderChat(id, rebuild) {
     else ta.style.height = '42px';
   };
   fixTa(); requestAnimationFrame(() => requestAnimationFrame(fixTa)); [90, 300, 800, 1600, 2600].forEach(t => setTimeout(fixTa, t));
+  /* звонок и полная карточка — прямо из окна диалога (раньше звонок был только в полной карточке) */
+  $('#chatCall')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget; const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.phone) + 'Звоню…';
+    try { const r = await api.post('/leads/' + l.id + '/call', {}); toast('📞 Звоним ВАМ' + (r.from ? ' · ' + r.from : ''), 'Снимите трубку — затем соединим с клиентом' + (r.to ? ' (' + r.to + ')' : ''), true); startCallWatch(l.id); }
+    catch (err) { toast('Звонок не пошёл', err.message); }
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
+  });
+  $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
     if (!t) return;

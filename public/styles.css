@@ -996,7 +996,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 .form-row { margin-bottom: 13px; }
 .form-row label { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-3); margin-bottom: 5px; }
 .form-row input, .form-row select, .form-row textarea { width: 100%; }
-.m-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+/* футер действий ЛИПКИЙ: при длинном теле (превью диалога в карточке лида) кнопки «Открыть диалог» и др.
+   раньше уходили за край — модалка скроллилась целиком. Теперь кнопки всегда видны внизу. */
+.m-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; position: sticky; bottom: -24px; z-index: 3; margin: 18px -24px -24px; padding: 15px 24px; background: rgba(255, 255, 255, .97); border-top: 1px solid var(--stroke-soft, #e7e3dd); border-radius: 0 0 var(--r-lg) var(--r-lg); }
 .toasts { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 200; }
 .toast {
   min-width: 260px; max-width: 360px; padding: 13px 16px; border-radius: var(--r-md);
@@ -8663,3 +8665,13 @@ body.client-view [data-team]{ display:none !important; }
   transition:background .12s, border-color .12s, color .12s; max-width:100%; text-align:left; }
 .brief-chip:hover{ border-color:var(--accent-soft-bd); background:var(--accent-soft, #EAF1FE); color:var(--accent); }
 .brief-chip:active{ transform:translateY(.5px); }
+
+/* «Первое касание» ↔ активная авто-цепочка: поясняющий баннер (убирает путаницу настроек) */
+.lc-ft-chainbar { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; margin: 2px 0 10px; border: 1px solid var(--accent-soft-bd, #c3d6fa); background: var(--accent-soft, #eaf1fe); border-radius: 10px; font-size: 12px; line-height: 1.45; }
+.lc-ft-chainbar > svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--accent); margin-top: 1px; }
+.lc-ft-cb-t { flex: 1; min-width: 0; }
+.lc-ft-cb-t b { display: block; color: var(--ink, #18181f); font-size: 12.5px; }
+.lc-ft-cb-t span { color: var(--muted); }
+.lc-ft-cb-go { flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--accent); background: var(--card, #fff); border: 1px solid var(--accent-soft-bd, #c3d6fa); border-radius: 999px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+.lc-ft-cb-go svg { width: 13px; height: 13px; }
+.lc-ft-cb-go:hover { background: var(--accent); color: #fff; border-color: transparent; }
