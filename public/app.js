@@ -15912,7 +15912,7 @@ PAGES.brokers = async (root) => {
         </div>
         <div class="br2-load"><div class="br2-bar ${pct >= 90 ? 'full' : ''}"><i style="width:${pct}%"></i></div><b>${b.load}/${b.capacity}</b></div>
         <div class="br2-stats">
-          <span><b>${b.deals90}</b> сделок · 90д</span>
+          <span><b>${b.deals90 || 0}</b> сделок · 90д</span>
           ${hot ? `<span class="hot"><b>${hot}</b> в работе</span>` : ''}
           <span class="tb-spacer"></span>
           <span class="br2-sch" title="${daysStr} · ${sched}">${daysStr ? daysStr + ' · ' + sched : 'смены не заданы'}</span>
