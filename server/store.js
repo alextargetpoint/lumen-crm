@@ -131,6 +131,14 @@ function loadTenant(tid) {
   }
   if (!db) { db = seedFn(); tenants.set(tid, db); saveTenantNow(tid); }
   else tenants.set(tid, db);
+  /* 🔒 БЕЗОПАСНОСТЬ ПРОДА: демо-симулятор входящих и ускорение отправки НИКОГДА не должны работать
+     у реального клиента (фабриковали «ответы лида» + слали пачкой мимо часовых окон). Форсим OFF для
+     всех тенантов, кроме явного демо-сэндбокса платформы (registry meta demoSandbox:true). Идемпотентно. */
+  try {
+    const isSandbox = !!(registry && registry.tenants && registry.tenants[tid] && registry.tenants[tid].demoSandbox);
+    const d = db && db.settings && db.settings.demo;
+    if (!isSandbox && d && (d.simulateReplies || d.accelerate)) { d.simulateReplies = false; d.accelerate = false; saveTenantNow(tid); }
+  } catch (_) {}
   lastLeads[tid] = (tenants.get(tid).leads || []).length;   /* базовая точка для детектора обнуления */
   return db;
 }

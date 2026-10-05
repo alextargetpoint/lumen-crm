@@ -3152,7 +3152,8 @@ engine.setGraySender(async (db, lead, m) => {
     const _mu = /^https?:\/\//i.test(m.media.url) ? m.media.url : (callBase(db) + m.media.url);
     _grayBody.media = { type: m.media.type || 'image', url: _mu, name: m.media.name || '', mimetype: m.media.mimetype || '' };
   }
-  await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', _grayBody);
+  const _sr = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', _grayBody);
+  if (_sr && _sr.id) m.waId = _sr.id;            /* id сообщения воркера — для сверки квитанций (пока grey-квитанций нет) */
   lead.grayPhone = num.phone;                    /* закрепляем номер за лидом — цепочка остаётся на нём */
   if (wasNew) {
     const today = new Date().toISOString().slice(0, 10);
@@ -3163,7 +3164,10 @@ engine.setGraySender(async (db, lead, m) => {
     if (num._newLeadsToday > cap && !num._capWarnedDay) { num._capWarnedDay = today; ai.pushEvent(db, { type: 'note', text: `⚠️ Осторожно: с номера +${num.realPhone || num.phone} сегодня уже ${num._newLeadsToday} первых касаний новым лидам (реком. ≤${cap}). Много первых касаний с одного серого номера повышает риск бана — распределите новых лидов на другие номера или добавьте номер.` }); }
     else if (num._capWarnedDay !== today) { num._capWarnedDay = null; }
   }
-  m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'delivered';
+  /* ЧЕСТНЫЙ СТАТУС: воркер вернул ok = сообщение ПЕРЕДАНО в Baileys (не подтверждена доставка устройству).
+     Раньше ставили 'delivered' → в CRM «доставлено», хотя у клиента в WhatsApp «Ожидание». Ставим 'sent'
+     (отправлено/в пути); 'delivered' выставит реальная квитанция, когда появится grey-receipt-канал. */
+  m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'sent';
   store.save();
 });
 
