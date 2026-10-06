@@ -6534,7 +6534,11 @@ async function renderChat(id, rebuild) {
   await ensureVendors();
   const pane = $('#chatPane');
   if (!pane) return;
-  const draft = $('#composerText') ? $('#composerText').value : '';
+  const _ta0 = $('#composerText');
+  const draft = _ta0 ? _ta0.value : '';
+  /* сохраняем фокус+позицию курсора композера, чтобы живой поллинг не выбивал менеджера из набора */
+  const _taFocused = !!(_ta0 && document.activeElement === _ta0);
+  const _taSelS = _ta0 ? _ta0.selectionStart : null, _taSelE = _ta0 ? _ta0.selectionEnd : null;
   const viaName = { ai: 'Lumen AI', chain: 'Цепочка', wake: 'Реанимация', human: 'Менеджер', template: 'Шаблон' };
   const chName = { wa: 'WA', tg: 'TG', viber: 'VB', email: '@' };
   let lastDay = '';
@@ -6556,8 +6560,11 @@ async function renderChat(id, rebuild) {
       <div class="bmeta">${m.channel && m.channel !== 'wa' ? `<span class="via-tag" style="background:rgba(255,255,255,.3)">${chName[m.channel] || m.channel}</span>` : ''}${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}</span>` : ''}</div>
     </div>`;
   }).join('');
-  /* «ИИ печатает» — клиент написал, автопилот готовит ответ */
-  const typing = l.lastDir === 'in' && l.ai.enabled && STATE.settings.ai.autopilot
+  /* «ИИ печатает» — клиент написал, ИИ готовит ответ. ⚠️ ТОЛЬКО ~2 мин после сообщения клиента:
+     раньше показывалось, пока lastDir==='in' + ИИ вкл — а это весь delay ответа 4-15 мин и дольше →
+     индикатор «висел постоянно», будто клиент всё время печатает. */
+  const typing = l.lastDir === 'in' && l.ai.enabled
+    && lastMsg && lastMsg.dir === 'in' && (Date.now() - (lastMsg.at || 0) < 120000)
     && !['handover', 'viewing', 'deal', 'lost'].includes(l.stage)
     ? '<div class="bubble in typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span></div>' : '';
 
@@ -6582,6 +6589,7 @@ async function renderChat(id, rebuild) {
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
     </div>`;
   $('#composerText').value = draft;
+  if (_taFocused) { const _ta1 = $('#composerText'); if (_ta1) { _ta1.focus(); try { _ta1.setSelectionRange(_taSelS != null ? _taSelS : draft.length, _taSelE != null ? _taSelE : draft.length); } catch (_) {} } }
   const body = $('#chatBody');
   body.scrollTop = body.scrollHeight;
   /* фикс «узкое поле при первом открытии»: flex:1 1 auto + width:100% в flex резолвился в
@@ -17970,7 +17978,9 @@ setInterval(async () => {
     if ($('.modal-bd')) return; // и под открытой модалкой тоже
     if (CUR_POP || document.querySelector('.hint-pop, #ctxPop, .cs.open, .dtp.open')) return; // открыт пикер/дропдаун/подсказка/контекст-меню — DOM под ними не дёргаем
     const ae = document.activeElement;
-    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; // юзер печатает
+    /* ⚠️ ИСКЛЮЧЕНИЕ для композера чата: раньше фокус на поле ответа глушил ВЕСЬ поллинг → новые
+       входящие в открытом диалоге не появлялись, пока менеджер печатал. renderChat восстановит фокус+курсор. */
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable) && ae.id !== 'composerText') return; // юзер печатает (кроме чата)
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
     else if (CUR === 'funnel') {
       /* ⭐ ТОЛЬКО воронка авто-обновляется по poll — и ТИХО (мгновенная подмена DOM, скролл на месте).
