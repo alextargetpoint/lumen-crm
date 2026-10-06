@@ -6739,8 +6739,8 @@ PAGES.waProfile = async (root) => {
     <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Мой WhatsApp</h1>
     <div class="muted" style="font-size:13px;margin-bottom:18px">Ваше имя, фото и описание — как вас увидит клиент в WhatsApp. Меняете сами, синкается в реальный аккаунт.</div>
     <div class="glass card" style="max-width:860px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.phone || I.chat)}Телефон для входящих звонков</div>
-      <div class="muted" style="font-size:12px;margin-bottom:10px;line-height:1.5">На этот номер телефония направит входящий звонок по вашему лиду (click-to-call). Можно изменить в любой момент.</div>
+      <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.phone || I.chat)}Мой номер для звонков (телефония)</div>
+      <div class="muted" style="font-size:12px;margin-bottom:10px;line-height:1.5">Это <b>личный мобильный</b>, не WhatsApp-номер клиента. При звонке из карточки лида (click-to-call) телефония сначала наберёт <b>вас</b> на этот номер — вы берёте трубку, и система соединяет с клиентом. Формат +66…, можно менять в любой момент.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input id="wmPhone" type="tel" value="${esc(data.myPhone || '')}" placeholder="+66…" style="max-width:260px">
         <button class="btn btn-accent btn-sm" id="wmPhoneSave">${ic(I.check)}Сохранить номер</button>
@@ -9787,6 +9787,7 @@ PAGES.automations = async (root) => {
   /* SaaS: свой домен для e-mail (Resend) — self-service подключение */
   (async () => {
     const card = $('#emDomainBody', root); if (!card) return;
+    let emForceAdd = false;   /* показать форму добавления своего домена даже когда один уже верифицирован (SaaS: сменить наш платформенный на свой) */
     const e2 = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     function presetRow(d) {
       const presets = d.presets || [{ key: 'classic', label: 'Классика' }, { key: 'minimal', label: 'Минимал' }, { key: 'warm', label: 'Тёплый' }, { key: 'dark', label: 'Тёмный' }];
@@ -9801,20 +9802,22 @@ PAGES.automations = async (root) => {
       let d; try { d = await api.get('/email/domain'); } catch (err) { card.innerHTML = '<span style="color:var(--bad,#c0392b)">' + e2(err.message) + '</span>'; return; }
       const pr = presetRow(d);
       if (!d.keyReady) { card.innerHTML = pr + 'Оператор платформы ещё не задал общий Resend-ключ (RESEND_API_KEY). Как только он появится — можно будет подключить свой домен.'; return; }
-      if (!d.domain) {
+      if (!d.domain || emForceAdd) {
         card.innerHTML = pr + `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
             <div class="form-row" style="flex:1;min-width:170px;margin:0"><label>Ваш домен</label><input id="emDomIn" placeholder="mail.agency.com"></div>
             <div class="form-row" style="width:110px;margin:0"><label>Отправитель</label><input id="emDomLocal" value="noreply"></div>
-            <button class="btn btn-sm btn-accent" id="emDomAdd">${ic(I.plus)}Подключить</button></div>
-          <div style="margin-top:8px">Добавим домен → покажем DNS-записи (SPF/DKIM/DMARC) → пропишете их у регистратора → «Проверить». Тогда письма пойдут с вашего домена во «Входящие».</div>`;
+            <button class="btn btn-sm btn-accent" id="emDomAdd">${ic(I.plus)}Подключить</button>
+            ${d.domain ? `<button class="btn btn-sm" id="emDomBack">Отмена</button>` : ''}</div>
+          <div style="margin-top:8px">Добавим домен → покажем DNS-записи (SPF/DKIM/DMARC) → пропишете их у регистратора → «Проверить». Тогда письма пойдут с <b>вашего</b> домена во «Входящие».${d.domain ? ` Текущий (<b>${e2(d.domain)}</b>) останется активным, пока новый не будет верифицирован.` : ''}</div>`;
         return;
       }
       const recs = (d.records || []).map(r => `<tr><td style="padding:4px 8px"><b>${e2(r.type || r.record || '')}</b></td><td style="padding:4px 8px;word-break:break-all">${e2(r.name || '')}</td><td style="padding:4px 8px;word-break:break-all">${e2(r.value || '')}</td><td style="padding:4px 8px">${e2(r.status || '')}</td></tr>`).join('');
       card.innerHTML = pr + `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b>${e2(d.domain)}</b><span class="badge ${d.verified ? 'ok' : 'warn'}"><i></i>${d.verified ? 'верифицирован' : 'ожидает DNS'}</span>
-          <span style="margin-left:auto;display:flex;gap:6px">
+          <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
             ${d.verified ? `<button class="btn btn-sm" id="emDomTest">Тест-письмо</button>` : `<button class="btn btn-sm btn-accent" id="emDomVerify">${ic(I.refresh)}Проверить</button>`}
-            <button class="btn btn-sm" id="emDomDel" title="Отключить">✕</button></span></div>
+            <button class="btn btn-sm" id="emDomSwitch">${ic(I.plus)}Подключить свой домен</button>
+            <button class="btn btn-sm" id="emDomDel" title="Отключить домен">✕</button></span></div>
         ${d.verified
           ? `<div style="margin-top:8px;color:var(--good,#6d8a4f)">Письма уходят с ${e2(d.senderLocal)}@${e2(d.domain)} ✅</div>`
           : `<div style="margin-top:8px">Пропишите у регистратора домена эти записи, затем «Проверить»:</div>
@@ -9835,7 +9838,9 @@ PAGES.automations = async (root) => {
         const f = bd && bd.querySelector && bd.querySelector('#emPvFrame'); if (f) f.srcdoc = r.html;
         return;
       }
-      if (b.id === 'emDomAdd') { const dom = ($('#emDomIn', card) || {}).value?.trim(); const local = ($('#emDomLocal', card) || {}).value?.trim() || 'noreply'; if (!dom) { toast('Впишите домен', '', false); return; } b.disabled = true; try { await api.post('/email/domain', { domain: dom, senderLocal: local }); toast('Домен добавлен', 'Пропишите DNS-записи и «Проверить»', true); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
+      if (b.id === 'emDomSwitch') { emForceAdd = true; await refresh(); const inp = $('#emDomIn', card); if (inp) inp.focus(); return; }
+      else if (b.id === 'emDomBack') { emForceAdd = false; await refresh(); return; }
+      else if (b.id === 'emDomAdd') { const dom = ($('#emDomIn', card) || {}).value?.trim(); const local = ($('#emDomLocal', card) || {}).value?.trim() || 'noreply'; if (!dom) { toast('Впишите домен', '', false); return; } b.disabled = true; try { await api.post('/email/domain', { domain: dom, senderLocal: local }); emForceAdd = false; toast('Домен добавлен', 'Пропишите DNS-записи и «Проверить»', true); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
       else if (b.id === 'emDomVerify') { b.disabled = true; b.textContent = 'Проверяю…'; try { const r = await api.post('/email/domain/verify', {}); toast(r.verified ? 'Верифицирован ✅' : 'Пока не верифицирован', r.verified ? 'Домен готов' : 'DNS ещё не распространились — подождите и повторите', r.verified); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
       else if (b.id === 'emDomTest') { b.disabled = true; try { const r = await api.post('/email/test', {}); toast(r.ok ? 'Тест отправлен' : 'Не ушло', r.ok ? ('от ' + r.from) : r.error, r.ok); } catch (err) { toast('Ошибка', err.message, false); } b.disabled = false; }
       else if (b.id === 'emDomDel') { try { await api.del('/email/domain'); toast('Домен отключён', '', true); } catch (err) { toast('Ошибка', err.message, false); } await refresh(); }
@@ -17483,6 +17488,9 @@ PAGES.settings = async (root) => {
             <label class="switch"><input type="checkbox" id="telWarm" ${(s.telephony || {}).warmupBeforeCall !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
           <div class="form-row" id="telWarmTextRow" style="${(s.telephony || {}).warmupBeforeCall === false ? 'display:none' : ''}"><label>Текст прогрева <span class="muted" style="font-weight:400">(подстановки: {name}, {broker}, {agency}, {prefix} — префикс номера дозвона)</span></label>
             <textarea id="telWarmText" rows="2" placeholder="Это {broker} из {agency} — звоню вам сейчас с номера {prefix}, возьмите, пожалуйста, трубку 🙏">${esc((s.telephony || {}).warmupText || '')}</textarea></div>
+          <div class="form-row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><label>${ic(I.phone)} Мой номер для звонков (основатель) <span class="muted" style="font-weight:400">— личный мобильный, не виртуальный</span></label>
+            <input id="telOwnerPhone" type="tel" value="${esc(((s.agency || {}).manager || {}).phone || '')}" placeholder="+66 / +39 / +971…" style="max-width:280px">
+            <div class="muted" style="font-size:11px;margin-top:5px;line-height:1.5">При звонке из карточки лида телефония <b>сначала наберёт вас</b> на этот номер — вы берёте трубку, и система соединяет с клиентом. Для лидов с назначенным брокером звонок идёт на номер <b>брокера</b> (он задаёт его в «Мой WhatsApp»); этот номер — для неназначенных лидов и вас как владельца. То же значение, что в «Профиль агентства → Менеджер → телефон».</div></div>
           <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent" id="telSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="telTest" type="button">${ic(I.spark)}Проверить</button></div>
           <div class="tel-test-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
           ${['twilio', 'telnyx'].includes((s.telephony || {}).provider) ? (() => {
@@ -17780,7 +17788,10 @@ PAGES.settings = async (root) => {
     if ($('#telPool')) t.fromNumbers = $('#telPool').value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 40);
     if ($('#telWarm')) t.warmupBeforeCall = $('#telWarm').checked;
     if ($('#telWarmText')) t.warmupText = $('#telWarmText').value.trim().slice(0, 400);
-    await api.patch('/settings', { telephony: t });
+    const patch = { telephony: t };
+    /* номер основателя (callback) = agency.manager.phone. Мержим с текущим manager, чтобы не затереть имя/email. */
+    if ($('#telOwnerPhone')) { const mgr = Object.assign({}, ((STATE.settings || {}).agency || {}).manager || {}, { phone: $('#telOwnerPhone').value.trim() }); patch.agency = { manager: mgr }; }
+    await api.patch('/settings', patch);
     toast('Телефония сохранена', prov === 'twilio' ? 'Нажми «Проверить», затем купи номер ниже' : (prov === 'none' ? undefined : 'Настрой вебхук у провайдера'), true);
     loadState();
   });
