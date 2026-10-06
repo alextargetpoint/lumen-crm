@@ -3091,14 +3091,24 @@ function waWorkerPlatform() { return !!(process.env.LUMEN_WA_WORKER_TOKEN || _pl
 async function waGrayApi(db, method, pathx, body) {
   const base = waWorkerBase(db);
   if (!base) throw new Error('WA-воркер не настроен (укажи URL в Настройках)');
-  const r = await fetch(base + pathx, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + waWorkerToken(db) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error('worker ' + r.status + ': ' + (j.error || 'ошибка'));
-  return j;
+  /* ⚠️ ТАЙМАУТ ОБЯЗАТЕЛЕН: без него зависший/медленный воркер блокировал await навсегда →
+     FIFO-очередь grey-отправки лида (_graySeq) вставала намертво → ИИ переставал отвечать. */
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const r = await fetch(base + pathx, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + waWorkerToken(db) },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error('worker ' + r.status + ': ' + (j.error || 'ошибка'));
+    return j;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('WA-воркер не ответил за 20с (таймаут)');
+    throw e;
+  } finally { clearTimeout(to); }
 }
 
 /* ── Серый TELEGRAM (MTProto user-accounts) — воркер lumen-tg-worker, аналог WA-воркера ── */
@@ -3108,10 +3118,14 @@ function tgWorkerReady(db) { return !!(tgWorkerBase(db) && tgWorkerToken(db)); }
 function tgGraySid(phone) { return 'tg_' + String(phone).replace(/[^0-9]/g, ''); }
 async function tgGrayApi(db, method, pathx, body) {
   const base = tgWorkerBase(db); if (!base) throw new Error('TG-воркер не настроен (LUMEN_TG_WORKER_URL / platformTgWorker)');
-  const r = await fetch(base + pathx, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tgWorkerToken(db) }, body: body ? JSON.stringify(body) : undefined });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error('tg-worker ' + r.status + ': ' + (j.error || 'ошибка'));
-  return j;
+  const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 20000);   /* таймаут: зависший TG-воркер не должен блокировать очередь отправки */
+  try {
+    const r = await fetch(base + pathx, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tgWorkerToken(db) }, body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error('tg-worker ' + r.status + ': ' + (j.error || 'ошибка'));
+    return j;
+  } catch (e) { if (e.name === 'AbortError') throw new Error('TG-воркер не ответил за 20с (таймаут)'); throw e; }
+  finally { clearTimeout(to); }
 }
 
 /* Автоподбор серого номера для лида: залипание за лидом → номер закреплённого брокера → любой подключённый.
