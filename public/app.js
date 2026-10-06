@@ -9733,11 +9733,25 @@ PAGES.automations = async (root) => {
     $('#repLink') && $('#repLink').addEventListener('click', () => { navigator.clipboard.writeText(repUrl()); toast('Ссылка на отчёт скопирована', 'Клиент откроет read-only отчёт', true); });
     $('#repOpen') && $('#repOpen').addEventListener('click', () => window.open(repUrl(), '_blank'));
     $('#repPdf') && $('#repPdf').addEventListener('click', () => window.open(repUrl() + '&print=1', '_blank')); }
+  /* ⚠️ АВТО-СОХРАНЕНИЕ порядка/тумблеров каскада на лету — раньше сохранялось ТОЛЬКО по кнопке
+     «Сохранить каскад», и пользователь включал тумблер, перезагружал и видел сброс в серый. */
+  const autoSaveCascade = async (silent) => {
+    const priority = $$('#chPrio .ch-prio', root).map(x => x.dataset.ch);
+    const enabled = {}; $$('[data-chen]', root).forEach(x => enabled[x.dataset.chen] = x.checked);
+    try {
+      await api.patch('/settings', { channels: { priority, enabled } });
+      STATE.settings.channels = STATE.settings.channels || {};
+      STATE.settings.channels.priority = priority; STATE.settings.channels.enabled = enabled;
+      if (!silent) toast('Сохранено', 'Канал в каскаде обновлён', true);
+    } catch (e) { toast('Не сохранилось', e.message); }
+  };
+  $$('[data-chen]', root).forEach(x => x.addEventListener('change', () => autoSaveCascade(false)));
   $$('[data-chmv]', root).forEach(b => b.addEventListener('click', () => {
     const row = b.closest('.ch-prio');
     const sib = +b.dataset.chmv < 0 ? row.previousElementSibling : row.nextElementSibling;
     if (sib) (+b.dataset.chmv < 0 ? sib.before(row) : sib.after(row));
     $$('#chPrio .ch-prio b', root).forEach((x, i2) => x.textContent = i2 + 1);
+    autoSaveCascade(true);
   }));
   /* Viber: показать поля только выбранного режима (PA / BSP) */
   { const vm = $('#chVbMode'); if (vm) vm.addEventListener('change', () => {
