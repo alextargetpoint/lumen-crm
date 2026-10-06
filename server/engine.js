@@ -532,7 +532,8 @@ function tickChains(db) {
           (async () => {
             try {
               const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { email: isEmail });
-              lead.ai[ck] = (out && out.message) || '';
+              /* ⚠️ пустой message (успех LLM, но пусто) — НЕ оставляем '' (иначе бесконечная регенерация, касание не уйдёт никогда): запасной текст */
+              lead.ai[ck] = (out && out.message) ? out.message : fillVars(db, lead, step.text || '{name}, здравствуйте! Вы оставляли заявку по креативу выше — подобрать актуальные варианты под ваш запрос?');
               if (isEmail && out && out.subject) lead.ai._ptEmailSubj = out.subject;
             } catch (e) {
               lead.ai[ck] = fillVars(db, lead, step.text || '{name}, здравствуйте! Вы оставляли заявку по креативу выше — подобрать актуальные варианты под ваш запрос?');
