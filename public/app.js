@@ -9814,14 +9814,27 @@ PAGES.automations = async (root) => {
       if (!d.keyReady) { card.innerHTML = pr + 'Оператор платформы ещё не задал общий Resend-ключ (RESEND_API_KEY). Как только он появится — можно будет подключить свой домен.'; return; }
       if (!d.domain || emForceAdd) {
         card.innerHTML = pr + `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <div class="form-row" style="flex:1;min-width:170px;margin:0"><label>Ваш домен</label><input id="emDomIn" placeholder="mail.agency.com"></div>
-            <div class="form-row" style="width:110px;margin:0"><label>Отправитель</label><input id="emDomLocal" value="noreply"></div>
+            <div class="form-row" style="flex:1;min-width:200px;margin:0"><label>Ваш домен отправителя</label><input id="emDomIn" placeholder="mail.youragency.com"></div>
+            <div class="form-row" style="width:120px;margin:0"><label>Имя отправителя</label><input id="emDomLocal" value="noreply"></div>
             <button class="btn btn-sm btn-accent" id="emDomAdd">${ic(I.plus)}Подключить</button>
             ${d.domain ? `<button class="btn btn-sm" id="emDomBack">Отмена</button>` : ''}</div>
-          <div style="margin-top:8px">Добавим домен → покажем DNS-записи (SPF/DKIM/DMARC) → пропишете их у регистратора → «Проверить». Тогда письма пойдут с <b>вашего</b> домена во «Входящие».${d.domain ? ` Текущий (<b>${e2(d.domain)}</b>) останется активным, пока новый не будет верифицирован.` : ''}</div>`;
+          <div class="em-steps">
+            <div class="em-step"><span class="em-step-n">1</span><div><b>Впишите свой домен</b> <span class="muted">— лучше <b>поддомен</b> для писем, напр. <code>mail.youragency.com</code> (не основной сайт, чтобы не задеть его почту). «Имя отправителя» — что до @ (noreply / hello / info).</span></div></div>
+            <div class="em-step"><span class="em-step-n">2</span><div><b>Добавьте DNS-записи у регистратора.</b> <span class="muted">После «Подключить» мы покажем 3–4 записи (SPF / DKIM / DMARC) с кнопками «копировать». Зайдите туда, где <b>куплен домен</b> (GoDaddy, Namecheap, Cloudflare, Reg.ru, Timeweb, Hostinger…) → раздел <b>«DNS» / «DNS-записи» / «Управление зоной»</b> → <b>Добавить запись</b> → вставьте <b>Тип</b>, <b>Имя (Host/Name)</b> и <b>Значение (Value/Content)</b> из каждой строки.</span></div></div>
+            <div class="em-step"><span class="em-step-n">3</span><div><b>Нажмите «Проверить».</b> <span class="muted">DNS обычно подхватываются за <b>5–30 минут</b> (редко до 24 ч). Как все записи позеленеют — письма пойдут с <b>вашего</b> домена во «Входящие», а не в спам.${d.domain ? ` Текущий (<b>${e2(d.domain)}</b>) работает, пока новый не верифицирован.` : ''}</span></div></div>
+          </div>`;
         return;
       }
-      const recs = (d.records || []).map(r => `<tr><td style="padding:4px 8px"><b>${e2(r.type || r.record || '')}</b></td><td style="padding:4px 8px;word-break:break-all">${e2(r.name || '')}</td><td style="padding:4px 8px;word-break:break-all">${e2(r.value || '')}</td><td style="padding:4px 8px">${e2(r.status || '')}</td></tr>`).join('');
+      const recs = (d.records || []).map(r => {
+        const nm = r.name || '', vl = r.value || '', typ = String(r.type || r.record || '').toUpperCase();
+        const ok = /verified|valid/i.test(r.status || '');
+        const row = (lbl, val, ph) => `<div class="em-rec-fld"><span class="em-rec-lbl">${lbl}</span><code class="em-rec-val">${e2(val) || ph}</code><button class="em-copy" data-emcopy="${e2(val)}" title="Копировать">${ic(I.copy)}</button></div>`;
+        return `<div class="em-rec">
+          <div class="em-rec-top"><span class="em-rec-type">${e2(typ)}</span><span class="em-rec-st ${ok ? 'ok' : ''}">${ok ? '✓ найдена' : 'ждёт'}</span></div>
+          ${row('Имя / Host', nm, '@')}
+          ${row('Значение / Value', vl, '—')}
+        </div>`;
+      }).join('');
       card.innerHTML = pr + `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b>${e2(d.domain)}</b><span class="badge ${d.verified ? 'ok' : 'warn'}"><i></i>${d.verified ? 'верифицирован' : 'ожидает DNS'}</span>
           <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
@@ -9830,11 +9843,13 @@ PAGES.automations = async (root) => {
             <button class="btn btn-sm" id="emDomDel" title="Отключить домен">✕</button></span></div>
         ${d.verified
           ? `<div style="margin-top:8px;color:var(--good,#6d8a4f)">Письма уходят с ${e2(d.senderLocal)}@${e2(d.domain)} ✅</div>`
-          : `<div style="margin-top:8px">Пропишите у регистратора домена эти записи, затем «Проверить»:</div>
-             <div style="overflow:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;min-width:100%"><thead><tr style="text-align:left"><th style="padding:4px 8px">Тип</th><th style="padding:4px 8px">Имя</th><th style="padding:4px 8px">Значение</th><th style="padding:4px 8px">Статус</th></tr></thead><tbody>${recs || '<tr><td colspan=4 style="padding:8px">записи появятся здесь</td></tr>'}</tbody></table></div>`}`;
+          : `<div style="margin-top:10px;font-size:12.5px;line-height:1.5"><b>Добавьте эти записи в DNS вашего регистратора</b> (каждую — отдельной записью: тип + имя + значение), затем «Проверить». Кнопка ⧉ копирует значение. Обычно подхватывается за 5–30 мин.</div>
+             <div class="em-recs">${recs || '<div class="muted" style="padding:8px">записи появятся здесь после «Подключить»</div>'}</div>`}`;
     }
     const curPreset = () => (card.querySelector('#emPresetSeg .chip-t.on') || {}).dataset?.empreset || 'classic';
     card.addEventListener('click', async (ev) => {
+      const cp = ev.target.closest('.em-copy');
+      if (cp) { try { await navigator.clipboard.writeText(cp.dataset.emcopy || ''); cp.classList.add('ok'); toast('Скопировано', 'Вставьте в поле DNS-записи у регистратора', true); setTimeout(() => cp.classList.remove('ok'), 900); } catch (_) { toast('Не скопировалось', 'выделите значение вручную', false); } return; }
       const chip = ev.target.closest('[data-empreset]');
       if (chip) {
         $$('#emPresetSeg .chip-t', card).forEach(x => x.classList.toggle('on', x === chip));
