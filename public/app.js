@@ -15608,7 +15608,7 @@ async function renderMoodboard(root, opts) {
 /* RBAC (зеркало серверных ROLE_CAPS/ROLE_DEFAULT_HIDE — сервер остаётся источником enforcement) */
 const RBAC_ROLES = { broker: 'Брокер', assistant: 'Ассистент', marketer: 'Маркетолог', analyst: 'Аналитик', manager: 'Менеджер' };
 const RBAC_DEFHIDE = {
-  broker: ['settings', 'numbers', 'brokers', 'billing'],   /* админ закрыт (подключения/роли/номера/биллинг). Личное у брокера остаётся: «Мой WhatsApp» (свой номер+визитка), профиль агентства read-only */
+  broker: ['settings', 'numbers', 'brokers', 'billing', 'agency'],   /* по умолчанию закрыто (подключения/роли/номера/биллинг/профиль агентства — это founder). 'agency' в ДЕФОЛТЕ (не в жёстком BROKER_HIDDEN_PAGES) → founder может ВЫДАТЬ брокеру доступ через шаблоны прав. Оформление (тема) — личное, всегда доступно */
   assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
   marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
   analyst: ['inbox', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],
@@ -17991,10 +17991,14 @@ document.getElementById('agencyMenuBtn')?.addEventListener('click', (e) => {
   e.stopPropagation();
   const ex = document.getElementById('agencyMenu'); if (ex) { ex.remove(); return; }
   const r = e.currentTarget.getBoundingClientRect();
-  const _isBroker = STATE && STATE.me && STATE.me.role === 'broker';   /* брокеру — только профиль (read-only) + выход; «Настройки» (подключения/роли) закрыты */
+  const _isBroker = STATE && STATE.me && STATE.me.role === 'broker';
+  /* «Профиль агентства» и «Настройки» в меню — только если у роли есть доступ к странице (брокеру по умолчанию закрыто,
+     founder может выдать через шаблоны прав). Оформление (тема) — отдельная личная кнопка ◐ в шапке, всегда доступна. */
+  const _canAgency = (typeof pageHiddenForUser === 'function') ? !pageHiddenForUser('agency') : !_isBroker;
+  const _canSettings = (typeof pageHiddenForUser === 'function') ? !pageHiddenForUser('settings') : !_isBroker;
   const m = el(`<div id="agencyMenu" class="agency-menu">
-    <button data-am="profile">${ic(I.gear)}${t('Профиль агентства','Agency profile')}</button>
-    ${_isBroker ? '' : `<button data-am="settings">${ic(I.gear)}${t('Настройки','Settings')}</button>`}
+    ${_canAgency ? `<button data-am="profile">${ic(I.gear)}${t('Профиль агентства','Agency profile')}</button>` : ''}
+    ${_canSettings ? `<button data-am="settings">${ic(I.gear)}${t('Настройки','Settings')}</button>` : ''}
     <div class="am-sep"></div>
     <button data-am="logout" class="am-logout">${ic(I.x)}${t('Выйти из аккаунта','Log out')}</button>
   </div>`);
