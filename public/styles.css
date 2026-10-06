@@ -761,6 +761,12 @@ textarea { resize: vertical; min-height: 70px; }
 .lc-pin-ref.busy { opacity: .55; pointer-events: none; }
 .lc-pin-ref.busy svg { animation: spin 1s linear infinite; }
 .lc-pin-status { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+/* сворачивание сводки: раньше была фиксированной и перекрывала хронологию/табы внутри карточки лида */
+.lc-pin-fold { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 22px; margin-left: 2px; padding: 0; border: none; background: transparent; cursor: pointer; border-radius: 7px; color: var(--ink-3); transition: background .2s; }
+.lc-pin-fold:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.lc-pin-fold svg { width: 15px; height: 15px; color: currentColor; transition: transform .22s ease; }
+.lc-pin.collapsed .lc-pin-fold svg { transform: rotate(-90deg); }
+.lc-pin.collapsed .lc-pin-status, .lc-pin.collapsed .lc-pin-body { display: none; }
 .lc-pin-chip { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent); }
 .lc-pin-chip.muted { background: color-mix(in srgb, var(--muted) 12%, transparent); color: var(--muted); border-color: color-mix(in srgb, var(--muted) 22%, transparent); }
 .lc-pin-chip.act { background: color-mix(in srgb, #16a34a 16%, transparent); color: #22c55e; border-color: color-mix(in srgb, #16a34a 34%, transparent); }

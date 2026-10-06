@@ -6003,9 +6003,10 @@ async function openLeadModal(id) {
       </div>
       <div class="lc-grid">
         <div class="lc-left">
-          <div class="lc-pin" id="lcPin">
+          <div class="lc-pin${(() => { try { return localStorage.getItem('lumen_lcPinFold') === '1' ? ' collapsed' : ''; } catch (e) { return ''; } })()}" id="lcPin">
             <div class="lc-pin-hd">${ic(I.spark)}<b>Сводка по лиду</b>${l.summaryAt ? `<span class="lc-pin-at">${ago(l.summaryAt)}</span>` : ''}
-              <button class="btn-ghost lc-pin-ref" id="lcPinRefresh" title="Пересобрать сводку из переписки, звонков и квалификации">${ic(I.refresh || I.spark)}<span>Обновить</span></button></div>
+              <button class="btn-ghost lc-pin-ref" id="lcPinRefresh" title="Пересобрать сводку из переписки, звонков и квалификации">${ic(I.refresh || I.spark)}<span>Обновить</span></button>
+              <button class="lc-pin-fold" id="lcPinFold" title="Свернуть / развернуть сводку" aria-label="Свернуть сводку"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
             <div class="lc-pin-status">
               <span class="lc-pin-chip">${stageName(l.stage)}</span>
               <span class="lc-pin-chip">${esc(l.geoName)}</span>
@@ -6146,6 +6147,7 @@ async function openLeadModal(id) {
     openLeadModal(id);
   };
   $('#lcPinRefresh', bd)?.addEventListener('click', () => rebuildSummary($('#lcPinRefresh', bd)));
+  $('#lcPinFold', bd)?.addEventListener('click', (e) => { e.stopPropagation(); const pin = $('#lcPin', bd); if (!pin) return; const on = pin.classList.toggle('collapsed'); try { localStorage.setItem('lumen_lcPinFold', on ? '1' : '0'); } catch (_) {} });
   $('#lcPcUse', bd)?.addEventListener('click', () => {
     const ta = $('#lcFtText', bd); if (ta && l.postCall) { ta.value = l.postCall.message; ta.dispatchEvent(new Event('input', { bubbles: true })); }
     const sec = ta && ta.closest('.coll'); if (sec && !sec.classList.contains('open')) sec.querySelector('.coll-head')?.click();
