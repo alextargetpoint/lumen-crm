@@ -491,7 +491,7 @@ const NAV = {
   wake:      { name: 'Реанимация базы', en: 'Reactivation', icon: I.wake, sub: '' },
   meetings:  { name: 'Встречи', en: 'Meetings', icon: I.cal, sub: '' },
   tasks:     { name: 'Мои задачи', en: 'My tasks', icon: I.task, sub: '' },
-  waProfile: { name: 'Мой WhatsApp', en: 'My WhatsApp', icon: I.chat, sub: 'ваше имя, фото и описание в WhatsApp', subEn: 'your WhatsApp name, photo & about' },
+  waProfile: { name: 'Мои подключения', en: 'My connections', icon: I.link || I.chat, sub: 'номер для звонков · видео-созвоны · Telegram · WhatsApp-профиль', subEn: 'call number · video calls · Telegram · WhatsApp profile' },
   moodboard: { name: 'Карта желаний', en: 'Vision board', icon: I.spark, sub: 'личная доска мотивации', subEn: 'personal motivation board' },
   automations: { name: 'Автоматизации', en: 'Automations', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', en: 'Sales playbook', icon: I.flame, sub: '' },
@@ -2618,7 +2618,9 @@ const fieldHiddenForMe = (key) => { const me = STATE && STATE.me; if (!me || me.
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
 /* 'sequences' открыта брокеру: он видит агентские (read-only) + свои личные + расшаренные, форкает и делится */
-const BROKER_HIDDEN_PAGES = ['control', 'qualifier', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'agency', 'billing'];
+/* 'agency' НЕ в списке: брокер может ПРОСМОТРЕТЬ профиль агентства (read-only, запись блокирует сервер) —
+   иначе открытие из аккаунт-меню тут же редиректило на «Обзор» (applyRoleUi→go('overview')). */
+const BROKER_HIDDEN_PAGES = ['control', 'qualifier', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'billing'];
 /* СИНГЛ-БРОКЕР (edition:'solo') — личное пространство одного брокера. Убираем всё «командное/
    управленческое»: лента, HR-подбор, брокеры, роли и доступы, контроль, академия агентства,
    подрядчики трафика (медиапланы/план-факт), комментарии. Остаётся: воронка, реанимация базы,
@@ -6736,8 +6738,8 @@ PAGES.waProfile = async (root) => {
   const n = data.number, pr = (n && n.persona) || {};
   const inits = (String(pr.name || '')).trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '👤';
   root.innerHTML = `
-    <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Мой WhatsApp</h1>
-    <div class="muted" style="font-size:13px;margin-bottom:18px">Ваше имя, фото и описание — как вас увидит клиент в WhatsApp. Меняете сами, синкается в реальный аккаунт.</div>
+    <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Мои подключения</h1>
+    <div class="muted" style="font-size:13px;margin-bottom:18px">Всё личное в одном месте: номер для звонков (телефония), видео-созвоны (Zoom/Meet), приложение в Telegram и ваш WhatsApp-профиль (имя, фото, описание — как вас увидит клиент). Меняете сами.</div>
     <div class="glass card" style="max-width:860px;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.phone || I.chat)}Мой номер для звонков (телефония)</div>
       <div class="muted" style="font-size:12px;margin-bottom:10px;line-height:1.5">Это <b>личный мобильный</b>, не WhatsApp-номер клиента. При звонке из карточки лида (click-to-call) телефония сначала наберёт <b>вас</b> на этот номер — вы берёте трубку, и система соединяет с клиентом. Формат +66…, можно менять в любой момент.</div>
@@ -17490,7 +17492,7 @@ PAGES.settings = async (root) => {
             <textarea id="telWarmText" rows="2" placeholder="Это {broker} из {agency} — звоню вам сейчас с номера {prefix}, возьмите, пожалуйста, трубку 🙏">${esc((s.telephony || {}).warmupText || '')}</textarea></div>
           <div class="form-row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><label>${ic(I.phone)} Мой номер для звонков (основатель) <span class="muted" style="font-weight:400">— личный мобильный, не виртуальный</span></label>
             <input id="telOwnerPhone" type="tel" value="${esc(((s.agency || {}).manager || {}).phone || '')}" placeholder="+66 / +39 / +971…" style="max-width:280px">
-            <div class="muted" style="font-size:11px;margin-top:5px;line-height:1.5">При звонке из карточки лида телефония <b>сначала наберёт вас</b> на этот номер — вы берёте трубку, и система соединяет с клиентом. Для лидов с назначенным брокером звонок идёт на номер <b>брокера</b> (он задаёт его в «Мой WhatsApp»); этот номер — для неназначенных лидов и вас как владельца. То же значение, что в «Профиль агентства → Менеджер → телефон».</div></div>
+            <div class="muted" style="font-size:11px;margin-top:5px;line-height:1.5">При звонке из карточки лида телефония <b>сначала наберёт вас</b> на этот номер — вы берёте трубку, и система соединяет с клиентом. Для лидов с назначенным брокером звонок идёт на номер <b>брокера</b> (он задаёт его в «Мои подключения»); этот номер — для неназначенных лидов и вас как владельца. То же значение, что в «Профиль агентства → Менеджер → телефон».</div></div>
           <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent" id="telSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="telTest" type="button">${ic(I.spark)}Проверить</button></div>
           <div class="tel-test-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
           ${['twilio', 'telnyx'].includes((s.telephony || {}).provider) ? (() => {

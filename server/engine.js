@@ -1075,6 +1075,7 @@ function inbound(db, lead, text, opts = {}) {
       l2.ai = l2.ai || {};
       if (l2.ai._replying && (Date.now() - l2.ai._replying) < 60000) return;
       l2.ai._replying = Date.now(); store.save();
+      try {
       let out = null;
       if (useLlm) {
         try { out = await llm.reply(fresh, l2); } catch (e) { console.error('[llm]', e.message); }
@@ -1115,8 +1116,8 @@ function inbound(db, lead, text, opts = {}) {
       if (reply.kind === 'handover_offer') {
         for (const cmp of fresh.campaigns) if (cmp.recipients.includes(l2.id)) cmp.stats.qualified += 1;
       }
-      delete l2.ai._replying;   /* снимаем in-flight лок */
-      store.save();
+      } catch (e) { console.error('[ai-reply]', e && e.message); }   /* ⚠️ раньше падение send() вылетало из async-колбэка → лок _replying зависал → ИИ больше не отвечал и не ретраил */
+      finally { try { if (l2 && l2.ai) delete l2.ai._replying; } catch (_) {} store.save(); }   /* in-flight лок снимаем ВСЕГДА */
     }, aiReplyDelayMs(db)); // человеческая задержка (3–12 мин по умолч.) — не «мгновенный бот»
   }
   store.save();
