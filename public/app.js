@@ -2686,8 +2686,8 @@ function applyRoleUi() {
   });
   if (isBroker && isHidden(CUR)) go('overview');
   const RT_NAME = { broker: 'брокер', assistant: 'ассистент', marketer: 'маркетолог', manager: 'менеджер' };
-  const foot = $('.side-foot .agency');
-  if (foot && isBroker && !foot.dataset.roleBadge) { foot.dataset.roleBadge = '1'; foot.insertAdjacentHTML('beforeend', `<div style="font-size:9.5px;color:#86AFFF;margin-top:3px">${RT_NAME[rt] || 'сотрудник'} · ${esc(me.name || '')}</div>`); }
+  const foot = $('.side-foot .agency .agency-tx');   /* вставляем в колонку текста, НЕ в flex-кнопку (иначе плашка роли наезжала на имя/шеврон) */
+  if (foot && isBroker && !foot.dataset.roleBadge) { foot.dataset.roleBadge = '1'; foot.insertAdjacentHTML('beforeend', `<div class="rl-broker" style="font-size:9.5px;color:#86AFFF;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${RT_NAME[rt] || 'сотрудник'} · ${esc(me.name || '')}</div>`); }
 }
 
 async function loadState() {
@@ -6355,15 +6355,18 @@ async function openLeadModal(id) {
       } catch (e2) { toast('ИИ не справился', e2.message); }
       finally { btn.disabled = false; btn.innerHTML = orig; }
     });
-    $('#lcFtSend', bd).addEventListener('click', async () => {
+    $('#lcFtSend', bd).addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget; if (btn.dataset.sending) return; btn.dataset.sending = '1'; btn.disabled = true;   /* анти-дабл-клик: раньше несколько кликов слали одно и то же касание пачкой */
       const text = $('#lcFtText', bd).value.trim();
       const wrap = $('#lcCreoWrap', bd);
       const creativeUrl = (wrap && !wrap.classList.contains('skip')) ? (wrap.dataset.creo || '') : '';
-      if (!text && !creativeUrl) { toast('Пустой текст'); return; }
-      /* learnStyle: отправленное касание учим как СТИЛЬ пишущего брокера (дообучение под него) */
-      await api.post(`/leads/${id}/message`, { text, creativeUrl, learnStyle: true });
-      toast('Первое касание отправлено', (creativeUrl ? 'Креатив + текст ушли клиенту' : 'Ушло клиенту в WhatsApp') + ' · стиль учтён', true);
-      openLeadModal(id);
+      if (!text && !creativeUrl) { toast('Пустой текст'); btn.disabled = false; delete btn.dataset.sending; return; }
+      try {
+        /* learnStyle: отправленное касание учим как СТИЛЬ пишущего брокера (дообучение под него) */
+        await api.post(`/leads/${id}/message`, { text, creativeUrl, learnStyle: true });
+        toast('Первое касание отправлено', (creativeUrl ? 'Креатив + текст ушли клиенту' : 'Ушло клиенту в WhatsApp') + ' · стиль учтён', true);
+        openLeadModal(id);
+      } catch (e) { toast('Не отправилось', e.message); btn.disabled = false; delete btn.dataset.sending; }
     });
     /* ★ явно запомнить текущий текст как «мой стиль» — не отправляя (движок будет подражать) */
     $('#lcFtStyle', bd)?.addEventListener('click', async () => {
@@ -9543,6 +9546,15 @@ PAGES.automations = async (root) => {
           ${swRow('Сначала на квалификатора', 'Переназначать на роль «Квалификатор» (если есть), иначе — на брокеров по загрузке', `<label class="switch"><input type="checkbox" id="rotToQual" ${r.toQualifier ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}
           <button class="btn btn-sm btn-accent" id="rotSave" style="margin-top:10px">Сохранить ротацию</button>
         </div>`; })()}
+        ${(() => { const ai = s.ai || {}; const dmin = Math.round((+ai.replyDelayMinSec || 180) / 60); const dmax = Math.round((+ai.replyDelayMaxSec || 720) / 60); return `<div class="glass card mb" data-ag="dist">
+          <div class="card-title">${ic(I.clock || I.spark)}Задержка ответа ИИ<span class="sub">как живой человек, не мгновенный бот</span></div>
+          <div class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5">ИИ отвечает клиенту не сразу, а через <b>случайное время в вашем диапазоне</b> (напр. 4–15 мин → то 5, то 7, то 12). Так переписка выглядит по-человечески и не палит бота. 0 в поле «от» — может ответить почти сразу.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>От, минут</label><input id="aiDelayMin" type="number" min="0" max="120" value="${dmin}"></div>
+            <div class="form-row"><label>До, минут</label><input id="aiDelayMax" type="number" min="1" max="180" value="${dmax}"></div>
+          </div>
+          <button class="btn btn-sm btn-accent" id="aiDelaySave" style="margin-top:10px">Сохранить задержку</button>
+        </div>`; })()}
         <div class="glass card mb" data-ag="reports">
           <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
           ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
@@ -9818,6 +9830,14 @@ PAGES.automations = async (root) => {
     const rotation = { enabled: $('#rotEnabled', root).checked, afterTouches: +$('#rotTouches', root).value || 3, afterHours: +$('#rotHours', root).value || 48, maxRotations: +$('#rotMax', root).value || 2, toQualifier: $('#rotToQual', root).checked };
     await saveAuto({ rotation });
     toast('Ротация сохранена', rotation.enabled ? 'Включена' : 'Выключена', true);
+  });
+  $('#aiDelaySave', root)?.addEventListener('click', async () => {
+    let lo = Math.max(0, Math.round(+$('#aiDelayMin', root).value || 0));
+    let hi = Math.max(1, Math.round(+$('#aiDelayMax', root).value || 12));
+    if (hi < lo + 1) hi = lo + 1;
+    await api.patch('/settings', { ai: { replyDelayMinSec: lo * 60, replyDelayMaxSec: hi * 60 } });
+    if (STATE.settings.ai) { STATE.settings.ai.replyDelayMinSec = lo * 60; STATE.settings.ai.replyDelayMaxSec = hi * 60; }
+    toast('Задержка ответа ИИ сохранена', `${lo}–${hi} мин · случайно в диапазоне`, true);
   });
   /* Solo: команда/распределение/SLA не нужны — прячем целыми карточками */
   if (IS_SOLO()) {
@@ -15565,7 +15585,7 @@ async function renderMoodboard(root, opts) {
 /* RBAC (зеркало серверных ROLE_CAPS/ROLE_DEFAULT_HIDE — сервер остаётся источником enforcement) */
 const RBAC_ROLES = { broker: 'Брокер', assistant: 'Ассистент', marketer: 'Маркетолог', analyst: 'Аналитик', manager: 'Менеджер' };
 const RBAC_DEFHIDE = {
-  broker: [],
+  broker: ['settings', 'numbers', 'brokers', 'billing'],   /* админ закрыт (подключения/роли/номера/биллинг). Личное у брокера остаётся: «Мой WhatsApp» (свой номер+визитка), профиль агентства read-only */
   assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
   marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
   analyst: ['inbox', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],
@@ -17942,9 +17962,10 @@ document.getElementById('agencyMenuBtn')?.addEventListener('click', (e) => {
   e.stopPropagation();
   const ex = document.getElementById('agencyMenu'); if (ex) { ex.remove(); return; }
   const r = e.currentTarget.getBoundingClientRect();
+  const _isBroker = STATE && STATE.me && STATE.me.role === 'broker';   /* брокеру — только профиль (read-only) + выход; «Настройки» (подключения/роли) закрыты */
   const m = el(`<div id="agencyMenu" class="agency-menu">
     <button data-am="profile">${ic(I.gear)}${t('Профиль агентства','Agency profile')}</button>
-    <button data-am="settings">${ic(I.gear)}${t('Настройки','Settings')}</button>
+    ${_isBroker ? '' : `<button data-am="settings">${ic(I.gear)}${t('Настройки','Settings')}</button>`}
     <div class="am-sep"></div>
     <button data-am="logout" class="am-logout">${ic(I.x)}${t('Выйти из аккаунта','Log out')}</button>
   </div>`);

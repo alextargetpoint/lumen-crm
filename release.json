@@ -1,8 +1,8 @@
 {
-  "at": "2026-09-14T14:24:28.140Z",
-  "git": "c4817fe · main",
-  "appVersion": "281",
-  "note": "i18n-движок + онбординг Atelier(Higgsfield) + TG-мини-апп ready() + поддержка-привязка",
+  "at": "2026-10-01T15:50:53.564Z",
+  "git": "69ad4ad · main",
+  "appVersion": "565",
+  "note": "",
   "suites": {
     "saasAuth": {
       "name": "Изоляция тенантов и авторизация",

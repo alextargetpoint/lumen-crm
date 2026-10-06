@@ -1277,7 +1277,7 @@ const ROLE_CAPS = {
 };
 /* дефолтное скрытие разделов под роль (владелец может переопределить hidePages у сотрудника) */
 const ROLE_DEFAULT_HIDE = {
-  broker: [],
+  broker: ['settings', 'numbers', 'brokers', 'billing'],   /* админ-зоны закрыты; личное остаётся: «Мой WhatsApp» (свой номер+визитка) + профиль агентства read-only */
   /* квалификатор: видит входящие/диалоги/воронку/встречи/задачи, прожимает заявки; всё остальное скрыто */
   qualifier: ['ads', 'comments', 'social', 'analytics', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake', 'hr', 'studio', 'content', 'mediaplan'],
   assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
@@ -7335,7 +7335,7 @@ const server = http.createServer(async (req, res) => {
       const lead0 = db.leads.find(l => l.id === m[1]);
       if (lead0 && !canSeeLead(lead0)) { audit(db, req, 'попытка доступа к чужому лиду', { leadId: lead0.id }); return json(res, 403, { error: 'чужой лид' }); }
     }
-    if ((m = p.match(/^\/api\/leads\/([^/]+)$/))) {
+    if ((m = p.match(/^\/api\/leads\/([^/]+)$/)) && !['merge', 'bulk'].includes(m[1])) {   /* не затеняем спец-роуты /leads/merge и /leads/bulk */
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
       if (req.method === 'GET') {
@@ -7608,6 +7608,13 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
       if (m[2] === 'message') {
+        /* ⚠️ АНТИ-ДУБЛЬ: тот же текст тому же лиду за последние 20с (двойной клик/ретрай сети) — не шлём повторно.
+           Раньше несколько кликов «Отправить» плодили одинаковые first-touch пачкой. */
+        const _dtxt = String(b.text || '').trim();
+        if (_dtxt && db.messages.some(mm => mm.leadId === lead.id && mm.dir === 'out' && String(mm.text || '').trim() === _dtxt && (Date.now() - (mm.at || 0)) < 20000)) {
+          const msgs0 = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
+          return json(res, 200, Object.assign(leadView(db, lead), { messages: msgs0, deduped: true }));
+        }
         /* первое касание вручную: если в панели показан креатив (загруженный ИЛИ атрибуция объявления,
            l.adCreative), он уходит первым сообщением — как это делает автопилот на chainStep 0. */
         const cu = b.creativeUrl ? String(b.creativeUrl).slice(0, 500) : '';
@@ -10034,7 +10041,11 @@ const server = http.createServer(async (req, res) => {
         /* трафик прогрева (отправитель — наш же номер) в лиды не превращаем */
         if ((g.numbers || []).some(n => String(n.phone).replace(/\D/g, '') === senderDigits)) return;
         const phone = '+' + senderDigits;
-        let lead = (tdb.leads || []).find(l => (l.phone || '').replace(/\D/g, '') === senderDigits);
+        /* ⚠️ ДУБЛИ ПО НОМЕРУ: берём АКТИВНУЮ карточку (не «потерян»), самую свежую по активности —
+           иначе входящее уходит в старший дубль-«Закрыт» с выключенным ИИ, а исходящие копятся в другой. */
+        const _byPhone = (tdb.leads || []).filter(l => (l.phone || '').replace(/\D/g, '') === senderDigits);
+        const _rank = l => ((l.lastMsgAt || l.lastInboundAt || l.createdAt || 0)) + (l.stage !== 'lost' ? 1e15 : 0) + ((l.ai && l.ai.enabled) ? 5e14 : 0);
+        let lead = _byPhone.sort((a, b) => _rank(b) - _rank(a))[0];
         if (!lead) {
           const geo0 = ((tdb.settings.agency && tdb.settings.agency.geos) || ['dubai'])[0];
           lead = { id: store.nextId('ld'), name: b.name || phone, phone, geo: geo0, lang: 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0, source: 'wa_gray', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['серый WhatsApp'], numberId: null, ads: null };
