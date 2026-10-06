@@ -20,6 +20,11 @@ function aiReplyDelayMs(db) {
   const hi = Math.max(lo + 5, Math.round(+a.replyDelayMaxSec || 720));
   return (lo + Math.random() * (hi - lo)) * 1000;
 }
+/* ⚠️ ФОРМАТ ВРЕМЕНИ В ПОЯСЕ ЛИДА. Сервер в UTC → toLocale* без пояса печатали UTC
+   (встреча показывалась «04:00» вместо «11:00» по Пхукету). Сдвигаем на lead.tz (часы) и форматируем как UTC. */
+function fmtLeadDT(ms, tz, opts) {
+  return new Date((+ms || 0) + ((+tz || 0) * 3600e3)).toLocaleString('ru-RU', Object.assign({ timeZone: 'UTC' }, opts || {}));
+}
 
 const MIN = 60e3, DAY = 24 * 3600e3;
 
@@ -735,12 +740,14 @@ function tickMeetings(db) {
         /* тихие часы: ночью не будим — кроме случая, когда встреча раньше «утра» (короткое напоминание важнее сна) */
         if (inQuiet(db, lead) && mt.at > morningAt(db, lead)) return;
         const broker = db.brokers.find(b => b.id === mt.brokerId);
-        const when = new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        const when = fmtLeadDT(mt.at, lead.tz, { hour: '2-digit', minute: '2-digit' });
         const soon = hrs <= 1;
+        const _solo = ((((db.settings.ai || {}).training || {}).handoff) || 'expert') === 'self';
+        const withWho = broker ? ' с ' + broker.name : (_solo ? '' : ' с экспертом');
         const pageUrl = global.LUMEN_BASE ? ` Вся информация: ${global.LUMEN_BASE}/m/${mt.id}` : (mt.link ? ' Ссылка: ' + mt.link : '');
         send(db, lead, soon
-          ? `${lead.name.split(' ')[0]}, через ${Math.round(hrs * 60)} минут начинаем — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'} с ${broker ? broker.name : 'экспертом'}.${pageUrl}`
-          : `${lead.name.split(' ')[0]}, напоминаю: ${new Date(mt.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} в ${when} — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'} с ${broker ? broker.name : 'экспертом'}.${pageUrl} Если время не подходит — напишите, перенесём.`, 'ai');
+          ? `${lead.name.split(' ')[0]}, через ${Math.round(hrs * 60)} минут начинаем — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'}${withWho}.${pageUrl}`
+          : `${lead.name.split(' ')[0]}, напоминаю: ${fmtLeadDT(mt.at, lead.tz, { day: 'numeric', month: 'long' })} в ${when} — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'}${withWho}.${pageUrl} Если время не подходит — напишите, перенесём.`, 'ai');
         mt.rem[i] = true;
         ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Напоминание (${hrs >= 1 ? 'за ' + hrs + ' ч' : 'за ' + Math.round(hrs * 60) + ' мин'}) отправлено: ${lead.name}` });
       }
@@ -1321,4 +1328,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT };

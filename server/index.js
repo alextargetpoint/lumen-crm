@@ -5047,7 +5047,7 @@ const server = http.createServer(async (req, res) => {
         await maybeScheduleMeetingBot(db, mt);   /* Zoom-native (запись в облаке) или бот Recall для Meet/Teams → транскрипт в карточку */
         if (b.confirm !== false) {
           const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
-          const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+          const when = engine.fmtLeadDT(mt.at, lead.tz, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });   /* пояс лида, не UTC */
           const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
           engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${abroker.name} — ${when}. Детали и кнопка подключения: ${base}/m/${mt.id} Если время не подойдёт — напишите сюда, перенесём.`, 'human', { channel: 'wa' });
           if (db.settings.ai.autoOff.onHumanReply && lead.ai && lead.ai.enabled) { lead.ai.enabled = false; lead.ai.pausedBy = 'broker'; }
@@ -10244,9 +10244,10 @@ const server = http.createServer(async (req, res) => {
       await maybeScheduleMeetingBot(db, mt);   /* Zoom-native или бот Recall (Meet/Teams) → транскрипт в карточку */
       if (b.confirm !== false) {
         const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
-        const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        const when = engine.fmtLeadDT(mt.at, lead.tz, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });   /* пояс лида, не UTC */
         const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
-        const withWho = broker ? ' с ' + broker.name : '';
+        const _solo2 = ((((db.settings.ai || {}).training || {}).handoff) || 'expert') === 'self';
+        const withWho = broker ? ' с ' + broker.name : (_solo2 ? '' : ' с экспертом');
         engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu}${withWho} — ${when}. Вся информация, напоминание и кнопка подключения: ${base}/m/${mt.id} Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
       }
       ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name}${broker ? ' + ' + broker.name : ''} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
