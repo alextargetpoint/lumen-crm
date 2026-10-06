@@ -191,7 +191,10 @@ function onInbound(db, lead, text) {
     pushEvent(db, { type: 'qualified', leadId: lead.id, text: `${lead.name} квалифицирован ИИ — готов к передаче брокеру` });
   }
   let reply = null;
-  if (lead.ai.enabled && db.settings.ai.autopilot && !['handover', 'viewing', 'deal', 'lost'].includes(lead.stage)) {
+  /* ⚠️ ПО-ЛИДНЫЙ ТУМБЛЕР РЕШАЕТ: если на карточке «ИИ ведёт» (lead.ai.enabled) — ИИ отвечает,
+     даже если глобальный settings.ai.autopilot выключен. Глобальный автопилот — это ДЕФОЛТ для авто-включения
+     ИИ на новых лидах/пачках, а не жёсткий стоп для уже включённых вручную. Раньше глобальный выкл глушил ВСЁ. */
+  if (lead.ai.enabled && !['handover', 'viewing', 'deal', 'lost'].includes(lead.stage)) {
     reply = nextQuestion(db, lead);
   }
   return { reply };
