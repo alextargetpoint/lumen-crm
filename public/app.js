@@ -5131,7 +5131,7 @@ function wireKanbanScroll(root) {
   }, { passive: false });
   /* боковые кнопки-стрелки (видны только когда есть куда скроллить) */
   if (!scrollable() || board.parentElement.querySelector('.kb-navbtn')) return;
-  const mk = (dir) => { const b = el(`<button class="kb-navbtn kb-nav-${dir < 0 ? 'l' : 'r'}" title="Листать стадии" style="position:absolute;top:50%;transform:translateY(-50%);${dir < 0 ? 'left:2px' : 'right:2px'};z-index:5;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer;font-size:17px;line-height:1;opacity:.92">${dir < 0 ? '‹' : '›'}</button>`); b.addEventListener('click', () => board.scrollBy({ left: dir * Math.round(board.clientWidth * 0.8), behavior: 'smooth' })); return b; };
+  const mk = (dir) => { const b = el(`<button class="kb-navbtn kb-nav-${dir < 0 ? 'l' : 'r'}" title="Листать стадии" aria-label="Листать стадии">${dir < 0 ? '‹' : '›'}</button>`); b.addEventListener('click', () => board.scrollBy({ left: dir * Math.round(board.clientWidth * 0.8), behavior: 'smooth' })); return b; };
   const wrap = board.parentElement;
   if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
   wrap.appendChild(mk(-1)); wrap.appendChild(mk(1));
