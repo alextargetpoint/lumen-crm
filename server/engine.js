@@ -1139,12 +1139,30 @@ function fireReply(db, lead) {
 function tickReplies(db) {
   const now = Date.now();
   for (const lead of (db.leads || [])) {
-    const a = lead.ai; if (!a || !a.replyDueAt) continue;
-    if (now < a.replyDueAt) continue;
-    delete a.replyDueAt;
-    if (!a.enabled || lead.lastDir !== 'in' || ['handover', 'viewing', 'deal', 'lost'].includes(lead.stage)) { delete a.pendingReply; continue; }
+    const a = lead.ai; if (!a) continue;
+    if (a.replyDueAt) {
+      if (now < a.replyDueAt) continue;
+      delete a.replyDueAt;
+      if (!a.enabled || lead.lastDir !== 'in' || ['handover', 'viewing', 'deal', 'lost'].includes(lead.stage)) { delete a.pendingReply; continue; }
+      if (a._replying && now - a._replying < 60000) continue;
+      try { fireReply(db, lead); } catch (e) { console.error('[tickReplies]', e && e.message); }
+      continue;
+    }
+    /* 🛟 СТРАХОВКА: ИИ включён, последнее сообщение — входящее клиента, но ответ НЕ запланирован (срок потерян рестартом
+       до фикса / сбой планирования). Клиент висит без ответа. До-планируем ответ, чтобы ИИ не замолкал молча. */
+    if (!a.enabled || lead.lastDir !== 'in' || ['handover', 'viewing', 'deal', 'lost'].includes(lead.stage)) continue;
     if (a._replying && now - a._replying < 60000) continue;
-    try { fireReply(db, lead); } catch (e) { console.error('[tickReplies]', e && e.message); }
+    const msgs = (db.messages || []).filter(m => m.leadId === lead.id);
+    const lastMsg = msgs.length ? msgs.reduce((p, c) => ((c.at || 0) >= (p.at || 0) ? c : p)) : null;
+    if (!lastMsg || lastMsg.dir !== 'in') continue;                       /* уже ответили (последнее — исходящее) */
+    if (now - (lastMsg.at || 0) < 60000) continue;                        /* свежий входящий получит срок сам — не вмешиваемся */
+    let reply = null; try { reply = (ai.onInbound(db, lead, lastMsg.text) || {}).reply; } catch (_) {}
+    a.pendingReply = reply ? { text: reply.text, kind: reply.kind } : { text: '', kind: '' };
+    a.replyInboundAt = lastMsg.at || now;
+    a.replySimulated = false;
+    a.replyDueAt = now + 3000;                                            /* ответит на следующем тике */
+    ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: ответ ИИ не был запланирован (возможно, потерян при рестарте) — восстановлено, отвечаю` });
+    store.save();
   }
 }
 
