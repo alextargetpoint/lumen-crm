@@ -1063,63 +1063,15 @@ function inbound(db, lead, text, opts = {}) {
     if ((db.settings.automations || {}).autoHandover) handover(db, lead); // авто-распределение на брокера
   }
   if (reply) {
-    /* LLM: 'auto' — только реальные входящие (симуляция не жжёт токены),
-       'llm' — всегда, 'core' — никогда. Ошибка/таймаут → скрипт ядра. */
-    const prov = db.settings.ai.provider;
-    const useLlm = llm.available() && (prov === 'llm' || (prov === 'auto' && !opts.simulated));
-    setTimeout(async () => {
-      const fresh = store.get();
-      const l2 = fresh.leads.find(x => x.id === lead.id);
-      if (!l2 || l2.lastDir !== 'in') return;
-      /* in-flight лок: всплеск входящих армит несколько таймеров — иначе оба зовут llm.reply и шлют 2 ответа.
-         Ставим флаг СИНХРОННО до await; второй таймер его видит и выходит. 60с — защита от залипшего лока. */
-      l2.ai = l2.ai || {};
-      if (l2.ai._replying && (Date.now() - l2.ai._replying) < 60000) return;
-      l2.ai._replying = Date.now(); store.save();
-      try {
-      let out = null;
-      if (useLlm) {
-        try { out = await llm.reply(fresh, l2); } catch (e) { console.error('[llm]', e.message); }
-      }
-      /* стоп-триггер: и фолбэк-ядро не должно дублировать себя по кругу */
-      const dupGuard = (txt) => {
-        const norm = (x) => String(x).toLowerCase().replace(/\s+/g, ' ').trim();
-        return fresh.messages.filter(x => x.leadId === l2.id && x.dir === 'out').slice(-3).some(x => norm(x.text) === norm(txt));
-      };
-      if (!out && dupGuard(reply.text)) {
-        l2.ai.enabled = false; delete l2.ai._replying;
-        l2.tags = [...new Set([...(l2.tags || []), 'нужен человек'])];
-        ai.pushEvent(fresh, { type: 'ai_off', leadId: l2.id, text: `${l2.name}: ИИ зациклился (повтор реплики) — автопилот на паузе, лид ждёт менеджера` });
-        store.save();
-        return;
-      }
-      if (out) {
-        let applied = 0;
-        for (const [axis, v] of Object.entries(out.axes)) {
-          if (!l2.quals[axis]) { l2.quals[axis] = v; applied++; }
-        }
-        if (applied) {
-          const was = ['qualified', 'handover', 'viewing', 'deal'].includes(l2.stage);
-          ai.screen(fresh, l2);
-          if (l2.stage === 'qualified' && !l2.summary) {
-            l2.summary = ai.buildSummary(fresh, l2);
-            ai.pushEvent(fresh, { type: 'qualified', leadId: l2.id, text: `${l2.name} квалифицирован ИИ (LLM) — готов к передаче брокеру` });
-          }
-          if (!was && l2.stage === 'qualified') {
-            if (module.exports.onQualified) module.exports.onQualified(fresh, l2);
-            if ((fresh.settings.automations || {}).autoHandover) handover(fresh, l2);   /* авто-передача и на LLM-ветке квалификации (была только на синхронной) */
-          }
-        }
-        send(fresh, l2, out.text, 'ai');
-      } else {
-        send(fresh, l2, reply.text, 'ai');
-      }
-      if (reply.kind === 'handover_offer') {
-        for (const cmp of fresh.campaigns) if (cmp.recipients.includes(l2.id)) cmp.stats.qualified += 1;
-      }
-      } catch (e) { console.error('[ai-reply]', e && e.message); }   /* ⚠️ раньше падение send() вылетало из async-колбэка → лок _replying зависал → ИИ больше не отвечал и не ретраил */
-      finally { try { if (l2 && l2.ai) delete l2.ai._replying; } catch (_) {} store.save(); }   /* in-flight лок снимаем ВСЕГДА */
-    }, aiReplyDelayMs(db)); // человеческая задержка (3–12 мин по умолч.) — не «мгновенный бот»
+    /* ⚠️ НЕ «запекаем» задержку в setTimeout (тогда смена настройки времени на лету не применялась к уже
+       запланированному ответу). Ставим СРОК ответа replyDueAt = now + delay; его проверяет tickReplies (каждые 5с).
+       Меняешь время в настройках → rescheduleDueReplies пересчитывает срок от момента входящего → ускоряется.
+       Бонус: переживает рестарт сервера (setTimeout терялся — ответ немел навсегда). */
+    lead.ai = lead.ai || {};
+    lead.ai.pendingReply = { text: reply.text, kind: reply.kind };
+    lead.ai.replyInboundAt = Date.now();
+    lead.ai.replySimulated = !!opts.simulated;
+    lead.ai.replyDueAt = Date.now() + aiReplyDelayMs(db);
   }
   store.save();
   return m;
@@ -1133,23 +1085,80 @@ function aiRespondNow(db, lead) {
   if (!lastIn) return false;
   lead.ai = lead.ai || {};
   if (lead.ai._replying && Date.now() - lead.ai._replying < 60000) return false;
-  lead.ai._replying = Date.now(); store.save();
-  const prov = (db.settings.ai || {}).provider;
-  const useLlm = llm.available && llm.available() && (prov === 'llm' || prov === 'auto');
-  /* отвечаем с человеческой задержкой (как живой менеджер), а не мгновенно по клику «включить ИИ» */
-  setTimeout(async () => {
-    const fresh = store.get();
-    const l2 = (fresh.leads || []).find(x => x.id === lead.id);
-    if (!l2 || l2.lastDir !== 'in' || !l2.ai || !l2.ai.enabled) { if (l2 && l2.ai) delete l2.ai._replying; store.save(); return; }
-    let reply = null; try { reply = (ai.onInbound(fresh, l2, lastIn.text) || {}).reply; } catch (_) {}
-    let out = null;
-    if (useLlm) { try { out = await llm.reply(fresh, l2); } catch (e) { console.error('[ai-catchup]', e.message); } }
-    try {
-      if (out) { for (const [axis, v] of Object.entries(out.axes || {})) if (!l2.quals[axis]) l2.quals[axis] = v; try { ai.screen(fresh, l2); } catch (_) {} send(fresh, l2, out.text, 'ai'); }
-      else if (reply && reply.text) { send(fresh, l2, reply.text, 'ai'); }
-    } finally { delete l2.ai._replying; store.save(); }
-  }, aiReplyDelayMs(db));
+  /* как и обычный входящий — ставим СРОК ответа (а не setTimeout), чтобы смена времени его двигала и он пережил рестарт */
+  let reply = null; try { reply = (ai.onInbound(db, lead, lastIn.text) || {}).reply; } catch (_) {}
+  lead.ai.pendingReply = reply ? { text: reply.text, kind: reply.kind } : { text: '', kind: '' };
+  lead.ai.replyInboundAt = Date.now();
+  lead.ai.replySimulated = false;
+  lead.ai.replyDueAt = Date.now() + aiReplyDelayMs(db);
+  store.save();
   return true;
+}
+
+/* ОТПРАВКА ОТЛОЖЕННОГО ОТВЕТА ИИ: вызывается tickReplies, когда настал replyDueAt. Пробует LLM, иначе —
+   сохранённый черновик ядра (pendingReply). Общая точка для обычного входящего и подхвата при включении ИИ. */
+function fireReply(db, lead) {
+  const l2 = lead; l2.ai = l2.ai || {};
+  if (l2.ai._replying && (Date.now() - l2.ai._replying) < 60000) return;
+  l2.ai._replying = Date.now();
+  const pending = l2.ai.pendingReply || null;
+  const prov = (db.settings.ai || {}).provider;
+  const useLlm = llm.available() && (prov === 'llm' || (prov === 'auto' && !l2.ai.replySimulated));
+  (async () => {
+    try {
+      let out = null;
+      if (useLlm) { try { out = await llm.reply(db, l2); } catch (e) { console.error('[llm]', e.message); } }
+      const dupGuard = (txt) => { const norm = (x) => String(x).toLowerCase().replace(/\s+/g, ' ').trim(); return db.messages.filter(x => x.leadId === l2.id && x.dir === 'out').slice(-3).some(x => norm(x.text) === norm(txt)); };
+      if (!out && (!pending || !pending.text)) { return; }                      /* нечего слать (подхват без LLM и без черновика) */
+      if (!out && dupGuard(pending.text)) {
+        l2.ai.enabled = false;
+        l2.tags = [...new Set([...(l2.tags || []), 'нужен человек'])];
+        ai.pushEvent(db, { type: 'ai_off', leadId: l2.id, text: `${l2.name}: ИИ зациклился (повтор реплики) — автопилот на паузе, лид ждёт менеджера` });
+        return;
+      }
+      if (out) {
+        let applied = 0;
+        for (const [axis, v] of Object.entries(out.axes || {})) { if (!l2.quals[axis]) { l2.quals[axis] = v; applied++; } }
+        if (applied) {
+          const was = ['qualified', 'handover', 'viewing', 'deal'].includes(l2.stage);
+          ai.screen(db, l2);
+          if (l2.stage === 'qualified' && !l2.summary) { l2.summary = ai.buildSummary(db, l2); ai.pushEvent(db, { type: 'qualified', leadId: l2.id, text: `${l2.name} квалифицирован ИИ (LLM) — готов к передаче брокеру` }); }
+          if (!was && l2.stage === 'qualified') { if (module.exports.onQualified) module.exports.onQualified(db, l2); if ((db.settings.automations || {}).autoHandover) handover(db, l2); }
+        }
+        send(db, l2, out.text, 'ai');
+      } else {
+        send(db, l2, pending.text, 'ai');
+      }
+      if (pending && pending.kind === 'handover_offer') { for (const cmp of db.campaigns) if (cmp.recipients.includes(l2.id)) cmp.stats.qualified += 1; }
+    } catch (e) { console.error('[ai-reply]', e && e.message); }
+    finally { try { delete l2.ai._replying; delete l2.ai.pendingReply; delete l2.ai.replyDueAt; delete l2.ai.replyInboundAt; delete l2.ai.replySimulated; } catch (_) {} store.save(); }
+  })();
+}
+
+/* ТИКЕР ОТЛОЖЕННЫХ ОТВЕТОВ (в startLoop, каждые 5с): шлёт ответы, у которых настал срок replyDueAt. */
+function tickReplies(db) {
+  const now = Date.now();
+  for (const lead of (db.leads || [])) {
+    const a = lead.ai; if (!a || !a.replyDueAt) continue;
+    if (now < a.replyDueAt) continue;
+    delete a.replyDueAt;
+    if (!a.enabled || lead.lastDir !== 'in' || ['handover', 'viewing', 'deal', 'lost'].includes(lead.stage)) { delete a.pendingReply; continue; }
+    if (a._replying && now - a._replying < 60000) continue;
+    try { fireReply(db, lead); } catch (e) { console.error('[tickReplies]', e && e.message); }
+  }
+}
+
+/* СМЕНА ВРЕМЕНИ ОТВЕТА НА ЛЕТУ: пересчитать срок у всех ожидающих ответа лидов от момента их входящего по
+   НОВОЙ задержке. Сократил 5-15→1-2 мин — висящий ответ тут же ускоряется (не позже чем через ~2с, если срок уже прошёл). */
+function rescheduleDueReplies(db) {
+  const now = Date.now(); let n = 0;
+  for (const lead of (db.leads || [])) {
+    const a = lead.ai; if (!a || !a.replyDueAt || !a.replyInboundAt) continue;
+    a.replyDueAt = Math.max(now + 2000, a.replyInboundAt + aiReplyDelayMs(db));
+    n++;
+  }
+  if (n) store.save();
+  return n;
 }
 
 /* ---------- отписка от рассылки (кнопка «Отписаться» в шаблоне) ----------
@@ -1320,7 +1329,7 @@ function startLoop() {
           const db = store.get();
           /* per-tick изоляция: сломанный подмодуль (битые данные одного тенанта) не должен
              голодить остальные тики этого же тенанта и не должен терять store.save() */
-          for (const [nm, fn] of [['chains', tickChains], ['campaigns', tickCampaigns], ['meetings', tickMeetings], ['sla', tickSla], ['assignNew', tickAssignNew], ['rotation', tickRotation], ['reports', tickReports], ['simulator', tickSimulator], ['control', tickControl], ['scheduled', tickScheduled]]) {
+          for (const [nm, fn] of [['replies', tickReplies], ['chains', tickChains], ['campaigns', tickCampaigns], ['meetings', tickMeetings], ['sla', tickSla], ['assignNew', tickAssignNew], ['rotation', tickRotation], ['reports', tickReports], ['simulator', tickSimulator], ['control', tickControl], ['scheduled', tickScheduled]]) {
             try { fn(db); } catch (e) { console.error('[engine]', tid, nm, e); }
           }
           store.save();
@@ -1330,4 +1339,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT };
