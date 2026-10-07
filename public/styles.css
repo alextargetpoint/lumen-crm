@@ -531,10 +531,16 @@ textarea { resize: vertical; min-height: 70px; }
 .chat-ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent); animation: aiBreath 1.9s ease-in-out infinite; }
 @keyframes aiBreath { 0%, 100% { opacity: .4; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.3); } }
 @media (prefers-reduced-motion: reduce) { .chat-ai-dot, .chat-ai-aura::before { animation: none; } }
-.chat-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--stroke-soft); flex-wrap: wrap; }
-.chat-head-id { flex: 1 1 130px; min-width: 0; }
+.chat-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--stroke-soft); flex-wrap: nowrap; }
+.chat-head-id { flex: 1 1 auto; min-width: 44px; }
 .chat-head-id .nm, .chat-head-id .ph { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.chat-head-actions { display: flex; align-items: center; gap: 7px; flex-wrap: nowrap; flex: 0 0 auto; margin-left: auto; }
+/* компактные чипы/кнопки в шапке, чтобы весь ряд гарантированно был в ОДНУ строку при 100% */
+.chat-head-actions .badge, .chat-head-actions .chn-chip { font-size: 11px; padding: 4px 9px; white-space: nowrap; }
+.chat-head-actions .btn { padding: 6px 11px; white-space: nowrap; }
+.chat-head-actions .btn svg { width: 14px; height: 14px; }
+.chat-head-actions .btn-icon { padding: 7px; aspect-ratio: 1; display: inline-flex; align-items: center; justify-content: center; }
+.chat-head-actions .btn-icon svg { margin: 0; }
 .chat-head .nm { font-weight: 650; font-size: 14.5px; color: var(--navy-900); }
 .chat-head .ph { font-size: 12px; color: var(--ink-3); }
 .chat-body { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; background: linear-gradient(180deg, #FBFCFE, #F6F9FD); }
@@ -618,6 +624,11 @@ textarea { resize: vertical; min-height: 70px; }
 .composer { display: flex; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--stroke-soft); align-items: flex-end; background: var(--card); border-radius: 0 0 var(--r-lg) var(--r-lg); }
 /* flex:1 1 0 (basis 0) — textarea растёт от нуля и заполняет остаток на КАЖДОМ рендере (было 1 1 auto+width:100% → intrinsic ~185px при первом открытии) */
 .composer textarea { flex: 1 1 0; min-width: 0; width: auto; min-height: 42px; max-height: 120px; background: var(--bg); }
+/* ⚠️ wireDictate оборачивает textarea композера в .aiwrap (ради микрофона) → flex-элементом .composer
+   становится .aiwrap. Без этого правила .aiwrap = flex:0 1 auto → сжимается в контент-ширину → узкое поле
+   «на несколько секунд при первом открытии». Растягиваем сам .aiwrap, textarea заполняет его. */
+.composer .aiwrap { flex: 1 1 0; min-width: 0; display: flex; }
+.composer .aiwrap textarea { flex: 1 1 0; width: 100%; min-width: 0; }
 .composer .btn, .composer button { flex: 0 0 auto; }
 .chat-empty { flex: 1; display: grid; place-items: center; color: var(--ink-3); font-size: 13px; }
 

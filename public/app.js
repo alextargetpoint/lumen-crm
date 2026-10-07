@@ -6582,7 +6582,7 @@ async function renderChat(id, rebuild) {
         <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
         <span class="badge acc">${stageName(l.stage)}</span>
         <button class="btn btn-sm" id="chatCall" title="Позвонить клиенту через телефонию (запись + транскрипт лягут в карточку)">${ic(I.phone)}Позвонить</button>
-        <button class="btn btn-sm" id="chatOpenLead" title="Открыть полную карточку лида">${ic(I.user || I.doc)}Карточка</button>
+        <button class="btn btn-sm btn-icon" id="chatOpenLead" title="Открыть полную карточку лида" aria-label="Карточка">${ic(I.user || I.doc)}</button>
       </div>
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
