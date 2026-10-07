@@ -14283,7 +14283,7 @@ PAGES.numbers = async (root) => {
   const telNums = (telData.list || []).filter(n => n && n.number);
   const NUMTAB = window.__numTab || (() => { try { return localStorage.getItem('lumen_numtab'); } catch (_) { return null; } })() || 'gray';   /* сохраняем под-вкладку при перезагрузке (была сброс на gray) */
   const brokerName = id => (STATE.brokers.find(b => b.id === id) || {}).name || '';
-  const grayStatusBadge = (live) => { const s = live && live.status; return s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; };
+  const grayStatusBadge = (live) => { const s = live && live.status; const base = s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; const decWarn = (live && live.decBad) ? ' <span class="badge bad" title="Сокет на связи, но номер не расшифровывает входящие (Bad MAC). Клиенты пишут — сообщения не доходят. Нажмите «Пересканировать».">⚠️ не читает входящие</span>' : ''; return base + decWarn; };
   const warmLiveHtml = (w) => {
     if (!w || !w.running) return '<div class="muted" style="font-size:11.5px;margin-top:8px">Прогрев выключен. Включите тумблер выше — номера начнут аккуратную переписку между собой (нужно ≥2 на связи).</div>';
     const log = w.log || [];
@@ -14384,7 +14384,7 @@ PAGES.numbers = async (root) => {
         <div class="num-actions">
           ${n.source === 'yesim' ? `<button class="btn btn-sm" data-yact="${esc(n.phone)}" title="Гид активации + приём SMS/OTP">${ic(I.spark)}Активация / коды</button>` : ''}
           <button class="btn btn-sm" data-waprofile="${esc(n.phone)}" title="Аватар/имя/описание → синк в WhatsApp">${ic(I.gear)}Профиль</button>
-          ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
+          ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span><button class="btn btn-sm" data-graycheck="${esc(n.phone)}" title="Проверить связь: тест отправки + реальный тест приёма (кросс-пинг с другого номера). Покажет честно, читает ли номер входящие.">${ic(I.shield)}Проверить связь</button><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
         </div>
@@ -14942,6 +14942,21 @@ PAGES.numbers = async (root) => {
   /* серые карточки: QR-переподключение, закреп за брокером, удаление — прямо со страницы */
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
   $$('[data-grayrescan]', root).forEach(b => b.addEventListener('click', () => openGrayRescan(b.dataset.grayrescan)));
+  $$('[data-graycheck]', root).forEach(b => b.addEventListener('click', async () => {
+    const phone = b.dataset.graycheck; const old = b.innerHTML;
+    b.disabled = true; b.innerHTML = ic(I.spark) + 'Проверяю связь…';
+    try {
+      const r = await api.post('/wa/gray/healthcheck', { phone });   /* ~8с: шлём кросс-пинг и ждём расшифровку */
+      if (r.verdict === 'broken') {
+        if (await uiConfirm('🔴 Есть проблема со связью', r.text || '', { ok: 'Пересканировать сейчас', cancel: 'Позже' })) openGrayRescan(phone);
+      } else if (r.verdict === 'ok') {
+        toast('✅ Связь работает', r.text, true);
+      } else {
+        await uiConfirm(r.verdict === 'no-worker' ? 'Воркер не настроен' : '🟡 Проверено частично', r.text || '', { ok: 'Понятно', cancel: 'Закрыть' });
+      }
+    } catch (e) { toast('Проверка не удалась', e.message); }
+    b.disabled = false; b.innerHTML = old;
+  }));
   $$('[data-waprofile]', root).forEach(b => b.addEventListener('click', () => window.openWaPersona && window.openWaPersona(b.dataset.waprofile, grayNums.find(n => n.phone === b.dataset.waprofile))));
   $$('[data-yact]', root).forEach(b => b.addEventListener('click', () => window.openYesimActivate && window.openYesimActivate(b.dataset.yact)));
   $$('.gn-broker2', root).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));

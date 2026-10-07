@@ -9765,6 +9765,55 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, phone, session: r.session });
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
+    /* ПРОВЕРКА СВЯЗИ номера: тест исходящего (пинг к серверам WA) + тест входящего (кросс-пинг с другого
+       номера → смотрим, вырос ли счётчик ошибок расшифровки). Честный ответ «реально работает / не читает».
+       owner-only. Отвечает на «почему пишет на связи, а рескан нужен»: сокет может быть жив, а расшифровка
+       входящих битой — это ловится только когда входящее реально приходит и НЕ расшифровывается. */
+    if (p === '/api/wa/gray/healthcheck' && req.method === 'POST') {
+      if (!isOwner(req, db)) return json(res, 403, { error: 'только владелец' });
+      const b = await body(req);
+      const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      if (!phone) return json(res, 400, { error: 'нужен номер' });
+      const g = db.settings.waGray || {};
+      const rec = (g.numbers || []).find(n => n.phone === phone);
+      if (!rec) return json(res, 404, { error: 'номер не найден в конфиге' });
+      if (!waWorkerReady(db)) return json(res, 200, { ok: true, send: null, recv: null, verdict: 'no-worker', text: 'Gray-воркер не настроен (демо-режим) — реальную связь проверить нечем.' });
+      let live = {};
+      try { live = await waGrayApi(db, 'GET', '/sessions'); live = live.sessions || live || {}; } catch (e) { return json(res, 200, { ok: false, error: 'воркер недоступен: ' + e.message }); }
+      const A = live[waGraySid(phone)] || {};
+      if (A.status !== 'connected') {
+        return json(res, 200, { ok: true, connected: false, send: false, recv: false, verdict: 'not-connected', text: `Номер не на связи (статус: ${A.status || 'нет сессии'}). Сначала «Пересканировать» по QR.` });
+      }
+      const decBefore = +A.decFails || 0;
+      /* 1) ИСХОДЯЩИЙ: онлайн-пинг к серверам WhatsApp через сокет этого номера (проверяем свой же номер) */
+      let send = false, sendErr = '';
+      try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/check', { to: phone }); send = (typeof r.exists !== 'undefined') ? true : true; } catch (e) { send = false; sendErr = e.message; }
+      /* 2) ВХОДЯЩИЙ: кросс-пинг с ДРУГОГО подключённого номера → он должен расшифроваться этим номером */
+      let recv = null, recvNote = '', crossFrom = '';
+      const partner = (g.numbers || []).find(n => n.phone !== phone && (live[waGraySid(n.phone)] || {}).status === 'connected');
+      if (partner) {
+        crossFrom = partner.phone;
+        const token = 'hc' + (decBefore + 1) + '-' + phone.slice(-4);
+        try {
+          await waGrayApi(db, 'POST', '/sessions/' + waGraySid(partner.phone) + '/send', { to: phone, text: '[[lumen-healthcheck]] 🔧 Lumen: тест связи ' + token + ' (служебное, можно игнорировать)' });
+          await new Promise(r => setTimeout(r, 8000));                           /* ждём доставку + попытку расшифровки воркером */
+          let live2 = {}; try { live2 = await waGrayApi(db, 'GET', '/sessions'); live2 = live2.sessions || live2 || {}; } catch (_) { live2 = live; }
+          const decAfter = +((live2[waGraySid(phone)] || {}).decFails) || 0;
+          if (decAfter > decBefore) { recv = false; recvNote = `входящее с ${crossFrom} НЕ расшифровалось (ошибок +${decAfter - decBefore})`; }
+          else { recv = true; recvNote = `входящее с ${crossFrom} расшифровано — приём работает`; }
+        } catch (e) { recv = null; recvNote = 'не удалось отправить кросс-пинг: ' + e.message; }
+      } else {
+        recvNote = 'нет второго подключённого номера для активного теста приёма; сужу по счётчику ошибок';
+        recv = (decBefore > 0 && A.lastDecFailAt && (Date.now() - A.lastDecFailAt < 30 * 60e3)) ? false : null;
+      }
+      const verdict = (send && recv === true) ? 'ok' : (recv === false || !send) ? 'broken' : 'partial';
+      let text;
+      if (verdict === 'ok') text = '✅ Связь в обе стороны работает. Отправка — ок, приём — ок' + (crossFrom ? ` (проверено сообщением с ${crossFrom})` : '') + '.';
+      else if (recv === false) text = `🔴 Приём НЕ работает: ${recvNote}. Нужен «Пересканировать» этого номера — клиенты пишут, а сообщения не доходят. Отправка: ${send ? 'работает' : 'тоже не работает (' + sendErr + ')'}.`;
+      else if (!send) text = `🔴 Отправка не работает (${sendErr || 'сокет не отвечает'}). Приём: ${recvNote}. Рекомендую рескан.`;
+      else text = `🟡 Отправка работает. Приём точно проверить нечем: ${recvNote}. Для надёжной проверки подключите второй номер.`;
+      return json(res, 200, { ok: true, connected: true, send, recv, verdict, crossFrom, decBefore, text });
+    }
     /* статус одного номера (CRM опрашивает раз в ~1.5с пока status==='qr') */
     if (p === '/api/wa/gray/status' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
