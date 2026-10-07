@@ -928,7 +928,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 .num-meta { display: flex; gap: 16px; margin: 13px 0 4px; }
 .num-meta .m .v { font-size: 14px; font-weight: 700; color: var(--navy-900); }
 .num-meta .m .k { font-size: 10.5px; color: var(--ink-3); }
-.num-actions { display: flex; gap: 8px; align-items: center; }
+.num-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--stroke); }
+.num-actions .btn { white-space: nowrap; }
+.num-actions .num-rm { margin-left: auto; }
 
 /* ---------- аналитика ---------- */
 .geo-bars { display: flex; flex-direction: column; gap: 12px; }

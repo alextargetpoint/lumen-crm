@@ -14384,9 +14384,8 @@ PAGES.numbers = async (root) => {
         <div class="num-actions">
           ${n.source === 'yesim' ? `<button class="btn btn-sm" data-yact="${esc(n.phone)}" title="Гид активации + приём SMS/OTP">${ic(I.spark)}Активация / коды</button>` : ''}
           <button class="btn btn-sm" data-waprofile="${esc(n.phone)}" title="Аватар/имя/описание → синк в WhatsApp">${ic(I.gear)}Профиль</button>
-          ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span><button class="btn btn-sm" data-graycheck="${esc(n.phone)}" title="Проверить связь: тест отправки + реальный тест приёма (кросс-пинг с другого номера). Покажет честно, читает ли номер входящие.">${ic(I.shield)}Проверить связь</button><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
-          <span class="tb-spacer"></span>
-          <button class="btn-ghost" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
+          ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<button class="btn btn-sm" data-graycheck="${esc(n.phone)}" title="Проверить связь: тест отправки + реальный тест приёма (кросс-пинг с другого номера). Покажет честно, читает ли номер входящие.">${ic(I.shield)}Проверить связь</button><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
+          <button class="btn-ghost num-rm" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
         </div>
       </div>`; }).join('')}
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Серых номеров пока нет — нажмите «Подключить по QR» выше.</div>`}

@@ -9770,8 +9770,8 @@ const server = http.createServer(async (req, res) => {
        owner-only. Отвечает на «почему пишет на связи, а рескан нужен»: сокет может быть жив, а расшифровка
        входящих битой — это ловится только когда входящее реально приходит и НЕ расшифровывается. */
     if (p === '/api/wa/gray/healthcheck' && req.method === 'POST') {
-      if (!isOwner(req, db)) return json(res, 403, { error: 'только владелец' });
-      const b = await body(req);
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
       const phone = String(b.phone || '').replace(/[^0-9]/g, '');
       if (!phone) return json(res, 400, { error: 'нужен номер' });
       const g = db.settings.waGray || {};
