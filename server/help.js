@@ -115,8 +115,9 @@ h1.title{font-family:'Cormorant',Georgia,serif;font-size:clamp(40px,6vw,64px);fo
 .art-head p{color:var(--mut);font-weight:300;font-size:15px;margin-top:6px}
 .intro{font-size:17px;line-height:1.7;color:#d9d7d2;font-weight:300;margin-bottom:14px}
 .intro b{color:var(--ink);font-weight:600}
-.sec{margin-top:38px}
-.sec-h{font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--gold);text-transform:none;padding-bottom:12px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.sec{margin-top:48px;scroll-margin-top:84px}
+.sec-h{font-family:'Cormorant',Georgia,serif;font-size:26px;font-weight:600;letter-spacing:-.01em;line-height:1.15;color:var(--ink);display:flex;align-items:center;gap:13px;padding:0 0 13px;margin:0 0 20px;border-bottom:1px solid var(--line)}
+.sec-h::before{content:'';flex:0 0 auto;width:4px;align-self:stretch;min-height:24px;border-radius:3px;background:linear-gradient(180deg,var(--gold),rgba(201,168,106,.25))}
 .step{display:flex;gap:16px;padding:14px 0}
 .step+.step{border-top:1px solid var(--line2)}
 .step-n{flex:0 0 auto;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--gold);border:1px solid rgba(214,199,168,.35);background:rgba(214,199,168,.06)}
@@ -151,6 +152,12 @@ h1.title{font-family:'Cormorant',Georgia,serif;font-size:clamp(40px,6vw,64px);fo
 .rel a:hover{color:var(--ink)}
 .rel a.on{color:var(--gold);font-weight:600}
 .rel a svg{width:14px;height:14px;flex:0 0 auto;opacity:.6}
+.secnav{display:flex;flex-direction:column;gap:1px;max-height:62vh;overflow-y:auto;margin:-3px -6px -3px 0;padding-right:4px}
+.secnav::-webkit-scrollbar{width:6px}.secnav::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.secnav a{display:block;padding:7px 11px;font-size:12.5px;line-height:1.35;color:var(--mut);text-decoration:none;border-radius:8px;border-left:2px solid transparent;transition:color .18s,background .18s,border-color .18s}
+.secnav a:hover{color:var(--ink);background:rgba(214,199,168,.06)}
+.secnav a.on{color:var(--gold);background:rgba(214,199,168,.1);border-left-color:var(--gold);font-weight:600}
+html{scroll-behavior:smooth}
 /* cta band */
 .band{margin-top:20px;border-top:1px solid var(--line)}
 .band-in{text-align:center;padding:64px 0}
@@ -233,8 +240,12 @@ function renderArticle(slug, base) {
   const richFn = RICH[slug];
   const richHtml = typeof richFn === 'function' ? (function () { try { return richFn(); } catch (e) { return ''; } })() : '';
   const stepHTML = (s, i) => `<div class="step"><span class="step-n">${i + 1}</span><div class="step-tx"><b>${s[0]}</b><span>${s[1]}</span></div></div>`;
-  const secHTML = (sec) => `<div class="sec"><div class="sec-h">${esc(sec.badge || '')}</div>${(sec.steps || []).map(stepHTML).join('')}${sec.shot ? `<div class="art-mock">${sec.shot}</div>` : ''}</div>`;
+  const secHTML = (sec, i) => `<section class="sec" id="s-${i}"><h2 class="sec-h">${esc(sec.badge || '')}</h2>${(sec.steps || []).map(stepHTML).join('')}${sec.shot ? `<div class="art-mock">${sec.shot}</div>` : ''}</section>`;
   const rel = cat ? cat.guides.map(k => `<a href="/help/${k}" class="${k === slug ? 'on' : ''}">${ic('arrow', 2)}${esc(GUIDES[k].title)}</a>`).join('') : '';
+  /* быстрый навигатор по разделам статьи (для длинных структурных гайдов) */
+  const secNav = (g.sections && g.sections.length >= 4)
+    ? `<div class="aside-box"><div class="aside-t">На этой странице</div><nav class="secnav" id="secnav">${g.sections.map((s, i) => `<a href="#s-${i}" data-sec="${i}">${esc(s.badge || ('Раздел ' + (i + 1)))}</a>`).join('')}</nav></div>`
+    : '';
   /* rich-гайд (мокапы+скриншоты) рендерим целиком; иначе — структурные шаги + диаграмма/мокапы из данных */
   const main = richHtml
     ? `<div class="intro">${g.intro || ''}</div><div class="gd-rich">${richHtml}</div>`
@@ -255,6 +266,7 @@ function renderArticle(slug, base) {
       ${main}
     </article>
     <aside class="aside">
+      ${secNav}
       <div class="aside-box"><div class="aside-t">Поделиться</div>
         <button class="share-btn" id="share">${ic('copy')}<span id="shareLbl">Скопировать ссылку</span></button>
       </div>
@@ -275,6 +287,25 @@ function renderArticle(slug, base) {
     window.lumenZoom=function(img){lbi.src=img.currentSrc||img.src;lb.classList.add('on');};
     document.addEventListener('click',function(e){var im=e.target.closest&&e.target.closest('.gd-rich img, .art-mock img, .art-img img');if(im&&!lb.contains(im)){lumenZoom(im);}});
     lb.addEventListener('click',function(){lb.classList.remove('on');});
+    /* навигатор разделов: подсветка активного при скролле + клик уводит плавно */
+    (function(){
+      var nav=document.getElementById('secnav'); if(!nav) return;
+      var links=[].slice.call(nav.querySelectorAll('a'));
+      var map={}; links.forEach(function(a){map[a.getAttribute('data-sec')]=a;});
+      var secs=[].slice.call(document.querySelectorAll('.sec[id^="s-"]'));
+      var cur=null;
+      function setOn(a){ if(a===cur) return; if(cur)cur.classList.remove('on'); cur=a; if(a){a.classList.add('on'); var r=a.getBoundingClientRect(),nr=nav.getBoundingClientRect(); if(r.top<nr.top||r.bottom>nr.bottom) a.scrollIntoView({block:'nearest'});} }
+      if('IntersectionObserver' in window){
+        var vis={};
+        var io=new IntersectionObserver(function(es){
+          es.forEach(function(e){ var id=e.target.id.slice(2); if(e.isIntersecting)vis[id]=1; else delete vis[id]; });
+          var top=null,ty=1e9; secs.forEach(function(s){ var t=s.getBoundingClientRect().top; if(vis[s.id.slice(2)]!=null && t<ty){ty=t;top=s;} });
+          if(top) setOn(map[top.id.slice(2)]);
+        },{rootMargin:'-80px 0px -65% 0px',threshold:[0,.1,.5,1]});
+        secs.forEach(function(s){io.observe(s);});
+      }
+      links.forEach(function(a){ a.addEventListener('click',function(){ setTimeout(function(){setOn(a);},60); }); });
+    })();
   </script>`;
   const desc = strip(g.intro).slice(0, 180) || g.tagline;
   return head({ base, rich: !!(richHtml || g.diagram || (g.sections || []).some(s => s.shot)), path: '/help/' + slug, title: g.title + ' — Справочник Lumen', desc }) + body + '</body></html>';
