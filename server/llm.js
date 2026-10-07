@@ -267,7 +267,8 @@ ${followup ? `
   • Валюта: суммы/бюджет — в той валюте, которую назвал клиент; не навязывай чужую. Если клиент из другой валютной зоны — можешь добавить «≈ эквивалент», но не грузи конвертацией.
   • Если клиент не определился («пока не знаю», «не уверен», «предложите что-нибудь») — НЕ дави и НЕ повторяй тот же вопрос. Мягко сузь выбор: предложи 1-2 типовых варианта по сути или сам сделай следующий шаг (подготовлю подборку / покажу на созвоне).
   • Тон под клиента: пишет коротко и неформально — отвечай так же, без официоза; копируй его уровень «ты/вы».
-  • Не повторяйся: если клиент не ответил на предложенное время/вопрос — предложи ДРУГИЕ варианты или уточни, что мешает, а не дублируй прежнее слово-в-слово.
+  • Не повторяйся: если клиент не ответил на предложенное время/вопрос — предложи ДРУГИЕ варианты или уточни, что мешает, а не дублируй прежнее слово-в-слово. КАТЕГОРИЧЕСКИ нельзя переписывать прошлое сообщение теми же словами/с теми же слотами времени.
+  • Клиент недоволен («странно пишете», «почему нельзя сразу», «вы не отвечаете по сути») — НЕ рассыпайся в извинениях по кругу и НЕ повторяй прежнее предложение. Признай одним словом и СРАЗУ сделай один конкретный шаг ИНАЧЕ: либо спроси, во сколько удобно ЕМУ (не навязывая свои часы снова), либо дай конкретную пользу, либо прямо предложи «давайте проще: …». Хватит обещать «подготовлю расчёты» по второму разу — либо дай факт, либо выводи на звонок коротко.
   • Не предлагай созвон на явную ночь/выходной у клиента; выбирай ближайшее рабочее и удобное ему окно.
   • Обращайся по имени естественно, не в каждом сообщении.
 - ФОРМАТ (ВАЖНО, как в живом мессенджере): НЕ пиши стеной текста. Если ответ выходит длиннее 1-2 предложений — раздели его на короткие смысловые абзацы, между абзацами ОБЯЗАТЕЛЬНО пустая строка (два перевода строки \\n\\n). Как правило: один абзац — суть/польза по запросу клиента; отдельный абзац — мягкий вопрос или предложение созвона с конкретным временем. Короткий ответ (1-2 фразы) оставляй одним абзацем, не дроби искусственно. Пример (НЕ копируй дословно, только структуру): «С учётом вашего бюджета ... как раз подходят ... , а все детали по доходности в переписке показать сложно.\\n\\nПодготовлю короткий обзор на экране — вам удобнее созвониться сегодня в 13:00 или завтра в 11:00?»
@@ -339,11 +340,24 @@ function validateReply(db, lead, text, promptContext) {
     const num = m2[1].replace(/[^\d]/g, '');
     if (num.length >= 2 && !knownNums.has(num)) return 'цифра не из контекста: ' + m2[0].trim();
   }
-  /* зацикливание: дубликат недавнего исходящего */
-  const lastOuts = db.messages.filter(m => m.leadId === lead.id && m.dir === 'out').slice(-3);
+  /* зацикливание: ТОЧНЫЙ дубликат недавнего исходящего */
+  const lastOuts = db.messages.filter(m => m.leadId === lead.id && m.dir === 'out').slice(-4);
   const norm = (x) => x.toLowerCase().replace(/\s+/g, ' ').trim();
   if (lastOuts.some(m2 => norm(m2.text) === norm(t))) return 'дубликат предыдущего сообщения';
+  /* ПОЧТИ-дубль: ИИ переписывает то же самое другими словами (то же предложение + те же слоты времени).
+     Клиента это бесит. Пересечение значимых слов с любым из 4 последних исходящих ≥ 0.5 → брак. */
+  if (lastOuts.some(m2 => textOverlap(t, m2.text) >= 0.5)) return 'почти-дубль недавнего сообщения (то же другими словами)';
   return null;
+}
+/* overlap coefficient по значимым словам (≥4 букв/цифр): |A∩B| / min(|A|,|B|). 1 = одно и то же. */
+function textTokens(s) {
+  return new Set(String(s || '').toLowerCase().replace(/[^0-9a-zа-яё\s]/gi, ' ').split(/\s+/).filter(w => w.length >= 4));
+}
+function textOverlap(a, b) {
+  const A = textTokens(a), B = textTokens(b);
+  if (A.size < 4 || B.size < 4) return 0;
+  let inter = 0; for (const w of A) if (B.has(w)) inter++;
+  return inter / Math.min(A.size, B.size);
 }
 
 async function reply(db, lead) {
@@ -352,17 +366,24 @@ async function reply(db, lead) {
     .slice(-12)
     .map(m => (m.dir === 'in' ? 'КЛИЕНТ: ' : 'ТЫ: ') + m.text)
     .join('\n');
-  const prompt = buildPrompt(db, lead, history);
-  const out = await callGemini(prompt);
-  if (!out || typeof out.reply !== 'string' || !out.reply.trim()) throw new Error('llm bad shape');
-  let raw = humanize(out.reply.trim());
-  /* страховка: если приветствие в переписке уже было, а LLM всё равно поздоровался — срезаем ведущее приветствие */
+  const base = buildPrompt(db, lead, history);
+  const lastOut = [...db.messages].reverse().find(m => m.leadId === lead.id && m.dir === 'out');
   const alreadyGreeted = db.messages.some(m => m.leadId === lead.id && m.dir === 'out' && GREET_RE.test(String(m.text || '')));
-  if (alreadyGreeted) { const s = stripLeadGreeting(raw); if (s && s.length >= 5) raw = s; }
-  const text = raw.slice(0, 650);
-  const bad = validateReply(db, lead, text, prompt);
-  if (bad) throw new Error('брак LLM: ' + bad);
-  return { text, axes: clampAxes(db, lead, out.axes) };
+  let lastBad = 'llm bad shape', lastAxes = {};
+  /* до 2 попыток: почти-дубль прошлого ответа → пересобираем с другим углом (клиента бесит повтор) */
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const prompt = attempt === 0 ? base
+      : base + `\n\n⚠️ ПРОШЛАЯ ПОПЫТКА ПОВТОРЯЛА недавнее наше сообщение${lastOut ? ' («' + String(lastOut.text).replace(/\s+/g, ' ').slice(0, 160) + '…»)' : ''}. Ответь СОВЕРШЕННО по-другому: другой угол, другой смысл, другие слова, НЕ повторяй те же слоты времени. Если клиент недоволен — не извиняйся по второму кругу, сделай один конкретный шаг иначе.`;
+    const out = await callGemini(prompt);
+    if (!out || typeof out.reply !== 'string' || !out.reply.trim()) { lastBad = 'llm bad shape'; continue; }
+    let raw = humanize(out.reply.trim());
+    if (alreadyGreeted) { const s = stripLeadGreeting(raw); if (s && s.length >= 5) raw = s; }   /* приветствие уже было → срезаем */
+    const text = raw.slice(0, 650);
+    const bad = validateReply(db, lead, text, prompt);
+    if (!bad) return { text, axes: clampAxes(db, lead, out.axes) };
+    lastBad = bad; lastAxes = out.axes || {};
+  }
+  throw new Error('брак LLM: ' + lastBad);
 }
 
 /* FOLLOW-UP по застрявшему диалогу: клиент замолчал (последним писали мы) → генерируем касание со ССЫЛКОЙ
@@ -373,15 +394,23 @@ async function followup(db, lead) {
     .slice(-14)
     .map(m => (m.dir === 'in' ? 'КЛИЕНТ: ' : 'ТЫ: ') + m.text)
     .join('\n');
-  const prompt = buildPrompt(db, lead, history, { followup: true });
-  const out = await callGemini(prompt);
-  if (!out || typeof out.reply !== 'string' || !out.reply.trim()) throw new Error('llm bad shape (followup)');
-  let raw = humanize(out.reply.trim());
-  const s = stripLeadGreeting(raw); if (s && s.length >= 5) raw = s;   /* в продолжающемся диалоге не здороваемся повторно */
-  const text = raw.slice(0, 650);
-  const bad = validateReply(db, lead, text, prompt);
-  if (bad) throw new Error('брак LLM (followup): ' + bad);
-  return { text };
+  const base = buildPrompt(db, lead, history, { followup: true });
+  const lastOut = [...db.messages].reverse().find(m => m.leadId === lead.id && m.dir === 'out');
+  let lastBad = 'llm bad shape (followup)';
+  /* до 2 попыток: если вышел почти-дубль прошлого — пересобираем с жёстким «смени угол и не повторяй слоты» */
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const prompt = attempt === 0 ? base
+      : base + `\n\n⚠️ ПРОШЛАЯ ПОПЫТКА ПОВТОРЯЛА недавнее наше сообщение${lastOut ? ' («' + String(lastOut.text).replace(/\s+/g, ' ').slice(0, 160) + '…»)' : ''}. Напиши СОВЕРШЕННО по-другому: другой угол, другой смысл, другие слова. НЕ предлагай те же часы созвона — если затык по времени, спроси, КОГДА удобно ЕМУ, не навязывая свои слоты. Не извиняйся повторно.`;
+    const out = await callGemini(prompt);
+    if (!out || typeof out.reply !== 'string' || !out.reply.trim()) { lastBad = 'llm bad shape (followup)'; continue; }
+    let raw = humanize(out.reply.trim());
+    const s = stripLeadGreeting(raw); if (s && s.length >= 5) raw = s;   /* в продолжающемся диалоге не здороваемся повторно */
+    const text = raw.slice(0, 650);
+    const bad = validateReply(db, lead, text, prompt);
+    if (!bad) return { text };
+    lastBad = bad;
+  }
+  throw new Error('брак LLM (followup): ' + lastBad);
 }
 
 /* ИИ-сводка по лиду: вся хронология → 3-5 предложений для брокера */
