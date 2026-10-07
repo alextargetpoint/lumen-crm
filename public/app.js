@@ -1595,7 +1595,9 @@ window.openGrayManager = async function (jumpPhone) {
     const st = (live && live.status) || 'none';
     const map = { connected: ['ok', 'На связи'], qr: ['warn', 'Ждёт QR'], connecting: ['warn', 'Подключение'], reconnecting: ['warn', 'Переподключение'], logged_out: ['bad', 'Вышел'], none: ['', '—'] };
     const [cls, tx] = map[st] || ['', st];
-    return `<span class="badge ${cls}">${tx}${live && live.phone ? ' · ' + esc(live.phone) : ''}</span>`;
+    /* ЧЕСТНЫЙ СТАТУС: connected, но не расшифровывает входящие → явный красный чип «не читает входящие — рескан» */
+    const decWarn = (live && live.decBad) ? ` <span class="badge bad" title="Номер на связи, но не расшифровывает входящие (Bad MAC). Клиенты пишут — сообщения не приходят. Нужен «Пересканировать».">⚠️ не читает входящие — рескан</span>` : '';
+    return `<span class="badge ${cls}">${tx}${live && live.phone ? ' · ' + esc(live.phone) : ''}</span>${decWarn}`;
   };
   /* готовность номера к рассылке: свежий номер сначала прогреть (≥3 дней активности), иначе риск бана */
   const readyPill = (n) => {

@@ -3315,11 +3315,20 @@ async function waDropWatch() {
           const prev = (n.live && n.live.status) || 'none';
           const who = n.label || (n.realPhone ? '+' + n.realPhone : n.phone);
           if (prev === 'connected' && cur !== 'connected') {
-            notify(db, { type: 'wa', level: 'critical', title: 'WhatsApp-номер отвалился', text: `Номер «${who}» больше не на связи. Срочно переподключите по QR в разделе «Номера» → WhatsApp QR — иначе прогрев и касания по нему встают.` });
+            notify(db, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер отвалился', text: `Номер «${who}» больше не на связи. Срочно переподключите по QR в разделе «Номера» → «Пересканировать» — иначе прогрев и касания по нему встают (отправка авто-идёт с других номеров).` });
           } else if (prev !== 'connected' && prev !== 'none' && cur === 'connected') {
             notify(db, { type: 'wa', level: 'success', title: 'WhatsApp-номер снова на связи', text: `Номер «${who}» переподключён — вернул в прогрев и касания.` });
           }
-          n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null });
+          /* ⚠️ ЧЕСТНЫЙ СТАТУС: номер «connected», но НЕ расшифровывает входящие (Bad MAC/no session) — клиенты
+             пишут, а сообщения не приходят в CRM. Статус-бейдж это не ловит → отдельный алерт + флаг для UI. */
+          const decFails = +s.decFails || 0;
+          const decBad = cur === 'connected' && decFails >= 3 && s.lastDecFailAt && (Date.now() - s.lastDecFailAt < 20 * 60e3);
+          if (decBad && (!n._decAlertAt || Date.now() - n._decAlertAt > 6 * 3600e3)) {
+            n._decAlertAt = Date.now();
+            notify(db, { type: 'wa', level: 'critical', title: '🔴 Номер не читает входящие', text: `Номер «${who}» на связи, но НЕ расшифровывает входящие (${decFails} ошибок) — клиенты пишут, а сообщения не доходят в CRM. Сделайте «Пересканировать» этого номера в «Номера».` });
+          }
+          if (!decBad) n._decAlertAt = null;
+          n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad });
           changed = true;
         }
         if (changed) store.save();
@@ -10051,6 +10060,18 @@ const server = http.createServer(async (req, res) => {
           const st = String(b.status || ''); if (!rank[st]) return;
           const msg = (tdb.messages || []).find(m => m.waId && m.waId === b.id);
           if (msg && rank[st] > (rank[msg.status] || 0)) { msg.status = st; store.save(); }
+          return;
+        }
+        /* ⚠️ МГНОВЕННЫЙ АЛЕРТ при разлогине номера (воркер шлёт logged_out) — раньше CRM это игнорировала,
+           фаундер узнавал только через вотчер (до 10 мин). Отправка авто-фейловерится на живые номера
+           (pickGrayNumber берёт только connected), но на разлогиненном переписка стоит → нужен срочный рескан. */
+        if (b.event === 'logged_out') {
+          const _ph = (sid0.split('__')[1] || String(b.phone || '')).replace(/\D/g, '');
+          const _rec = (g.numbers || []).find(n => String(n.phone).replace(/\D/g, '') === _ph || (n.live && String(n.live.phone || '').replace(/\D/g, '') === _ph));
+          const _who = (_rec && (_rec.label || (_rec.realPhone ? '+' + _rec.realPhone : _rec.phone))) || ('+' + _ph);
+          if (_rec) _rec.live = Object.assign({}, _rec.live || {}, { status: 'logged_out' });
+          notify(tdb, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер разлогинился', text: `Номер «${_who}» вышел из WhatsApp — СРОЧНО переподключите по QR («Номера» → «Пересканировать»). Отправка автоматически идёт с других номеров, но входящие и переписка на этом номере стоят.` });
+          store.save();
           return;
         }
         if (b.event !== 'message' || b.fromMe || !b.text) return;
