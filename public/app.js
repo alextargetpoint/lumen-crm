@@ -6572,7 +6572,14 @@ async function renderChat(id, rebuild) {
     && !['handover', 'viewing', 'deal', 'lost'].includes(l.stage)
     ? '<div class="bubble in typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span></div>' : '';
 
-  const chn = l.activeChannel || 'wa';
+  /* выбор канала касания — вычисляем ДО скина, чтобы фон/тема чата шли по выбранному в пикере каналу (переживает поллинг) */
+  const _chans = l.chans || { wa: { avail: true, enabled: true } };
+  const _avail = ['wa', 'tg', 'email', 'viber'].filter(c => _chans[c] && _chans[c].avail && _chans[c].enabled);
+  if (!_avail.length) _avail.push('wa');
+  const _rec = _avail.find(c => _chans[c] && _chans[c].recommended);
+  let _selCh = COMPOSER_CH[id]; if (!_selCh || !_avail.includes(_selCh)) _selCh = _rec || (l.activeChannel && _avail.includes(l.activeChannel) ? l.activeChannel : _avail[0]);
+  COMPOSER_CH[id] = _selCh;
+  const chn = _selCh;
   pane.className = 'glass chat chat--' + chn + (l.ai.enabled ? ' ai-live' : '');
   const chnMeta = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], viber: ['Viber', '#7360F2'], email: ['E-mail', '#8A90A0'] }[chn] || ['WhatsApp', '#25D366'];
   pane.innerHTML = `
@@ -6580,9 +6587,11 @@ async function renderChat(id, rebuild) {
       ${avaHtml(l)}
       <div class="chat-head-id" id="chatHeadId" title="Открыть карточку лида"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName}</div></div>
       <div class="chat-head-actions">
-        <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
-        <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
-        <span class="badge acc">${stageName(l.stage)}</span>
+        <div class="chat-head-chips">
+          <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
+          <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
+          <span class="badge acc">${stageName(l.stage)}</span>
+        </div>
         <button class="btn btn-sm" id="chatCall" title="Позвонить клиенту через телефонию (запись + транскрипт лягут в карточку)">${ic(I.phone)}Позвонить</button>
         <button class="btn btn-sm btn-icon" id="chatOpenLead" title="Открыть полную карточку лида" aria-label="Карточка">${ic(I.user || I.doc)}</button>
       </div>
@@ -6590,12 +6599,7 @@ async function renderChat(id, rebuild) {
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
     ${(() => {
-      const chans = l.chans || { wa: { avail: true, enabled: true } };
-      const avail = ['wa', 'tg', 'email', 'viber'].filter(c => chans[c] && chans[c].avail && chans[c].enabled);
-      if (!avail.length) avail.push('wa');
-      const rec = avail.find(c => chans[c] && chans[c].recommended);
-      let sel = COMPOSER_CH[id]; if (!sel || !avail.includes(sel)) sel = rec || (l.activeChannel && avail.includes(l.activeChannel) ? l.activeChannel : avail[0]);
-      COMPOSER_CH[id] = sel;
+      const chans = _chans, avail = _avail, sel = _selCh;
       const segs = avail.map(c => `<button class="ch-seg ${c === sel ? 'on' : ''}" data-ch="${c}" style="--chc:${CH_META[c][1]}" title="Отправить касание в ${CH_META[c][0]}${chans[c] && chans[c].confirmed ? ' · клиент подтверждён' : ' · холодное касание'}">${CH_META[c][0]}${chans[c] && chans[c].recommended ? ' ★' : ''}</button>`).join('');
       return `<div class="chat-tools">
       <div class="ch-pick" id="chPick" title="Канал ручного касания — автодетект по данным лида">${segs}</div>
@@ -6635,9 +6639,13 @@ async function renderChat(id, rebuild) {
   $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
   $('#chatHeadId')?.addEventListener('click', () => openLeadModal(l.id));   /* клик по имени/номеру → карточка лида (по инерции) */
   $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {
-    COMPOSER_CH[id] = b.dataset.ch;
+    const ch = b.dataset.ch;
+    COMPOSER_CH[id] = ch;
     $$('#chPick .ch-seg').forEach(x => x.classList.toggle('on', x === b));
-    const ta = $('#composerText'); if (ta) { ta.placeholder = `Написать в ${(CH_META[b.dataset.ch] || ['канал'])[0]}… (перехват у ИИ)`; }
+    const ta = $('#composerText'); if (ta) { ta.placeholder = `Написать в ${(CH_META[ch] || ['канал'])[0]}… (перехват у ИИ)`; }
+    /* мгновенно перекрашиваем тему чата под выбранный канал (фон/пузыри/чип в шапке) */
+    const pane = $('#chatPane'); if (pane) pane.className = pane.className.replace(/chat--\w+/, 'chat--' + ch);
+    const hc = $('.chn-chip', pane); if (hc) { const meta = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], viber: ['Viber', '#7360F2'], email: ['E-mail', '#8A90A0'] }[ch] || ['WhatsApp', '#25D366']; hc.style.setProperty('--chn', meta[1]); hc.innerHTML = '<i></i>' + meta[0]; }
   }));
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
