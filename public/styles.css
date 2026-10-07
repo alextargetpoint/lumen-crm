@@ -623,6 +623,9 @@ textarea { resize: vertical; min-height: 70px; }
 .via-tag { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 8px; background: rgba(255, 255, 255, .22); }
 .bubble.in .via-tag { background: var(--blue-100); color: var(--accent); }
 .day-sep { align-self: center; font-size: 10.5px; color: var(--ink-3); background: var(--card); border: 1px solid var(--stroke-soft); padding: 3px 12px; border-radius: 12px; margin: 6px 0; }
+.chat-tools { display: flex; gap: 8px; padding: 8px 16px 0; background: var(--card); flex-wrap: wrap; }
+.chat-tool { font-size: 12px; }
+.chat-tool.hot { border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .composer { display: flex; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--stroke-soft); align-items: flex-end; background: var(--card); border-radius: 0 0 var(--r-lg) var(--r-lg); }
 /* flex:1 1 0 (basis 0) — textarea растёт от нуля и заполняет остаток на КАЖДОМ рендере (было 1 1 auto+width:100% → intrinsic ~185px при первом открытии) */
 .composer textarea { flex: 1 1 0; min-width: 0; width: auto; min-height: 42px; max-height: 120px; background: var(--bg); }

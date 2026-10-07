@@ -6587,6 +6587,9 @@ async function renderChat(id, rebuild) {
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
+    <div class="chat-tools">
+      <button class="btn btn-sm chat-tool ${l.lastDir === 'out' ? 'hot' : ''}" id="followupBtn" title="Клиент замолчал? Сгенерирую follow-up со ссылкой на вашу переписку — новый угол, без упрёков. Текст подставлю в поле — отредактируете и отправите.">${ic(I.spark)}Подтолкнуть${l.lastDir === 'out' ? ' — клиент молчит' : ''}</button>
+    </div>
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
@@ -6625,6 +6628,17 @@ async function renderChat(id, rebuild) {
     $('#composerText').value = '';
     await api.post(`/leads/${id}/message`, { text: t });
     renderChat(id, false);
+  });
+  $('#followupBtn')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget; const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Генерирую…';
+    try {
+      const r = await api.post(`/leads/${id}/followup`, {});
+      if (r.ok && r.text) {
+        const ta = $('#composerText'); if (ta) { ta.value = r.text; ta.focus(); try { ta.setSelectionRange(r.text.length, r.text.length); } catch (_) {} ta.dispatchEvent(new Event('input')); }
+        toast('Follow-up готов', 'Проверьте текст и отправьте', true);
+      } else { toast('Не вышло', r.error || 'пустой ответ'); }
+    } catch (err) { toast('Не вышло', err.message); }
+    btn.disabled = false; btn.innerHTML = old;
   });
   $('#composerText').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#sendBtn').click(); } // Shift+Enter — перенос строки

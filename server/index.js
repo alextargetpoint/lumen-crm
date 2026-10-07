@@ -7446,6 +7446,22 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    /* FOLLOW-UP по застрявшему диалогу: сгенерировать касание со ссылкой на переписку (клиент замолчал).
+       send=1 → сразу отправить; иначе вернуть черновик (кнопка подставит его в поле ввода для правки). */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/followup$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req).catch(() => ({}));
+      let text = null;
+      if (llm.available()) { try { text = (await llm.followup(db, lead) || {}).text; } catch (e) { console.error('[followup]', e.message); } }
+      if (!text) { try { text = ai.nextQuestion ? (ai.nextQuestion(db, lead) || {}).text : ''; } catch (_) {} }   /* фолбэк без LLM: следующий вопрос квалификации из ядра */
+      if (!text) return json(res, 200, { ok: false, error: 'не удалось сгенерировать касание (нет LLM-ключа и ядро пустое)' });
+      if (b.send) {
+        try { const msg = engine.send(db, lead, text, 'ai'); if (lead.ai) { lead.ai.silentSince = null; } store.save(); return json(res, 200, { ok: true, sent: true, text, messageId: msg && msg.id }); }
+        catch (e) { return json(res, 200, { ok: false, error: 'отправка не прошла: ' + e.message, text }); }
+      }
+      return json(res, 200, { ok: true, sent: false, text });   /* черновик для правки в поле ввода */
+    }
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/summary$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });

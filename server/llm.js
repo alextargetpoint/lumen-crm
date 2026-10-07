@@ -226,7 +226,8 @@ function stripLeadGreeting(text) {
   if (m) { const rest = t.slice(m[0].length).trimStart(); if (rest.length >= 5) t = rest.charAt(0).toUpperCase() + rest.slice(1); }
   return t;
 }
-function buildPrompt(db, lead, history) {
+function buildPrompt(db, lead, history, opts = {}) {
+  const followup = !!opts.followup;
   const g = db.settings.geoNames[lead.geo] || lead.geo;
   const allGeos = (db.settings.agency.geos || []).map(x => db.settings.geoNames[x] || x).join(', ');
   const crit = db.settings.criteria[lead.geo] || {};
@@ -248,7 +249,13 @@ function buildPrompt(db, lead, history) {
     ? 'мягко и за минимум сообщений довести клиента до следующего шага С ТОБОЙ — короткого видео-созвона или показа, который ты проводишь САМ. Дай краткую пользу по запросу, покажи экспертизу — и предложи конкретное удобное время. Не вываливай всё в переписке: детальный разбор и подбор делаешь ты на звонке/показе. Каждое сообщение мягко подводит к назначению встречи с тобой.'
     : 'как можно быстрее и меньшим числом сообщений вывести клиента на видео-созвон (Zoom / Google Meet) с экспертом. Дай краткую общую информацию по запросу, покажи ценность — и предложи конкретное удобное время созвона. НЕ продавай подробно в переписке и не вываливай всю информацию: глубокую презентацию и подбор делает живой эксперт на звонке. Каждое твоё сообщение должно мягко подводить к назначению созвона.';
   return `${identity} Агентство работает по направлениям: ${allGeos}. Сейчас клиент интересуется направлением «${g}» — если он назовёт другое из наших направлений, спокойно работай с ним и НЕ говори, что вы только по «${g}». Ты ведёшь WhatsApp-диалог с лидом по имени ${lead.name.split(' ')[0]}.
-
+${followup ? `
+⚠️ РЕЖИМ FOLLOW-UP (клиент замолчал). Последним писали МЫ — клиент не ответил. Твоя задача — написать ОДНО короткое сообщение, которое мягко оживит диалог:
+- ОБЯЗАТЕЛЬНО опирайся на то, что УЖЕ обсуждали в переписке ниже (его запрос/цель/бюджет/что ему показывали) — follow-up должен быть «по следам разговора», а не абстрактный.
+- Зайди с НОВОГО полезного угла: свежий факт/выгода/ограниченность по времени/забота — то, чего ещё не говорил. НЕ повторяй прошлое сообщение.
+- Если в переписке мы предлагали созвон/время и клиент не подтвердил — мягко вернись к этому, предложи КОНКРЕТНЫЕ новые слоты (в его поясе).
+- БЕЗ упрёков и давления: никаких «вы не ответили», «жду вашего ответа», «вы пропали». По-человечески, лёгкое касание, одна мысль + один мягкий вопрос/шаг.
+` : ''}
 РЕГЛАМЕНТ:
 - ЦЕЛЬ ДИАЛОГА (главное — к чему ведёшь): ${((db.settings.ai && db.settings.ai.training && db.settings.ai.training.goal) || '').trim() || goalDefault}${SOLO ? '\n- ⚠️ ТЫ ВЕДЁШЬ КЛИЕНТА САМ (ты и есть брокер): НИКОГДА не ссылайся на «эксперта», «коллегу», «специалиста», «нашего менеджера» как на отдельного человека и не обещай «подключить/передать» кого-то. Говори только от первого лица: «я покажу», «я подберу», «давайте созвонимся/встретимся». Созвон/показ проводишь ТЫ.' : ''}${brokerAiBlock(db, lead)}
 - КОНКРЕТНОЕ ВРЕМЯ: когда предлагаешь созвон/показ — давай КОНКРЕТНЫЕ варианты, не размытое «когда вам удобно». Ориентир (уже пересчитан в ПОЯС КЛИЕНТА и сведён с рабочими часами специалиста — подстрой под ответ клиента, не повторяй дословно): ${meetingSlots(db, lead)}.
@@ -356,6 +363,25 @@ async function reply(db, lead) {
   const bad = validateReply(db, lead, text, prompt);
   if (bad) throw new Error('брак LLM: ' + bad);
   return { text, axes: clampAxes(db, lead, out.axes) };
+}
+
+/* FOLLOW-UP по застрявшему диалогу: клиент замолчал (последним писали мы) → генерируем касание со ССЫЛКОЙ
+   на переписку (новый угол, без упрёков). Та же инфраструктура, что reply(), но в follow-up-режиме. */
+async function followup(db, lead) {
+  const history = db.messages
+    .filter(m => m.leadId === lead.id)
+    .slice(-14)
+    .map(m => (m.dir === 'in' ? 'КЛИЕНТ: ' : 'ТЫ: ') + m.text)
+    .join('\n');
+  const prompt = buildPrompt(db, lead, history, { followup: true });
+  const out = await callGemini(prompt);
+  if (!out || typeof out.reply !== 'string' || !out.reply.trim()) throw new Error('llm bad shape (followup)');
+  let raw = humanize(out.reply.trim());
+  const s = stripLeadGreeting(raw); if (s && s.length >= 5) raw = s;   /* в продолжающемся диалоге не здороваемся повторно */
+  const text = raw.slice(0, 650);
+  const bad = validateReply(db, lead, text, prompt);
+  if (bad) throw new Error('брак LLM (followup): ' + bad);
+  return { text };
 }
 
 /* ИИ-сводка по лиду: вся хронология → 3-5 предложений для брокера */
@@ -1525,6 +1551,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, followup, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
