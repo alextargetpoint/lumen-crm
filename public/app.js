@@ -6576,13 +6576,14 @@ async function renderChat(id, rebuild) {
   pane.innerHTML = `
     <div class="chat-head">
       ${avaHtml(l)}
-      <div><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName}</div></div>
-      <div class="tb-spacer"></div>
-      <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
-      <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
-      <span class="badge acc">${stageName(l.stage)}</span>
-      <button class="btn btn-sm" id="chatCall" title="Позвонить клиенту через телефонию (запись + транскрипт лягут в карточку)">${ic(I.phone)}Позвонить</button>
-      <button class="btn btn-sm" id="chatOpenLead" title="Открыть полную карточку лида">${ic(I.user || I.doc)}Карточка</button>
+      <div class="chat-head-id"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName}</div></div>
+      <div class="chat-head-actions">
+        <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
+        <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
+        <span class="badge acc">${stageName(l.stage)}</span>
+        <button class="btn btn-sm" id="chatCall" title="Позвонить клиенту через телефонию (запись + транскрипт лягут в карточку)">${ic(I.phone)}Позвонить</button>
+        <button class="btn btn-sm" id="chatOpenLead" title="Открыть полную карточку лида">${ic(I.user || I.doc)}Карточка</button>
+      </div>
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
