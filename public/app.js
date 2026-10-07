@@ -6576,7 +6576,7 @@ async function renderChat(id, rebuild) {
   pane.innerHTML = `
     <div class="chat-head">
       ${avaHtml(l)}
-      <div class="chat-head-id"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName}</div></div>
+      <div class="chat-head-id" id="chatHeadId" title="Открыть карточку лида"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName}</div></div>
       <div class="chat-head-actions">
         <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
         <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
@@ -6618,6 +6618,7 @@ async function renderChat(id, rebuild) {
     setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
   });
   $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
+  $('#chatHeadId')?.addEventListener('click', () => openLeadModal(l.id));   /* клик по имени/номеру → карточка лида (по инерции) */
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
     if (!t) return;
