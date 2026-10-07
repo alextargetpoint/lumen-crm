@@ -6911,6 +6911,10 @@ PAGES.qualifier = async (root) => {
             <div class="sp"><div class="sl">ИИ отвечает сам (глобально, по умолчанию)</div><div class="sd">Первый контакт ≤ 1 минуты, квалификация по 4 осям: цель · срок · бюджет · тип. Стадии двигаются только по фактам из сообщений клиента. <b>Это дефолт для всех лидов.</b> Выключение НЕ останавливает лидов, где «ИИ ведёт» включён на карточке вручную — по-лидный тумблер всегда главнее.</div></div>
             <label class="switch"><input type="checkbox" id="autopilot" ${s.ai.autopilot ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
           </div>
+          <div class="set-row">
+            <div class="sp"><div class="sl">После ручного сообщения — ставить ИИ на паузу</div><div class="sd">Когда пишешь клиенту сам (перехват) — ИИ замолкает, и диалог дальше ведёшь ты. <b>Выключи</b> — ИИ продолжит отвечать даже после твоих сообщений: ты лишь подсказываешь, автопилот не останавливается после первого касания.</div></div>
+            <label class="switch"><input type="checkbox" id="aiAutoOffHuman" ${(((s.ai.autoOff || {}).onHumanReply) !== false) ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          </div>
           <div class="lp-sec" style="margin-top:18px">ИИ-герой квалификатора ${hint('persona', 'Как работают герои', [['Свой характер', 'Каждый герой ведёт диалог своей манерой — тон реально меняет ответы ИИ'],['Прокачка', 'Герой растёт в уровне за каждого квалифицированного лида'],['Бесшовно', 'Клиент общается будто с живым менеджером; брокер подхватит тот же чат — тот же голос']])}</div>
           <div class="hero-grid">
             ${AI_HEROES.map(h => {
@@ -7010,6 +7014,7 @@ PAGES.qualifier = async (root) => {
     btn.disabled = false; await loadState();
   });
   $('#autopilot').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { autopilot: e.target.checked } }); toast(e.target.checked ? 'Автопилот включён' : 'Автопилот выключен', null, true); loadState(); });
+  $('#aiAutoOffHuman')?.addEventListener('change', async (e) => { await api.patch('/settings', { ai: { autoOff: { onHumanReply: e.target.checked } } }); toast(e.target.checked ? 'После твоего сообщения ИИ встаёт на паузу' : 'ИИ продолжит отвечать после твоих сообщений', null, true); loadState(); });
   $$('.hero-card', root).forEach(card => card.addEventListener('click', async () => {
     if (card.classList.contains('on')) return;
     const h = AI_HEROES.find(x => x.id === card.dataset.hero);
@@ -14324,7 +14329,7 @@ PAGES.numbers = async (root) => {
   const telNums = (telData.list || []).filter(n => n && n.number);
   const NUMTAB = window.__numTab || (() => { try { return localStorage.getItem('lumen_numtab'); } catch (_) { return null; } })() || 'gray';   /* сохраняем под-вкладку при перезагрузке (была сброс на gray) */
   const brokerName = id => (STATE.brokers.find(b => b.id === id) || {}).name || '';
-  const grayStatusBadge = (live) => { const s = live && live.status; const base = s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; const decWarn = (live && live.decBad) ? ' <span class="badge bad" title="Сокет на связи, но номер не расшифровывает входящие (Bad MAC). Клиенты пишут — сообщения не доходят. Нажмите «Пересканировать».">⚠️ не читает входящие</span>' : ''; return base + decWarn; };
+  const grayStatusBadge = (live) => { const s = live && live.status; const base = s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; const decWarn = (live && live.decBad) ? ' <span class="badge bad" title="Сокет на связи, но номер не расшифровывает входящие (Bad MAC). Клиенты пишут — сообщения не доходят. Нажмите «Пересканировать».">⚠️ не читает входящие</span>' : ''; const retryWarn = (live && live.retryBad) ? ' <span class="badge bad" title="Клиенты не могут расшифровать наши сообщения («Waiting for this message»). Система авто-пересобирает сессии и временно шлёт с других номеров — рекомендуется «Пересканировать».">⚠️ клиенты не получают</span>' : ''; return base + decWarn + retryWarn; };
   const warmLiveHtml = (w) => {
     if (!w || !w.running) return '<div class="muted" style="font-size:11.5px;margin-top:8px">Прогрев выключен. Включите тумблер выше — номера начнут аккуратную переписку между собой (нужно ≥2 на связи).</div>';
     const log = w.log || [];

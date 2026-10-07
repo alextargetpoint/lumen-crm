@@ -3137,11 +3137,22 @@ async function tgGrayApi(db, method, pathx, body) {
    Действующие диалоги (у лида уже есть grayPhone) НЕ считаются и НЕ ограничиваются. */
 function grayNewLeadCap(db) { const g = db.settings.waGray || {}; return g.newLeadCapPerDay || 5; }
 function grayNewToday(n) { const today = new Date().toISOString().slice(0, 10); return n._newLeadDay === today ? (n._newLeadsToday || 0) : 0; }
+/* номер «деградировал»: получатели не расшифровывают наши сообщения (retryIn↑) ИЛИ сам не читает входящие (decFails↑)
+   в последние 20 мин. Такой номер временно НЕ выбираем для новых касаний — уводим на здоровый (авто-failover). */
+function grayDegraded(s) {
+  if (!s) return false;
+  const now = Date.now();
+  const retryBad = (+s.retryIn || 0) >= 5 && s.lastRetryAt && (now - s.lastRetryAt < 20 * 60e3);
+  const decBad = (+s.decFails || 0) >= 3 && s.lastDecFailAt && (now - s.lastDecFailAt < 20 * 60e3);
+  return retryBad || decBad;
+}
 function pickGrayNumber(db, lead, live) {
   const g = db.settings.waGray || {};
   const connected = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected' && (!n.roles || n.roles.send !== false); });
   if (!connected.length) return null;
-  if (lead.grayPhone) { const s = connected.find(n => n.phone === lead.grayPhone); if (s) return s; }          /* действующий диалог: вся цепочка с одного номера, без лимита */
+  /* действующий диалог: вся цепочка с одного номера — НО если этот номер деградировал, перебрасываем на здоровый
+     (лучше сообщение с другого номера, чем «waiting» в чёрную дыру). */
+  if (lead.grayPhone) { const s = connected.find(n => n.phone === lead.grayPhone); if (s && !grayDegraded(live[waGraySid(s.phone)])) return s; }
   /* НОВЫЙ лид (первое касание): потолок новых лидов — МЯГКИЙ. Предпочитаем номер под лимитом,
      но НЕ блокируем отправку (только френдли-предупреждение в graySender). */
   const cap = grayNewLeadCap(db);
@@ -3151,7 +3162,9 @@ function pickGrayNumber(db, lead, live) {
   let scope = connected;
   if (lead.broker) { const mine = connected.filter(n => n.brokerId === lead.broker); if (mine.length) scope = mine; }
   const under = scope.filter(n => grayNewToday(n) < cap);
-  const pool = under.length ? under : scope;                                                                    /* под лимитом, иначе — все в scope (мягко) */
+  const pool0 = under.length ? under : scope;                                                                   /* под лимитом, иначе — все в scope (мягко) */
+  const healthy = pool0.filter(n => !grayDegraded(live[waGraySid(n.phone)]));                                   /* авто-failover: деградировавшие номера не берём, пока лечатся */
+  const pool = healthy.length ? healthy : pool0;                                                               /* если все деградировали — шлём хоть с какого (лучше, чем никуда) */
   return pool.sort((a, b) => grayNewToday(a) - grayNewToday(b))[0];                                             /* наименее нагруженный новыми лидами */
 }
 
@@ -3331,7 +3344,17 @@ async function waDropWatch() {
             notify(db, { type: 'wa', level: 'critical', title: '🔴 Номер не читает входящие', text: `Номер «${who}» на связи, но НЕ расшифровывает входящие (${decFails} ошибок) — клиенты пишут, а сообщения не доходят в CRM. Сделайте «Пересканировать» этого номера в «Номера».` });
           }
           if (!decBad) n._decAlertAt = null;
-          n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad });
+          /* ⚠️ ИСХОДЯЩИЙ «waiting»: получатели НЕ расшифровывают наши сообщения (retry-receipt у воркера). Клиент
+             видит «Waiting for this message». Воркер считает retryIn и САМ форс-рефрешит сессию контакта (авто-heal).
+             При всплеске — алерт + флаг retryBad → pickGrayNumber уводит новые касания на здоровый номер, пока этот лечится. */
+          const retryIn = +s.retryIn || 0;
+          const retryBad = cur === 'connected' && retryIn >= 5 && s.lastRetryAt && (Date.now() - s.lastRetryAt < 20 * 60e3);
+          if (retryBad && (!n._retryAlertAt || Date.now() - n._retryAlertAt > 6 * 3600e3)) {
+            n._retryAlertAt = Date.now();
+            notify(db, { type: 'wa', level: 'critical', title: '🔴 Клиенты не получают сообщения с номера', text: `С номера «${who}» ${retryIn} раз устройства клиентов не смогли расшифровать сообщение («Waiting for this message»). Система авто-пересобирает сессии и временно шлёт новые касания с других номеров — но этот номер лучше «Пересканировать».` });
+          }
+          if (!retryBad) n._retryAlertAt = null;
+          n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad, retryIn, retryBad });
           changed = true;
         }
         if (changed) store.save();
@@ -8621,6 +8644,12 @@ const server = http.createServer(async (req, res) => {
         db.settings.ai = db.settings.ai || {};
         db.settings.ai.training = Object.assign({}, db.settings.ai.training || {}, b.ai.training);
         delete b.ai.training;
+      }
+      /* ⚠️ ai.autoOff мержим ГЛУБОКО: частичный {onHumanReply} не должен стирать onHumanRequest/onEscalation */
+      if (b.ai && b.ai.autoOff && typeof b.ai.autoOff === 'object' && !Array.isArray(b.ai.autoOff)) {
+        db.settings.ai = db.settings.ai || {};
+        db.settings.ai.autoOff = Object.assign({ onHumanReply: true, onHumanRequest: true, onEscalation: true }, db.settings.ai.autoOff || {}, b.ai.autoOff);
+        delete b.ai.autoOff;
       }
       const _replyDelayChanged = !!(b.ai && (b.ai.replyDelayMinSec != null || b.ai.replyDelayMaxSec != null));   /* сменили время ответа ИИ → пересчитать сроки висящих ответов */
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) Object.assign(db.settings[k], b[k]);   /* SEC/robustness: только plain-object, иначе Object.assign(obj,"строка") засоряет настройки числовыми ключами */
