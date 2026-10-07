@@ -6531,6 +6531,8 @@ async function openHandoverPreview(id) {
   });
 }
 
+const COMPOSER_CH = {};   /* выбранный канал ручного касания по лиду (переживает ре-рендеры поллинга) */
+const CH_META = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], email: ['E-mail', '#E8833A'], viber: ['Viber', '#7360F2'] };
 async function renderChat(id, rebuild) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
@@ -6587,9 +6589,19 @@ async function renderChat(id, rebuild) {
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
-    <div class="chat-tools">
+    ${(() => {
+      const chans = l.chans || { wa: { avail: true, enabled: true } };
+      const avail = ['wa', 'tg', 'email', 'viber'].filter(c => chans[c] && chans[c].avail && chans[c].enabled);
+      if (!avail.length) avail.push('wa');
+      const rec = avail.find(c => chans[c] && chans[c].recommended);
+      let sel = COMPOSER_CH[id]; if (!sel || !avail.includes(sel)) sel = rec || (l.activeChannel && avail.includes(l.activeChannel) ? l.activeChannel : avail[0]);
+      COMPOSER_CH[id] = sel;
+      const segs = avail.map(c => `<button class="ch-seg ${c === sel ? 'on' : ''}" data-ch="${c}" style="--chc:${CH_META[c][1]}" title="Отправить касание в ${CH_META[c][0]}${chans[c] && chans[c].confirmed ? ' · клиент подтверждён' : ' · холодное касание'}">${CH_META[c][0]}${chans[c] && chans[c].recommended ? ' ★' : ''}</button>`).join('');
+      return `<div class="chat-tools">
+      <div class="ch-pick" id="chPick" title="Канал ручного касания — автодетект по данным лида">${segs}</div>
       <button class="btn btn-sm chat-tool ${l.lastDir === 'out' ? 'hot' : ''}" id="followupBtn" title="Клиент замолчал? Сгенерирую follow-up со ссылкой на вашу переписку — новый угол, без упрёков. Текст подставлю в поле — отредактируете и отправите.">${ic(I.spark)}Подтолкнуть${l.lastDir === 'out' ? ' — клиент молчит' : ''}</button>
-    </div>
+    </div>`;
+    })()}
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
@@ -6622,11 +6634,16 @@ async function renderChat(id, rebuild) {
   });
   $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
   $('#chatHeadId')?.addEventListener('click', () => openLeadModal(l.id));   /* клик по имени/номеру → карточка лида (по инерции) */
+  $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {
+    COMPOSER_CH[id] = b.dataset.ch;
+    $$('#chPick .ch-seg').forEach(x => x.classList.toggle('on', x === b));
+    const ta = $('#composerText'); if (ta) { ta.placeholder = `Написать в ${(CH_META[b.dataset.ch] || ['канал'])[0]}… (перехват у ИИ)`; }
+  }));
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
     if (!t) return;
     $('#composerText').value = '';
-    await api.post(`/leads/${id}/message`, { text: t });
+    await api.post(`/leads/${id}/message`, { text: t, channel: COMPOSER_CH[id] || undefined });   /* ручной выбор канала касания */
     renderChat(id, false);
   });
   $('#followupBtn')?.addEventListener('click', async (e) => {

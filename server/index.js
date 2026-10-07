@@ -7375,6 +7375,7 @@ const server = http.createServer(async (req, res) => {
           messages: msgs,
           events: db.events.filter(e => e.leadId === lead.id).slice(0, 60),
           meetings: (db.meetings || []).filter(mt => mt.leadId === lead.id).map(mt => Object.assign({}, mt, { brokerName: (db.brokers.find(x => x.id === mt.brokerId) || {}).name || '—' })),
+          chans: engine.channelsFor(db, lead),   /* автодетект доступных каналов касания (WA/TG/email/viber) для ручного выбора */
         }));
       }
       if (req.method === 'PATCH') {
@@ -7457,7 +7458,8 @@ const server = http.createServer(async (req, res) => {
       if (!text) { try { text = ai.nextQuestion ? (ai.nextQuestion(db, lead) || {}).text : ''; } catch (_) {} }   /* фолбэк без LLM: следующий вопрос квалификации из ядра */
       if (!text) return json(res, 200, { ok: false, error: 'не удалось сгенерировать касание (нет LLM-ключа и ядро пустое)' });
       if (b.send) {
-        try { const msg = engine.send(db, lead, text, 'ai'); if (lead.ai) { lead.ai.silentSince = null; } store.save(); return json(res, 200, { ok: true, sent: true, text, messageId: msg && msg.id }); }
+        const _ch = ['wa', 'tg', 'viber', 'email'].includes(b.channel) ? b.channel : undefined;
+        try { const msg = engine.send(db, lead, text, 'ai', _ch ? { channel: _ch } : undefined); if (lead.ai) { lead.ai.silentSince = null; } store.save(); return json(res, 200, { ok: true, sent: true, text, messageId: msg && msg.id }); }
         catch (e) { return json(res, 200, { ok: false, error: 'отправка не прошла: ' + e.message, text }); }
       }
       return json(res, 200, { ok: true, sent: false, text });   /* черновик для правки в поле ввода */

@@ -623,8 +623,12 @@ textarea { resize: vertical; min-height: 70px; }
 .via-tag { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 8px; background: rgba(255, 255, 255, .22); }
 .bubble.in .via-tag { background: var(--blue-100); color: var(--accent); }
 .day-sep { align-self: center; font-size: 10.5px; color: var(--ink-3); background: var(--card); border: 1px solid var(--stroke-soft); padding: 3px 12px; border-radius: 12px; margin: 6px 0; }
-.chat-tools { display: flex; gap: 8px; padding: 8px 16px 0; background: var(--card); flex-wrap: wrap; }
+.chat-tools { display: flex; gap: 8px; padding: 8px 16px 0; background: var(--card); flex-wrap: wrap; align-items: center; }
 .chat-tool { font-size: 12px; }
+.ch-pick { display: inline-flex; gap: 4px; background: var(--bg); border: 1px solid var(--stroke); border-radius: 10px; padding: 3px; margin-right: auto; }
+.ch-seg { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border: none; background: transparent; color: var(--ink-3); border-radius: 7px; cursor: pointer; white-space: nowrap; transition: background .14s, color .14s; }
+.ch-seg:hover { color: var(--ink); }
+.ch-seg.on { background: color-mix(in srgb, var(--chc, var(--accent)) 16%, transparent); color: var(--chc, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chc, var(--accent)) 40%, transparent); }
 .chat-tool.hot { border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .composer { display: flex; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--stroke-soft); align-items: flex-end; background: var(--card); border-radius: 0 0 var(--r-lg) var(--r-lg); }
 /* flex:1 1 0 (basis 0) — textarea растёт от нуля и заполняет остаток на КАЖДОМ рендере (было 1 1 auto+width:100% → intrinsic ~185px при первом открытии) */

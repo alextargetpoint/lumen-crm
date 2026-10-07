@@ -29,16 +29,34 @@ function fmtLeadDT(ms, tz, opts) {
 const MIN = 60e3, DAY = 24 * 3600e3;
 
 /* ---------- омниканал: выбор канала по приоритетам ---------- */
+/* МОЖНО ли достучаться до лида в канале ch (автодетект по данным лида). cfg = db.settings.channels. */
+function channelHas(db, lead, ch, cfg) {
+  cfg = cfg || db.settings.channels || {};
+  if (ch === 'wa') return (lead.channels?.wa || 'unknown') !== 'no';
+  if (ch === 'email') return (lead.contacts || []).some(c => c.kind === 'email');
+  if (ch === 'tg') return lead.channels?.tg === 'yes' || (lead.channels?.tg !== 'no' && !!lead.phone) || (lead.contacts || []).some(c => c.kind === 'telegram');
+  if (ch === 'viber') { const vb = cfg.viber || {}; return lead.channels?.viber === 'yes' || (vb.mode === 'bsp' && !!lead.phone && lead.channels?.viber !== 'no'); }
+  return false;
+}
+/* Доступные каналы для РУЧНОГО выбора касания: { wa:{avail,enabled,confirmed}, tg:{...}, email:{...} }.
+   avail — можно достучаться; enabled — канал включён в настройках; confirmed — клиент реально в нём отвечал/подтверждён. */
+function channelsFor(db, lead) {
+  const cfg = db.settings.channels || { enabled: {} };
+  const en = cfg.enabled || {};
+  const out = {};
+  for (const ch of ['wa', 'tg', 'email', 'viber']) {
+    const avail = channelHas(db, lead, ch, cfg);
+    const confirmed = ch === 'email' ? (lead.contacts || []).some(c => c.kind === 'email')
+      : (lead.channels && lead.channels[ch] === 'yes');
+    const enabled = ch === 'wa' ? (en.wa !== false) : !!en[ch];
+    out[ch] = { avail, enabled, confirmed };
+  }
+  out[resolveChannel(db, lead)] = Object.assign(out[resolveChannel(db, lead)] || {}, { recommended: true });
+  return out;
+}
 function resolveChannel(db, lead) {
   const cfg = db.settings.channels || { priority: ['wa'], enabled: { wa: true } };
-  const has = (ch) => {
-    if (ch === 'wa') return (lead.channels?.wa || 'unknown') !== 'no';
-    if (ch === 'email') return (lead.contacts || []).some(c => c.kind === 'email');
-    if (ch === 'tg') return lead.channels?.tg === 'yes' || (lead.channels?.tg !== 'no' && !!lead.phone) || (lead.contacts || []).some(c => c.kind === 'telegram');   /* холодный TG по номеру (прогретые аккаунты) — пробуем, пока не помечен 'no' */
-    if (ch === 'viber') { const vb = cfg.viber || {}; return lead.channels?.viber === 'yes' || (vb.mode === 'bsp' && !!lead.phone && lead.channels?.viber !== 'no'); }   /* BSP шлёт по номеру → фолбэк-касание можно и без прежнего контакта */
-    return false;
-  };
-  const pr = cfg.priority.filter(ch => cfg.enabled[ch] && has(ch));
+  const pr = (cfg.priority || ['wa']).filter(ch => cfg.enabled[ch] && channelHas(db, lead, ch, cfg));
   const want = lead.activeChannel || 'wa';
   if (pr.includes(want)) return want;
   return pr[0] || 'wa';
@@ -1357,4 +1375,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT };
