@@ -6558,7 +6558,7 @@ async function renderChat(id, rebuild) {
       : _mt === 'document' ? `<a class="bubble-doc" href="${esc(m.media.url)}" target="_blank" style="color:inherit;display:inline-flex;gap:7px;align-items:center;text-decoration:none;font-weight:600">${ic(I.doc || I.file || I.paper)}${esc(m.media.name || 'файл')}</a>`
       : `<img class="bubble-media" src="${esc(m.media.url)}" loading="lazy" alt="креатив">`) : '';
     return sep + `<div class="bubble ${m.dir}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
-      ${media}${m.text ? esc(m.text) : (media ? '' : '')}
+      ${media}${m.text ? esc(m.text).replace(/\n/g, '<br>') : (media ? '' : '')}
       <div class="bmeta">${m.channel && m.channel !== 'wa' ? `<span class="via-tag" style="background:rgba(255,255,255,.3)">${chName[m.channel] || m.channel}</span>` : ''}${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}</span>` : ''}</div>
     </div>`;
   }).join('');
