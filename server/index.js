@@ -1156,10 +1156,13 @@ function seatAudit(db) {
   const byIp = {};
   active.forEach(x => { if (x.ip) (byIp[x.ip] = byIp[x.ip] || new Set()).add(x.who); });
   for (const [ip, set] of Object.entries(byIp)) if (set.size >= 2) findings.push({ kind: 'ip_multi', severity: 'high', ip, who: [...set].map(brokerName), text: `${set.size} разных аккаунта работают с одного IP прямо сейчас` });
-  /* 2) один аккаунт — несколько IP одновременно (расшаренный доступ) */
+  /* 2) один аккаунт — несколько IP одновременно (расшаренный доступ).
+     Учитываем квоту устройств сотрудника (broker.maxDevices, по умолч. 1): легитимный ПК+MacBook (2 IP)
+     при maxDevices=2 — НЕ флагим. Флаг только при превышении разрешённого числа устройств. */
+  const maxDevFor = (who) => { if (who === 'owner') return Math.max(1, +((db.settings.auth && db.settings.auth.ownerMaxDevices) || 1)); const br = db.brokers.find(b => b.id === who); return Math.max(1, +((br && br.maxDevices) || 1)); };
   const byWho = {};
   active.forEach(x => { if (x.ip) (byWho[x.who] = byWho[x.who] || new Set()).add(x.ip); });
-  for (const [who, set] of Object.entries(byWho)) if (set.size >= 2) findings.push({ kind: 'acct_multi_ip', severity: 'high', who: [brokerName(who)], ips: [...set], text: `Аккаунт «${brokerName(who)}» активен с ${set.size} разных IP одновременно` });
+  for (const [who, set] of Object.entries(byWho)) { const allowed = maxDevFor(who); if (set.size > allowed) findings.push({ kind: 'acct_multi_ip', severity: 'high', who: [brokerName(who)], ips: [...set], text: `Аккаунт «${brokerName(who)}» активен с ${set.size} разных IP одновременно (разрешено устройств: ${allowed})` }); }
   /* 3) история за неделю: одно устройство (fp+ip) под несколькими аккаунтами */
   const log = (db.seatLog || []).filter(e => (now - e.at) < WEEK);
   const byDev = {};
@@ -8059,6 +8062,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (b.capacity != null) br.capacity = +b.capacity;
+      if (b.maxDevices != null) br.maxDevices = Math.max(1, Math.min(5, Math.round(+b.maxDevices) || 1));   /* сколько устройств/IP одновременно разрешено этому сотруднику (ПК+MacBook=2) — аудит мест не флагит в пределах квоты */
       /* дежурство/замещение: «в отсутствии» — новых лидов не даём, владелец сохраняется, клиенты уходят заместителю */
       if (b.away !== undefined) { br.away = !!b.away; audit(db, req, br.away ? 'брокер в отсутствии' : 'брокер вернулся', { broker: br.name }); }
       if (b.substituteId !== undefined) br.substituteId = b.substituteId && db.brokers.some(x => x.id === b.substituteId && x.id !== br.id) ? b.substituteId : null;

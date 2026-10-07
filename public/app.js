@@ -15994,6 +15994,10 @@ PAGES.brokers = async (root) => {
               <div class="pd-fact"><label class="lc-lbl">Лимит лидов</label><input class="gi" data-be="capacity" type="number" value="${b.capacity}"></div>
             </div>
             <div class="pds-grid c2" style="margin-top:10px">
+              <div class="pd-fact"><label class="lc-lbl">Разрешено устройств</label><input class="gi" data-be="maxDevices" type="number" min="1" max="5" value="${b.maxDevices || 1}"></div>
+              <div class="pd-fact" style="align-self:end"><span class="muted" style="font-size:11px;line-height:1.4">2 = работать с ПК и MacBook одновременно без тревоги «расшаренный доступ». 1 = строго одно устройство.</span></div>
+            </div>
+            <div class="pds-grid c2" style="margin-top:10px">
               <div class="pd-fact"><label class="lc-lbl">Код доступа брокера</label>
                 ${b.pinPlain ? `<div class="br-pin" data-brpincode="${esc(b.pinPlain)}"><b>${esc(b.pinPlain)}</b><button type="button" class="btn-ghost br-pincopy" title="Скопировать код">${ic(I.copy)}</button><span class="muted">${b.accessAt ? 'выдан ' + ago(b.accessAt) : 'сохранён'}</span></div>` : (b.pinHash ? '<div class="muted" style="font-size:11.5px;padding-top:6px">PIN задан вручную (скрыт). Нажми «Выдать доступ», чтобы задать новый и сохранить его видимым.</div>' : '<div class="muted" style="font-size:11.5px;padding-top:6px">Доступ не выдан. Нажми «Выдать доступ» ↑</div>')}
                 <input class="gi" data-be="pin" type="password" placeholder="сменить PIN вручную (мин. 6)" style="margin-top:8px"></div>
@@ -16160,6 +16164,7 @@ PAGES.brokers = async (root) => {
         name: eb.querySelector('[data-be="name"]').value,
         geo: eb.querySelector('[data-be="geo"]').value,
         capacity: +eb.querySelector('[data-be="capacity"]').value,
+        maxDevices: +(eb.querySelector('[data-be="maxDevices"]') || {}).value || 1,
         ...(pinVal ? { pin: pinVal } : {}),
         active: eb.querySelector('[data-be="active"]').checked,
         phone: eb.querySelector('[data-be="phone"]').value,
