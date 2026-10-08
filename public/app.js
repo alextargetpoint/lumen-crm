@@ -6023,7 +6023,7 @@ async function openLeadModal(id) {
             <div class="lc-pc-hd">${ic(I.phone)}<b>Касание после звонка готово</b><span class="lc-pc-ap pc-${esc(l.postCall.approach)}">${esc(ap)}</span></div>
             ${l.postCall.reason ? `<div class="lc-pc-why">${ic(I.spark)}${esc(l.postCall.reason)}</div>` : ''}
             <div class="lc-pc-msg">${esc(l.postCall.message)}</div>
-            <div class="lc-pc-btns"><button class="btn btn-accent btn-sm" id="lcPcUse">${ic(I.send)}Вставить в первое касание</button><button class="btn-ghost btn-sm" id="lcPcDismiss">Скрыть</button></div>
+            <div class="lc-pc-btns"><button class="btn btn-accent btn-sm" id="lcPcSend" title="Отправить клиенту в текущий диалог с того же номера (без «первого касания»)">${ic(I.send)}Отправить в диалог</button><button class="btn btn-sm" id="lcPcUse">В первое касание</button><button class="btn-ghost btn-sm" id="lcPcDismiss">Скрыть</button></div>
           </div>`; })() : ''}
           <div class="lc-note-row">
             <input id="lcNote" placeholder="Комментарий по лиду… (Enter — сохранить)">
@@ -6157,6 +6157,18 @@ async function openLeadModal(id) {
     const sec = ta && ta.closest('.coll'); if (sec && !sec.classList.contains('open')) sec.querySelector('.coll-head')?.click();
     ta?.scrollIntoView({ behavior: 'smooth', block: 'center' }); ta?.focus();
     toast('Вставлено в «Первое касание»', 'Проверьте текст и отправьте с прогретого номера брокера', true);
+  });
+  /* ПРЯМАЯ отправка рекомендованного сообщения в ТЕКУЩИЙ диалог (с того же липкого номера) — без «первого касания».
+     Раньше рекомендованное можно было отправить только через «первое касание» → уходило round-robin с разных номеров. */
+  $('#lcPcSend', bd)?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget; if (!l.postCall || !l.postCall.message) return;
+    const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Отправляю…';
+    try {
+      await api.post(`/leads/${id}/message`, { text: l.postCall.message });   /* engine.send → липкий grayPhone диалога */
+      try { await api.patch('/leads/' + id, { postCallSent: true }); } catch (_) {}
+      toast('Отправлено в диалог', 'Сообщение ушло клиенту с номера диалога', true);
+      openLeadModal(id);
+    } catch (err) { btn.disabled = false; btn.innerHTML = old; toast('Не отправилось', err.message); }
   });
   $('#lcPcDismiss', bd)?.addEventListener('click', async () => { $('#lcPostCall', bd)?.remove(); try { await api.patch('/leads/' + id, { postCallSent: true }); } catch (_) {} });
   $('#lcNaSave', bd).addEventListener('click', async () => {
@@ -6429,6 +6441,18 @@ async function openLeadModal(id) {
     let saved = false;
     const save = async () => { if (saved) return; saved = true; const v = inp.value.trim(); try { await api.post(`/leads/${id}/qual`, { key: k, value: v }); openLeadModal(id); } catch (e) { toast('Не сохранилось', e.message); b2.innerHTML = old; } };
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') { saved = true; b2.innerHTML = old; } });
+    inp.addEventListener('blur', save);
+  }));
+  /* редактирование ВИДИМОЙ карточки квалификации (.axr) прямо в панели — клик по строке → инлайн-инпут.
+     «Объект» (type) можно вписать вручную; сохраняется тем же /qual, что и компактная карточка. */
+  $$('.axr[data-qual]', bd).forEach(el => el.addEventListener('click', () => {
+    if (el.querySelector('input')) return;
+    const k = el.dataset.qual; const vEl = el.querySelector('.axr-v'); const old = vEl.innerHTML; const cur = (l.quals[k] || {}).value || '';
+    vEl.innerHTML = `<input class="axr-inp" value="${esc(cur)}" style="width:100%;box-sizing:border-box;font:inherit;border:1px solid var(--accent);border-radius:6px;padding:2px 6px;background:var(--bg-2,#fff);color:inherit">`;
+    const inp = vEl.querySelector('input'); inp.focus(); inp.select();
+    let saved = false;
+    const save = async () => { if (saved) return; saved = true; const v = inp.value.trim(); try { await api.post(`/leads/${id}/qual`, { key: k, value: v }); openLeadModal(id); } catch (e) { toast('Не сохранилось', e.message); vEl.innerHTML = old; } };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') { saved = true; vEl.innerHTML = old; } });
     inp.addEventListener('blur', save);
   }));
   $('#lcCAdd', bd).addEventListener('click', () => {
@@ -6712,7 +6736,7 @@ async function renderChat(id, rebuild) {
     </div>
     <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
     <div class="axr-list">
-      ${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axr ${q ? 'done' : ''}">
+      ${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axr ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить">
         <span class="axr-k">${axName[a]}</span>
         <span class="axr-v">${q ? esc(q.value) : '—'}</span>
         ${q ? `<span class="axr-ok">${ic(I.check)}</span>` : ''}
