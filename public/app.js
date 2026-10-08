@@ -5923,9 +5923,44 @@ function fvBody(l) {
 }
 let LC_AUDIO = null;
 
+/* ── блоки карточки лида: Задачи и Комментарии (видны сразу при открытии, справа) ── */
+function lcTaskRow(t) {
+  const overdue = t.status !== 'done' && t.due && t.due < Date.now();
+  const dueLabel = t.due ? (overdue ? 'Просрочено · ' : '') + new Date(t.due).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : (t.scheduled || '');
+  const br = (STATE.brokers || []).find(b => b.id === t.brokerId);
+  const who = br ? br.name : (t.brokerId ? t.brokerId : 'Вы');
+  return `<div class="lc-task ${t.status === 'done' ? 'done' : ''} ${overdue ? 'overdue' : ''}" data-tid="${t.id}">
+    <button class="lc-task-ck" data-ttog="${t.id}" title="${t.status === 'done' ? 'Вернуть в работу' : 'Завершить'}">${t.status === 'done' ? ic(I.check) : ''}</button>
+    <div class="lc-task-main"><b>${esc(t.title)}</b>${dueLabel ? `<span class="lc-task-due">${ic(I.cal)}${esc(dueLabel)}</span>` : ''}</div>
+    <span class="lc-task-ava" title="${esc(who)}">${esc((who || '?').slice(0, 1).toUpperCase())}</span>
+  </div>`;
+}
+function lcTasksBlock(tasks) {
+  const open = tasks.filter(t => t.status !== 'done'), done = tasks.filter(t => t.status === 'done');
+  return `<div class="lc-blk lc-tasks">
+    <div class="lc-blk-hd"><b>Задачи по лиду</b><span class="lc-cnt">${open.length}</span><button class="btn btn-sm btn-accent lc-blk-add" id="lcTaskAdd">${ic(I.plus)}Задача</button></div>
+    <div class="lc-task-list">${open.map(lcTaskRow).join('') || '<div class="lc-blk-empty">Активных задач нет</div>'}</div>
+    ${done.length ? `<button class="lc-blk-more" id="lcTasksDoneTog" type="button">Выполненные · ${done.length} <i>⌄</i></button><div class="lc-task-done" id="lcTasksDone" style="display:none">${done.map(lcTaskRow).join('')}</div>` : ''}
+  </div>`;
+}
+function lcCommentRow(n) {
+  const who = n.by || 'Команда';
+  const when = new Date(n.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return `<div class="lc-cmt"><span class="lc-cmt-ava">${esc((who || '?').slice(0, 1).toUpperCase())}</span><div class="lc-cmt-b"><div class="lc-cmt-meta"><b>${esc(who)}</b><span>${esc(when)}</span></div><div class="lc-cmt-tx">${esc(n.text)}</div></div></div>`;
+}
+function lcCommentsBlock(l) {
+  const notes = (l.notes || []);
+  return `<div class="lc-blk lc-comments">
+    <div class="lc-blk-hd"><b>Комментарии</b><span class="lc-cnt">${notes.length}</span><span class="lc-blk-lock">${ic(I.shield)}Видны только команде</span></div>
+    <div class="lc-cmt-list">${notes.map(lcCommentRow).join('') || '<div class="lc-blk-empty">Внутренних заметок пока нет</div>'}</div>
+    <div class="lc-cmt-add"><input id="lcNote" placeholder="Добавить внутренний комментарий…"><button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.send)}</button></div>
+  </div>`;
+}
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
+  /* задачи ЭТОГО лида — показываем прямо в карточке (блок справа), без перехода в «Мои задачи» */
+  const leadTasks = await api.get('/tasks').then(d => (d.tasks || []).filter(t => t.leadId === id)).catch(() => []);
   const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
   const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
   const contactKinds = { telegram: 'Telegram', email: 'E-mail', instagram: 'Instagram', whatsapp: 'WhatsApp #2', other: 'Другое' };
@@ -5940,7 +5975,7 @@ async function openLeadModal(id) {
     ...(l.messages || []).map(m => ({ at: m.at, kind: 'msg', m })),
     ...(l.transcripts || []).map(t => ({ at: t.at, kind: 'call', t })),
     ...(l.events || []).map(e => ({ at: e.at, kind: 'ev', e })),
-    ...(l.notes || []).map(n => ({ at: n.at, kind: 'note', n })),
+    /* внутренние комментарии вынесены в отдельный блок справа (не дублируем в переписке) */
     ...(l.meetings || []).map(mt => ({ at: mt.createdAt, kind: 'meet', mt })),
   ].sort((a, b) => b.at - a.at);
 
@@ -6025,9 +6060,7 @@ async function openLeadModal(id) {
             <div class="lc-pc-msg">${esc(l.postCall.message)}</div>
             <div class="lc-pc-btns"><button class="btn btn-accent btn-sm" id="lcPcSend" title="Отправить клиенту в текущий диалог с того же номера (без «первого касания»)">${ic(I.send)}Отправить в диалог</button><button class="btn btn-sm" id="lcPcUse">В первое касание</button><button class="btn-ghost btn-sm" id="lcPcDismiss">Скрыть</button></div>
           </div>`; })() : ''}
-          <div class="lc-note-row">
-            <input id="lcNote" placeholder="Комментарий по лиду… (Enter — сохранить)">
-            <button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.plus)}</button>
+          <div class="lc-note-row lc-callrow">
             <button class="btn btn-sm" id="lcCallBtn" title="Загрузить запись звонка/Zoom — расшифруется сама">${ic(I.mic || I.phone)}Запись</button>
             <button class="btn btn-sm" id="lcDial" title="Позвонить через телефонию — Twilio соединит вас с лидом, запись и транскрипт лягут в карточку">${ic(I.phone)}Позвонить</button>
             <input type="file" id="lcCallFile" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.webm" style="display:none">
@@ -6043,6 +6076,11 @@ async function openLeadModal(id) {
           <div class="lc-timeline" id="lcTimeline">${tlHtml}</div>
         </div>
         <div class="lc-right">
+          ${lcTasksBlock(leadTasks)}
+          ${lcCommentsBlock(l)}
+          <div class="lc-more" id="lcMore">
+            <button class="lc-more-hd" id="lcMoreTog" type="button">${ic(I.layers)}<span class="lc-more-t"><b>Дополнительно</b><i>ИИ-помощник, контакты, файлы, поля и встречи</i></span><svg class="lc-more-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="lc-more-body" id="lcMoreBody" style="display:none">
           <div class="lc-ai ${l.ai.enabled ? 'on' : ''}">
             <div class="lc-ai-head">${ic(I.spark)}<b>ИИ-помощник</b>
               <label class="switch" title="Автопилот"><input type="checkbox" id="lcAi" ${l.ai.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
@@ -6114,6 +6152,8 @@ async function openLeadModal(id) {
           ${coll('Встречи', `<div style="margin-top:6px">${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}
             ${mt.status === 'scheduled' ? `<span class="lc-meet-acts"><button class="btn btn-sm" data-mtst="${mt.id}|done">Прошла</button><button class="btn btn-sm btn-danger" data-mtst="${mt.id}|no_show">Не пришёл</button></span>` : `<span class="badge" style="margin-left:6px">${{ done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[mt.status] || mt.status}</span>`}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}</div>`,
     { open: (l.meetings || []).some(mt => mt.status === 'scheduled'), icon: I.cal, count: (l.meetings || []).length || null })}
+            </div>
+          </div>
         </div>
       </div>`,
     actions: [
@@ -6307,6 +6347,14 @@ async function openLeadModal(id) {
     openLeadModal(id);
   };
   $('#lcNoteAdd', bd).addEventListener('click', addNote);
+  /* F: задачи лида прямо в карточке + сворачиваемое «Дополнительно» */
+  $('#lcTaskAdd', bd)?.addEventListener('click', () => { openQuickTask({ id: l.id, name: l.name, geoName: l.geoName, geo: l.geo, onDone: () => openLeadModal(id) }); });
+  $$('.lc-task-ck[data-ttog]', bd).forEach(b => b.addEventListener('click', async () => {
+    const tid = b.dataset.ttog; const row = b.closest('.lc-task'); const done = row && row.classList.contains('done');
+    try { await api.patch('/tasks/' + tid, { status: done ? 'todo' : 'done' }); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); }
+  }));
+  $('#lcTasksDoneTog', bd)?.addEventListener('click', () => { const d = $('#lcTasksDone', bd); if (d) d.style.display = d.style.display === 'none' ? '' : 'none'; });
+  $('#lcMoreTog', bd)?.addEventListener('click', () => { const mb = $('#lcMoreBody', bd), mo = $('#lcMore', bd); if (mb) { const open = mb.style.display !== 'none'; mb.style.display = open ? 'none' : ''; if (mo) mo.classList.toggle('open', !open); } });
   $('#lcCallBtn', bd).addEventListener('click', () => $('#lcCallFile', bd).click());
   $('#lcDial', bd)?.addEventListener('click', async () => {
     const btn = $('#lcDial', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.phone) + 'Звоню…';
@@ -13910,7 +13958,7 @@ function openQuickTask(lead) {
       </div>`,
     actions: [{ label: 'Поставить задачу', cls: 'btn-accent', onClick: async () => {
       const title = $('#qtTitle', bd).value.trim(); if (!title) { toast('Что сделать?'); return false; }
-      try { await api.post('/tasks', { title, leadId: lead.id, priority: pri, due: dueMs, scheduled: dueMs ? dstrLocal(new Date(dueMs)) : dstrLocal(new Date()) }); toast('Задача поставлена', esc(lead.name || ''), true); } catch (e) { toast('Не вышло', e.message); return false; }
+      try { await api.post('/tasks', { title, leadId: lead.id, priority: pri, due: dueMs, scheduled: dueMs ? dstrLocal(new Date(dueMs)) : dstrLocal(new Date()) }); toast('Задача поставлена', esc(lead.name || ''), true); if (lead.onDone) try { lead.onDone(); } catch (_) {} } catch (e) { toast('Не вышло', e.message); return false; }
     } }, { label: 'Отмена' }],
   });
   $$('#qtPri .tk-pdot', bd).forEach(b => b.addEventListener('click', () => { pri = b.dataset.np; $$('#qtPri .tk-pdot', bd).forEach(x => x.classList.toggle('on', x === b)); }));

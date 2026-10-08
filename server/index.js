@@ -7584,7 +7584,9 @@ const server = http.createServer(async (req, res) => {
         const text = String(b.text || '').trim();
         if (text) {
           lead.notes = lead.notes || [];
-          lead.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: text.slice(0, 2000) });
+          const _R = sessionRole(req);
+          const _by = (_R && _R.role === 'broker') ? (((db.brokers || []).find(x => x.id === _R.brokerId) || {}).name || 'Брокер') : (((db.settings.agency || {}).manager) || 'Владелец');
+          lead.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: text.slice(0, 2000), by: _by });
         }
       }
       if (m[2] === 'contacts') lead.contacts = (b.contacts || []).slice(0, 20).map(c => ({ kind: String(c.kind || 'other').slice(0, 20), value: String(c.value || '').slice(0, 200) })).filter(c => c.value);
