@@ -307,7 +307,9 @@ ${history}
 function clampAxes(db, lead, axes) {
   const inboundText = db.messages
     .filter(m => m.leadId === lead.id && m.dir === 'in')
-    .map(m => m.text.toLowerCase()).join('\n');
+    .map(m => (m.text || '').toLowerCase()).join('\n')
+    + '\n' + ((lead.transcripts || []).map(t => String(t.text || '').toLowerCase()).join('\n'))
+    + '\n' + ((lead.voiceNotes || []).map(v => String(v.transcript || '').toLowerCase()).join('\n'));
   const ok = {};
   for (const [axis, v] of Object.entries(axes || {})) {
     if (!['purpose', 'timeline', 'budget', 'type'].includes(axis)) continue;
@@ -463,7 +465,7 @@ async function extractQuals(db, lead, transcript) {
 Верни строго JSON:
 {
  "purpose": "цель покупки одним словом/фразой: для жизни / инвестиция / аренда / перепродажа / зимовка — или \\"\\"",
- "timeline": "срок выхода на сделку: сейчас / 1-3 мес / 3-6 мес / полгода+ / думает — или \\"\\"",
+ "timeline": "срок выхода на сделку: сейчас / 1-3 мес / 3-6 мес / полгода+ / думает — или \\"\\". ВАЖНО: фразы готовности ('готов брать', 'как только подберём/найдём объект — готов', 'хоть сейчас', 'сразу готов') — это НЕ пусто, а срок 'готов, как подберём'",
  "budget": "бюджет как сказал клиент (с валютой, напр. \\"до 300к $\\" или \\"150-200к €\\") — или \\"\\"",
  "type": "тип объекта: студия / 1-спальня / 2-спальни / вилла / таунхаус / участок / коммерция — или \\"\\"",
  "tags": ["до 3 коротких тега-пометки: напр. \\"срочно\\", \\"ипотека\\", \\"с детьми\\", \\"у моря\\" — только если явно прозвучало"],

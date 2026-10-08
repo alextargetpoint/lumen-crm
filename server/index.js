@@ -3005,6 +3005,49 @@ function assetPathSafe(webPath) {
   return null;
 }
 
+/* ── Матчинг упомянутого ОБЪЕКТА к базе, устойчивый к КИРИЛЛИЦА↔ЛАТИНИЦА (клиент пишет «Бингхатти Амбер»,
+   в базе «Binghatti Amber»). Транслит одним символом + скелет без гласных → ловим даже неточный транслит. */
+const _TR = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'sh',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya' };
+function translitRu(s) { return String(s || '').toLowerCase().replace(/[а-яё]/g, c => (_TR[c] !== undefined ? _TR[c] : c)); }
+function _normName(s) { return ' ' + translitRu(s).replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
+function _skel(s) { return translitRu(s).replace(/[^a-z0-9]+/g, '').replace(/[aeiouy]/g, ''); }
+const _PROP_STOP = new Set(['the', 'dubai', 'phuket', 'bali', 'thailand', 'residence', 'residences', 'tower', 'towers', 'apartments', 'by', 'at', 'property', 'проект', 'жк', 'комплекс']);
+function matchPropertyMention(db, text) {
+  const hayNorm = _normName(text); const haySkel = _skel(text);
+  if (hayNorm.length < 6) return null;
+  let best = null;
+  for (const pr of (db.properties || [])) {
+    const toks = _normName(pr.name).trim().split(/\s+/).filter(w => w.length >= 4 && !_PROP_STOP.has(w));
+    if (!toks.length) continue;
+    const full = _normName(pr.name).trim();
+    const hitFull = full.length >= 5 && hayNorm.includes(' ' + full + ' ');
+    const hitTok = toks.every(w => hayNorm.includes(' ' + w + ' ') || (_skel(w).length >= 2 && haySkel.includes(_skel(w))) || hayNorm.includes(' ' + w.replace(/e$/, '') + ' '));
+    if (hitFull || hitTok) { const sc = toks.join('').length + (hitFull ? 100 : 0); if (!best || sc > best.sc) best = { pr, sc }; }
+  }
+  return best ? best.pr : null;
+}
+/* Единый разбор извлечённых квалов в карточку (звонок/встреча/нотетейкер). Заполняет ТОЛЬКО пустые/не-ручные
+   поля. Объект (type) дополнительно матчим по названию из базы (кириллица↔латиница) — конкретный объект важнее
+   generic-категории. Возвращает число заполненных полей. */
+function applyExtractedQuals(db, lead, ex, text, src) {
+  lead.quals = lead.quals || {};
+  let filled = 0;
+  for (const k of ['purpose', 'timeline', 'type']) { const cur = lead.quals[k]; if (ex && ex[k] && !(cur && cur.value)) { lead.quals[k] = { value: ex[k], by: 'ai', src, at: Date.now() }; filled++; } }
+  if (ex && ex.budget && !(lead.quals.budget && lead.quals.budget.value)) { lead.quals.budget = { value: ex.budget, by: 'ai', src, at: Date.now() }; if (ex.budgetNum) lead.quals.budget.num = ex.budgetNum; filled++; }
+  try {
+    const pr = matchPropertyMention(db, text);
+    const cur = lead.quals.type;
+    if (pr && !(cur && cur.by === 'human') && !(cur && cur.propertyId === pr.id)) {
+      lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src, at: Date.now() };
+      if (!(cur && cur.value)) filled++;
+    }
+  } catch (_) {}
+  if (ex && ex.tags && ex.tags.length) { lead.tags = lead.tags || []; for (const t of ex.tags) if (!lead.tags.includes(t)) lead.tags.push(t); }
+  if (ex && ex.nextAction && !(lead.nextAction && lead.nextAction.text)) lead.nextAction = { text: ex.nextAction, at: null, by: 'ai' };
+  lead.qualAt = Date.now();
+  return filled;
+}
+
 /* --- запись звонка → скачать → Whisper → транскрипт в карточку лида (общая для всех провайдеров) --- */
 function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
   (async () => {
@@ -3026,6 +3069,14 @@ function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
       store.save();
       /* 3) АВТО-АНАЛИЗ: ИИ-сводка сразу по свежему транскрипту (раньше приходилось жать вручную) */
       if (text && llm.available()) { try { const sum = await llm.summarize(db, lead); if (sum) { lead.summary = sum; lead.summaryAt = Date.now(); ai.pushEvent(db, { type: 'call', leadId: lead.id, text: 'ИИ обновил сводку по лиду после звонка' }); store.save(); } } catch (e) { console.error('[call-summary]', e.message); } }
+      /* 3b) КВАЛИФИКАЦИЯ ИЗ ТЕЛЕФОНИИ: раньше звонок давал только сводку — теперь раскладываем транскрипт по
+         полям (цель/срок/бюджет/объект), как у встреч. Бюджет/сроки, озвученные голосом, попадают в карточку. */
+      if (text && text.length > 30 && llm.available()) {
+        try {
+          const ex = await llm.extractQuals(db, lead, text);
+          if (ex) { const n = applyExtractedQuals(db, lead, ex, text, 'call'); if (n) { ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `ИИ разложил звонок по полям карточки (${['purpose', 'timeline', 'budget', 'type'].filter(k => lead.quals[k] && lead.quals[k].value).length}/4 квала)` }); store.save(); } }
+        } catch (e) { console.error('[call-quals]', e.message); }
+      }
       /* 4) ПОСТ-ЗВОНКОВАЯ РАЗВИЛКА: транскрипт + психо-паттерны → готовое первое касание в WhatsApp
          (дозвон = есть транскрипт). Кладём ЧЕРНОВИК в lead.postCall — брокер отправит его серым способом
          со своего прогретого номера (кнопка в карточке), а не автослёт. Недозвон (нет записи) сюда не
@@ -3641,19 +3692,8 @@ async function applyMeetingTranscript(db, mt, text, srcLabel, audioUrl) {
     try {
       const ex = await llm.extractQuals(db, lead, text);
       if (ex) {
-        lead.quals = lead.quals || {};
-        for (const k of ['purpose', 'timeline', 'type']) {
-          const cur = lead.quals[k];
-          if (ex[k] && !(cur && cur.value)) lead.quals[k] = { value: ex[k], by: 'ai', src: 'meeting', at: Date.now() };
-        }
-        if (ex.budget && !(lead.quals.budget && lead.quals.budget.value)) {
-          lead.quals.budget = { value: ex.budget, by: 'ai', src: 'meeting', at: Date.now() };
-          if (ex.budgetNum) lead.quals.budget.num = ex.budgetNum;
-        }
-        if (ex.tags.length) { lead.tags = lead.tags || []; for (const t of ex.tags) if (!lead.tags.includes(t)) lead.tags.push(t); }
-        if (ex.nextAction && !(lead.nextAction && lead.nextAction.text)) lead.nextAction = { text: ex.nextAction, at: null, by: 'ai' };
-        lead.qualAt = Date.now();
-        ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `ИИ разложил встречу по полям карточки (${['purpose', 'timeline', 'budget', 'type'].filter(k => ex[k]).length} квала заполнено)` });
+        applyExtractedQuals(db, lead, ex, text, 'meeting');   /* общий разбор + матчинг объекта кириллица↔латиница */
+        ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `ИИ разложил встречу по полям карточки (${['purpose', 'timeline', 'budget', 'type'].filter(k => lead.quals[k] && lead.quals[k].value).length}/4 квала)` });
         store.save();
       }
     } catch (_) {}
@@ -10265,6 +10305,14 @@ const server = http.createServer(async (req, res) => {
           } catch (e) { console.error('[wa media ingest]', e && e.message); }
         }
         try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media } : {}); } catch (e) { console.error('[inbound wa]', e && e.message); try { ai.pushEvent(tdb, { type: 'note', leadId: lead.id, text: `⚠️ Сбой обработки входящего (${lead.name}): ${e.message}` }); } catch (_) {} }
+        /* ОБЪЕКТ в сообщении (в т.ч. кириллицей) → матчим к базе (латиница) и закрываем ось «Объект» */
+        try {
+          const pr = matchPropertyMention(tdb, _inText);
+          const cur = lead.quals && lead.quals.type;
+          if (pr && !(cur && cur.by === 'human') && !(cur && cur.propertyId === pr.id)) {
+            lead.quals = lead.quals || {}; lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src: 'chat', at: Date.now() }; lead.qualAt = Date.now();
+          }
+        } catch (_) {}
         store.save();
       });
       if (!okAuth) return json(res, 401, { error: 'unauthorized' });
