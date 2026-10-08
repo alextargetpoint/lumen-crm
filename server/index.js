@@ -3026,20 +3026,59 @@ function matchPropertyMention(db, text) {
   }
   return best ? best.pr : null;
 }
-/* Единый разбор извлечённых квалов в карточку (звонок/встреча/нотетейкер). Заполняет ТОЛЬКО пустые/не-ручные
-   поля. Объект (type) дополнительно матчим по названию из базы (кириллица↔латиница) — конкретный объект важнее
-   generic-категории. Возвращает число заполненных полей. */
+/* УМНОЕ слияние значения квала из разных источников (чат/звонок/встреча), БЕЗ затирания:
+   - ручное (by:'human') — не трогаем вообще;
+   - одно значение содержит другое → берём более конкретное, фиксируем оба источника;
+   - значения РАЗНЫЕ → двойное значение «A · B» (вилка), оба видны, брокер поправит вручную;
+   - sources[] хранит, откуда пришло каждое (чат/звонок/встреча) — для прозрачности в карточке. */
+function mergeQualVal(cur, newVal, src, opts) {
+  opts = opts || {};
+  const nv = String(newVal == null ? '' : newVal).trim();
+  if (!nv) return { q: cur, changed: false };
+  if (!cur || !cur.value) { const q = Object.assign({ value: nv, by: 'ai', src, at: Date.now(), sources: [{ v: nv, src, at: Date.now() }] }, opts.extra || {}); return { q, changed: true }; }
+  if (cur.by === 'human') return { q: cur, changed: false };   /* ручное не трогаем */
+  const cv = String(cur.value).trim(), lc = cv.toLowerCase(), ln = nv.toLowerCase();
+  const sources = (cur.sources && cur.sources.length) ? cur.sources.slice() : [{ v: cv, src: cur.src, at: cur.at }];
+  if (!sources.some(s => String(s.v).toLowerCase() === ln && s.src === src)) sources.push({ v: nv, src, at: Date.now() });
+  if (lc === ln || lc.includes(ln) || ln.includes(lc)) {
+    const value = cv.length >= nv.length ? cv : nv;   /* одно внутри другого → более конкретное */
+    return { q: Object.assign({}, cur, opts.extra || {}, { value, by: 'ai', at: Date.now(), sources }), changed: value !== cv };
+  }
+  const parts = cv.split(/\s*·\s*/).map(s => s.toLowerCase());
+  const value = parts.includes(ln) ? cv : (cv + ' · ' + nv);   /* РАЗНОЕ → двойное значение/вилка */
+  return { q: Object.assign({}, cur, opts.extra || {}, { value, by: 'ai', merged: true, at: Date.now(), sources }), changed: true };
+}
+
+/* Единый разбор извлечённых квалов в карточку (звонок/встреча/нотетейкер). УМНО сливает с уже имеющимися
+   (чат+телефон не затирают друг друга — вилка/двойное значение), ручное не трогает. Объект (type) матчим
+   по названию из базы (кириллица↔латиница). Возвращает число заполненных полей. */
 function applyExtractedQuals(db, lead, ex, text, src) {
   lead.quals = lead.quals || {};
   let filled = 0;
-  for (const k of ['purpose', 'timeline', 'type']) { const cur = lead.quals[k]; if (ex && ex[k] && !(cur && cur.value)) { lead.quals[k] = { value: ex[k], by: 'ai', src, at: Date.now() }; filled++; } }
-  if (ex && ex.budget && !(lead.quals.budget && lead.quals.budget.value)) { lead.quals.budget = { value: ex.budget, by: 'ai', src, at: Date.now() }; if (ex.budgetNum) lead.quals.budget.num = ex.budgetNum; filled++; }
+  for (const k of ['purpose', 'timeline', 'type']) {
+    if (!(ex && ex[k])) continue;
+    const before = lead.quals[k] && lead.quals[k].value;
+    const { q, changed } = mergeQualVal(lead.quals[k], ex[k], src);
+    if (changed) { lead.quals[k] = q; if (!before) filled++; }
+  }
+  if (ex && ex.budget) {
+    const before = lead.quals.budget && lead.quals.budget.value;
+    const old = lead.quals.budget && lead.quals.budget.num;
+    const extra = {};
+    if (ex.budgetNum) { extra.num = ex.budgetNum; if (old && old !== ex.budgetNum) { extra.numLo = Math.min(old, ex.budgetNum); extra.numHi = Math.max(old, ex.budgetNum); } }
+    const { q, changed } = mergeQualVal(lead.quals.budget, ex.budget, src, { extra });
+    if (changed) { lead.quals.budget = q; if (!before) filled++; }
+  }
   try {
     const pr = matchPropertyMention(db, text);
     const cur = lead.quals.type;
-    if (pr && !(cur && cur.by === 'human') && !(cur && cur.propertyId === pr.id)) {
-      lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src, at: Date.now() };
-      if (!(cur && cur.value)) filled++;
+    if (pr && !(cur && cur.by === 'human')) {
+      if (!cur || !cur.value) { lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src, at: Date.now(), sources: [{ v: pr.name, src, at: Date.now() }] }; filled++; }
+      else if (cur.propertyId !== pr.id && !String(cur.value).toLowerCase().includes(pr.name.toLowerCase())) {
+        const { q } = mergeQualVal(cur, pr.name, src);   /* другой объект из базы → двойное значение (смотрит два) */
+        q.propertyIds = (cur.propertyIds || (cur.propertyId ? [cur.propertyId] : [])).concat(pr.id); delete q.propertyId;
+        lead.quals.type = q;
+      }
     }
   } catch (_) {}
   if (ex && ex.tags && ex.tags.length) { lead.tags = lead.tags || []; for (const t of ex.tags) if (!lead.tags.includes(t)) lead.tags.push(t); }
@@ -7675,7 +7714,8 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req); const k = String(b.key || '');
       if (!['purpose', 'timeline', 'budget', 'type'].includes(k)) return json(res, 400, { error: 'неизвестная ось' });
       lead.quals = lead.quals || {}; const v = String(b.value || '').trim();
-      if (v) { lead.quals[k] = Object.assign({}, lead.quals[k] || {}, { value: v.slice(0, 200) }); if (k === 'budget') { const num = parseInt(v.replace(/[^\d]/g, ''), 10); if (num) lead.quals[k].num = num; } }
+      /* ручная правка брокера → by:'human' + at: ИИ её больше НЕ перезаписывает и не мёржит (см. mergeQualVal) */
+      if (v) { lead.quals[k] = Object.assign({}, lead.quals[k] || {}, { value: v.slice(0, 200), by: 'human', at: Date.now() }); if (k === 'budget') { const num = parseInt(v.replace(/[^\d]/g, ''), 10); if (num) lead.quals[k].num = num; } }
       else lead.quals[k] = null;
       store.save();
       return json(res, 200, { ok: true });
@@ -10307,12 +10347,17 @@ const server = http.createServer(async (req, res) => {
           } catch (e) { console.error('[wa media ingest]', e && e.message); }
         }
         try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media } : {}); } catch (e) { console.error('[inbound wa]', e && e.message); try { ai.pushEvent(tdb, { type: 'note', leadId: lead.id, text: `⚠️ Сбой обработки входящего (${lead.name}): ${e.message}` }); } catch (_) {} }
-        /* ОБЪЕКТ в сообщении (в т.ч. кириллицей) → матчим к базе (латиница) и закрываем ось «Объект» */
+        /* ОБЪЕКТ в сообщении (в т.ч. кириллицей) → матчим к базе (латиница), закрываем ось «Объект».
+           Умное слияние: другой объект не затирает прежний, а даёт двойное значение (клиент смотрит два). */
         try {
           const pr = matchPropertyMention(tdb, _inText);
-          const cur = lead.quals && lead.quals.type;
-          if (pr && !(cur && cur.by === 'human') && !(cur && cur.propertyId === pr.id)) {
-            lead.quals = lead.quals || {}; lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src: 'chat', at: Date.now() }; lead.qualAt = Date.now();
+          lead.quals = lead.quals || {};
+          const cur = lead.quals.type;
+          if (pr && !(cur && cur.by === 'human')) {
+            if (!cur || !cur.value) { lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src: 'chat', at: Date.now(), sources: [{ v: pr.name, src: 'chat', at: Date.now() }] }; lead.qualAt = Date.now(); }
+            else if (cur.propertyId !== pr.id && !String(cur.value).toLowerCase().includes(pr.name.toLowerCase())) {
+              const { q } = mergeQualVal(cur, pr.name, 'chat'); q.propertyIds = (cur.propertyIds || (cur.propertyId ? [cur.propertyId] : [])).concat(pr.id); delete q.propertyId; lead.quals.type = q; lead.qualAt = Date.now();
+            }
           }
         } catch (_) {}
         store.save();
