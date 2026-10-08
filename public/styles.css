@@ -8844,3 +8844,12 @@ body.client-view [data-team]{ display:none !important; }
 .fu-tx{font-size:13px;line-height:1.5;color:var(--ink-2,#444);flex:1}
 .fu-btns{display:flex;gap:8px}
 @media(max-width:640px){.fu-grid{grid-template-columns:1fr}}
+
+/* ── Запись голосового в браузере (L) ── */
+.composer-mic{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center}
+.composer-mic svg{width:18px;height:18px}
+.composer-mic.rec{background:#fdeaea;color:#c62828;border-color:#f3c2c2}
+.vrec-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;margin:0 0 8px;background:var(--bg-2);border:1px solid var(--stroke);border-radius:12px}
+.vrec-prev{height:34px;max-width:230px;flex:1 1 180px}
+.vrec-opt{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);white-space:nowrap}
+.vrec-opt input{margin:0}

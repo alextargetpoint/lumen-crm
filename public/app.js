@@ -6649,6 +6649,44 @@ function wireVoicePlayers(scope) {
     setIcon(false);
   });
 }
+/* L: запись голосового прямо в браузере → обработка на сервере (ускорение+чистка) → отправка клиенту как голосовое */
+function wireVoiceRecord(id) {
+  const btn = $('#voiceRecBtn'); if (!btn || btn._wired) return; btn._wired = true;
+  let mediaRec = null, chunks = [], stream = null, startT = 0, timerIv = null;
+  const composer = btn.closest('.composer');
+  const STOP = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+  const resetBtn = () => { btn.classList.remove('rec'); btn.innerHTML = ic(I.mic); btn.title = 'Записать голосовое'; };
+  const stopStream = () => { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } if (timerIv) { clearInterval(timerIv); timerIv = null; } };
+  btn.addEventListener('click', async () => {
+    if (mediaRec && mediaRec.state === 'recording') { mediaRec.stop(); return; }
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { toast('Нет доступа к микрофону', e.message); return; }
+    chunks = [];
+    const mime = (window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) ? 'audio/webm;codecs=opus' : 'audio/webm';
+    try { mediaRec = new MediaRecorder(stream, { mimeType: mime }); } catch (e) { mediaRec = new MediaRecorder(stream); }
+    mediaRec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    mediaRec.onstop = () => { stopStream(); resetBtn(); const blob = new Blob(chunks, { type: mime }); showPreview(blob); };
+    mediaRec.start(); startT = Date.now();
+    btn.classList.add('rec'); btn.innerHTML = STOP + '<span id="recT" style="font-size:11px;margin-left:4px">0:00</span>'; btn.title = 'Остановить запись';
+    timerIv = setInterval(() => { const s = Math.floor((Date.now() - startT) / 1000); const t = $('#recT'); if (t) t.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }, 300);
+  });
+  function showPreview(blob) {
+    if (!blob || !blob.size) return;
+    const url = URL.createObjectURL(blob);
+    const bar = el(`<div class="vrec-bar"><audio class="vrec-prev" src="${url}" controls preload="metadata"></audio><label class="vrec-opt"><input type="checkbox" id="vrecProc" checked> ускорить + почистить</label><button class="btn btn-sm btn-accent" id="vrecSend">${ic(I.send)}Отправить голосовое</button><button class="btn btn-sm" id="vrecCancel" title="Удалить">${ic(I.x)}</button></div>`);
+    composer.parentNode.insertBefore(bar, composer);
+    $('#vrecCancel', bar).addEventListener('click', () => { URL.revokeObjectURL(url); bar.remove(); });
+    $('#vrecSend', bar).addEventListener('click', async () => {
+      const proc = $('#vrecProc', bar).checked; const sb = $('#vrecSend', bar); sb.disabled = true; sb.innerHTML = ic(I.spark) + 'Отправляю…';
+      try {
+        const ch = (typeof COMPOSER_CH !== 'undefined' && COMPOSER_CH[id]) ? '&channel=' + COMPOSER_CH[id] : '';
+        const r = await fetch(`/api/leads/${id}/send-voice?clean=${proc ? 1 : 0}&speed=${proc ? '1.15' : '1'}&filename=voice.webm${ch}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
+        const j = await r.json();
+        if (j.ok) { toast('Голосовое отправлено', null, true); URL.revokeObjectURL(url); bar.remove(); renderChat(id, false); }
+        else { toast('Не отправилось', j.error || 'ошибка'); sb.disabled = false; sb.innerHTML = ic(I.send) + 'Отправить голосовое'; }
+      } catch (e) { toast('Не вышло', e.message); sb.disabled = false; sb.innerHTML = ic(I.send) + 'Отправить голосовое'; }
+    });
+  }
+}
 async function renderChat(id, rebuild) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
@@ -6724,6 +6762,7 @@ async function renderChat(id, rebuild) {
     })()}
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
+      <button class="btn composer-mic" id="voiceRecBtn" title="Записать голосовое">${ic(I.mic)}</button>
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
     </div>`;
   $('#composerText').value = draft;
@@ -6882,6 +6921,7 @@ async function renderChat(id, rebuild) {
     inp.addEventListener('blur', save);
   }));
   wireVoicePlayers(panel);   /* G: кастомные голосовые плееры со скоростью (1/1.5/2×) */
+  wireVoiceRecord(id);       /* L: запись голосового в браузере → обработка → отправка */
   const hb = $('#handoverBtn');
   if (hb) hb.addEventListener('click', () => openHandoverPreview(id));
   $('#meetBtn').addEventListener('click', () => openMeetingModal(l, () => renderChat(id, true)));

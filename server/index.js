@@ -45,6 +45,29 @@ async function compressVideoToMp4(inPath, outPath, targetMB = 24) {
   return outPath;
 }
 
+/* ── Обработка ГОЛОСОВОГО (L): ускорение С СОХРАНЕНИЕМ ТОНАЛЬНОСТИ (atempo, не «гном») + чистка длинных
+   пауз/«э-э» (silenceremove) + лёгкая чистка шума (afftdn/highpass) → opus/ogg для WhatsApp. Голос остаётся
+   своим, не студийным. speed≈1.15 по умолчанию. Если ffmpeg недоступен — вернём исходник без обработки. ── */
+async function processVoiceNote(inBuf, opts) {
+  opts = opts || {};
+  const speed = Math.max(1, Math.min(2, parseFloat(opts.speed) || 1.15));
+  const clean = opts.clean !== false;
+  const tmp = os.tmpdir();
+  const inP = path.join(tmp, 'vin_' + crypto.randomBytes(5).toString('hex'));
+  const outP = path.join(tmp, 'vout_' + crypto.randomBytes(5).toString('hex') + '.ogg');
+  fs.writeFileSync(inP, inBuf);
+  const filters = [];
+  if (clean) filters.push('highpass=f=80', 'afftdn=nr=12', 'silenceremove=start_periods=1:start_duration=0.1:start_threshold=-38dB:stop_periods=-1:stop_duration=0.5:stop_threshold=-38dB');
+  if (speed && speed !== 1) filters.push('atempo=' + speed.toFixed(2));   /* atempo — тайм-стретч БЕЗ изменения высоты голоса */
+  const args = ['-y', '-i', inP];
+  if (filters.length) args.push('-af', filters.join(','));
+  args.push('-c:a', 'libopus', '-b:a', '32k', '-ar', '48000', '-application', 'voip', outP);
+  await new Promise((resolve, reject) => { const p = spawn('ffmpeg', args); let err = ''; p.stderr.on('data', d => { err += d; if (err.length > 4000) err = err.slice(-4000); }); p.on('error', reject); p.on('close', c => c === 0 ? resolve() : reject(new Error('ffmpeg ' + c + ': ' + err.slice(-200)))); });
+  const out = fs.readFileSync(outP);
+  try { fs.unlinkSync(inP); fs.unlinkSync(outP); } catch (_) {}
+  return out;
+}
+
 /* ── УМНЫЙ ТРАНСКРИБАТОР креативов: видео → аудио (ffmpeg) → Gemini транскрипт → контекст для персонализации ── */
 function extractAudioMp3(inPath, outPath, maxSec = 300) {
   return new Promise((resolve, reject) => {
@@ -7977,6 +8000,29 @@ const server = http.createServer(async (req, res) => {
         }
         return json(res, 200, { text });
       } catch (e) { return json(res, 500, { error: 'не распозналось: ' + e.message }); }
+    }
+    /* ЗАПИСЬ ГОЛОСОВОГО В БРАУЗЕРЕ (L): принимаем запись → обрабатываем (ускорение с сохранением тональности +
+       чистка пауз/шума) → сохраняем на том → отправляем клиенту как голосовое + кладём в voiceNotes карточки. */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/send-voice$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      const chunks = []; let size = 0, over = false;
+      await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 16e6) { over = true; req.destroy(); resolve(); } else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
+      if (over) return json(res, 400, { error: 'запись слишком длинная (>16МБ)' });
+      if (!size) return json(res, 400, { error: 'пустая запись' });
+      const inBuf = Buffer.concat(chunks);
+      const clean = u.searchParams.get('clean') !== '0';         /* чистка пауз/шума (по умолчанию да) */
+      const speed = u.searchParams.get('speed') || '1.15';        /* ускорение с сохранением тональности */
+      let outBuf = inBuf, ext = 'ogg';
+      try { if (await ffmpegAvailable()) outBuf = await processVoiceNote(inBuf, { speed, clean }); else ext = ((u.searchParams.get('filename') || 'voice.webm').split('.').pop() || 'webm').slice(0, 5); }
+      catch (e) { console.error('[voice process]', e && e.message); outBuf = inBuf; ext = ((u.searchParams.get('filename') || 'voice.webm').split('.').pop() || 'webm').slice(0, 5); }
+      const fn = String(lead.id).replace(/[^\w]/g, '') + '_' + Date.now() + '.' + ext;
+      const url = saveMedia('wa-gray', fn, outBuf);
+      let transcript = ''; try { transcript = String(await llm.transcribe(outBuf, 'voice.' + ext, { groqKey: platformGroqKey() }) || '').trim(); } catch (_) {}
+      lead.voiceNotes = lead.voiceNotes || [];
+      lead.voiceNotes.unshift({ id: crypto.randomBytes(4).toString('hex'), url, dur: 0, transcript: transcript.slice(0, 4000), who: 'Менеджер', at: Date.now() });
+      const _ch = ['wa', 'tg', 'viber', 'email'].includes(u.searchParams.get('channel')) ? u.searchParams.get('channel') : undefined;
+      try { const msg = engine.send(db, lead, '', 'human', { media: { type: 'voice', url, name: 'voice.' + ext }, channel: _ch }); store.save(); return json(res, 200, { ok: true, url, transcript, messageId: msg && msg.id }); }
+      catch (e) { store.save(); return json(res, 200, { ok: false, url, transcript, error: 'отправка не прошла: ' + e.message }); }
     }
     /* Причесать заметку: сырой/надиктованный текст → аккуратная структура (заголовок, буллеты, чек-боксы) */
     if (p === '/api/tidy-note' && req.method === 'POST') {
