@@ -6659,14 +6659,22 @@ function wireVoiceRecord(id) {
   const resetBtn = () => { btn.classList.remove('rec'); btn.innerHTML = ic(I.mic); btn.title = 'Записать голосовое'; };
   const stopStream = () => { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } if (timerIv) { clearInterval(timerIv); timerIv = null; } };
   btn.addEventListener('click', async () => {
-    if (mediaRec && mediaRec.state === 'recording') { mediaRec.stop(); return; }
+    if (mediaRec && mediaRec.state === 'recording') { try { mediaRec.requestData(); } catch (_) {} mediaRec.stop(); return; }
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { toast('Нет доступа к микрофону', e.message); return; }
     chunks = [];
-    const mime = (window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) ? 'audio/webm;codecs=opus' : 'audio/webm';
-    try { mediaRec = new MediaRecorder(stream, { mimeType: mime }); } catch (e) { mediaRec = new MediaRecorder(stream); }
+    /* выбираем поддерживаемый контейнер: Arc/Chromium — webm/opus; на всякий случай фолбэки (ogg/mp4) */
+    let mime = 'audio/webm;codecs=opus';
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
+      const cand = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+      mime = cand.find(m => MediaRecorder.isTypeSupported(m)) || '';
+    }
+    try { mediaRec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); } catch (e) { try { mediaRec = new MediaRecorder(stream); } catch (e2) { stopStream(); toast('Запись не поддерживается в этом браузере', e2.message); return; } }
+    const realMime = (mediaRec.mimeType || mime || 'audio/webm');
     mediaRec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-    mediaRec.onstop = () => { stopStream(); resetBtn(); const blob = new Blob(chunks, { type: mime }); showPreview(blob); };
-    mediaRec.start(); startT = Date.now();
+    mediaRec.onerror = (ev) => { window.VOICE_RECORDING = false; stopStream(); resetBtn(); toast('Сбой записи', (ev && ev.error && ev.error.name) || 'ошибка микрофона'); };
+    mediaRec.onstop = () => { window.VOICE_RECORDING = false; stopStream(); resetBtn(); const blob = new Blob(chunks, { type: realMime }); if (!blob.size) { toast('Запись пустая', 'Похоже, микрофон не дал звук — попробуйте ещё раз'); return; } showPreview(blob, realMime); };
+    window.VOICE_RECORDING = true;
+    mediaRec.start(200); startT = Date.now();   /* ⚠️ таймслайс 200мс: чанки копятся по ходу (в Arc/Chromium без него при раннем teardown blob пустой) */
     btn.classList.add('rec'); btn.innerHTML = STOP + '<span id="recT" style="font-size:11px;margin-left:4px">0:00</span>'; btn.title = 'Остановить запись';
     timerIv = setInterval(() => { const s = Math.floor((Date.now() - startT) / 1000); const t = $('#recT'); if (t) t.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }, 300);
   });
@@ -18293,6 +18301,7 @@ setInterval(async () => {
     if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания
     if ($('.modal-bd')) return; // и под открытой модалкой тоже
     if (CUR_POP || document.querySelector('.hint-pop, #ctxPop, .cs.open, .dtp.open')) return; // открыт пикер/дропдаун/подсказка/контекст-меню — DOM под ними не дёргаем
+    if (window.VOICE_RECORDING || document.querySelector('.vrec-bar')) return; // идёт запись голосового / открыто превью записи — НЕ пересобираем композер (иначе запись рвётся, а в Arc чанки пустые)
     const ae = document.activeElement;
     /* ⚠️ ИСКЛЮЧЕНИЕ для композера чата: раньше фокус на поле ответа глушил ВЕСЬ поллинг → новые
        входящие в открытом диалоге не появлялись, пока менеджер печатал. renderChat восстановит фокус+курсор. */

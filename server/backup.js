@@ -248,4 +248,4 @@ function start(store) {
   setInterval(() => syncMedia(), CFG.dailyHours * 3600e3);
 }
 
-module.exports = { start, snapshotOnce, syncMedia, runAndVerify, decrypt, enabled, CFG };
+module.exports = { start, snapshotOnce, syncMedia, runAndVerify, decrypt, enabled, CFG, b2Upload, b2Download };

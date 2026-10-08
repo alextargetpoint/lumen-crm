@@ -138,7 +138,16 @@ const CREATIVES_DIR = path.join(DATA_DIR, 'creatives');
 /* ПЕРСИСТЕНТНЫЕ медиа объектов (фото/рендеры/планировки из импорта-обогащения): на volume, переживают деплой.
    Раздаются через /media/* (см. роут ниже). Иначе фото карточек 404 после редеплоя Railway. */
 const MEDIA_DIR = path.join(DATA_DIR, 'media');
-function saveMedia(sub, filename, buf) { const dir = path.join(MEDIA_DIR, sub); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, filename), buf); return '/media/' + sub + '/' + filename; }
+function saveMedia(sub, filename, buf) {
+  const dir = path.join(MEDIA_DIR, sub); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, filename), buf);
+  const rel = sub + '/' + filename;
+  /* ⚠️ МУЛЬТИ-РЕПЛИКА: CRM на Railway может крутиться в НЕСКОЛЬКИХ репликах. Файл, записанный одной
+     репликой, на диске другой отсутствует → голос/фото 404 у части запросов (видели вживую: тот же URL
+     то 404, то 200). Дублируем медиа в B2 (общее хранилище, переживает и гибель тома) и отдаём из него
+     фолбэком в роуте /media при локальном промахе. best-effort, отправку не блокируем. */
+  try { if (b2backup.enabled && b2backup.enabled() && b2backup.b2Upload) b2backup.b2Upload('media/' + rel, buf).catch(() => {}); } catch (_) {}
+  return '/media/' + rel;
+}
 /* ── ПЕРСИСТЕНТНОЕ хранилище ЗАГРУЗОК /assets (логотипы, аватары, мудборды, файлы лида, карусели, кейсы) ──
    Исторически эти загрузки писались в public/assets. Но public/ на Railway ЭФЕМЕРНА: при каждом деплое
    контейнер пересобирается из git и всё незакоммиченное СТИРАЕТСЯ — так пропал логотип Trust Phuket.
@@ -3036,16 +3045,31 @@ function _normName(s) { return ' ' + translitRu(s).replace(/[^a-z0-9]+/g, ' ').t
 function _skel(s) { return translitRu(s).replace(/[^a-z0-9]+/g, '').replace(/[aeiouy]/g, ''); }
 const _PROP_STOP = new Set(['the', 'dubai', 'phuket', 'bali', 'thailand', 'residence', 'residences', 'tower', 'towers', 'apartments', 'by', 'at', 'property', 'проект', 'жк', 'комплекс']);
 function matchPropertyMention(db, text) {
-  const hayNorm = _normName(text); const haySkel = _skel(text);
+  const hayNorm = _normName(text);
   if (hayNorm.length < 6) return null;
+  /* ⚠️ ТОЧНОСТЬ: скелеты (без гласных) сверяем с ЦЕЛЫМИ словами текста (равенство), НЕ подстрокой —
+     иначе «vista»→«vst» ложно матчился внутри «известно»→«zvstn». Набор скелетов слов текста: */
+  const haySkelWords = new Set(hayNorm.trim().split(/\s+/).map(_skel).filter(s => s.length >= 3));
+  /* слово токена «попало» в текст: целым словом, ИЛИ без конечной -e (vista/vist, olive/oliv), ИЛИ
+     его скелет РАВЕН скелету какого-то целого слова текста (кириллица→латиница: тайтл→ttl=title). */
+  const tokHit = (w) => hayNorm.includes(' ' + w + ' ')
+    || (w.length >= 5 && hayNorm.includes(' ' + w.replace(/e$/, '') + ' '))
+    || (_skel(w).length >= 3 && haySkelWords.has(_skel(w)));
   let best = null;
   for (const pr of (db.properties || [])) {
-    const toks = _normName(pr.name).trim().split(/\s+/).filter(w => w.length >= 4 && !_PROP_STOP.has(w));
-    if (!toks.length) continue;
     const full = _normName(pr.name).trim();
-    const hitFull = full.length >= 5 && hayNorm.includes(' ' + full + ' ');
-    const hitTok = toks.every(w => hayNorm.includes(' ' + w + ' ') || (_skel(w).length >= 2 && haySkel.includes(_skel(w))) || hayNorm.includes(' ' + w.replace(/e$/, '') + ' '));
-    if (hitFull || hitTok) { const sc = toks.join('').length + (hitFull ? 100 : 0); if (!best || sc > best.sc) best = { pr, sc }; }
+    if (!full) continue;
+    const strong = full.split(/\s+/).filter(w => w.length >= 4 && !_PROP_STOP.has(w));
+    if (!strong.length) continue;
+    const hitFull = full.length >= 6 && hayNorm.includes(' ' + full + ' ');
+    const hits = strong.filter(tokHit);
+    /* полное имя целиком → надёжно; многословное имя → минимум ДВА значимых токена (один слабый не триггерит);
+       односложное имя → его единственный токен должен реально попасть (слово/скелет-слово), длиной ≥5. */
+    let ok = false;
+    if (hitFull) ok = true;
+    else if (strong.length >= 2) ok = hits.length >= 2;
+    else ok = strong[0].length >= 5 && hits.length === 1;
+    if (ok) { const sc = hits.join('').length + (hitFull ? 100 : 0); if (!best || sc > best.sc) best = { pr, sc }; }
   }
   return best ? best.pr : null;
 }
@@ -10424,6 +10448,20 @@ const server = http.createServer(async (req, res) => {
           store.save();
           return;
         }
+        /* ⚠️ ЭСКАЛАЦИЯ САМОЛЕЧЕНИЯ: воркер сообщает, что контакту сообщения НЕ расшифровываются даже после
+           многократного форс-рефреша Signal-сессии → клиент не видит наши сообщения («Ожидание сообщения»
+           на его устройстве, на любом языке). Детект протокольный (retry-receipt), не по тексту. Громкий
+           алерт + метка на лиде, чтобы команда вмешалась — НЕ теряем клиента молча. */
+        if (b.event === 'undelivered') {
+          const _ph = String(b.phone || (sid0.split('__')[1] || '')).replace(/\D/g, '');
+          const _lead = (tdb.leads || []).filter(l => (l.phone || '').replace(/\D/g, '') === _ph).sort((a, c) => ((c.lastMsgAt || c.createdAt || 0) - (a.lastMsgAt || a.createdAt || 0)))[0];
+          const _nm = _lead ? _lead.name : ('+' + _ph);
+          if (_lead) _lead.deliveryWarn = { at: Date.now(), reason: 'wa_undecryptable' };
+          notify(tdb, { type: 'wa', level: 'critical', title: '⚠️ Клиент не видит наши сообщения', text: `${_nm}: устройство клиента не расшифровывает наши сообщения даже после авто-лечения сессии — он их НЕ получает. Отправьте текст ещё раз или позвоните; если не поможет — переподключите номер по QR.` });
+          if (_lead) ai.pushEvent(tdb, { type: 'wa_undelivered', leadId: _lead.id, text: `⚠️ ${_nm}: сообщения не расшифровываются у клиента (возможна потеря лида) — нужно вмешаться.` });
+          store.save();
+          return;
+        }
         if (b.event !== 'message' || b.fromMe) return;
         if (!b.text && !(b.media && b.media.data)) return;   /* пустое текстовое — пропуск; но МЕДИА без текста (голосовое!) принимаем */
         const senderDigits = String(b.phone || '').replace(/\D/g, '');
@@ -16689,8 +16727,21 @@ cont.addEventListener('drop',function(e){e.preventDefault();if(!dg)return;dg.dat
     }
     /* ---------------- медиа объектов из ПЕРСИСТЕНТНОГО хранилища (переживают деплой) ---------------- */
     if (req.method === 'GET' && /^\/media\/[A-Za-z0-9._\/-]+$/.test(p) && !p.includes('..')) {
-      const fp = path.join(MEDIA_DIR, p.replace(/^\/media\//, ''));
-      if (!fp.startsWith(MEDIA_DIR) || !fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
+      const rel = p.replace(/^\/media\//, '');
+      const fp = path.join(MEDIA_DIR, rel);
+      if (!fp.startsWith(MEDIA_DIR)) { res.writeHead(404); res.end('not found'); return; }
+      /* ⚠️ МУЛЬТИ-РЕПЛИКА/ГИБЕЛЬ ТОМА: файла нет на диске ЭТОЙ реплики → тянем из B2 (куда saveMedia его
+         дублировал) и кэшируем на локальный диск, чтобы следующие отдачи были мгновенными. Так голос/фото
+         не 404-ят, даже если записала другая реплика. */
+      if (!fs.existsSync(fp)) {
+        let b2buf = null;
+        try { if (b2backup.enabled && b2backup.enabled() && b2backup.b2Download) b2buf = await b2backup.b2Download('media/' + rel); } catch (_) {}
+        if (!b2buf) { res.writeHead(404); res.end('not found'); return; }
+        try { fs.mkdirSync(path.dirname(fp), { recursive: true }); fs.writeFileSync(fp, b2buf); } catch (_) {}   /* write-through кэш */
+        const type0 = MIME[path.extname(fp).toLowerCase()] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': type0, 'Content-Length': b2buf.length, 'Cache-Control': 'public, max-age=604800' });
+        res.end(b2buf); return;
+      }
       const type = MIME[path.extname(fp).toLowerCase()] || 'application/octet-stream';
       const stat = fs.statSync(fp);
       res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Cache-Control': 'public, max-age=604800' });
