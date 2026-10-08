@@ -6863,6 +6863,14 @@ PAGES.waProfile = async (root) => {
   root.innerHTML = `
     <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Мои подключения</h1>
     <div class="muted" style="font-size:13px;margin-bottom:18px">Всё личное в одном месте: номер для звонков (телефония), видео-созвоны (Zoom/Meet), приложение в Telegram и ваш WhatsApp-профиль (имя, фото, описание — как вас увидит клиент). Меняете сами.</div>
+    <div class="glass card" style="max-width:860px;margin-bottom:14px;display:flex;align-items:center;gap:16px">
+      <img src="/assets/notetaker/icon.png" alt="" style="width:52px;height:52px;border-radius:12px;flex:0 0 auto;box-shadow:0 4px 14px rgba(0,0,0,.12)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:650;font-size:14px">Нотетейкер звонков <span class="badge" style="margin-left:4px">macOS</span></div>
+        <div class="muted" style="font-size:12px;line-height:1.5;margin-top:2px">Фоновое приложение пишет и расшифровывает ваши звонки и видео-встречи (Zoom/Meet/Teams) <b>локально на маке</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент ничего не видит, плашки записи нет.</div>
+      </div>
+      <a class="btn btn-accent btn-sm" href="/notetaker.html" target="_blank" style="flex:0 0 auto;text-decoration:none">${ic(I.doc)}Установить и гайд</a>
+    </div>
     <div class="glass card" style="max-width:860px;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.phone || I.chat)}Мой номер для звонков (телефония)</div>
       <div class="muted" style="font-size:12px;margin-bottom:10px;line-height:1.5">Это <b>личный мобильный</b>, не WhatsApp-номер клиента. При звонке из карточки лида (click-to-call) телефония сначала наберёт <b>вас</b> на этот номер — вы берёте трубку, и система соединяет с клиентом. Формат +66…, можно менять в любой момент.</div>
