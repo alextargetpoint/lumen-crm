@@ -6628,6 +6628,7 @@ const server = http.createServer(async (req, res) => {
     /* Сравнение: правка/рерайт текста брокером со страницы /cmp?edit=токен — авторизация токеном ?t= */
     const cmpEditOk = /^\/api\/properties\/compare\/cmp_[a-z0-9]+\/(edit|rewrite|publish|unpublish)$/.test(p) && !!u.searchParams.get('t');
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
+    const tgGrayIncomingOk = p === '/api/tg/gray/incoming' && req.method === 'POST';   /* вебхук входящих серого Telegram (токен воркера внутри) */
     const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
     const farmEmailOk = p === '/api/farm/email-inbound' && req.method === 'POST';  /* вебхук входящей почты фермы (Telegram-коды), секрет внутри */
     const emailInboundOk = p === '/api/email/inbound' && req.method === 'POST';    /* вебхук входящих писем (ответы лидов), тенант по домену-получателю */
@@ -6635,7 +6636,7 @@ const server = http.createServer(async (req, res) => {
     const meetingBotOk = p === '/api/meeting-bot/webhook' && req.method === 'POST'; /* вебхук Recall.ai (транскрипт готов), секрет внутри */
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
     const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !cmpEditOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !emailInboundOk && !emailHookOk && !meetingBotOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !cmpEditOk && !waGrayIncomingOk && !tgGrayIncomingOk && !viberInboundOk && !farmEmailOk && !emailInboundOk && !emailHookOk && !meetingBotOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
 
     /* вебхук входящей почты фермы: Cloudflare Email Worker шлёт {to,subject,text,secret}; читаем код Telegram */
     if (farmEmailOk) {
@@ -10327,6 +10328,66 @@ const server = http.createServer(async (req, res) => {
       if (b.perDay !== undefined) db.settings.waGray.warmup.perDay = Math.max(2, Math.min(60, +b.perDay || 16));
       store.save();
       return json(res, 200, { ok: true, warmup: db.settings.waGray.warmup });
+    }
+    /* ВХОДЯЩИЕ клиента по СЕРОМУ TELEGRAM → карточка лида (текст/голос/медиа + транскрибация). Раньше серый TG
+       был send-only — карточки не синхронились. sid = tg_<phone> (без тенанта) → тенанта ищем по серому номеру. */
+    if (p === '/api/tg/gray/incoming' && req.method === 'POST') {
+      const auth = req.headers.authorization || ''; const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+      const b = await readBodyLarge(req, 30e6);
+      const sid0 = String(b.sessionId || '');
+      const grayDigits = sid0.replace(/^tg_/, '').replace(/\D/g, '');
+      if (!grayDigits) return json(res, 200, { ok: true });
+      const tid = findTenant(() => (((store.get().settings.tgGray || {}).numbers) || []).some(n => String(n.phone).replace(/\D/g, '') === grayDigits));
+      if (!tid) return json(res, 200, { ok: true });
+      let okAuth = false;
+      await store.runInTenant(tid, async () => {
+        const tdb = store.get(); const g = tdb.settings.tgGray || {};
+        const platTok = tgWorkerToken(tdb);
+        if (!tok || (tok !== g.token && tok !== platTok)) return;
+        okAuth = true;
+        if (b.event !== 'message' || b.fromMe) return;
+        if (!b.text && !(b.media && b.media.data)) return;
+        const senderDigits = String(b.phone || '').replace(/\D/g, '');
+        if (senderDigits && (g.numbers || []).some(n => String(n.phone).replace(/\D/g, '') === senderDigits)) return;   /* наш же номер — не лид */
+        /* матч лида: телефон → tgUserId → tgUsername; иначе создаём */
+        let lead = null;
+        if (senderDigits) { const by = (tdb.leads || []).filter(l => (l.phone || '').replace(/\D/g, '') === senderDigits); const rank = l => ((l.lastMsgAt || l.lastInboundAt || l.createdAt || 0)) + (l.stage !== 'lost' ? 1e15 : 0); lead = by.sort((a, c) => rank(c) - rank(a))[0]; }
+        if (!lead && b.userId) lead = (tdb.leads || []).find(l => l.tgUserId && String(l.tgUserId) === String(b.userId));
+        if (!lead && b.username) lead = (tdb.leads || []).find(l => l.tgUsername && String(l.tgUsername).toLowerCase() === String(b.username).toLowerCase());
+        if (!lead) {
+          const geo0 = ((tdb.settings.agency && tdb.settings.agency.geos) || ['dubai'])[0];
+          const phone = senderDigits ? ('+' + senderDigits) : '';
+          lead = { id: store.nextId('ld'), name: b.name || (phone || (b.username ? '@' + b.username : 'Telegram')), phone, geo: geo0, lang: 'ru', tz: phone ? tzFromPhone(phone) : 'Asia/Dubai', stage: 'new', score: 0, source: 'tg_gray', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['серый Telegram'], numberId: null, ads: null, channels: { wa: 'unknown', tg: 'yes', viber: 'unknown', email: 'unknown' } };
+          if (b.userId) lead.tgUserId = String(b.userId); if (b.username) lead.tgUsername = b.username;
+          lead.tgGrayPhone = grayDigits;   /* липкий серый TG-номер диалога */
+          tdb.leads = tdb.leads || []; tdb.leads.push(lead);
+          ai.pushEvent(tdb, { type: 'lead_new', leadId: lead.id, text: `Входящий (серый Telegram): ${lead.name}` });
+        } else {
+          if (b.userId && !lead.tgUserId) lead.tgUserId = String(b.userId);
+          if (b.username && !lead.tgUsername) lead.tgUsername = b.username;
+          if (!lead.tgGrayPhone) lead.tgGrayPhone = grayDigits;
+          lead.channels = lead.channels || {}; if (lead.channels.tg !== 'yes') lead.channels.tg = 'yes';
+        }
+        /* медиа + голос (как WA): сохраняем на том, голос транскрибируем для ИИ */
+        let _media = null, _inText = b.text || '';
+        if (b.media && b.media.data) {
+          try {
+            const buf = Buffer.from(b.media.data, 'base64');
+            const mt0 = String(b.media.type || 'audio').toLowerCase();
+            const isVoice = mt0 === 'voice' || mt0 === 'ptt' || mt0 === 'audio';
+            const ext = mt0 === 'image' ? 'jpg' : mt0 === 'video' ? 'mp4' : mt0 === 'document' ? (((b.media.name || '').split('.').pop() || 'bin').slice(0, 6)) : 'ogg';
+            const fn = sid0.replace(/[^\w]/g, '_') + '_' + String(b.messageId || Date.now()).replace(/[^\w]/g, '') + '.' + ext;
+            const url = saveMedia('tg-gray', fn, buf);
+            _media = { type: isVoice ? 'voice' : mt0, url, name: (b.media.name || '').slice(0, 120) };
+            if (isVoice && !(_inText && _inText.trim())) { try { const tr = await llm.transcribe(buf, 'voice.ogg', { groqKey: platformGroqKey(), lang: 'ru' }); if (tr) _inText = String(tr).trim().slice(0, 4000); } catch (e) { console.error('[tg voice stt]', e && e.message); } }
+          } catch (e) { console.error('[tg media ingest]', e && e.message); }
+        }
+        try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media } : {}); } catch (e) { console.error('[inbound tg]', e && e.message); }
+        try { const pr = matchPropertyMention(tdb, _inText); const cur = lead.quals && lead.quals.type; if (pr && !(cur && cur.by === 'human')) { if (!cur || !cur.value) { lead.quals = lead.quals || {}; lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src: 'chat', at: Date.now(), sources: [{ v: pr.name, src: 'chat', at: Date.now() }] }; lead.qualAt = Date.now(); } else if (cur.propertyId !== pr.id && !String(cur.value).toLowerCase().includes(pr.name.toLowerCase())) { const r2 = mergeQualVal(cur, pr.name, 'chat'); const q = r2.q; q.propertyIds = (cur.propertyIds || (cur.propertyId ? [cur.propertyId] : [])).concat(pr.id); delete q.propertyId; lead.quals.type = q; lead.qualAt = Date.now(); } } } catch (_) {}
+        store.save();
+      });
+      if (!okAuth) return json(res, 401, { error: 'unauthorized' });
+      return json(res, 200, { ok: true });
     }
     /* входящие/события ОТ воркера (публично; тенант — из sessionId, токен — этого тенанта) */
     if (p === '/api/wa/gray/incoming' && req.method === 'POST') {
