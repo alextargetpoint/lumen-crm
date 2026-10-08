@@ -8455,6 +8455,7 @@ PAGES.properties = async (root) => {
               <div class="pd2-lang" id="pdLangDD"><select id="pdLang" title="Язык карточки — перевод для просмотра и шеринга клиенту">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm ${(PAGE_STATE.compare || []).includes(pr.id) ? 'btn-accent' : 'pd2-ghost'}" id="pdCompare" title="Добавить в сравнение (до 3 объектов)">${ic(I.grid || I.layers)}${(PAGE_STATE.compare || []).includes(pr.id) ? 'В сравнении ✓' : 'Сравнить'}</button>
+              <button class="btn btn-sm btn-accent" id="pdPresV2" title="Конструктор презентаций: 4 формата (16:9/A4/9:16), 8 палитр, шрифты, PDF и адаптивная веб-ссылка">${ic(I.spark)}Презентация</button>
               <button class="btn btn-sm pd2-ghost" id="pdObjPdf" title="Собрать премиум арт-PDF по этому объекту (журнальный разворот) — редактируемый">${ic(I.doc)}PDF объекта</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
@@ -8757,6 +8758,15 @@ PAGES.properties = async (root) => {
       render();   /* обновит подпись кнопки + панель сравнения (глобальная, из render) */
     });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
+    $('#pdPresV2')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Открываю…';
+      try {
+        const r = await api.post('/presentations', { projectId: pr.id });
+        if (r && r.id) { window.open('/pres/' + r.id, '_blank'); toast('Конструктор презентации открыт', 'в новой вкладке — форматы, стиль, PDF и ссылка', true); }
+        else toast('Не вышло', (r && r.error) || 'ошибка');
+      } catch (err) { toast('Не вышло', err.message); }
+      btn.disabled = false; btn.innerHTML = old;
+    });
     $('#pdObjPdf')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget; btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Собираю…';
       try {
