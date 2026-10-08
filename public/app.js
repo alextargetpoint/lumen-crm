@@ -484,6 +484,7 @@ const NAV = {
   inbox:     { name: 'Диалоги', en: 'Inbox', icon: I.chat, sub: '' },
   properties: { name: 'Объекты', en: 'Properties', icon: I.building, sub: '' },
   collections: { name: 'Подборки', en: 'Collections', icon: I.layers, sub: '' },
+  presentations: { name: 'Презентации', en: 'Presentations', icon: I.doc, sub: 'конструктор презентаций и PDF объектов', subEn: 'presentation builder & object PDFs' },
   autopilot: { name: 'Автопилот', en: 'Autopilot', icon: I.spark, sub: 'квалификатор · цепочки · шаблоны', subEn: 'qualifier · chains · templates' },
   knowledge: { name: 'База знаний ИИ', en: 'AI knowledge', icon: I.flame, sub: 'приёмы · академия · оценка звонка', subEn: 'plays · academy · call review' },
   qualifier: { name: 'ИИ-квалификатор', en: 'AI Qualifier', icon: I.spark, sub: '' },
@@ -526,7 +527,7 @@ function navSub(k) { const n = NAV[k] || {}; return t(n.sub || '', n.subEn); }
 const WORKSPACES = {
   pipeline: { label: 'Воронка',       labelEn: 'Pipeline',   icon: I.funnel,   pages: ['funnel', 'wake'] },
   dialogs:  { label: 'Диалоги',       labelEn: 'Inbox',      icon: I.chat,     pages: ['inbox', 'comments', 'parlo'] },
-  base:   { label: 'База',           labelEn: 'Base',       icon: I.building, pages: ['properties', 'collections'] },
+  base:   { label: 'База',           labelEn: 'Base',       icon: I.building, pages: ['properties', 'collections', 'presentations'] },
   ads:    { label: 'Реклама',         labelEn: 'Ads',        icon: I.target,   pages: ['mediaplan', 'ads'] },
   analytics: { label: 'Аналитика',   labelEn: 'Analytics',  icon: I.bars,     pages: ['analytics', 'adsAnalytics'] },
   engine: { label: 'Автоматизация',  labelEn: 'Automation', icon: I.bolt,     pages: ['autopilot', 'automations', 'knowledge', 'learn', 'studio'] },
@@ -8562,8 +8563,8 @@ PAGES.properties = async (root) => {
               <div class="pd2-lang" id="pdLangDD"><select id="pdLang" title="Язык карточки — перевод для просмотра и шеринга клиенту">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm ${(PAGE_STATE.compare || []).includes(pr.id) ? 'btn-accent' : 'pd2-ghost'}" id="pdCompare" title="Добавить в сравнение (до 3 объектов)">${ic(I.grid || I.layers)}${(PAGE_STATE.compare || []).includes(pr.id) ? 'В сравнении ✓' : 'Сравнить'}</button>
-              <button class="btn btn-sm btn-accent" id="pdPresV2" title="Конструктор презентаций: 4 формата (16:9/A4/9:16), 8 палитр, шрифты, PDF и адаптивная веб-ссылка">${ic(I.spark)}Презентация</button>
-              <button class="btn btn-sm pd2-ghost" id="pdObjPdf" title="Собрать премиум арт-PDF по этому объекту (журнальный разворот) — редактируемый">${ic(I.doc)}PDF объекта</button>
+              <button class="btn btn-sm btn-accent" id="pdPresV2" title="Открыть конструктор презентаций: 4 формата (16:9/A4/9:16), палитры, шрифты, PDF и веб-ссылка">${ic(I.spark)}Презентация</button>
+              <button class="btn btn-sm pd2-ghost" id="pdPresPdf" title="Быстрый PDF этого объекта (без редактирования)">${ic(I.doc)}PDF объекта</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
             </div>
@@ -8874,13 +8875,14 @@ PAGES.properties = async (root) => {
       } catch (err) { toast('Не вышло', err.message); }
       btn.disabled = false; btn.innerHTML = old;
     });
-    $('#pdObjPdf')?.addEventListener('click', async (e) => {
+    /* БЫСТРЫЙ PDF объекта — через тот же конструктор v2 (не отдельный арт-движок): собираем черновик и
+       сразу открываем печатный вид (Cmd/Ctrl+P → Сохранить как PDF), без редактора. */
+    $('#pdPresPdf')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget; btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Собираю…';
       try {
-        const r = await api.post('/collections', { title: pr.name, propertyIds: [pr.id], singleProject: true, design: { auto: true } });
-        const key = r.editKey ? '&edit=1&key=' + encodeURIComponent(r.editKey) : '';
-        window.open(`/p/${r.id}?design=1${key}`, '_blank');
-        toast('Арт-PDF объекта готов', 'в новой вкладке — правь и «Скачать PDF»', true);
+        const r = await api.post('/presentations', { projectId: pr.id });
+        if (r && r.id) { window.open('/pres/' + r.id + '/print?format=portrait_a4', '_blank'); toast('PDF объекта готов', 'в новой вкладке — Cmd/Ctrl+P → «Сохранить как PDF»', true); }
+        else toast('Не вышло', (r && r.error) || 'ошибка');
       } catch (err) { toast('Не вышло', err.message); }
       btn.disabled = false; btn.innerHTML = old;
     });
@@ -9363,6 +9365,33 @@ async function openDesignModal(id, title) {
   });
   setTimeout(() => { const rb = $('#dmRecompose'); if (rb) rb.addEventListener('click', async () => { const r = await api.post('/collections/' + id + '/recompose?key=' + key); window.open('/p/' + id + '?design=1&key=' + key, '_blank'); }); }, 60);
 }
+PAGES.presentations = async (root) => {
+  const [d, props] = await Promise.all([api.get('/presentations').catch(() => ({ items: [] })), api.get('/properties').catch(() => [])]);
+  const items = (d.items || []).filter(x => x.status !== 'archived');
+  const propList = Array.isArray(props) ? props : (props.items || props.properties || []);
+  const STLAB = { draft: 'Черновик', ready: 'Готово' };
+  const FLAB = { landscape_16_9: '16:9', portrait_a4: 'A4', landscape_a4: 'A4 гориз.', portrait_9_16: '9:16' };
+  const absU = u => (u && /^assets\//.test(u)) ? '/' + u : u;
+  const cards = items.map(x => `<div class="pres-card">
+      <div class="pres-thumb" style="${x.thumb ? `background-image:url('${esc(absU(x.thumb))}')` : ''}"></div>
+      <div class="pres-b"><div class="pres-t">${esc(x.title || 'Презентация')}</div>
+        <div class="pres-m"><span class="pres-st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span> · ${FLAB[x.defaultFormat] || ''}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}</div>
+        <div class="pres-acts"><button class="btn btn-sm btn-accent" data-popen="${x.id}">${ic(I.doc)}Открыть</button><button class="btn btn-sm" data-ppdf="${x.id}" title="Быстрый PDF">${ic(I.doc)}PDF</button>${x.hasPublic ? `<button class="btn btn-sm" data-ppub="${x.id}">${ic(I.link || I.send)}Ссылка</button>` : ''}</div>
+      </div></div>`).join('');
+  root.innerHTML = `
+    <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Презентации</h1>
+    <div class="muted" style="font-size:13px;margin-bottom:16px;max-width:760px">Конструктор клиентских презентаций объектов: 4 формата (16:9 · A4 · 9:16), палитры и шрифты, PDF и адаптивная веб-ссылка. Создавайте из карточки объекта (кнопка «Презентация») или кнопкой ниже.</div>
+    <div style="margin-bottom:18px"><button class="btn btn-accent" id="presNew">${ic(I.plus)}Новая презентация из объекта</button></div>
+    ${items.length ? `<div class="pres-grid">${cards}</div>` : '<div class="muted" style="padding:34px 0;text-align:center;border:1px dashed var(--stroke);border-radius:14px">Пока нет презентаций. Нажмите «Новая презентация из объекта» или откройте объект в Базе → «Презентация».</div>'}`;
+  $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.popen, '_blank')));
+  $$('[data-ppdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ppdf + '/print?format=portrait_a4', '_blank')));
+  $$('[data-ppub]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.ppub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
+  $('#presNew', root)?.addEventListener('click', () => {
+    if (!propList.length) { toast('Нет объектов', 'Добавьте объект в Базе'); return; }
+    modal({ title: 'Новая презентация', sub: 'Выберите объект — соберём черновик и откроем конструктор', body: '<div style="display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto">' + propList.slice(0, 60).map(p => `<button class="btn pres-pick" data-pp="${p.id}" style="justify-content:flex-start">${ic(I.building)}${esc(p.name || p.id)}</button>`).join('') + '</div>', actions: [{ label: 'Отмена' }] });
+    setTimeout(() => { $$('.pres-pick').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp }); if (r && r.id) { closeModal(); window.open('/pres/' + r.id, '_blank'); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
+  });
+};
 PAGES.collections = async (root) => {
   const [cols0, props, leads, allFolders] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads'), api.get('/folders')]);
   const cFolders = allFolders.filter(f => f.kind === 'coll');
@@ -9441,8 +9470,7 @@ PAGES.collections = async (root) => {
             <div class="cl2-meta">${c.propertyIds.length} ${plural(c.propertyIds.length, 'объект', 'объекта', 'объектов')}${c.leadName ? ' · для ' + esc(c.leadName) : ''} · ${ago(c.createdAt)}</div>
             ${c.analytics ? `<div class="cl2-analytics ${c.analytics.maxDepth >= 75 ? 'hot' : ''}"><div class="cl2-bar"><i style="width:${c.analytics.maxDepth}%"></i></div><span>изучил ${c.analytics.maxDepth}%${c.analytics.deepSessions ? ' · глубоких ' + c.analytics.deepSessions : ''}</span></div>` : ''}
             <div class="cl2-acts">
-              <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
-              <a class="btn btn-sm" href="/p/${c.id}?design=1&key=${c.editKey}" target="_blank" title="Премиум арт-документ (журнальный разворот) → из него «Скачать PDF»">${ic(I.spark)}Арт-PDF</a>
+              <a class="btn btn-sm btn-accent" href="/p/${c.id}?design=1&edit=1&key=${c.editKey}" target="_blank" title="Открыть конструктор подборки — редактируемый арт-документ, из него «Скачать PDF»">${ic(I.edit || I.doc)}Открыть</a>
               <button class="btn btn-sm" data-act="compose" title="Изменить объекты и юниты подборки">${ic(I.grid)}Состав</button>
               <button class="btn btn-sm" data-act="share" title="Поделиться">${ic(I.send)}Поделиться</button>
               <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть классический вид">${ic(I.eye)}</a>
@@ -15892,11 +15920,11 @@ const RBAC_ROLES = { broker: 'Брокер', assistant: 'Ассистент', ma
 const RBAC_DEFHIDE = {
   broker: ['settings', 'numbers', 'brokers', 'billing', 'agency'],   /* по умолчанию закрыто (подключения/роли/номера/биллинг/профиль агентства — это founder). 'agency' в ДЕФОЛТЕ (не в жёстком BROKER_HIDDEN_PAGES) → founder может ВЫДАТЬ брокеру доступ через шаблоны прав. Оформление (тема) — личное, всегда доступно */
   assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
-  marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
-  analyst: ['inbox', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],
+  marketer: ['inbox', 'funnel', 'presentations', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
+  analyst: ['inbox', 'presentations', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],
   manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
 };
-const RBAC_SECTIONS = ['funnel', 'inbox', 'properties', 'collections', 'qualifier', 'sequences', 'wake', 'meetings', 'tasks', 'automations', 'playbook', 'academy', 'callReview', 'ads', 'mediaplan', 'comments', 'social', 'parlo', 'analytics'];
+const RBAC_SECTIONS = ['funnel', 'inbox', 'properties', 'collections', 'presentations', 'qualifier', 'sequences', 'wake', 'meetings', 'tasks', 'automations', 'playbook', 'academy', 'callReview', 'ads', 'mediaplan', 'comments', 'social', 'parlo', 'analytics'];
 const RBAC_SOURCES = [['ad_comment', 'Комментарии рекламы'], ['wa_inbound', 'Прямые (WhatsApp)'], ['import', 'Импорт / выгрузка'], ['broker_card', 'От брокера']];
 /* эффективный шаблон скрытых разделов роли: настроенный владельцем (settings.roleTemplates) или дефолт */
 function roleTplHide(rt) { const t = (STATE.settings && STATE.settings.roleTemplates && STATE.settings.roleTemplates[rt]); return (t && Array.isArray(t.hidePages)) ? t.hidePages : (RBAC_DEFHIDE[rt] || []); }
