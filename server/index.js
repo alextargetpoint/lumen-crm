@@ -3154,7 +3154,8 @@ async function tgGrayApi(db, method, pathx, body) {
 function grayNewLeadCap(db) { const g = db.settings.waGray || {}; return g.newLeadCapPerDay || 5; }
 function grayNewToday(n) { const today = new Date().toISOString().slice(0, 10); return n._newLeadDay === today ? (n._newLeadsToday || 0) : 0; }
 /* номер «деградировал»: получатели не расшифровывают наши сообщения (retryIn↑) ИЛИ сам не читает входящие (decFails↑)
-   в последние 20 мин. Такой номер временно НЕ выбираем для новых касаний — уводим на здоровый (авто-failover). */
+   в последние 20 мин. ⚠️ Используется ТОЛЬКО для АЛЕРТА «пересканируйте номер» — НЕ для смены номера.
+   Диалоги с такого номера НЕ переводятся на другие номера (лечение — форс-рефреш сессии в воркере, см. pickGrayNumber). */
 function grayDegraded(s) {
   if (!s) return false;
   const now = Date.now();
@@ -3166,9 +3167,18 @@ function pickGrayNumber(db, lead, live) {
   const g = db.settings.waGray || {};
   const connected = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected' && (!n.roles || n.roles.send !== false); });
   if (!connected.length) return null;
-  /* действующий диалог: вся цепочка с одного номера — НО если этот номер деградировал, перебрасываем на здоровый
-     (лучше сообщение с другого номера, чем «waiting» в чёрную дыру). */
-  if (lead.grayPhone) { const s = connected.find(n => n.phone === lead.grayPhone); if (s && !grayDegraded(live[waGraySid(s.phone)])) return s; }
+  /* ДЕЙСТВУЮЩИЙ ДИАЛОГ: вся переписка строго с ОДНОГО номера. Диалог НИКОГДА не мигрирует на другой номер
+     автоматически — даже при retry/decFails/«Waiting for this message». Это лечится ВНУТРИ того же номера
+     (форс-рефреш Signal-сессии в воркере), а не сменой номера. Деградация влияет ТОЛЬКО на алерт, не на маршрут.
+     Если закреплённый номер на связи — всегда возвращаем именно его. Переезд на другой номер — ТОЛЬКО вручную. */
+  if (lead.grayPhone) {
+    const s = connected.find(n => n.phone === lead.grayPhone);
+    if (s) return s;
+    /* номер диалога НЕ на связи (полностью отвалился/разлогинен): авто-переезд запрещён.
+       Разрешаем только явный РУЧНОЙ перевод диалога (lead.grayPhoneForce), иначе честный провал + алерт. */
+    if (lead.grayPhoneForce) { const f = connected.find(n => n.phone === lead.grayPhoneForce); if (f) return f; }
+    return null;
+  }
   /* НОВЫЙ лид (первое касание): потолок новых лидов — МЯГКИЙ. Предпочитаем номер под лимитом,
      но НЕ блокируем отправку (только френдли-предупреждение в graySender). */
   const cap = grayNewLeadCap(db);
@@ -3179,9 +3189,10 @@ function pickGrayNumber(db, lead, live) {
   if (lead.broker) { const mine = connected.filter(n => n.brokerId === lead.broker); if (mine.length) scope = mine; }
   const under = scope.filter(n => grayNewToday(n) < cap);
   const pool0 = under.length ? under : scope;                                                                   /* под лимитом, иначе — все в scope (мягко) */
-  const healthy = pool0.filter(n => !grayDegraded(live[waGraySid(n.phone)]));                                   /* авто-failover: деградировавшие номера не берём, пока лечатся */
-  const pool = healthy.length ? healthy : pool0;                                                               /* если все деградировали — шлём хоть с какого (лучше, чем никуда) */
-  return pool.sort((a, b) => grayNewToday(a) - grayNewToday(b))[0];                                             /* наименее нагруженный новыми лидами */
+  /* НЕ фильтруем по «деградации»: детект ненадёжен и НЕ должен влиять на выбор номера (иначе рассылка скачет
+     по номерам). Деградация идёт только в АЛЕРТ («пересканируйте номер»). Первое касание нового лида — просто
+     наименее нагруженный номер брокера. Как только номер закрепился за диалогом — он больше не меняется (см. выше). */
+  return pool0.sort((a, b) => grayNewToday(a) - grayNewToday(b))[0];
 }
 
 /* Серый транспорт для engine.send: реальная отправка с прогретого номера брокера через Baileys-воркер.
@@ -3200,7 +3211,14 @@ engine.setGraySender((db, lead, m, _opts) => {
   let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { m.status = 'failed'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): WA-воркер недоступен (${e.message})` }); store.save(); return; }
   const wasNew = !lead.grayPhone;
   const num = pickGrayNumber(db, lead, live);
-  if (!num) { m.status = 'failed'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): нет серого номера на связи — переподключите по QR в «Номера»` }); store.save(); return; }   /* был мок «delivered» — теперь честный провал */
+  if (!num) {   /* был мок «delivered» — теперь честный провал. Диалог НЕ переносим на другой номер автоматически. */
+    m.status = 'failed';
+    const stuck = lead.grayPhone
+      ? `номер диалога +${lead.grayPhone} сейчас не на связи. Переподключите его по QR в «Номера» — переписка продолжится с него же. Либо переведите диалог на другой номер вручную (автоматически переписка на другие номера НЕ переносится).`
+      : 'нет серого номера на связи — переподключите по QR в «Номера»';
+    ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): ${stuck}` });
+    store.save(); return;
+  }
   /* медиа (голос/видео/фото/подборки-документы/PDF) — прокидываем воркеру абсолютным URL, который он скачает и отправит через Baileys */
   const _grayBody = { to: lead.phone, text: m.text || '' };
   if (m.media && m.media.url) {
@@ -3210,6 +3228,7 @@ engine.setGraySender((db, lead, m, _opts) => {
   const _sr = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', _grayBody);
   if (_sr && _sr.id) m.waId = _sr.id;            /* id сообщения воркера — для сверки квитанций (пока grey-квитанций нет) */
   lead.grayPhone = num.phone;                    /* закрепляем номер за лидом — цепочка остаётся на нём */
+  if (lead.grayPhoneForce === num.phone) delete lead.grayPhoneForce;   /* ручной перевод выполнен — снимаем флаг */
   if (wasNew) {
     const today = new Date().toISOString().slice(0, 10);
     if (num._newLeadDay !== today) { num._newLeadDay = today; num._newLeadsToday = 0; }
@@ -3347,7 +3366,7 @@ async function waDropWatch() {
           const prev = (n.live && n.live.status) || 'none';
           const who = n.label || (n.realPhone ? '+' + n.realPhone : n.phone);
           if (prev === 'connected' && cur !== 'connected') {
-            notify(db, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер отвалился', text: `Номер «${who}» больше не на связи. Срочно переподключите по QR в разделе «Номера» → «Пересканировать» — иначе прогрев и касания по нему встают (отправка авто-идёт с других номеров).` });
+            notify(db, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер отвалился', text: `Номер «${who}» больше не на связи. Срочно переподключите по QR в разделе «Номера» → «Пересканировать». Диалоги этого номера ждут его возврата — на другие номера переписка автоматически НЕ переносится (перевод диалога — только вручную).` });
           } else if (prev !== 'connected' && prev !== 'none' && cur === 'connected') {
             notify(db, { type: 'wa', level: 'success', title: 'WhatsApp-номер снова на связи', text: `Номер «${who}» переподключён — вернул в прогрев и касания.` });
           }
@@ -3361,13 +3380,13 @@ async function waDropWatch() {
           }
           if (!decBad) n._decAlertAt = null;
           /* ⚠️ ИСХОДЯЩИЙ «waiting»: получатели НЕ расшифровывают наши сообщения (retry-receipt у воркера). Клиент
-             видит «Waiting for this message». Воркер считает retryIn и САМ форс-рефрешит сессию контакта (авто-heal).
-             При всплеске — алерт + флаг retryBad → pickGrayNumber уводит новые касания на здоровый номер, пока этот лечится. */
+             видит «Waiting for this message». Воркер считает retryIn и САМ форс-рефрешит сессию контакта (авто-heal
+             ВНУТРИ того же номера). Диалоги с номера НЕ переносятся на другие номера — только алерт «пересканируйте». */
           const retryIn = +s.retryIn || 0;
           const retryBad = cur === 'connected' && retryIn >= 5 && s.lastRetryAt && (Date.now() - s.lastRetryAt < 20 * 60e3);
           if (retryBad && (!n._retryAlertAt || Date.now() - n._retryAlertAt > 6 * 3600e3)) {
             n._retryAlertAt = Date.now();
-            notify(db, { type: 'wa', level: 'critical', title: '🔴 Клиенты не получают сообщения с номера', text: `С номера «${who}» ${retryIn} раз устройства клиентов не смогли расшифровать сообщение («Waiting for this message»). Система авто-пересобирает сессии и временно шлёт новые касания с других номеров — но этот номер лучше «Пересканировать».` });
+            notify(db, { type: 'wa', level: 'critical', title: '🔴 Клиенты не получают сообщения с номера', text: `С номера «${who}» ${retryIn} раз устройства клиентов не смогли расшифровать сообщение («Waiting for this message»). Воркер сам пере-собирает сессию на ЭТОМ номере — переписка с него НЕ переносится на другие номера. Если не восстановится за несколько минут — сделайте «Пересканировать» этого номера по QR.` });
           }
           if (!retryBad) n._retryAlertAt = null;
           n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad, retryIn, retryBad });
@@ -7576,6 +7595,22 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true });
     }
+    /* РУЧНОЙ перевод диалога на другой серый номер (переписка НИКОГДА не мигрирует автоматически).
+       Нужен, когда закреплённый номер полностью заблокирован/разлогинен и его не поднять. Задаёт grayPhoneForce;
+       при пустом phone — просто снимает флаг (вернуться к закреплённому номеру). */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/gray-move$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const phone = String(b.phone || '').replace(/[^\d]/g, '');
+      if (!phone) { delete lead.grayPhoneForce; store.save(); return json(res, 200, { ok: true, grayPhoneForce: null }); }
+      const exists = ((db.settings.waGray || {}).numbers || []).some(n => n.phone === phone);
+      if (!exists) return json(res, 400, { error: 'такого серого номера нет' });
+      lead.grayPhoneForce = phone;   /* следующая отправка уйдёт с него и закрепит grayPhone за ним */
+      ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `↪️ Диалог с ${lead.name} вручную переведён на номер +${phone} (следующее сообщение уйдёт с него).` });
+      store.save();
+      return json(res, 200, { ok: true, grayPhoneForce: phone });
+    }
     /* редактирование базовых полей лида из карточки (пробел: раньше телефон/имя/гео нельзя было изменить) */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/update$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
@@ -10160,7 +10195,7 @@ const server = http.createServer(async (req, res) => {
     /* входящие/события ОТ воркера (публично; тенант — из sessionId, токен — этого тенанта) */
     if (p === '/api/wa/gray/incoming' && req.method === 'POST') {
       const auth = req.headers.authorization || ''; const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-      const b = await readBody(req);
+      const b = await readBodyLarge(req, 30e6);   /* входящее МЕДИА (голос/фото) приходит base64 → больше 2МБ readBody */
       const sid0 = String(b.sessionId || '');
       const tid = sid0.includes('__') ? sid0.split('__')[0] : store.PRIMARY;
       let okAuth = false;
@@ -10188,11 +10223,12 @@ const server = http.createServer(async (req, res) => {
           const _rec = (g.numbers || []).find(n => String(n.phone).replace(/\D/g, '') === _ph || (n.live && String(n.live.phone || '').replace(/\D/g, '') === _ph));
           const _who = (_rec && (_rec.label || (_rec.realPhone ? '+' + _rec.realPhone : _rec.phone))) || ('+' + _ph);
           if (_rec) _rec.live = Object.assign({}, _rec.live || {}, { status: 'logged_out' });
-          notify(tdb, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер разлогинился', text: `Номер «${_who}» вышел из WhatsApp — СРОЧНО переподключите по QR («Номера» → «Пересканировать»). Отправка автоматически идёт с других номеров, но входящие и переписка на этом номере стоят.` });
+          notify(tdb, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер разлогинился', text: `Номер «${_who}» вышел из WhatsApp — СРОЧНО переподключите по QR («Номера» → «Пересканировать»). Диалоги этого номера приостановлены до его возврата; автоматически на другие номера переписка НЕ переносится (перевод — вручную).` });
           store.save();
           return;
         }
-        if (b.event !== 'message' || b.fromMe || !b.text) return;
+        if (b.event !== 'message' || b.fromMe) return;
+        if (!b.text && !(b.media && b.media.data)) return;   /* пустое текстовое — пропуск; но МЕДИА без текста (голосовое!) принимаем */
         const senderDigits = String(b.phone || '').replace(/\D/g, '');
         if (!senderDigits) return;
         /* трафик прогрева (отправитель — наш же номер) в лиды не превращаем */
@@ -10209,7 +10245,26 @@ const server = http.createServer(async (req, res) => {
           tdb.leads = tdb.leads || []; tdb.leads.push(lead);
           ai.pushEvent(tdb, { type: 'lead_new', leadId: lead.id, text: `Входящий (серый WhatsApp): ${lead.name}` });
         }
-        try { engine.inbound(tdb, lead, String(b.text).slice(0, 4000), {}); } catch (e) { console.error('[inbound wa]', e && e.message); try { ai.pushEvent(tdb, { type: 'note', leadId: lead.id, text: `⚠️ Сбой обработки входящего (${lead.name}): ${e.message}` }); } catch (_) {} }
+        /* ВХОДЯЩЕЕ МЕДИА (голос/аудио/фото/видео/документ): сохраняем на том (переживёт деплой) + отдаём плееру.
+           Голосовое/аудио → транскрибируем (Groq/Whisper), чтобы ИИ «услышал» клиента, ответил и забрал инфу в
+           квалификацию (бюджет/сроки, озвученные голосом). Раньше голосовые терялись: воркер слал text='' и приём резался. */
+        let _media = null, _inText = b.text || '';
+        if (b.media && b.media.data) {
+          try {
+            const buf = Buffer.from(b.media.data, 'base64');
+            const mt0 = String(b.media.type || 'audio').toLowerCase();
+            const isVoice = mt0 === 'voice' || mt0 === 'ptt' || mt0 === 'audio';
+            const ext = mt0 === 'image' ? 'jpg' : mt0 === 'video' ? 'mp4' : mt0 === 'document' ? (((b.media.name || '').split('.').pop() || 'bin').slice(0, 6)) : 'ogg';
+            const fn = sid0.replace(/[^\w]/g, '_') + '_' + String(b.messageId || Date.now()).replace(/[^\w]/g, '') + '.' + ext;
+            const url = saveMedia('wa-gray', fn, buf);
+            _media = { type: isVoice ? 'voice' : mt0, url, name: (b.media.name || '').slice(0, 120) };
+            if (isVoice && !(_inText && _inText.trim())) {
+              try { const tr = await llm.transcribe(buf, 'voice.ogg', { groqKey: platformGroqKey(), lang: 'ru' }); if (tr) _inText = String(tr).trim().slice(0, 4000); }
+              catch (e) { console.error('[wa voice stt]', e && e.message); }
+            }
+          } catch (e) { console.error('[wa media ingest]', e && e.message); }
+        }
+        try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media } : {}); } catch (e) { console.error('[inbound wa]', e && e.message); try { ai.pushEvent(tdb, { type: 'note', leadId: lead.id, text: `⚠️ Сбой обработки входящего (${lead.name}): ${e.message}` }); } catch (_) {} }
         store.save();
       });
       if (!okAuth) return json(res, 401, { error: 'unauthorized' });
