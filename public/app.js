@@ -6147,7 +6147,15 @@ async function openLeadModal(id) {
               <select id="lcCKind" style="width:118px;flex:0 0 118px">${Object.entries(contactKinds).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
               <input id="lcCVal" placeholder="@ник / почта…">
               <button class="btn btn-sm" id="lcCAdd">${ic(I.plus)}</button>
-            </div>`,
+            </div>
+            ${(l.grayPhone || (STATE.settings.waGray && (STATE.settings.waGray.numbers || []).length)) ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--stroke)">
+              <label class="lc-lbl">Номер отправки · серый WhatsApp</label>
+              <div class="muted" style="font-size:11px;margin:3px 0 7px;line-height:1.5">Переписка идёт с ОДНОГО номера и автоматически не переносится. Переводите вручную только если номер полностью заблокирован.</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span class="badge">${l.grayPhone ? ((l.grayPhoneForce && l.grayPhoneForce !== l.grayPhone) ? 'временно +' + esc(l.grayPhoneForce) : '+' + esc(l.grayPhone)) : 'назначится при первом касании'}</span>
+                <button class="btn btn-sm" id="lcGrayMove">${ic(I.chat)}Перевести на другой номер</button>
+              </div>
+            </div>` : ''}`,
     { open: !l.phone, icon: I.phone, count: (l.contacts || []).length || null })}
           ${coll('Встречи', `<div style="margin-top:6px">${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}
             ${mt.status === 'scheduled' ? `<span class="lc-meet-acts"><button class="btn btn-sm" data-mtst="${mt.id}|done">Прошла</button><button class="btn btn-sm btn-danger" data-mtst="${mt.id}|no_show">Не пришёл</button></span>` : `<span class="badge" style="margin-left:6px">${{ done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[mt.status] || mt.status}</span>`}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}</div>`,
@@ -6355,6 +6363,18 @@ async function openLeadModal(id) {
   }));
   $('#lcTasksDoneTog', bd)?.addEventListener('click', () => { const d = $('#lcTasksDone', bd); if (d) d.style.display = d.style.display === 'none' ? '' : 'none'; });
   $('#lcMoreTog', bd)?.addEventListener('click', () => { const mb = $('#lcMoreBody', bd), mo = $('#lcMore', bd); if (mb) { const open = mb.style.display !== 'none'; mb.style.display = open ? 'none' : ''; if (mo) mo.classList.toggle('open', !open); } });
+  /* B-UI: ручной перевод диалога на другой серый номер (авто-переноса нет — только вручную) */
+  $('#lcGrayMove', bd)?.addEventListener('click', async () => {
+    let r; try { r = await api.get('/wa/gray/list'); } catch (e) { toast('Не вышло', e.message); return; }
+    const nums = (r.numbers || []).filter(n => n.live && n.live.status === 'connected' && n.phone !== l.grayPhone);
+    if (!nums.length) { toast('Нет других номеров на связи', 'Подключите номер в «Номера»'); return; }
+    modal({ title: 'Перевести диалог на номер', sub: 'Переписка продолжится с выбранного номера. Это ручное действие — автопереноса нет.', body:
+      '<div style="display:flex;flex-direction:column;gap:8px">' + nums.map(n => `<button class="btn lc-mvpick" data-mv="${esc(n.phone)}" style="justify-content:flex-start">${ic(I.chat)}+${esc(n.realPhone || n.phone)}${n.label ? ' · ' + esc(n.label) : ''}</button>`).join('') + '</div>',
+      actions: [{ label: 'Отмена' }] });
+    setTimeout(() => { $$('.lc-mvpick').forEach(b => b.addEventListener('click', async () => {
+      try { await api.post('/leads/' + id + '/gray-move', { phone: b.dataset.mv }); toast('Диалог переведён', 'Следующее сообщение уйдёт с нового номера', true); closeModal(); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); }
+    })); }, 40);
+  });
   $('#lcCallBtn', bd).addEventListener('click', () => $('#lcCallFile', bd).click());
   $('#lcDial', bd)?.addEventListener('click', async () => {
     const btn = $('#lcDial', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.phone) + 'Звоню…';
@@ -6815,6 +6835,17 @@ async function renderChat(id, rebuild) {
   $('#aiToggle').addEventListener('change', async (e) => { const chatEl = document.querySelector('.chat'); if (chatEl) chatEl.classList.toggle('ai-live', e.target.checked); await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); renderChat(id, false); });
   $('#takeoverBtn')?.addEventListener('click', async () => { await api.patch('/leads/' + id, { ai: { enabled: false } }); toast('Диалог у вас', 'ИИ на паузе — пишите клиенту с того же номера', true); renderChat(id, false); });
   $('#resumeAiBtn')?.addEventListener('click', async () => { await api.patch('/leads/' + id, { ai: { enabled: true } }); toast('ИИ снова ведёт диалог', null, true); renderChat(id, false); });
+  /* КВАЛИФИКАЦИЯ в диалоге — редактируемая с автосохранением: клик по строке → инлайн-инпут → /qual (by:human, ИИ не перезапишет) */
+  $$('.axr[data-qual]', panel).forEach(el => el.addEventListener('click', () => {
+    if (el.querySelector('input')) return;
+    const k = el.dataset.qual; const vEl = el.querySelector('.axr-v'); const old = vEl.innerHTML; const cur = (l.quals[k] || {}).value || '';
+    vEl.innerHTML = `<input class="axr-inp" value="${esc(cur)}" style="width:100%;box-sizing:border-box;font:inherit;border:1px solid var(--accent);border-radius:6px;padding:2px 6px;background:var(--bg-2,#fff);color:inherit">`;
+    const inp = vEl.querySelector('input'); inp.focus(); inp.select();
+    let saved = false;
+    const save = async () => { if (saved) return; saved = true; const v = inp.value.trim(); try { await api.post(`/leads/${id}/qual`, { key: k, value: v }); renderChat(id, false); } catch (e) { toast('Не сохранилось', e.message); vEl.innerHTML = old; } };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') { saved = true; vEl.innerHTML = old; } });
+    inp.addEventListener('blur', save);
+  }));
   const hb = $('#handoverBtn');
   if (hb) hb.addEventListener('click', () => openHandoverPreview(id));
   $('#meetBtn').addEventListener('click', () => openMeetingModal(l, () => renderChat(id, true)));

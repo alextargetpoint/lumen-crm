@@ -16316,6 +16316,45 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
       }
 
       // ---- pages ----
+      // каталог презентаций (список «мои презентации»)
+      if (p === '/presentations' && req.method === 'GET') {
+        const R = presAuth();
+        if (!R) { res.writeHead(302, { Location: '/' }); res.end(); return; }
+        const items = presList().filter(x => (R.role === 'owner' || x.brokerId === R.brokerId) && x.status !== 'archived')
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        const STLAB = { draft: 'Черновик', ready: 'Готово', archived: 'Архив' };
+        const FLAB = { landscape_16_9: '16:9', portrait_a4: 'A4', landscape_a4: 'A4 гориз.', portrait_9_16: '9:16' };
+        const cards = items.map(x => {
+          const pr = (db.properties || []).find(p2 => p2.id === x.projectId) || {};
+          const img = (pr.images || [])[0] || '';
+          const upd = x.updatedAt ? new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
+          const pub = x.publicToken ? `<a href="${baseUrl(req)}/pv/${x.publicToken}" target="_blank" class="pub">Публичная ссылка →</a>` : '';
+          return `<a class="pc" href="/pres/${x.id}">
+            <div class="pc-img" style="${img ? `background-image:url('${esc(img.startsWith('assets/') ? '/' + img : img)}')` : ''}"></div>
+            <div class="pc-b"><div class="pc-t">${esc(pr.name || 'Презентация')}</div>
+            <div class="pc-m"><span class="st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span> · ${FLAB[x.defaultFormat] || x.defaultFormat} · ${esc(upd)}</div>${pub}</div></a>`;
+        }).join('');
+        const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Презентации · Lumen</title>
+<style>body{margin:0;background:#f4f2ec;color:#201c17;font-family:-apple-system,system-ui,sans-serif}.wrap{max-width:960px;margin:0 auto;padding:28px 22px}
+h1{font-weight:600;font-size:26px;margin:0 0 4px}.sub{color:#8a8178;font-size:13px;margin-bottom:22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.pc{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e7e1d5;border-radius:14px;overflow:hidden;transition:box-shadow .15s}
+.pc:hover{box-shadow:0 10px 30px rgba(40,30,15,.12)}
+.pc-img{height:140px;background:#efe9dc center/cover no-repeat}
+.pc-b{padding:13px 15px}.pc-t{font-weight:600;font-size:15px;margin-bottom:5px}
+.pc-m{font-size:12px;color:#8a8178}.st{font-weight:600}.st-ready{color:#2e7d52}.st-draft{color:#b26a00}
+.pub{display:inline-block;margin-top:8px;font-size:12.5px;color:#8a6d3b;font-weight:600}
+.empty{color:#8a8178;font-size:14px;padding:40px 0;text-align:center}
+.top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+a.back{color:#8a6d3b;text-decoration:none;font-size:13px;font-weight:600}</style></head>
+<body><div class="wrap"><div class="top"><h1>Мои презентации</h1><a class="back" href="/">← в CRM</a></div>
+<div class="sub">Создавайте новые из карточки объекта → кнопка «Презентация». Здесь — список уже собранных.</div>
+${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пока нет презентаций. Откройте объект в CRM и нажмите «Презентация».</div>'}
+</div></body></html>`;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(html);
+        return;
+      }
       // editor shell
       if ((mm = p.match(/^\/pres\/(pres_[a-f0-9]+)$/)) && req.method === 'GET') {
         const R = presAuth();
