@@ -6771,15 +6771,26 @@ async function renderChat(id, rebuild) {
     renderChat(id, false);
   });
   $('#followupBtn')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget; const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Генерирую…';
-    try {
-      const r = await api.post(`/leads/${id}/followup`, {});
-      if (r.ok && r.text) {
-        const ta = $('#composerText'); if (ta) { ta.value = r.text; ta.focus(); try { ta.setSelectionRange(r.text.length, r.text.length); } catch (_) {} ta.dispatchEvent(new Event('input')); }
-        toast('Follow-up готов', 'Проверьте текст и отправьте', true);
-      } else { toast('Не вышло', r.error || 'пустой ответ'); }
-    } catch (err) { toast('Не вышло', err.message); }
+    const btn = e.currentTarget; const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Анализирую чат…';
+    let r; try { r = await api.post(`/leads/${id}/followup/variants`, {}); } catch (err) { r = { ok: false, error: err.message }; }
     btn.disabled = false; btn.innerHTML = old;
+    const variants = (r && r.variants) || [];
+    if (!variants.length) {   /* фолбэк на одиночный дожим */
+      try { const r2 = await api.post(`/leads/${id}/followup`, {}); if (r2.ok && r2.text) { const ta = $('#composerText'); if (ta) { ta.value = r2.text; ta.focus(); ta.dispatchEvent(new Event('input')); } toast('Follow-up готов', 'Проверьте и отправьте', true); return; } } catch (_) {}
+      toast('Не вышло', (r && r.error) || 'пусто'); return;
+    }
+    const cards = variants.map((v, i) => `<div class="fu-card" data-fu="${i}">
+      <div class="fu-h"><span class="fu-ap">${v.form === 'voice' ? ic(I.mic || I.phone) : ic(I.spark)}${esc(v.approach)}</span><span class="fu-form ${v.form}">${v.form === 'voice' ? 'голосовое' : 'текст'}</span></div>
+      <div class="fu-tx">${esc(v.text).replace(/\n/g, '<br>')}</div>
+      <div class="fu-btns"><button class="btn btn-sm fu-ins" data-i="${i}">${v.form === 'voice' ? 'Вставить скрипт' : 'Вставить'}</button>${v.form === 'voice' ? '' : `<button class="btn btn-sm btn-accent fu-snd" data-i="${i}">Отправить</button>`}</div>
+    </div>`).join('');
+    const colCard = `<div class="fu-card fu-action"><div class="fu-h"><span class="fu-ap">${ic(I.layers)}Подборка объектов</span><span class="fu-form act">действие</span></div><div class="fu-tx">Собрать и отправить персональную подборку под запрос — часто цепляет сильнее текста.</div><div class="fu-btns"><button class="btn btn-sm btn-accent" id="fuCollect">Собрать подборку</button></div></div>`;
+    modal({ title: 'Как подтолкнуть — выберите заход', sub: 'Разные углы на основе всего диалога и библиотеки цепочек. Голосовое часто оживляет молчащего клиента.', wide: true, body: `<div class="fu-grid">${cards}${colCard}</div>`, actions: [{ label: 'Закрыть' }] });
+    setTimeout(() => {
+      $$('.fu-ins').forEach(b => b.addEventListener('click', () => { const v = variants[+b.dataset.i]; const ta = $('#composerText'); if (ta) { ta.value = v.text; ta.focus(); ta.dispatchEvent(new Event('input')); } closeModal(); toast(v.form === 'voice' ? 'Скрипт вставлен' : 'Вставлено', v.form === 'voice' ? 'Запишите голосовое с этим текстом' : 'Проверьте и отправьте', true); }));
+      $$('.fu-snd').forEach(b => b.addEventListener('click', async () => { const v = variants[+b.dataset.i]; try { await api.post(`/leads/${id}/message`, { text: v.text }); closeModal(); toast('Отправлено клиенту', null, true); renderChat(id, false); } catch (e) { toast('Не отправилось', e.message); } }));
+      const fc = $('#fuCollect'); if (fc) fc.addEventListener('click', async () => { fc.disabled = true; fc.textContent = 'Собираю…'; try { const cr = await api.post(`/leads/${id}/auto-collection`, {}); closeModal(); toast('Подборка собрана', `${cr.count} объектов — открываю`, true); if (cr.id) window.open('/p/' + cr.id + (cr.editKey ? '?edit=1&key=' + cr.editKey : ''), '_blank'); } catch (e) { fc.disabled = false; fc.textContent = 'Собрать подборку'; toast('Не вышло', e.message); } });
+    }, 40);
   });
   $('#composerText').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#sendBtn').click(); } // Shift+Enter — перенос строки

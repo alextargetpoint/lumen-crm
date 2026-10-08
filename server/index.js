@@ -7604,6 +7604,14 @@ const server = http.createServer(async (req, res) => {
       }
       return json(res, 200, { ok: true, sent: false, text });   /* черновик для правки в поле ввода */
     }
+    /* ВАРИАТИВНЫЙ ДОЖИМ: несколько РАЗНЫХ заходов за раз (разные методологии + форма голосового) — брокер выбирает угол */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/followup\/variants$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 200, { ok: false, variants: [], error: 'нет LLM-ключа' });
+      try { const variants = await llm.followupVariants(db, lead, 4); return json(res, 200, { ok: true, variants }); }
+      catch (e) { console.error('[followup-variants]', e.message); return json(res, 200, { ok: false, variants: [], error: e.message }); }
+    }
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/summary$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });

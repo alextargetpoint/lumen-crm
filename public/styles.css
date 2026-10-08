@@ -8831,3 +8831,16 @@ body.client-view [data-team]{ display:none !important; }
 .vp-rate{flex:0 0 auto;border:0;background:rgba(0,0,0,.09);border-radius:12px;padding:3px 9px;font-size:11.5px;font-weight:700;color:var(--accent,#1f1b17);cursor:pointer;font-variant-numeric:tabular-nums}
 .vp-rate:hover{background:rgba(0,0,0,.15)}
 .vp-play:focus-visible,.vp-rate:focus-visible,.vp-seek:focus-visible{outline:2px solid var(--accent,#1f1b17);outline-offset:2px}
+
+/* ── Вариативный «Подтолкнуть» (H): выбор захода дожима ── */
+.fu-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:62vh;overflow:auto;padding:2px}
+.fu-card{border:1px solid var(--stroke);border-radius:12px;padding:13px 14px;background:var(--card);display:flex;flex-direction:column;gap:9px}
+.fu-card.fu-action{background:var(--bg-2)}
+.fu-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.fu-ap{display:inline-flex;align-items:center;gap:6px;font-weight:650;font-size:13.5px}
+.fu-ap svg{width:15px;height:15px;color:var(--accent);flex:0 0 auto}
+.fu-form{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);background:var(--bg-2);border-radius:20px;padding:3px 8px;flex:0 0 auto}
+.fu-form.voice{color:var(--accent);background:rgba(0,0,0,.06)}
+.fu-tx{font-size:13px;line-height:1.5;color:var(--ink-2,#444);flex:1}
+.fu-btns{display:flex;gap:8px}
+@media(max-width:640px){.fu-grid{grid-template-columns:1fr}}

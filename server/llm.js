@@ -437,6 +437,34 @@ ${chainAngles ? '\nПРОВЕРЕННЫЕ УГЛЫ ЦЕПОЧЕК АГЕНТСТ
   throw new Error('брак LLM (followup): ' + lastBad);
 }
 
+/* ВАРИАТИВНЫЙ ДОЖИМ: несколько РАЗНЫХ заходов за раз (разные методологии + форма голосового),
+   чтобы брокер выбирал угол, а не спамил один и тот же перенос созвона. */
+async function followupVariants(db, lead, n) {
+  n = Math.min(5, Math.max(2, n || 4));
+  const history = db.messages.filter(m => m.leadId === lead.id).slice(-14)
+    .map(m => { const who = m.dir === 'in' ? (m.media && m.media.type === 'voice' ? 'КЛИЕНТ (голосовое)' : 'КЛИЕНТ') : 'ТЫ'; return who + ': ' + (m.text || (m.media ? '[' + (m.media.type || 'медиа') + ']' : '')); }).join('\n');
+  const fuTech = ((playbook.PLAYBOOK || []).filter(p => p.cat === 'followup')).map(p => `- ${p.title}: ${p.tip}`).join('\n');
+  const chainAngles = (db.sequences || []).filter(s => s.active)
+    .flatMap(s => (s.steps || []).filter(st => st.active).slice(1).map(st => `- «${st.label || 'касание'}»: ${String(st.prompt || st.text || '').slice(0, 150)}`)).slice(0, 8).join('\n');
+  const touchCount = db.messages.filter(m => m.leadId === lead.id && m.dir === 'out').length;
+  const prevHooks = [...db.messages].reverse().filter(m => m.leadId === lead.id && m.dir === 'out').slice(0, 5).map(m => '«' + String(m.text).replace(/\s+/g, ' ').slice(0, 80) + '…»').join(' / ');
+  const lib = `БИБЛИОТЕКА ДОЖИМА. Запрещён дженерик «давайте созвонимся, покажу пару локаций» и повтор тех же слотов созвона.
+МЕТОДОЛОГИИ FOLLOW-UP:
+${fuTech}${chainAngles ? '\nУГЛЫ ЦЕПОЧЕК АГЕНТСТВА (держи их голос):\n' + chainAngles : ''}
+Это ~${touchCount}-е касание. ${prevHooks ? 'НЕ повторяй прежние заходы: ' + prevHooks : ''}`;
+  const base = buildPrompt(db, lead, history, { followup: true, followupLib: lib });
+  const prompt = base + `\n\nВерни строго JSON:
+{"variants":[{"approach":"2-3 слова — угол дожима (напр.: новая ценность / срочность очереди / рост цен / кейс с цифрами / смена формата / вопрос-крючок / мягкое прощание)","form":"text|voice","text":"готовое сообщение клиенту на ЕГО языке, короткими абзацами через \\n\\n. Для form:voice — РАЗГОВОРНЫЙ скрипт для голосового (как живой человек голосом, без канцелярита)"}]}
+Дай РОВНО ${n} РАЗНЫХ варианта: КАЖДЫЙ на ДРУГОЙ методологии из библиотеки, разные по смыслу и подаче. Обязательно минимум один form:"voice". НЕ навязывай часы созвона — если затык по времени, спроси, когда удобно ЕМУ. Без длинных тире.`;
+  const out = await callGemini(prompt, 12000, 1200);
+  let variants = (out && Array.isArray(out.variants)) ? out.variants : [];
+  variants = variants.map(v => {
+    let raw = humanize(String(v.text || '').trim()); const s = stripLeadGreeting(raw); if (s && s.length >= 5) raw = s;
+    return { approach: String(v.approach || 'угол').slice(0, 40), form: v.form === 'voice' ? 'voice' : 'text', text: raw.slice(0, 650) };
+  }).filter(v => v.text && !validateReply(db, lead, v.text));
+  return variants.slice(0, n);
+}
+
 /* ИИ-сводка по лиду: вся хронология → 3-5 предложений для брокера */
 async function summarize(db, lead) {
   const history = db.messages
@@ -1604,6 +1632,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, followup, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, followup, followupVariants, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
