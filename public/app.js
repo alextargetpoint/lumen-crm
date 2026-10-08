@@ -6625,6 +6625,30 @@ async function openHandoverPreview(id) {
 
 const COMPOSER_CH = {};   /* выбранный канал ручного касания по лиду (переживает ре-рендеры поллинга) */
 const CH_META = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], email: ['E-mail', '#E8833A'], viber: ['Viber', '#7360F2'] };
+/* ── Голосовой плеер: доступный, со скоростями (1/1.5/2×), дефолт 1.5× (запоминается). ── */
+const VP_PLAY = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+const VP_PAUSE = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+const VP_RATES = [1, 1.5, 2];
+let VOICE_RATE = (() => { try { return parseFloat(localStorage.getItem('lumen_voiceRate') || '1.5') || 1.5; } catch (e) { return 1.5; } })();
+function wireVoicePlayers(scope) {
+  (scope || document).querySelectorAll('.vp:not([data-wired])').forEach(vp => {
+    vp.setAttribute('data-wired', '1');
+    const au = new Audio(); au.preload = 'none'; au.src = vp.dataset.src;
+    const play = vp.querySelector('.vp-play'), seek = vp.querySelector('.vp-seek'), time = vp.querySelector('.vp-time'), rate = vp.querySelector('.vp-rate');
+    let dur = 0;
+    const fmt = s => { s = Math.max(0, s | 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    rate.textContent = VOICE_RATE + '×';
+    const setIcon = p => { play.innerHTML = p ? VP_PAUSE : VP_PLAY; play.setAttribute('aria-label', p ? 'Пауза' : 'Воспроизвести голосовое'); };
+    play.addEventListener('click', () => { if (au.paused) { document.querySelectorAll('.vp audio').forEach(a => a !== au && a.pause()); au.playbackRate = VOICE_RATE; au.play().catch(() => {}); } else au.pause(); });
+    au.addEventListener('play', () => setIcon(true)); au.addEventListener('pause', () => setIcon(false));
+    au.addEventListener('ended', () => { setIcon(false); seek.value = 0; time.textContent = fmt(dur); });
+    au.addEventListener('loadedmetadata', () => { dur = isFinite(au.duration) ? au.duration : 0; time.textContent = fmt(dur); });
+    au.addEventListener('timeupdate', () => { if (dur) { seek.value = Math.round(au.currentTime / dur * 1000); time.textContent = fmt(dur - au.currentTime); } });
+    seek.addEventListener('input', () => { if (dur) au.currentTime = seek.value / 1000 * dur; });
+    rate.addEventListener('click', () => { VOICE_RATE = VP_RATES[(VP_RATES.indexOf(VOICE_RATE) + 1) % VP_RATES.length]; try { localStorage.setItem('lumen_voiceRate', VOICE_RATE); } catch (e) {} document.querySelectorAll('.vp .vp-rate').forEach(r => r.textContent = VOICE_RATE + '×'); au.playbackRate = VOICE_RATE; });
+    setIcon(false);
+  });
+}
 async function renderChat(id, rebuild) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
@@ -6648,7 +6672,7 @@ async function renderChat(id, rebuild) {
     const _mt = m.media && m.media.type;
     const media = m.media && m.media.url ? (
       _mt === 'video' ? `<video class="bubble-media" src="${esc(m.media.url)}" controls playsinline preload="metadata"></video>`
-      : (_mt === 'voice' || _mt === 'audio') ? `<audio class="bubble-audio" src="${esc(m.media.url)}" controls preload="none" style="display:block;max-width:230px;height:38px;margin:3px 0"></audio>`
+      : (_mt === 'voice' || _mt === 'audio') ? `<div class="vp" data-src="${esc(m.media.url)}" role="group" aria-label="Голосовое сообщение"><button class="vp-play" type="button" aria-label="Воспроизвести голосовое">${VP_PLAY}</button><input class="vp-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Перемотка голосового"><span class="vp-time" aria-hidden="true">0:00</span><button class="vp-rate" type="button" aria-label="Скорость воспроизведения">${(parseFloat(localStorage.getItem('lumen_voiceRate') || '1.5') || 1.5)}×</button></div>`
       : _mt === 'document' ? `<a class="bubble-doc" href="${esc(m.media.url)}" target="_blank" style="color:inherit;display:inline-flex;gap:7px;align-items:center;text-decoration:none;font-weight:600">${ic(I.doc || I.file || I.paper)}${esc(m.media.name || 'файл')}</a>`
       : `<img class="bubble-media" src="${esc(m.media.url)}" loading="lazy" alt="креатив">`) : '';
     return sep + `<div class="bubble ${m.dir}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
@@ -6846,6 +6870,7 @@ async function renderChat(id, rebuild) {
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') { saved = true; vEl.innerHTML = old; } });
     inp.addEventListener('blur', save);
   }));
+  wireVoicePlayers(panel);   /* G: кастомные голосовые плееры со скоростью (1/1.5/2×) */
   const hb = $('#handoverBtn');
   if (hb) hb.addEventListener('click', () => openHandoverPreview(id));
   $('#meetBtn').addEventListener('click', () => openMeetingModal(l, () => renderChat(id, true)));
@@ -17818,6 +17843,15 @@ PAGES.settings = async (root) => {
     ${coll(`${ic(I.phone)}Телефония — звонки в карточку`, telForm, { open: false })}
     ${coll(`${ic(I.cal || I.chat)}Zoom — авто-ссылки и запись встреч`, zoomForm, { open: false })}
     ${coll(`${ic(I.cal || I.chat)}Google Meet — авто-ссылки встреч`, gmeetForm, { open: false })}
+    ${coll(`${ic(I.mic || I.phone)}Нотетейкер звонков · фоновая запись → карточка лида`, `
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <img src="/assets/notetaker/icon.png" alt="" style="width:46px;height:46px;border-radius:11px;flex:0 0 auto">
+        <div style="flex:1;min-width:200px"><div class="muted" style="font-size:12.5px;line-height:1.55">Приложение для мака: пишет и расшифровывает звонки и видео-встречи (Zoom/Meet/Teams) <b>локально</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент не видит плашку записи. Вход — вашим аккаунтом дашборда.</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download style="text-decoration:none">${ic(I.doc)}Скачать для macOS</a>
+          <a class="btn btn-sm" href="/notetaker.html" target="_blank" style="text-decoration:none">Гайд по установке</a>
+        </div>
+      </div>`, { open: false })}
 
     <div class="set-sec-h">${ic(I.spark)}ИИ и автоматизация</div>
     ${coll(`${ic(I.spark)}Движок ИИ`, aiForm, { open: false })}

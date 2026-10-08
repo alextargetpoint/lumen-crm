@@ -8819,3 +8819,15 @@ body.client-view [data-team]{ display:none !important; }
 .lc-more.open .lc-more-chev{transform:rotate(180deg)}
 .lc-more-body{padding:4px 14px 12px}
 .lc-callrow{gap:8px}
+
+/* ── Голосовой плеер в переписке (G): доступный, со скоростью ── */
+.vp{display:inline-flex;align-items:center;gap:9px;background:rgba(0,0,0,.05);border-radius:20px;padding:6px 10px 6px 6px;max-width:270px;min-width:210px;margin:3px 0}
+.bubble.out .vp{background:rgba(0,0,0,.07)}
+.vp-play{width:32px;height:32px;flex:0 0 auto;border-radius:50%;border:0;background:var(--accent,#1f1b17);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.vp-seek{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;background:rgba(0,0,0,.18);outline:none;cursor:pointer}
+.vp-seek::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent,#1f1b17);cursor:pointer}
+.vp-seek::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--accent,#1f1b17);cursor:pointer}
+.vp-time{font-size:11.5px;color:var(--ink-3,#777);font-variant-numeric:tabular-nums;min-width:30px;text-align:right}
+.vp-rate{flex:0 0 auto;border:0;background:rgba(0,0,0,.09);border-radius:12px;padding:3px 9px;font-size:11.5px;font-weight:700;color:var(--accent,#1f1b17);cursor:pointer;font-variant-numeric:tabular-nums}
+.vp-rate:hover{background:rgba(0,0,0,.15)}
+.vp-play:focus-visible,.vp-rate:focus-visible,.vp-seek:focus-visible{outline:2px solid var(--accent,#1f1b17);outline-offset:2px}
