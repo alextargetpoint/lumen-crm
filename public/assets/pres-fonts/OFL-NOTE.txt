@@ -1,0 +1,2 @@
+Fonts: Cormorant Garamond, Prata, Manrope, Golos Text, Onest, Inter, EB Garamond — all SIL OFL 1.1.
+Source: Google Fonts. Self-hosted subsets (cyrillic/ext, latin/ext). SHA256 in SHA256-MANIFEST.txt.

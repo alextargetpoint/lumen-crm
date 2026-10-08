@@ -20,3 +20,7 @@ data/
 # Local Netlify folder
 .netlify
 public/assets/props/prop_*
+
+# presentation builder test fixtures
+public/_presdemo.html
+public/assets/_presdemo/

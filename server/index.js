@@ -147,6 +147,20 @@ const inventory = require('./inventory');
 const tgbridge = require('./tgbridge'); /* двусторонний мост Telegram ⇄ WhatsApp (брокер отвечает с телефона) */
 const mailer = require('./email'); /* SaaS-почта: Atelier-шаблоны (RU/EN) + Resend + конструктор в админке */
 const design = require('./design'); /* Ф1: движок арт-дирекшна подборок (design.js) */
+const presentation = require('./presentation'); /* Конструктор презентаций v2 (ТЗ Lumen_Developer_Package) */
+presentation.setTidGetter(() => store.currentTid());
+function baseUrl(req) { const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0] || (req.socket && req.socket.encrypted ? 'https' : 'http'); return `${proto}://${req.headers.host || 'app.lumen247.com'}`; }
+async function qrDataUrl(text) { try { return await require('qrcode').toDataURL(String(text), { margin: 1, width: 320 }); } catch (e) { return ''; } }
+function TOK_has(kind, id) { const K = presentation.TOK; const arr = kind === 'palette' ? K.PALETTES : kind === 'fontPair' ? K.FONT_PAIRS : K.FORMATS; return arr.some(x => x.id === id); }
+function presEditorShell(id) {
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Конструктор презентации · Lumen</title>
+<link rel="stylesheet" href="/pres-styles.css"><link rel="stylesheet" href="/presedit.css?v=1">
+<script>window.__PRES_ID=${JSON.stringify(id)};</script></head>
+<body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
+<script src="/pres-tokens.js?v=1"></script><script src="/pres-templates.js?v=1"></script><script src="/presedit.js?v=1"></script>
+</body></html>`;
+}
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
 const shot = require('./shot'); /* серверный скриншот (chrome-headless-shell) для автономного QA-цикла */
 const playbook = require('./playbook');
@@ -1111,6 +1125,8 @@ function publicTenantFor(p) {
   if ((m = p.match(/^\/m\/(mt_[\w]+)/))) { const id = m[1]; return findTenant(() => (store.get().meetings || []).some(x => x.id === id)); }
   /* визитка брокера /b/:id */
   if ((m = p.match(/^\/b\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().brokers || []).some(x => x.id === id || x.cardId === id)); }
+  /* публичная презентация /pv/:token (опубликованный снимок конструктора v2) */
+  if ((m = p.match(/^\/pv\/([a-f0-9]+)/))) { const tok = m[1]; return findTenant(() => (store.get().presentations || []).some(x => x.publicToken === tok)); }
   /* страница воспроизведения медиа из письма /e/:id */
   if ((m = p.match(/^\/e\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => !!(store.get().emailMedia && store.get().emailMedia[id])); }
   /* отписка от рассылок /u/:token */
@@ -16029,6 +16045,159 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
 </body></html>`);
       return;
     }
+
+    /* ============================================================
+       КОНСТРУКТОР ПРЕЗЕНТАЦИЙ v2 (ТЗ Lumen_Developer_Package)
+       data: db.presentations[] (черновики + inline snapshots + publicToken)
+       ============================================================ */
+    {
+      const presAuth = () => { const R = sessionRole(req); return (R && (R.role === 'owner' || R.role === 'broker')) ? R : null; };
+      const presCanEdit = (R, pres) => R.role === 'owner' || pres.brokerId === R.brokerId;
+      const presList = () => (db.presentations = db.presentations || []);
+      const presFind = (id) => presList().find(x => x.id === id);
+      const presBroker = (pres) => (db.brokers || []).find(b => b.id === pres.brokerId) || null;
+      let mm;
+
+      // catalog
+      if (p === '/api/presentations' && req.method === 'GET') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const items = presList().filter(x => R.role === 'owner' || x.brokerId === R.brokerId).map(x => {
+          const pr = (db.properties || []).find(pp => pp.id === x.projectId) || {};
+          return { id: x.id, projectId: x.projectId, title: pr.name || 'Презентация', brokerId: x.brokerId, status: x.status || 'draft', defaultFormat: x.defaultFormat, updatedAt: x.updatedAt, thumb: (pr.images || [])[0] || '', hasPublic: !!x.publicToken };
+        }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        return json(res, 200, { items });
+      }
+      // create from property
+      if (p === '/api/presentations' && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const b = await readBody(req);
+        const pr = (db.properties || []).find(x => x.id === b.projectId);
+        if (!pr) return json(res, 404, { error: 'property not found' });
+        // broker: explicit → lead's broker → self (if broker) → first broker (owner default)
+        let brokerId = b.brokerId || (R.role === 'broker' ? R.brokerId : null);
+        if (!brokerId && b.leadId) { const ld = (db.leads || []).find(l => l.id === b.leadId); if (ld && ld.broker) brokerId = ld.broker; }
+        const broker = (db.brokers || []).find(x => x.id === brokerId) || null;
+        const pres = presentation.draftFromProperty(db, pr, broker);
+        presList().unshift(pres); store.save();
+        return json(res, 200, pres);
+      }
+      // read (full for editor, or meta)
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)$/)) && req.method === 'GET') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        if (u.searchParams.get('full') === '1') {
+          const pr = (db.properties || []).find(x => x.id === pres.projectId) || {};
+          const broker = presBroker(pres);
+          return json(res, 200, {
+            pres, source: pr, assets: presentation.assetsForProperty(pr),
+            brand: presentation.brandFor(db, broker), broker,
+            brokers: (db.brokers || []).map(x => ({ id: x.id, name: x.name })),
+          });
+        }
+        return json(res, 200, pres);
+      }
+      // patch (optimistic concurrency, TZ §21)
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)$/)) && req.method === 'PATCH') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req);
+        if (b.expectedRevision != null && +b.expectedRevision !== (pres.draftRevision || 1))
+          return json(res, 409, { error: 'VERSION_CONFLICT', currentRevision: pres.draftRevision });
+        const ch = b.changes || b.patch || {};
+        if (ch.theme && typeof ch.theme === 'object') {
+          if (ch.theme.paletteId && TOK_has('palette', ch.theme.paletteId)) pres.theme.paletteId = ch.theme.paletteId;
+          if (ch.theme.fontPairId && TOK_has('fontPair', ch.theme.fontPairId)) pres.theme.fontPairId = ch.theme.fontPairId;
+        }
+        if (ch.defaultFormat && TOK_has('format', ch.defaultFormat)) pres.defaultFormat = ch.defaultFormat;
+        if (Array.isArray(ch.orderedSections)) pres.orderedSections = ch.orderedSections;
+        if (ch.brokerAppendix && typeof ch.brokerAppendix === 'object') pres.brokerAppendix = Object.assign(pres.brokerAppendix || {}, ch.brokerAppendix);
+        if (ch.brokerId !== undefined) { pres.brokerId = ch.brokerId; if (pres.brokerAppendix) { pres.brokerAppendix.enabled = !!ch.brokerId; pres.brokerAppendix.profileId = ch.brokerId; } }
+        if (ch.status && ['draft', 'ready', 'archived'].includes(ch.status)) pres.status = ch.status;
+        pres.draftRevision = (pres.draftRevision || 1) + 1; pres.updatedAt = Date.now(); pres.updatedBy = R.brokerId || 'owner';
+        store.save();
+        return json(res, 200, { ok: true, revision: pres.draftRevision });
+      }
+      // validate / preflight
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/validate$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req).catch(() => ({}));
+        return json(res, 200, presentation.validate(db, pres, (b && b.format) || pres.defaultFormat));
+      }
+      // snapshot (freeze)
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/snapshot$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req).catch(() => ({}));
+        const snap = presentation.makeSnapshot(db, pres, (b && b.format) || pres.defaultFormat);
+        pres.snapshots = (pres.snapshots || []).concat(snap).slice(-10); pres.updatedAt = Date.now(); store.save();
+        return json(res, 200, { snapshotId: snap.id, contentHash: snap.contentHash, format: snap.format });
+      }
+      // publish → public link (TZ §20)
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/publish$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req).catch(() => ({}));
+        const chk = presentation.validate(db, pres, (b && b.format) || pres.defaultFormat);
+        if (!chk.ok) return json(res, 400, { error: 'PREFLIGHT_FAILED', issues: chk.issues });
+        const snap = presentation.makeSnapshot(db, pres, (b && b.format) || pres.defaultFormat);
+        // attach broker QR to the published snapshot (real link, TZ §19)
+        if (snap.broker && snap.broker.channels) { try { snap.broker.qr = await qrDataUrl(`${baseUrl(req)}/pv/${pres.publicToken || ''}`); } catch (e) {} }
+        pres.snapshots = (pres.snapshots || []).concat(snap).slice(-10);
+        if (!pres.publicToken) pres.publicToken = crypto.randomBytes(8).toString('hex');
+        pres.publishedSnapshotId = snap.id; pres.status = 'ready'; pres.updatedAt = Date.now();
+        // regenerate QR now that token exists
+        if (snap.broker && snap.broker.channels) { try { snap.broker.qr = await qrDataUrl(`${baseUrl(req)}/pv/${pres.publicToken}`); } catch (e) {} }
+        store.save();
+        return json(res, 200, { token: pres.publicToken, url: `${baseUrl(req)}/pv/${pres.publicToken}`, snapshotId: snap.id });
+      }
+      // archive / delete
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)$/)) && req.method === 'DELETE') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        pres.status = 'archived'; pres.updatedAt = Date.now(); store.save();
+        return json(res, 200, { ok: true });
+      }
+
+      // ---- pages ----
+      // editor shell
+      if ((mm = p.match(/^\/pres\/(pres_[a-f0-9]+)$/)) && req.method === 'GET') {
+        const R = presAuth();
+        const pres = presFind(mm[1]);
+        if (!R) { res.writeHead(302, { Location: '/' }); res.end(); return; }
+        if (!pres || !presCanEdit(R, pres)) { res.writeHead(404); res.end('not found'); return; }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(presEditorShell(pres.id));
+        return;
+      }
+      // print view (live draft) for Save-as-PDF
+      if ((mm = p.match(/^\/pres\/(pres_[a-f0-9]+)\/print$/)) && req.method === 'GET') {
+        const R = presAuth(); const pres = presFind(mm[1]);
+        if (!R || !pres || !presCanEdit(R, pres)) { res.writeHead(403); res.end(); return; }
+        const fmt = u.searchParams.get('format') || pres.defaultFormat;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(presentation.documentHTML(db, pres, presBroker(pres), { format: fmt, print: true }));
+        return;
+      }
+      // public view (published snapshot)
+      if ((mm = p.match(/^\/pv\/([a-f0-9]+)$/)) && req.method === 'GET') {
+        const pres = presList().find(x => x.publicToken === mm[1]);
+        if (!pres || !pres.publishedSnapshotId) { res.writeHead(404); res.end('Презентация не найдена'); return; }
+        const snap = (pres.snapshots || []).find(s => s.id === pres.publishedSnapshotId);
+        if (!snap) { res.writeHead(404); res.end('Снимок не найден'); return; }
+        if (!pres._pubViews || Date.now() - (pres._lastPubView || 0) > 60e3) { pres._pubViews = (pres._pubViews || 0) + 1; pres._lastPubView = Date.now(); store.save(); }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(presentation.documentFromSnapshot(snap, { title: presentation.titleOf(db, pres) }));
+        return;
+      }
+    }
+
 
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 
