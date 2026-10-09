@@ -54,6 +54,12 @@ function assetsForProperty(pr) {
   return m;
 }
 const absUrl = (u) => (u && /^assets\//.test(u)) ? '/' + u : (u || '');
+/* карта ассетов документа: подборка несёт свою мердж-карту (неймспейс o{k}_), объект — по projectId */
+function assetsFor(db, pres) {
+  if (pres && pres.collectionAssets) return pres.collectionAssets;
+  const pr = (db.properties || []).find(p => p.id === (pres && pres.projectId)) || {};
+  return assetsForProperty(pr);
+}
 
 /* ---------- content-binding helpers ---------- */
 const ov = (v) => ({ mode: 'override', value: v });
@@ -160,6 +166,56 @@ function draftFromProperty(db, pr, broker) {
     updatedAt: Date.now(), updatedBy: null,
   };
 }
+/* ---------- ADAPTER: несколько объектов → мульти-объектная подборка (ТЗ v3 §9,§10) ----------
+   Переиспользует draftFromProperty для каждого объекта; ассеты неймспейсятся o{k}_ и
+   собираются в collectionAssets (одна мердж-карта). Структура §10: Вступление → Объект₁..ₙ →
+   [Сравнение/Рекомендация — позже] → ОДНА пара страниц брокера в конце (brokerAppendix).
+   Рендер/снимок/проекция/валидация работают без изменений через assetsFor(). */
+function draftCollection(db, properties, broker, opts) {
+  opts = opts || {};
+  const props = (properties || []).filter(Boolean);
+  const sections = []; const assets = {};
+  const sid = () => 's' + hex(3);
+  const first = props[0] || {};
+  const gi0 = geoInfo(first.geo);
+  // Вступление / обложка подборки (персонализируется первой страницей — ТЗ §9 шаг2)
+  const introImg = (first.images || [])[0];
+  if (introImg) assets['intro_hero'] = { url: absUrl(introImg) };
+  sections.push({
+    id: sid(), family: 'hero', enabled: true,
+    assetRefs: introImg ? [{ assetId: 'intro_hero', role: 'hero', fit: 'cover', focalPoint: { x: .5, y: .5 } }] : [],
+    contentBindings: {
+      title: ov(opts.title || 'Подборка объектов'),
+      subtitle: opts.greeting ? ov(opts.greeting) : ov(''),
+      locationLabel: ov(opts.clientName ? ['Подготовлено для ' + opts.clientName] : [gi0.region, gi0.country].filter(Boolean)),
+      metrics: ov([{ value: String(props.length), label: props.length === 1 ? 'объект' : 'объектов', icon: 'home' }]),
+    },
+  });
+  // Объекты: секции каждого объекта с неймспейсом ассетов (без его собственного брокер-финала)
+  props.forEach((pr, k) => {
+    const d = draftFromProperty(db, pr, null);
+    const amap = assetsForProperty(pr);
+    const ns = 'o' + k + '_';
+    Object.keys(amap).forEach(key => { assets[ns + key] = amap[key]; });
+    (d.orderedSections || []).filter(s => s.family !== 'broker').forEach(s => {
+      sections.push(Object.assign({}, s, {
+        id: ns + s.id,
+        assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })),
+      }));
+    });
+  });
+  return {
+    id: 'coll_' + hex(5), kind: 'collection', schemaVersion: SCHEMA_VERSION, tenantId: store_currentTid(),
+    brokerId: broker ? broker.id : null, clientId: opts.clientId || null,
+    projectId: null, projectIds: props.map(p => p.id), title: opts.title || 'Подборка объектов',
+    locale: 'ru-RU', draftRevision: 1, sourceRevision: 'crm',
+    theme: { paletteId: opts.paletteId || defaultPalette(first.geo), fontPairId: 'editorial' },
+    defaultFormat: opts.format || 'portrait_a4', status: 'draft',
+    orderedSections: sections, collectionAssets: assets,
+    brokerAppendix: { enabled: !!(broker && broker.name), profileId: broker ? broker.id : null, pageTypes: ['broker_intro', 'broker_contacts'] },
+    updatedAt: Date.now(), updatedBy: null,
+  };
+}
 let _tidGetter = () => 'primary';
 function store_currentTid() { try { return _tidGetter(); } catch { return 'primary'; } }
 function setTidGetter(fn) { _tidGetter = fn; }
@@ -207,7 +263,7 @@ function ctxFor(db, pres, broker, format) {
   if (brand.broker) brand.broker.points = brokerPoints(broker);
   return {
     format: format || pres.defaultFormat, theme: pres.theme,
-    assets: assetsForProperty(pr), brand, source: pr, opts: {},
+    assets: assetsFor(db, pres), brand, source: pr, opts: {},
   };
 }
 function brokerPoints(b) {
@@ -271,6 +327,7 @@ ${opts.noindex !== false ? '<meta name="robots" content="noindex,nofollow">' : '
 </head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script></body></html>`;
 }
 function titleOf(db, pres) {
+  if (pres && pres.kind === 'collection') return pres.title || 'Подборка объектов';
   const pr = (db.properties || []).find(p => p.id === pres.projectId);
   return (pr && pr.name) || 'Презентация';
 }
@@ -279,7 +336,7 @@ function titleOf(db, pres) {
 function validate(db, pres, format) {
   const issues = [];
   const pr = (db.properties || []).find(p => p.id === pres.projectId) || {};
-  const assets = assetsForProperty(pr);
+  const assets = assetsFor(db, pres);
   const enabled = (pres.orderedSections || []).filter(s => s.enabled !== false);
   if (!enabled.length) issues.push({ code: 'EMPTY_DOC', severity: 'blocking', message: 'Нет ни одной включённой страницы', suggestedAction: 'Выберите структуру' });
 
@@ -337,10 +394,11 @@ function makeSnapshot(db, pres, format) {
   const fmt = format || pres.defaultFormat;
   const doc = withBrokerAppendix(pres);
   const pr = (db.properties || []).find(p => p.id === pres.projectId) || {};
+  const amap = assetsFor(db, pres);
   // resolve bindings to concrete values (freeze)
   const resolvedSections = (doc.orderedSections || []).filter(s => s.enabled !== false).map(s => ({
     id: s.id, family: s.family, pageType: s.pageType || null,
-    content: T.content(s, pr), assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { url: (assetsForProperty(pr)[r.assetId] || {}).url || r.url })),
+    content: T.content(s, pr), assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { url: (amap[r.assetId] || {}).url || r.url })),
   }));
   const snap = {
     id: 'snap_' + hex(6), presentationId: pres.id, revision: pres.draftRevision,
@@ -387,7 +445,7 @@ function publicProjection(snap) {
 
 module.exports = {
   SCHEMA_VERSION, RENDERER_VERSION, TOK, T,
-  draftFromProperty, brandFor, assetsForProperty, renderPages, withBrokerAppendix,
+  draftFromProperty, draftCollection, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
 };
