@@ -594,8 +594,13 @@ function renderDesignDoc(db, c, opts) {
     plan.length = 0; plan.push(...fp);
   }
   const P = dna.pal;
-  const cur = (p) => p && p.currency === 'EUR' ? '€' : '$';
+  /* ⚠️ ВАЛЮТА: раньше всё, кроме EUR, слепо печаталось как «$» — у Trust Phuket цены в ฿ выходили долларами.
+     Теперь реальная карта символов по коду валюты объекта; незнакомый код — сам код с пробелом (не «$»). */
+  const CUR_SYM = { USD: '$', EUR: '€', THB: '฿', RUB: '₽', AED: 'AED ', GBP: '£', SGD: 'S$', CHF: 'CHF ' };
+  const cur = (p) => { const c = String((p && p.currency) || '').toUpperCase(); return CUR_SYM[c] || (c ? c + ' ' : '$'); };
   const money = (n, p) => cur(p) + Number(n || 0).toLocaleString('ru-RU');
+  /* в подборке несколько объектов могут быть в РАЗНЫХ валютах — не сравнивать/складывать их напрямую (см. сравнение) */
+  const mixedCurrencies = () => { const s = new Set(props.map(p => p.currency).filter(Boolean).map(x => String(x).toUpperCase())); return s.size > 1; };
   const abs = (u) => u && /^assets\//.test(u) ? '/' + u : u;
   const isPrint = !!opts.print;
   const format = opts.format === 'wide' ? 'wide' : 'a4';   /* A4 (вертикаль) | wide (16:9 экран) */
@@ -605,6 +610,11 @@ function renderDesignDoc(db, c, opts) {
   const num2 = (n) => String(n).padStart(2, '0');
   const initials = (nm) => (nm || AG).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const wordmark = () => logo ? `<img class="wm-img" src="${esc(logo)}" alt="${esc(AG)}">` : `<span class="wm-tx">${esc(AG)}</span>`;
+  /* ⚠️ КЛИЕНТСКАЯ ОБЛОЖКА: раньше в углу печаталось ВНУТРЕННЕЕ имя стиля движка («EDITORIAL LUXURY») — это
+     техническая метка, клиенту не для глаз. Заменяем на осмысленный эйбрау-направление (гео). Имя стиля
+     остаётся только в конструкторе (recompose-bar). */
+  const coverTag = String((geoNames[(props[0] || {}).geo]) || '').trim();
+  const cvTag = () => coverTag ? `<span class="cv-tag">${esc(coverTag)}</span>` : '';
 
   /* метрика-рельса (модули варьируются, не один KPI-блок ×N) */
   function metricRail(pr, variant) {
@@ -662,7 +672,7 @@ function renderDesignDoc(db, c, opts) {
     if (!d.name) return '';
     return `<div class="loc">${kicker('Локация · ' + esc(d.name))}
       ${d.blurb && !skipBlurb ? `<p class="loc-b">${esc(d.blurb)}</p>` : ''}
-      ${times.length ? `<div class="dt">${times.map(t => `<div class="dt-r"><b class="dt-min">${esc(t.min)}<i>мин</i></b><span class="dt-line"></span><span class="dt-pl">${esc(t.place)}</span></div>`).join('')}</div>` : ''}</div>`;
+      ${times.length ? `<div class="dt">${times.map(t => { const mn = Number(t.min); const badge = (mn && mn > 0) ? `${esc(String(t.min))}<i>мин</i>` : `<i class="dt-na">—</i>`; return `<div class="dt-r"><b class="dt-min">${badge}</b><span class="dt-line"></span><span class="dt-pl">${esc(t.place)}</span></div>`; }).join('')}</div>` : ''}</div>`;
   }
 
   function amenList(pr) {
@@ -736,17 +746,17 @@ function renderDesignDoc(db, c, opts) {
       const forWho = lead ? `<div class="cv-for">Подготовлено для<b>${esc(lead.name || '')}</b></div>` : '';
       if (pg.v === 'band') {
         return `<section class="page cover cv-band ${hero ? 'has' : ''}" ${hero ? `style="background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.72)),url('${esc(abs(hero.url))}');background-position:${esc(hero.focal || 'center')}"` : ''}>
-          <header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+          <header class="cv-top">${wordmark()}${cvTag()}</header>
           <div class="cv-mid"><div class="cv-kick">${esc(geo || 'Недвижимость')} · подборка</div><h1 class="cv-h">${esc(title)}</h1>${forWho}</div>
           <footer class="cv-bot">${meta}</footer></section>`;
       }
       if (pg.v === 'type') {
-        return `<section class="page cover cv-type"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+        return `<section class="page cover cv-type"><header class="cv-top">${wordmark()}${cvTag()}</header>
           <div class="cv-mid"><div class="cv-kick">${esc(geo || 'Недвижимость')} · персональная подборка</div><h1 class="cv-h xl">${esc(title)}</h1>${forWho}${meta}</div>
           <footer class="cv-bot line"><span>${esc(mgr.name || AG)}</span><span>${new Date(c.createdAt || Date.now()).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</span></footer></section>`;
       }
       if (pg.v === 'editorial') {
-        return `<section class="page cover cv-edi"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+        return `<section class="page cover cv-edi"><header class="cv-top">${wordmark()}${cvTag()}</header>
           <div class="cv-split"><div class="cv-l"><div class="cv-kick">${esc(geo || 'Недвижимость')}</div><h1 class="cv-h">${esc(title)}</h1>${c.intro ? `<p class="cv-lede">${esc(String(c.intro).split('\n')[0])}</p>` : ''}${forWho}${meta}</div>
           <div class="cv-r">${imgCell(hero, 'cover-img', geo)}</div></div>
           <footer class="cv-bot"></footer></section>`;
@@ -754,7 +764,7 @@ function renderDesignDoc(db, c, opts) {
       if (pg.v === 'splitVertical') {
         const dt = new Date(c.createdAt || Date.now()).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
         return `<section class="page cover cv-sv"><div class="sv-photo">${imgCell(hero, 'cover-img', geo)}</div>
-          <div class="sv-panel"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+          <div class="sv-panel"><header class="cv-top">${wordmark()}${cvTag()}</header>
           <div class="sv-mid"><div class="cv-kick">${esc(geo || 'Недвижимость')} · подборка</div><h1 class="cv-h">${esc(title)}</h1>${forWho}${meta}</div>
           <footer class="sv-bot"><span>${esc(mgr.name || AG)}</span><span>${dt}</span></footer></div></section>`;
       }
@@ -767,14 +777,14 @@ function renderDesignDoc(db, c, opts) {
           const pr2 = p.priceFrom ? 'от ' + money(p.priceFrom, p) : '';
           return `<li class="ix-r"><span class="ix-no">${num2(i + 1)}</span><div class="ix-tx"><b class="ix-nm">${esc(p.name)}</b>${mt ? `<span class="ix-mt">${mt}</span>` : ''}</div>${pr2 ? `<span class="ix-pr">${esc(pr2)}</span>` : ''}</li>`;
         }).join('');
-        return `<section class="page cover cv-index"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+        return `<section class="page cover cv-index"><header class="cv-top">${wordmark()}${cvTag()}</header>
           <div class="ix-head"><div class="cv-kick">${esc(geo || 'Недвижимость')} · содержание</div><h1 class="cv-h">${esc(title)}</h1>${forWho}</div>
           <ol class="ix-list">${items}</ol>
           <footer class="cv-bot line"><span>${esc(mgr.name || AG)}</span><span>${dt}</span></footer></section>`;
       }
       /* plate — фото + плавающая идентити-плашка */
       return `<section class="page cover cv-plate"><div class="cv-photo">${imgCell(hero, 'cover-img', geo)}</div>
-        <div class="cv-plate-in"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+        <div class="cv-plate-in"><header class="cv-top">${wordmark()}${cvTag()}</header>
           <div class="cv-kick">${esc(geo || 'Недвижимость')} · подборка</div><h1 class="cv-h">${esc(title)}</h1>${forWho}${meta}</div></section>`;
     },
 
