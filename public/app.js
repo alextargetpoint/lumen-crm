@@ -9441,13 +9441,13 @@ PAGES.collections = async (root) => {
         <label class="cl-premium"><input type="checkbox" id="clPremium" checked><span class="cl-chk"></span><span style="flex:1">${ic(I.spark)}<b>Премиум арт-документ</b> <span class="muted" style="font-size:11px">— авто-дизайн уровня студии (журнальный разворот, не «CRM-PDF»)</span></span></label>
         <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
         <div class="cl-props">
-          ${ordered.map(pr => { const us = (pr.units || []).filter(Boolean); const uLbl = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area)) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`; return `<div class="cl-prow">
+          ${ordered.map(pr => { const us = (pr.units || []).filter(Boolean); const uLbl = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area).replace(/\s*(m²|м²|m2|sqm|кв\.?\s*м)\s*$/i, '')) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`; return `<div class="cl-prow">
             <label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
             <span class="cl-chk"></span>
             <span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area)} · ${esc(pr.type)} · от ${fmt(pr)}</span></span>
             ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>
             ${us.length ? `<div class="cl-units" data-ppid="${pr.id}">
-              <button type="button" class="cl-units-tg" data-uall="${us.length}">${ic(I.grid)}юниты: <b class="cl-usum">все ${us.length}</b><span class="cl-ucar">${ic(I.chev)}</span></button>
+              <button type="button" class="cl-units-tg" data-uall="${us.length}">${ic(I.grid)}юниты: <b class="cl-usum">все ${us.length}</b><span class="cl-ucar">${ic(I.chev)}</span></button><button type="button" class="cl-ub" data-usel="all">Все</button><button type="button" class="cl-ub" data-usel="none">Снять</button>
               <div class="cl-units-list" hidden>${us.map((u, i) => `<label class="cl-unit ${u.status === 'sold' ? 'sold' : ''}"><input type="checkbox" data-uidx="${i}" ${u.status === 'sold' ? '' : 'checked'}><span>${uLbl(u)}</span></label>`).join('')}</div>
             </div>` : ''}
           </div>`; }).join('')}
@@ -9509,18 +9509,19 @@ PAGES.collections = async (root) => {
   $$('.cl-units', root).forEach(box => {
     const tg = $('.cl-units-tg', box), list = $('.cl-units-list', box);
     tg?.addEventListener('click', () => { list.hidden = !list.hidden; box.classList.toggle('open', !list.hidden); });
+    $$('.cl-ub', box).forEach(b => b.addEventListener('click', () => { const on = b.dataset.usel === 'all'; $$('.cl-unit input', box).forEach(ch => { ch.checked = on && !ch.closest('.cl-unit').classList.contains('sold'); }); updUSum(box); }));
     $$('.cl-unit input', box).forEach(ch => ch.addEventListener('change', () => updUSum(box)));
     updUSum(box);
   });
   const collectUnitSel = (ids) => { const sel = {}; $$('.cl-units', root).forEach(box => { const pid = box.dataset.ppid; if (!ids.includes(pid)) return; const all = $$('.cl-unit input', box); const checked = all.filter(x => x.checked); if (checked.length && checked.length < all.length) sel[pid] = checked.map(x => +x.dataset.uidx); }); return sel; };
-  const uLblC = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area)) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`;
+  const uLblC = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area).replace(/\s*(m²|м²|m2|sqm|кв\.?\s*м)\s*$/i, '')) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`;
   function openComposeModal(col, allProps) {
     if (!col) return;
     const selIds = col.propertyIds || []; const uSel = col.unitSel || {};
     const ordered = [...allProps].sort((a, b) => (selIds.includes(b.id) ? 1 : 0) - (selIds.includes(a.id) ? 1 : 0));
     const body = `<div class="cl-props" style="max-height:52vh">${ordered.map(pr => { const us = (pr.units || []).filter(Boolean); const psel = uSel[pr.id]; const inCol = selIds.includes(pr.id); return `<div class="cl-prow">
       <label class="cl-prop"><input type="checkbox" value="${pr.id}" ${inCol ? 'checked' : ''}><span class="cl-chk"></span><span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area || '')} · ${esc(pr.type || '')}</span></span></label>
-      ${us.length ? `<div class="cl-units ${inCol ? 'open' : ''}" data-ppid="${pr.id}"><button type="button" class="cl-units-tg">${ic(I.grid)}юниты: <b class="cl-usum"></b><span class="cl-ucar">${ic(I.chev)}</span></button>
+      ${us.length ? `<div class="cl-units ${inCol ? 'open' : ''}" data-ppid="${pr.id}"><button type="button" class="cl-units-tg">${ic(I.grid)}юниты: <b class="cl-usum"></b><span class="cl-ucar">${ic(I.chev)}</span></button><button type="button" class="cl-ub" data-usel="all">Все</button><button type="button" class="cl-ub" data-usel="none">Снять</button>
         <div class="cl-units-list" ${inCol ? '' : 'hidden'}>${us.map((u, i) => `<label class="cl-unit ${u.status === 'sold' ? 'sold' : ''}"><input type="checkbox" data-uidx="${i}" ${(psel ? psel.includes(i) : (u.status !== 'sold')) ? 'checked' : ''}><span>${uLblC(u)}</span></label>`).join('')}</div></div>` : ''}
     </div>`; }).join('')}</div>`;
     const md = modal({ title: 'Состав подборки', sub: 'объекты и юниты, которые войдут в документ', wide: true, body, actions: [
@@ -9536,6 +9537,7 @@ PAGES.collections = async (root) => {
     $$('.cl-units', md).forEach(box => { const tg = $('.cl-units-tg', box), list = $('.cl-units-list', box);
       const upd = () => { const all = $$('.cl-unit input', box); const n = all.filter(x => x.checked).length; const s = $('.cl-usum', box); if (s) s.textContent = (n === all.length ? 'все ' + all.length : n + ' из ' + all.length); };
       tg?.addEventListener('click', () => { list.hidden = !list.hidden; box.classList.toggle('open', !list.hidden); });
+      $$('.cl-ub', box).forEach(b => b.addEventListener('click', () => { const on = b.dataset.usel === 'all'; $$('.cl-unit input', box).forEach(ch => { ch.checked = on && !ch.closest('.cl-unit').classList.contains('sold'); }); upd(); }));
       $$('.cl-unit input', box).forEach(ch => ch.addEventListener('change', upd)); upd();
     });
   }

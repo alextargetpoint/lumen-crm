@@ -1454,6 +1454,9 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .cl-units.open .cl-units-tg .cl-ucar { transform: rotate(90deg); }
 .cl-units-tg:hover { color: var(--accent); border-color: var(--accent-soft-bd, #c3d6fa); }
 .cl-units-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.cl-units-list[hidden] { display: none; }   /* ⚠️ author display:flex перебивал UA [hidden]{display:none} → список не сворачивался. Явно гасим. */
+.cl-ub { font: inherit; font-size: 11px; font-weight: 600; color: var(--muted); background: transparent; border: 1px solid var(--stroke-soft); border-radius: 999px; padding: 3px 9px; margin-left: 5px; cursor: pointer; }
+.cl-ub:hover { color: var(--accent); border-color: var(--accent-soft-bd, #c3d6fa); }
 .cl-unit { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink, #1d2939); cursor: pointer; padding: 2px 0; }
 .cl-unit input { width: 15px; height: 15px; flex: 0 0 15px; accent-color: var(--accent); }
 .cl-unit.sold { color: var(--muted); text-decoration: line-through; opacity: .7; }
