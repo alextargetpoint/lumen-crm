@@ -6778,6 +6778,7 @@ async function renderChat(id, rebuild) {
   if (_taFocused) { const _ta1 = $('#composerText'); if (_ta1) { _ta1.focus(); try { _ta1.setSelectionRange(_taSelS != null ? _taSelS : draft.length, _taSelE != null ? _taSelE : draft.length); } catch (_) {} } }
   const body = $('#chatBody');
   body.scrollTop = body.scrollHeight;
+  wireVoicePlayers(pane);   /* ⚠️ renderChat пересобирает #chatPane на КАЖДОМ поллинге/отправке → .vp-плееры рождаются без обработчиков. Перевешиваем здесь, иначе кнопка ▶ мёртвая после первого ре-рендера (голос не воспроизводился). */
   /* фикс «узкое поле при первом открытии»: flex:1 1 auto + width:100% в flex резолвился в
      intrinsic-ширину textarea (~185px) до того, как раскладка устоялась. Ставим flex:1 1 0 (basis 0 —
      textarea растёт от нуля и надёжно заполняет остаток), кнопку не сжимаем. Плюс повтор после раскладки. */
