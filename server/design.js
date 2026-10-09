@@ -686,9 +686,29 @@ function renderDesignDoc(db, c, opts) {
     if (dna.dataDepth !== 'dashboard' || dna.density === 'light') return '';
     const u = (pr.units || []).filter(Boolean);
     if (!u.length) return '';
-    return `<div class="units">${kicker('Доступные юниты')}
-      <table><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th class="r">Цена</th></tr></thead>
-      <tbody>${u.map(x => `<tr><td><b>${esc(x.plan)}</b></td><td>${esc(x.area)}</td><td>${esc(x.floor)}</td><td>${esc(x.view)}</td><td class="r num">${money(x.price, pr)}</td></tr>`).join('')}</tbody></table></div>`;
+    const uPlural = (n) => { const a = Math.abs(n) % 100, b = a % 10; return (a > 10 && a < 20) ? 'вариантов' : (b > 1 && b < 5) ? 'варианта' : (b === 1 ? 'вариант' : 'вариантов'); };
+    const row = (x) => `<tr><td><b>${esc(x.plan)}</b></td><td>${esc(x.area)}</td><td>${esc(x.floor)}</td><td>${esc(x.view)}</td><td class="r num">${x.price ? money(x.price, pr) : '—'}</td></tr>`;
+    const table = (rows) => `<table><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th class="r">Цена</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table>`;
+    /* ≤5 юнитов — простая таблица */
+    if (u.length <= 5) return `<div class="units">${kicker('Доступные юниты')}${table(u)}</div>`;
+    /* ⚠️ >5 юнитов — 3 УРОВНЯ (ТЗ redesign §2): раньше вываливали все 72 строки в одну таблицу.
+       1) курированная подборка 3–5 (дешевейший на каждый тип, добор до 5); 2) обзор по типам;
+       3) полный каталог под раскрытием (чекбокс-хак: сворачивается на вебе, раскрыт в печати). */
+    const byType = {}; for (const x of u) { const k = (String(x.plan || '').trim()) || 'Другое'; (byType[k] = byType[k] || []).push(x); }
+    const types = Object.keys(byType);
+    const pick = []; const seen = new Set();
+    for (const k of types) { const g = [...byType[k]].sort((a, b) => (+a.price || 1e15) - (+b.price || 1e15)); pick.push(g[0]); seen.add(g[0]); if (pick.length >= 5) break; }
+    if (pick.length < 5) { for (const x of [...u].sort((a, b) => (+a.price || 1e15) - (+b.price || 1e15))) { if (!seen.has(x)) { pick.push(x); seen.add(x); if (pick.length >= 5) break; } } }
+    const overview = types.map(k => { const g = byType[k]; const ps = g.map(x => +x.price).filter(n => n > 0); const minP = ps.length ? Math.min(...ps) : 0; return `<div class="ut-type"><b>${esc(k)}</b><span>${g.length} ${uPlural(g.length)}</span>${minP ? `<em>от ${money(minP, pr)}</em>` : ''}</div>`; }).join('');
+    const tid = 'utf_' + String(pr.id || '').replace(/[^a-z0-9]/gi, '');
+    return `<div class="units">
+      ${kicker('Квартиры · подборка')}
+      ${table(pick)}
+      <div class="ut-ov"><div class="ut-ov-h">Обзор по типам</div><div class="ut-types">${overview}</div></div>
+      <input type="checkbox" id="${tid}" class="ut-toggle">
+      <label for="${tid}" class="ut-full-sum">Полный каталог — ${u.length} ${uPlural(u.length)}</label>
+      <div class="ut-full-body">${table(u)}</div>
+    </div>`;
   }
 
   /* Ф2 · focal-aware изображение. img — классифицированный объект {url,focal,contain,role}
@@ -1339,6 +1359,14 @@ p{font-size:var(--s-body);line-height:1.6}
 .units table{width:100%;border-collapse:collapse;font-size:13.5px}
 .units th{text-align:left;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:700;padding:0 12px 10px;border-bottom:1px solid var(--ink)}
 .units td{padding:12px;border-bottom:1px solid var(--line)}.units .r{text-align:right}.units td.num{font-family:var(--disp);font-weight:600}
+.ut-ov{margin:16px 0 4px}.ut-ov-h{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px}
+.ut-types{display:flex;flex-wrap:wrap;gap:8px}
+.ut-type{border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:118px}
+.ut-type b{font-size:13px}.ut-type span{font-size:11px;color:var(--mut)}.ut-type em{font-style:normal;font-size:12px;font-weight:600;font-family:var(--disp)}
+.ut-toggle{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.ut-full-sum{display:inline-block;cursor:pointer;font-size:12px;font-weight:600;color:var(--accent);margin-top:16px}
+.ut-full-sum:before{content:"▸ ";color:var(--mut)}.ut-toggle:checked ~ .ut-full-sum:before{content:"▾ "}
+.ut-full-body{display:none;margin-top:8px}.ut-toggle:checked ~ .ut-full-body{display:block}
 /* ---- why (inline recommendation, not a green box) ---- */
 .rec-inline{margin:10px 0 22px;border-left:2px solid var(--accent);padding-left:22px}
 .why{list-style:none;counter-reset:w}.why li{counter-increment:w;position:relative;padding:9px 0 9px 34px;font-size:14.5px;line-height:1.5;border-bottom:1px solid var(--line)}.why li:last-child{border-bottom:0}
@@ -1702,6 +1730,8 @@ p{font-size:var(--s-body);line-height:1.6}
   .fplan{margin:10px 0 14px}
   .loc{margin:4px 0 12px}.loc-b{margin-bottom:10px}.dt-r{padding:7px 0}
   .units{margin:8px 0 12px}.units td{padding:9px 12px}
+  .units thead{display:table-header-group}  /* повтор шапки таблицы на каждой печатной странице (ТЗ §13) */
+  .ut-full-sum{display:none!important}.ut-full-body{display:block!important}  /* в печати полный каталог раскрыт */
   .rec-inline{margin:8px 0 12px;padding-left:18px}
   .why li{padding:6px 0 6px 32px}
   .amen{margin:4px 0 10px}.amen-c{padding:5px 12px}
