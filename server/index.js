@@ -148,6 +148,12 @@ function saveMedia(sub, filename, buf) {
   try { if (b2backup.enabled && b2backup.enabled() && b2backup.b2Upload) b2backup.b2Upload('media/' + rel, buf).catch(() => {}); } catch (_) {}
   return '/media/' + rel;
 }
+/* ⚠️ /creatives тоже эфемерны по репликам/тому и УХОДЯТ КЛИЕНТУ в WhatsApp (воркер тянет по URL) — 404 у
+   части реплик = клиент не получит картинку/видео. Немедленно дублируем в B2 (ключ как у syncMedia:
+   media/creatives/<fn>); роут /creatives тянет из B2 фолбэком при промахе. best-effort, не блокируем. */
+function saveCreativeB2(fn) {
+  try { if (b2backup.enabled && b2backup.enabled() && b2backup.b2Upload) { const buf = fs.readFileSync(path.join(CREATIVES_DIR, fn)); b2backup.b2Upload('media/creatives/' + fn, buf).catch(() => {}); } } catch (_) {}
+}
 /* ── ПЕРСИСТЕНТНОЕ хранилище ЗАГРУЗОК /assets (логотипы, аватары, мудборды, файлы лида, карусели, кейсы) ──
    Исторически эти загрузки писались в public/assets. Но public/ на Railway ЭФЕМЕРНА: при каждом деплое
    контейнер пересобирается из git и всё незакоммиченное СТИРАЕТСЯ — так пропал логотип Trust Phuket.
@@ -5443,6 +5449,7 @@ const server = http.createServer(async (req, res) => {
       const ext = mm[1].replace('x-m4a', 'm4a').replace('mpeg', 'mp3');
       const fn = 'call-' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.' + ext;
       try { fs.writeFileSync(path.join(CREATIVES_DIR, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
+      saveCreativeB2(fn);
       return json(res, 200, { url: (callBase() ? callBase() : '') + '/creatives/' + fn, path: '/creatives/' + fn });
     }
     /* ── Нотетейкер, session-режим (приложение логинится реальным аккаунтом → САМО понимает, кто вошёл) ── */
@@ -5481,6 +5488,7 @@ const server = http.createServer(async (req, res) => {
       const ext = mm[1].replace('x-m4a', 'm4a').replace('mpeg', 'mp3');
       const fn = 'call-' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.' + ext;
       try { fs.writeFileSync(path.join(CREATIVES_DIR, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
+      saveCreativeB2(fn);
       return json(res, 200, { url: (callBase() ? callBase() : '') + '/creatives/' + fn, path: '/creatives/' + fn });
     }
     if (p === '/api/notetaker/ingest' && req.method === 'POST') {
@@ -10137,6 +10145,7 @@ const server = http.createServer(async (req, res) => {
       try { fs.mkdirSync(CREATIVES_DIR, { recursive: true }); } catch (_) {}
       const fn = 'avatar-' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.jpg';
       try { fs.writeFileSync(path.join(CREATIVES_DIR, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
+      saveCreativeB2(fn);
       return json(res, 200, { url: (callBase() ? callBase() : '') + '/creatives/' + fn, path: '/creatives/' + fn });
     }
     /* профиль серого WhatsApp-номера (имя/описание/аватар) → синк в РЕАЛЬНЫЙ WhatsApp */
@@ -12376,7 +12385,7 @@ ${SCR}
       if (!size) { cleanTmp(); return json(res, 400, { error: 'пустой файл' }); }
       fs.mkdirSync(CREATIVES_DIR, { recursive: true });   /* ПЕРСИСТЕНТНО (volume), не public/ (эфемерна) */
       const stamp = `ad-${String(ad.adId).slice(-8)}-${crypto.randomBytes(3).toString('hex')}`;
-      const storeAs = (fname, type) => { ad.media = { type, url: '/creatives/' + fname }; propagateAdByName(db, ad); store.save(); };
+      const storeAs = (fname, type) => { ad.media = { type, url: '/creatives/' + fname }; saveCreativeB2(fname); propagateAdByName(db, ad); store.save(); };
       const COMPRESS_OVER = 28e6;   /* видео крупнее ~28 МБ — жмём под ~24 МБ */
       const sizeMB = size / 1e6;
       /* транскодим В mp4 если: видео большое ИЛИ формат не mp4 (mov/m4v/mkv/… — иначе WhatsApp не проиграет по ссылке) */
@@ -16752,7 +16761,18 @@ cont.addEventListener('drop',function(e){e.preventDefault();if(!dg)return;dg.dat
     /* публично (без сессии): их тянет и браузер в карточке, и серверы WhatsApp по ссылке. Range — для проигрывания видео. */
     if (req.method === 'GET' && /^\/creatives\/[A-Za-z0-9._-]+$/.test(p)) {
       const fp = path.join(CREATIVES_DIR, path.basename(p));
-      if (!fp.startsWith(CREATIVES_DIR) || !fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
+      if (!fp.startsWith(CREATIVES_DIR)) { res.writeHead(404); res.end('not found'); return; }
+      /* мульти-реплика/том: нет локально → тянем из B2 (media/creatives/<fn>) + write-through кэш.
+         Критично: эти файлы уходят клиенту в WhatsApp — 404 = клиент без картинки/видео. */
+      if (!fs.existsSync(fp)) {
+        let b2buf = null;
+        try { if (b2backup.enabled && b2backup.enabled() && b2backup.b2Download) b2buf = await b2backup.b2Download('media/creatives/' + path.basename(p)); } catch (_) {}
+        if (!b2buf) { res.writeHead(404); res.end('not found'); return; }
+        try { fs.mkdirSync(CREATIVES_DIR, { recursive: true }); fs.writeFileSync(fp, b2buf); } catch (_) {}
+        const t0 = MIME[path.extname(fp).toLowerCase()] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': t0, 'Content-Length': b2buf.length, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400' });
+        res.end(b2buf); return;
+      }
       const ext = path.extname(fp).toLowerCase();
       const type = MIME[ext] || 'application/octet-stream';
       const stat = fs.statSync(fp);
