@@ -524,6 +524,22 @@ function blockOp(db, c, proj, action, grammar) {
     d.locks[proj] = g;
     return { ok: true, action: 'set', proj, grammar: g };
   }
+  if (action === 'hide' || action === 'show') {    /* скрыть/вернуть объект в выпуск (в редакторе остаётся) */
+    d.hidden = d.hidden || [];
+    const i = d.hidden.indexOf(proj);
+    if (action === 'hide' && i < 0) d.hidden.push(proj);
+    if (action === 'show' && i >= 0) d.hidden.splice(i, 1);
+    return { ok: true, action, proj, hidden: d.hidden };
+  }
+  if (action === 'moveup' || action === 'movedown') {   /* порядок объектов в документе */
+    const ids = c.propertyIds || [];
+    const i = ids.indexOf(proj);
+    if (i < 0) return { error: 'not in collection' };
+    const j = action === 'moveup' ? i - 1 : i + 1;
+    if (j < 0 || j >= ids.length) return { ok: true, action, proj, moved: false };
+    const t = ids[i]; ids[i] = ids[j]; ids[j] = t;
+    return { ok: true, action, proj, moved: true, order: ids.slice() };
+  }
   if (action === 'regen') {
     delete d.locks[proj];                         /* реген подразумевает свободу менять */
     const before = grammarOf();
@@ -550,7 +566,11 @@ function renderDesignDoc(db, c, opts) {
   const logo = S.agency && S.agency.logo;
   const geoNames = S.geoNames || {};
   const prById = (pid) => applyUnitSel(c, db.properties.find(x => x.id === pid));
-  const props = (c.propertyIds || []).map(prById).filter(Boolean);
+  /* «Скрыто из выпуска»: скрытые объекты исключаются из ВСЕГО документа (обложка/сравнение/страницы),
+     а не только своих страниц. В редакторе доступны в «корзине скрытых» для возврата. */
+  const hiddenSet = new Set((c.design && c.design.hidden) || []);
+  const propsAll = (c.propertyIds || []).map(prById).filter(Boolean);
+  const props = propsAll.filter(p => !hiddenSet.has(p.id));
   const lead = c.leadId ? db.leads.find(l => l.id === c.leadId) : null;
   /* Ф4 · агент, подготовивший подборку: назначенный брокер лида → иначе реальный менеджер агентства.
      Плейсхолдер «Ваш менеджер» с пустыми контактами агентом НЕ считаем. */
@@ -695,9 +715,12 @@ function renderDesignDoc(db, c, opts) {
     if (!opts.canEdit || isPrint) return '';
     const locked = pg.locked;
     return `<div class="blk-ctl" data-proj="${esc(pg.pid)}">`
+      + `<button class="bc-btn" data-bact="moveup" title="Выше в документе">↑</button>`
+      + `<button class="bc-btn" data-bact="movedown" title="Ниже в документе">↓</button>`
       + `<button class="bc-btn" data-compose="${esc(pg.pid)}" title="Выбрать композицию страницы">⊞</button>`
       + `<button class="bc-btn${locked ? ' on' : ''}" data-bact="${locked ? 'unlock' : 'lock'}" title="${locked ? 'Снять фиксацию макета проекта' : 'Зафиксировать макет проекта'}">${locked ? '🔒' : '🔓'}</button>`
-      + `<button class="bc-btn" data-bact="regen" title="Другой макет этого проекта">↻</button></div>`;
+      + `<button class="bc-btn" data-bact="regen" title="Другой макет этого проекта">↻</button>`
+      + `<button class="bc-btn" data-bact="hide" title="Скрыть объект из выпуска (клиент не увидит)">🙈</button></div>`;
   };
 
   const G = {
@@ -1693,6 +1716,14 @@ p{font-size:var(--s-body);line-height:1.6}
 .page:hover .bc-btn{opacity:1}
 .bc-btn.on{background:var(--accent);color:#fff;border-color:var(--accent);opacity:1}
 @media print{.blk-ctl{display:none!important}}
+/* «Скрыто из выпуска» — корзина в редакторе (возврат объекта в выпуск) */
+.hidden-tray{max-width:860px;margin:8px auto 0;background:var(--paper);border:1px dashed var(--line);border-radius:14px;padding:18px 22px}
+.htr-h{font-family:var(--meta);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:12px}
+.htr-list{display:flex;flex-direction:column;gap:8px}
+.htr-item{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--tint)}
+.htr-nm{font-family:var(--disp);font-size:16px;font-weight:600;color:var(--ink)}
+.htr-show{border:0;background:var(--ink);color:var(--paper);font-family:var(--meta);font-size:12.5px;font-weight:600;padding:8px 15px;border-radius:100px;cursor:pointer}
+@media print{.hidden-tray{display:none!important}}
 /* анти-обрезка: длинные неразрывные токены не выпихивают текст за кадр (page overflow:hidden) */
 .lede,.po-h,.h2,.cv-h,.op-h,.loc-b,.rn-open,.sn-open,.fg-blurb,.pk-nm,.rk-nm{overflow-wrap:break-word;word-break:break-word}
 .h2,.po-h,.cv-h,.op-h{text-wrap:balance}
@@ -1803,7 +1834,7 @@ document.addEventListener('click',function(ev){var t=ev.target.closest('[data-ba
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${css}</style></head>
 <body class="style-${dna.ax.style} dom-${dna.ax.imageDom} dens-${dna.ax.density} int-${dna.ax.artDir}${dna.dark ? ' dark' : ''} fmt-${format}">
-<div class="doc">${body}</div>${bar}
+<div class="doc">${body}${(canEdit && !isPrint && propsAll.length > props.length) ? `<div class="hidden-tray"><div class="htr-h">🙈 Скрыто из выпуска · ${propsAll.length - props.length} — клиент не увидит</div><div class="htr-list">${propsAll.filter(p => hiddenSet.has(p.id)).map(p => `<div class="htr-item"><span class="htr-nm">${esc(p.name)}</span><button class="htr-show" data-bact="show" data-proj="${esc(p.id)}">Вернуть в выпуск</button></div>`).join('')}</div></div>` : ''}</div>${bar}
 </body></html>`;
 }
 
