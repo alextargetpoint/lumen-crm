@@ -650,7 +650,13 @@ function renderDesignDoc(db, c, opts) {
      или голый URL (фолбэк). Планы/карты → contain (не срезаем), фото → object-position по focal. */
   function imgEl(img, cls, label) {
     const o = (img && typeof img === 'object') ? img : { url: img, focal: '50% 45%', contain: false, role: '' };
-    if (!o.url) return `<div class="ph grad ${cls || ''}"><span>${esc(label || '')}</span></div>`;
+    /* Нет изображения: в выпуске клиенту НИКАКИХ заглушек с градиентом/подписью —
+       нейтральный тон (поле само собой коллапсирует в композиции без фото).
+       В режиме редактирования — действенный слот «Добавить фото». */
+    if (!o.url) {
+      if (opts.canEdit && !isPrint) return `<div class="ph noimg ${cls || ''}"><span class="noimg-tx">Добавить фото</span></div>`;
+      return `<div class="ph ${cls || ''}"></div>`;
+    }
     if (o.contain) return `<div class="ph plan ${cls || ''}" data-role="${esc(o.role || '')}" style="background-image:url('${esc(abs(o.url))}');background-size:contain;background-repeat:no-repeat;background-position:center;background-color:var(--tint)"></div>`;
     return `<div class="ph ${cls || ''}" data-role="${esc(o.role || '')}" style="background-image:url('${esc(abs(o.url))}');background-position:${esc(o.focal || '50% 45%')}"></div>`;
   }
@@ -1665,11 +1671,68 @@ p{font-size:var(--s-body);line-height:1.6}
 .page:hover .bc-btn{opacity:1}
 .bc-btn.on{background:var(--accent);color:#fff;border-color:var(--accent);opacity:1}
 @media print{.blk-ctl{display:none!important}}
+/* анти-обрезка: длинные неразрывные токены не выпихивают текст за кадр (page overflow:hidden) */
+.lede,.po-h,.h2,.cv-h,.op-h,.loc-b,.rn-open,.sn-open,.fg-blurb,.pk-nm,.rk-nm{overflow-wrap:break-word;word-break:break-word}
+.h2,.po-h,.cv-h,.op-h{text-wrap:balance}
+/* слот «Добавить фото» — только в редакторе, в выпуск не попадает */
+.ph.noimg{display:flex;align-items:center;justify-content:center;background:var(--tint);border:1px dashed color-mix(in srgb,var(--mut) 55%,var(--tint))}
+.ph.noimg .noimg-tx{font-family:var(--meta);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}
+@media print{.ph.noimg{border:0}.ph.noimg .noimg-tx{display:none}}
+/* ---- панель «Проверка перед выпуском» (edit-режим) ---- */
+.vpanel{position:fixed;right:18px;bottom:78px;width:380px;max-width:calc(100vw - 36px);max-height:72vh;display:flex;flex-direction:column;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 30px 80px -24px rgba(0,0,0,.55);z-index:60;overflow:hidden;font-family:var(--meta)}
+.vpanel[hidden]{display:none}
+.vp-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.vp-head b{font-family:var(--disp);font-size:18px;font-weight:600;letter-spacing:-.01em}
+.vp-x{border:0;background:transparent;color:var(--mut);font-size:16px;cursor:pointer;line-height:1;padding:4px}
+.vp-sum{display:flex;gap:8px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line)}
+.vp-chip{font-size:11.5px;font-weight:700;letter-spacing:.02em;padding:5px 11px;border-radius:100px;display:inline-flex;align-items:center;gap:6px}
+.vp-chip.err{background:#FBE9E7;color:#B3261E}
+.vp-chip.warn{background:#FCF1DC;color:#9A6A12}
+.vp-chip.ok{background:var(--accent-soft);color:var(--accent)}
+.vp-body{overflow-y:auto;padding:8px 0}
+.vp-grp{padding:8px 18px 4px}
+.vp-grp-t{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px}
+.vp-i{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+.vp-grp:last-child .vp-i:last-child{border-bottom:0}
+.vp-dot{flex:0 0 8px;width:8px;height:8px;border-radius:50%;margin-top:6px}
+.vp-i.error .vp-dot{background:#D93025}.vp-i.warn .vp-dot{background:#E0A008}.vp-i.info .vp-dot{background:var(--mut)}
+.vp-tx b{font-size:13.5px;font-weight:600;line-height:1.4;display:block}
+.vp-src{font-size:11.5px;color:var(--mut);margin-top:3px;display:block}
+.vp-empty{padding:34px 18px;text-align:center;color:var(--mut);font-size:13.5px}
+.vp-empty b{display:block;font-family:var(--disp);font-size:20px;color:var(--ink);margin-bottom:6px;font-weight:600}
+.vp-foot{padding:12px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--mut);line-height:1.5}
+.vp-foot.block{color:#B3261E}
+.rc-check{border:0;background:#fff;color:#111;font:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:100px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.rc-check .rc-badge{min-width:18px;height:18px;padding:0 5px;border-radius:100px;font-size:11px;display:inline-flex;align-items:center;justify-content:center;color:#fff}
+.rc-check .rc-badge.err{background:#D93025}.rc-check .rc-badge.warn{background:#E0A008}.rc-check .rc-badge.ok{background:#1E8E3E}
+@media print{.vpanel{display:none!important}}
 `;
 
   const canEdit = opts.canEdit;
-  const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density} · фото ${dna.ax.imageDom}</span><button id="recompose">Другой вариант</button><a href="/p/${c.id}?design=1&print=1" target="_blank">Печать / PDF</a></div>
+  /* Проверка перед выпуском — честные замечания в 3 корзины (данные/вёрстка/рекомендации) */
+  const vr = (canEdit && !isPrint) ? validateCollection(db, c) : null;
+  const vGroup = (title, arr) => arr.length ? `<div class="vp-grp"><div class="vp-grp-t">${esc(title)}</div>${arr.map(i => `<div class="vp-i ${i.level}"><span class="vp-dot"></span><div class="vp-tx"><b>${esc(i.msg)}</b>${(i.projName || i.field) ? `<span class="vp-src">${[i.projName, i.field].filter(Boolean).map(esc).join(' · ')}</span>` : ''}</div></div>`).join('')}</div>` : '';
+  let vPanel = '', vBtn = '';
+  if (vr) {
+    const ct = vr.counts;
+    vBtn = `<button id="vcheck" class="rc-check">Проверка${ct.errors ? `<span class="rc-badge err">${ct.errors}</span>` : ct.total ? `<span class="rc-badge warn">${ct.warns + ct.infos}</span>` : `<span class="rc-badge ok">✓</span>`}</button>`;
+    const sum = `<div class="vp-sum">`
+      + (ct.errors ? `<span class="vp-chip err">● ${ct.errors} ошиб.</span>` : '')
+      + (ct.warns ? `<span class="vp-chip warn">● ${ct.warns} предупр.</span>` : '')
+      + (ct.infos ? `<span class="vp-chip ok">● ${ct.infos} рекоменд.</span>` : '')
+      + (ct.total ? '' : `<span class="vp-chip ok">✓ Проверено</span>`)
+      + `</div>`;
+    const body = ct.total
+      ? `<div class="vp-body">${vGroup('Ошибки данных', vr.data)}${vGroup('Вёрстка', vr.layout)}${vGroup('Рекомендации', vr.rec)}</div>`
+      : `<div class="vp-empty"><b>Всё чисто</b>Данные, вёрстка и контент проверены. Блокирующих проблем нет.</div>`;
+    const foot = vr.blocking
+      ? `<div class="vp-foot block">Для финального выпуска устраните ошибки данных. Черновик можно скачать в любой момент.</div>`
+      : `<div class="vp-foot">Блокирующих проблем нет — подборку можно выпускать.</div>`;
+    vPanel = `<div class="vpanel" id="vpanel" hidden><div class="vp-head"><b>Проверка перед выпуском</b><button class="vp-x" id="vpx">✕</button></div>${sum}${body}${foot}</div>`;
+  }
+  const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density} · фото ${dna.ax.imageDom}</span><button id="recompose">Другой вариант</button>${vBtn}<a href="/p/${c.id}?design=1&print=1" target="_blank">Печать / PDF</a></div>${vPanel}
 <script>(function(){var k='${esc(opts.key || '')}';var b=document.getElementById('recompose');if(b)b.onclick=function(){b.textContent='…';fetch('/api/collections/${c.id}/recompose?key='+k,{method:'POST'}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})};
+var vc=document.getElementById('vcheck'),vp=document.getElementById('vpanel'),vx=document.getElementById('vpx');if(vc&&vp){vc.onclick=function(){vp.hidden=!vp.hidden};}if(vx&&vp){vx.onclick=function(){vp.hidden=true};}
 document.addEventListener('click',function(ev){var t=ev.target.closest('[data-bact]');if(!t)return;var w=t.closest('[data-proj]');if(!w)return;var proj=w.getAttribute('data-proj'),act=t.getAttribute('data-bact');t.textContent='…';fetch('/api/collections/${c.id}/block?key='+k,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({proj:proj,action:act})}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})});})();</script>` : '';
 
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1684,6 +1747,118 @@ document.addEventListener('click',function(ev){var t=ev.target.closest('[data-ba
 
 function plural(n) { n = +n; return n % 10 === 1 && n % 100 !== 11 ? 'проект' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'проекта' : 'проектов'; }
 
+/* ============================================================================
+   ПРОВЕРКА ПЕРЕД ВЫПУСКОМ (валидация) — ЧЕСТНАЯ, БЕЗ АВТО-ПРАВОК.
+   Вместо ложного «Нет ошибок» — три корзины: ДАННЫЕ (блокируют финал),
+   ВЁРСТКА (переполнение/обрезка), РЕКОМЕНДАЦИИ (дубли фото, низкое разрешение,
+   нет фото). Каждое замечание указывает на проект и поле. Систему НЕ просим
+   «исправить» подозрительные данные — она их только помечает (решает брокер).
+   ========================================================================== */
+
+/* извлекаем нормализованные даты сдачи из строки вроде «Q1 2028» / «December 2028» */
+const HO_MONTHS = { янв: 1, фев: 2, мар: 3, апр: 4, май: 5, мая: 5, июн: 6, июл: 7, авг: 8, сен: 9, окт: 10, ноя: 11, дек: 12, jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+function handoverDates(s) {
+  s = String(s || ''); const toks = [], years = new Set(); let m;
+  const qre = /Q\s*([1-4])\s*'?\s*(20\d\d|\d{2})\b/gi;
+  while ((m = qre.exec(s))) { const y = m[2].length === 2 ? 2000 + (+m[2]) : +m[2]; toks.push('Q' + m[1] + ' ' + y); years.add(y); }
+  const mre = /([А-Яа-яA-Za-z]{3,})\.?\s*'?\s*(20\d\d)\b/g;
+  while ((m = mre.exec(s))) { const k = m[1].toLowerCase().slice(0, 3); if (HO_MONTHS[k] != null) { toks.push('M' + HO_MONTHS[k] + ' ' + m[2]); years.add(+m[2]); } }
+  let yre = /\b(20\d\d)\b/g; while ((m = yre.exec(s))) years.add(+m[1]);
+  return { toks: [...new Set(toks)], years: [...years] };
+}
+function handoverConflict(s) {
+  const d = handoverDates(s);
+  if (d.toks.length >= 2) return true;      /* две разные конкретные даты (Q1 2028 и December 2028) */
+  if (d.years.length >= 2) return true;      /* два разных года */
+  return false;
+}
+
+/* одно замечание */
+function vIssue(bucket, level, msg, extra) { return Object.assign({ bucket, level, msg }, extra || {}); }
+
+/* главная проверка подборки → {data, layout, rec, counts, blocking} */
+function validateCollection(db, c) {
+  const props = (c.propertyIds || []).map(pid => applyUnitSel(c, (db.properties || []).find(x => x.id === pid))).filter(Boolean);
+  const data = [], layout = [], rec = [];
+  const cur0 = (p) => { try { return curateImages(p); } catch (e) { return { photos: [], plans: [], hero: null }; } };
+
+  if (!props.length) {
+    data.push(vIssue('data', 'error', 'В подборке нет объектов — добавьте хотя бы один.', { field: 'подборка' }));
+  }
+
+  const seenImg = {};   /* url → [имена проектов] для дублей */
+  props.forEach((pr) => {
+    const nm = pr.name || 'Объект';
+    const co = (() => { try { return projCopy(c, pr.id, pr); } catch (e) { return { hook: pr.name, why: [], blurb: '' }; } })();
+
+    /* — ДАННЫЕ — */
+    /* противоречие в сроке сдачи */
+    if (pr.handover && handoverConflict(pr.handover)) {
+      data.push(vIssue('data', 'error', 'Противоречие в сроке сдачи: указаны разные значения. Выберите подтверждённое или скройте показатель.', { pid: pr.id, projName: nm, field: 'Срок сдачи', value: String(pr.handover) }));
+    }
+    /* цена */
+    if (pr.priceFrom != null && pr.priceFrom !== '' && !(Number(pr.priceFrom) > 0)) {
+      data.push(vIssue('data', 'error', 'Некорректная цена «от» — проверьте значение.', { pid: pr.id, projName: nm, field: 'Цена' }));
+    } else if (Number(pr.priceFrom) > 0 && !pr.currency) {
+      data.push(vIssue('data', 'warn', 'Не указана валюта цены — по умолчанию показываем $.', { pid: pr.id, projName: nm, field: 'Валюта' }));
+    }
+    /* локация: расстояние/время перепутаны или неправдоподобны */
+    const times = ((pr.district || {}).times || []).filter(t => t && t.place);
+    times.forEach(t => {
+      const raw = String(t.min == null ? '' : t.min);
+      const minN = numOf(raw);
+      /* \b в JS — ASCII-only, для кириллицы не работает: убираем слова «мин/минут», затем ищем единицу расстояния */
+      const minClean = raw.replace(/минут[аыуой]*|\bмин\b|\bmin\b/gi, '').trim();
+      const distUnit = /(^|[\s\d])(км|km|метр[а-яё]*|meters?|miles?|миль|mi|m|м)($|[\s.,])/i.test(minClean);
+      if (distUnit) {
+        data.push(vIssue('data', 'error', `«${raw}» до «${t.place}» — похоже, в поле времени указано расстояние. Разделите расстояние и время в пути.`, { pid: pr.id, projName: nm, field: 'Локация · время' }));
+      } else if (minN != null && minN > 120) {
+        data.push(vIssue('data', 'error', `${minN} мин до «${t.place}» — необычно большое время в пути, проверьте.`, { pid: pr.id, projName: nm, field: 'Локация · время' }));
+      } else if (minN === 0) {
+        data.push(vIssue('data', 'warn', `0 мин до «${t.place}» — проверьте значение.`, { pid: pr.id, projName: nm, field: 'Локация · время' }));
+      }
+    });
+
+    /* — ВЁРСТКА / переполнение (эвристика по длине; никогда не режем молча) — */
+    if (co.hook && String(co.hook).length > 90) {
+      layout.push(vIssue('layout', 'warn', 'Слишком длинный заголовок — перекомпонуется или предложите короткую редакцию.', { pid: pr.id, projName: nm, field: 'Заголовок' }));
+    }
+    if (co.blurb && String(co.blurb).length > 650) {
+      layout.push(vIssue('layout', 'warn', 'Длинное описание — разбейте на смысловые блоки или вынесите на отдельную страницу (не уменьшаем шрифт до нечитаемого).', { pid: pr.id, projName: nm, field: 'Описание' }));
+    }
+
+    /* — РЕКОМЕНДАЦИИ — */
+    const cu = cur0(pr);
+    if (!cu.hero && !cu.photos.length) {
+      rec.push(vIssue('rec', 'info', 'Нет фотографии — это нормально для текстовой композиции, либо добавьте изображение из карточки.', { pid: pr.id, projName: nm, field: 'Фото' }));
+    }
+    (cu.photos || []).forEach(im => {
+      const u = im && im.url; if (!u) return;
+      (seenImg[u] = seenImg[u] || []).push(nm);
+      if (/(thumb|_small|-small|=s\d{2,3}\b|\/\d{2,3}x\d{2,3}\/|\bmini\b)/i.test(u)) {
+        rec.push(vIssue('rec', 'info', 'Возможно низкое разрешение фото — предложите замену.', { pid: pr.id, projName: nm, field: 'Фото' }));
+      }
+    });
+  });
+
+  /* дубли фото между проектами */
+  Object.keys(seenImg).forEach(u => {
+    const names = [...new Set(seenImg[u])];
+    if (names.length >= 2) rec.push(vIssue('rec', 'info', `Повторяющаяся фотография в проектах: ${names.join(', ')}.`, { field: 'Фото' }));
+  });
+
+  const all = data.concat(layout, rec);
+  const blocking = all.filter(i => i.level === 'error').length;
+  const counts = {
+    errors: all.filter(i => i.level === 'error').length,
+    warns: all.filter(i => i.level === 'warn').length,
+    infos: all.filter(i => i.level === 'info').length,
+    data: data.length, layout: layout.length, rec: rec.length,
+    total: all.length,
+  };
+  return { data, layout, rec, counts, blocking, ok: counts.total === 0 };
+}
+
 /* Выбор юнитов на уровне подборки: c.unitSel[pid] = массив индексов в pr.units[].
    Пусто/нет ключа → все юниты (обратная совместимость). Клонируем pr, чтобы не мутировать базу. */
 function applyUnitSel(c, pr) {
@@ -1695,4 +1870,4 @@ function applyUnitSel(c, pr) {
   return { ...pr, units };
 }
 
-module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES, applyUnitSel };
+module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES, applyUnitSel, validateCollection };
