@@ -941,7 +941,7 @@ function renderDesignDoc(db, c, opts) {
         if (dims.length) {
           return `<section class="page pg cmp cmp-ranked">${kicker('Сравнение')}<h2 class="h2">Кто лидирует по каждому критерию</h2>
             <div class="rk-list">${dims.map((r, i) => { const bi = bestIdx(r); const p = props[bi]; return `<div class="rk-row"><span class="rk-no">${num2(i + 1)}</span><div class="rk-dim"><span class="rk-k">${esc(r.k)}</span><b class="rk-nm">${esc(p.name)}</b></div><b class="rk-v num">${r.fmt(p)}</b></div>`; }).join('')}</div>
-            <p class="cc-note">«Лидирует» — по фактическим цифрам объектов (мин. цена, ранняя сдача, макс. доходность/прирост), не наша оценка.</p>
+            <p class="cc-note">По фактическим данным объектов — для ориентира, финальный выбор за вами.</p>
             ${foot('сравнение')}</section>`;
         }
       }
@@ -965,7 +965,7 @@ function renderDesignDoc(db, c, opts) {
           }).join('');
           return `<section class="page pg cmp cmp-bars">${kicker('Сравнение')}<h2 class="h2">Соотношение по цифрам</h2>
             ${groups}
-            <p class="cc-note">Длина полос — относительно максимума в строке по фактическим цифрам объектов; подсветка — лучшее значение (мин. цена / макс. доходность), не рейтинг.</p>
+            <p class="cc-note">Полосы — по каждому параметру относительно лучшего в подборке. Для ориентира.</p>
             ${foot('сравнение')}</section>`;
         }
       }
@@ -973,7 +973,7 @@ function renderDesignDoc(db, c, opts) {
         return `<section class="page pg cmp">${kicker('Сравнение')}<h2 class="h2">${esc(dna.ctx.nProj)} ${plural(dna.ctx.nProj)} рядом</h2>
           <div class="cmp-cards">${props.map((p, i) => `<div class="cmpc"><div class="cmpc-h"><b>${esc(p.name)}</b><span>${esc(p.area || '')}</span></div>
             ${rows.map(r => { const bi = bestIdx(r); return `<div class="cmpc-r ${bi === i ? 'best' : ''}"><span class="ck">${esc(r.k)}</span><b class="cv num">${r.fmt(p)}</b>${bi === i ? '<i class="bi">лучшее</i>' : ''}</div>`; }).join('')}</div>`).join('')}</div>
-          <p class="cc-note">«Лучшее» — по фактическим цифрам объектов (мин. цена, макс. доходность/прирост, ранняя сдача), не оценка.</p>
+          <p class="cc-note">Отмечено лучшее значение по каждому параметру — для ориентира.</p>
           ${foot('сравнение')}</section>`;
       }
       const heads = props.map(p => `<th><b>${esc(p.name)}</b><span>${esc(p.area || '')}</span></th>`).join('');
@@ -981,7 +981,7 @@ function renderDesignDoc(db, c, opts) {
         <div class="cmp-wrap"><table class="cmp-matrix"><thead><tr><th></th>${heads}</tr></thead><tbody>
         ${rows.map(r => { const bi = bestIdx(r); return `<tr><td class="rk">${esc(r.k)}</td>${props.map((p, i) => `<td class="num ${bi === i ? 'best' : ''}">${r.fmt(p)}${bi === i ? '<i class="bi">✓</i>' : ''}</td>`).join('')}</tr>`; }).join('')}
         </tbody></table></div>
-        <p class="cc-note">Подсветка — лучшее значение в строке по фактическим данным (не рейтинг).</p>
+        <p class="cc-note">Отмечено лучшее значение в каждой строке — для ориентира.</p>
         ${foot('сравнение')}</section>`;
     },
 
