@@ -244,7 +244,9 @@ function validGrammars(prof, dna) {
   if (prof.heroOk && (prof.metrics >= 2 || prof.payRows >= 2 || prof.rich || prof.hasBlurb)) out.push('sidebarRail');
   if (prof.heroOk) out.push('figureGround');
   if ((prof.rich || prof.metrics >= 2 || prof.payRows >= 2) && dna.dataDepth !== 'minimal') out.push('dataLed');
-  return out.length ? out : ['singleHero'];
+  /* неполные данные: без hero fallback НЕ в singleHero (даст пустой кадр), а в текст/цифры-грамматику */
+  if (!out.length) return prof.heroOk ? ['singleHero'] : ['dataLed'];
+  return out;
 }
 
 /* fit-скоры грамматики под профиль (0..1) */
@@ -576,6 +578,7 @@ function renderDesignDoc(db, c, opts) {
   const money = (n, p) => cur(p) + Number(n || 0).toLocaleString('ru-RU');
   const abs = (u) => u && /^assets\//.test(u) ? '/' + u : u;
   const isPrint = !!opts.print;
+  const format = opts.format === 'wide' ? 'wide' : 'a4';   /* A4 (вертикаль) | wide (16:9 экран) */
 
   /* ---- атомы UI ---- */
   const kicker = (t) => `<div class="kick">${esc(t)}</div>`;
@@ -859,7 +862,7 @@ function renderDesignDoc(db, c, opts) {
         ${head}
         <div class="me-split">
           <div class="me-l">${co.blurb ? `<p class="lede drop">${esc(co.blurb)}</p>` : ''}${driveTimes(pr, true)}${amenList(pr)}</div>
-          <aside class="me-r">${imgEl(hero, 'me-img', pr.area)}${metricRail(pr, 'stack')}</aside>
+          <aside class="me-r">${hero ? imgEl(hero, 'me-img', pr.area) : ''}${metricRail(pr, 'stack')}</aside>
         </div>
         ${payTrack(pr)}${fp}${why}${unitsTable(pr)}
         ${foot(esc(pr.name))}</section>`;
@@ -1676,6 +1679,9 @@ p{font-size:var(--s-body);line-height:1.6}
 .recompose-bar b{color:#fff;font-weight:600}
 .recompose-bar button{border:0;background:#fff;color:#111;font:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:100px;cursor:pointer}
 .recompose-bar a{color:rgba(255,255,255,.65);font-size:12.5px;text-decoration:none;padding:0 6px}
+.recompose-bar .fmt-tog{display:inline-flex;border:1px solid rgba(255,255,255,.22);border-radius:100px;overflow:hidden}
+.recompose-bar .fmt-tog a{color:rgba(255,255,255,.6);padding:7px 13px;font-size:12px;font-weight:600}
+.recompose-bar .fmt-tog a.on{background:#fff;color:#111}
 @media print{.recompose-bar{display:none}}
 /* Ф3 · пер-проектные контролы (только edit-режим) */
 .blk-ctl{position:absolute;top:14px;right:14px;z-index:41;display:flex;gap:7px}
@@ -1719,11 +1725,40 @@ p{font-size:var(--s-body);line-height:1.6}
 .rc-check .rc-badge{min-width:18px;height:18px;padding:0 5px;border-radius:100px;font-size:11px;display:inline-flex;align-items:center;justify-content:center;color:#fff}
 .rc-check .rc-badge.err{background:#D93025}.rc-check .rc-badge.warn{background:#E0A008}.rc-check .rc-badge.ok{background:#1E8E3E}
 @media print{.vpanel{display:none!important}}
+/* ================= ФОРМАТ 16:9 (экранная презентация) =================
+   Тот же контент — ландшафтная перекомпоновка сетки. Full-bleed роли заполняют
+   кадр; текстовые/проектные страницы раскладывают факты в 2 колонки, шапка и
+   главный визуал — на всю ширину. Пустые места (нет фото/показателя) схлопнуты. */
+body.fmt-wide .doc{max-width:1200px;padding:28px 18px 60px}
+@media(max-width:860px){body.fmt-wide .doc{padding:0}}
+body.fmt-wide .page{aspect-ratio:16/9;min-height:0;overflow:hidden}
+body.fmt-wide .page.cover,body.fmt-wide .page.opener{aspect-ratio:16/9;min-height:0}
+body.fmt-wide .cover,body.fmt-wide .opener,body.fmt-wide .cv-edi .cv-split,body.fmt-wide .cv-sv{min-height:0;height:100%}
+body.fmt-wide .cv-mid,body.fmt-wide .cv-edi .cv-l,body.fmt-wide .sv-panel .sv-mid{justify-content:center}
+/* текстовые страницы (.pg) → 2 колонки */
+body.fmt-wide .page.pg{display:block;columns:2;column-gap:56px;padding:46px 60px}
+body.fmt-wide .page.pg > .kick,body.fmt-wide .page.pg > .h2,body.fmt-wide .page.pg > .lede,body.fmt-wide .page.pg > .pg-foot,body.fmt-wide .page.pg > .cc-note,body.fmt-wide .page.pg > p{column-span:all}
+body.fmt-wide .page.pg > *{break-inside:avoid}
+/* проектные страницы → факты в 2 колонки; шапка/визуал/футер на всю ширину */
+body.fmt-wide .page.po{display:block;columns:2;column-gap:48px;padding:44px 56px}
+body.fmt-wide .page.po.po-single{padding:44px 56px}
+body.fmt-wide .page.po > .po-head,body.fmt-wide .page.po > .po-hero,body.fmt-wide .page.po > .pg-foot,body.fmt-wide .page.po > .bento,body.fmt-wide .page.po .gal5,body.fmt-wide .page.po .gal4,body.fmt-wide .page.po .gal3,body.fmt-wide .page.po > .fg-stage,body.fmt-wide .blk-ctl{column-span:all}
+body.fmt-wide .page.po > *{break-inside:avoid}
+body.fmt-wide .po-single .po-hero{position:relative;height:280px;margin:0 0 20px}
+body.fmt-wide .po-single .po-hero .hero{position:absolute;inset:0}
+body.fmt-wide .po-single .po-head,body.fmt-wide .po-single .lede,body.fmt-wide .po-single .mrail,body.fmt-wide .po-single .loc,body.fmt-wide .po-single .pay,body.fmt-wide .po-single .rec-inline{margin-left:0;margin-right:0}
+/* внутренние grid-грамматики в ландшафте — ровно 2 колонки в один ряд */
+body.fmt-wide .me-split,body.fmt-wide .rail-split,body.fmt-wide .dl-top,body.fmt-wide .po-cols{grid-template-columns:1fr 1fr!important;gap:36px}
+body.fmt-wide .fg-stage{height:320px}
+body.fmt-wide .cmp-cards{grid-auto-flow:column}
+@media(max-width:860px){body.fmt-wide .page{aspect-ratio:auto;overflow:visible}body.fmt-wide .page.pg,body.fmt-wide .page.po{columns:1}}
 `;
 
   if (opts.returnParts) return { css, body };
 
   const canEdit = opts.canEdit;
+  const kq = opts.key ? '&key=' + encodeURIComponent(opts.key) : '';
+  const fmtTog = `<span class="fmt-tog"><a href="/p/${c.id}?design=1${kq}" class="${format === 'a4' ? 'on' : ''}">A4</a><a href="/p/${c.id}?design=1&format=wide${kq}" class="${format === 'wide' ? 'on' : ''}">16:9</a></span>`;
   /* Проверка перед выпуском — честные замечания в 3 корзины (данные/вёрстка/рекомендации) */
   const vr = (canEdit && !isPrint) ? validateCollection(db, c) : null;
   const vGroup = (title, arr) => arr.length ? `<div class="vp-grp"><div class="vp-grp-t">${esc(title)}</div>${arr.map(i => `<div class="vp-i ${i.level}"><span class="vp-dot"></span><div class="vp-tx"><b>${esc(i.msg)}</b>${(i.projName || i.field) ? `<span class="vp-src">${[i.projName, i.field].filter(Boolean).map(esc).join(' · ')}</span>` : ''}</div></div>`).join('')}</div>` : '';
@@ -1745,7 +1780,7 @@ p{font-size:var(--s-body);line-height:1.6}
       : `<div class="vp-foot">Блокирующих проблем нет — подборку можно выпускать.</div>`;
     vPanel = `<div class="vpanel" id="vpanel" hidden><div class="vp-head"><b>Проверка перед выпуском</b><button class="vp-x" id="vpx">✕</button></div>${sum}${body}${foot}</div>`;
   }
-  const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density} · фото ${dna.ax.imageDom}</span><button id="recompose">Другой вариант</button>${vBtn}<a href="/p/${c.id}?design=1&print=1" target="_blank">Печать / PDF</a></div>${vPanel}
+  const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density}</span>${fmtTog}<button id="recompose">Другой вариант</button>${vBtn}<a href="/p/${c.id}?design=1&print=1${format === 'wide' ? '&format=wide' : ''}" target="_blank">Печать / PDF</a></div>${vPanel}
 <script>(function(){var k='${esc(opts.key || '')}';var b=document.getElementById('recompose');if(b)b.onclick=function(){b.textContent='…';fetch('/api/collections/${c.id}/recompose?key='+k,{method:'POST'}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})};
 var vc=document.getElementById('vcheck'),vp=document.getElementById('vpanel'),vx=document.getElementById('vpx');if(vc&&vp){vc.onclick=function(){vp.hidden=!vp.hidden};}if(vx&&vp){vx.onclick=function(){vp.hidden=true};}
 document.addEventListener('click',function(ev){var cb=ev.target.closest('[data-compose]');if(cb){ev.preventDefault();location.href='/p/${c.id}?design=1&compose='+encodeURIComponent(cb.getAttribute('data-compose'))+'&key='+k;}});
@@ -1756,7 +1791,7 @@ document.addEventListener('click',function(ev){var t=ev.target.closest('[data-ba
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${css}</style></head>
-<body class="style-${dna.ax.style} dom-${dna.ax.imageDom} dens-${dna.ax.density} int-${dna.ax.artDir}${dna.dark ? ' dark' : ''}">
+<body class="style-${dna.ax.style} dom-${dna.ax.imageDom} dens-${dna.ax.density} int-${dna.ax.artDir}${dna.dark ? ' dark' : ''} fmt-${format}">
 <div class="doc">${body}</div>${bar}
 </body></html>`;
 }

@@ -15665,6 +15665,7 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
         const seedQ = u.searchParams.get('seed');
         const html = design.renderDesignDoc(db, c, {
           print: u.searchParams.get('print') === '1',
+          format: u.searchParams.get('format') === 'wide' ? 'wide' : 'a4',
           seed: seedQ != null && /^\d+$/.test(seedQ) ? +seedQ : undefined,
           style: u.searchParams.get('style') || undefined,   /* превью направления (?style=darkluxury/cinematic) */
           brand: u.searchParams.get('brand') || undefined,
