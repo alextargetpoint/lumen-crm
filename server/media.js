@@ -123,7 +123,7 @@ function analyzeAsset(buf, meta) {
   const sourcePx = meta.sourcePx && meta.sourcePx.w ? meta.sourcePx : { w: dims.width, h: dims.height };
   const upscaled = !!meta.upscaled || (sourcePx.w < dims.width);
   const flags = [];
-  if (bpp > 0 && bpp < 0.12) flags.push('high_compression');    // сильная компрессия → возможны артефакты/низкая детализация (нужна проверка, не приговор)
+  if (bpp > 0 && bpp < 0.05) flags.push('high_compression');    // ТОЛЬКО экстремальная компрессия (нормальный JPEG 0.1–0.3 bpp); не понижает статус, лишь пометка. Настоящая проверка резкости — адаптер.
   if (upscaled) flags.push('upscaled');
   if (mp < 0.5) flags.push('low_resolution');
   return {
@@ -187,8 +187,8 @@ function suitability(analysis, slot) {
   /* огромный оригинал в маленький слот — не ошибка, просто уменьшить (ТЗ: «Лучше уменьшить») */
   if (status === 'suitable' && ppi > target * 2.4) reasons.push('Оригинал крупнее нужного — будет уменьшен');
 
-  /* мягкие флаги (не приговор): компрессия/апскейл → «нужна проверка» (резкость проверяется отдельно) */
-  if (analysis.flags && analysis.flags.includes('high_compression') && status === 'suitable') { status = 'needs_review'; reasons.push('Сильная компрессия — проверьте резкость/артефакты'); }
+  /* мягкие пометки (НЕ меняют статус — статус ведёт PPI; настоящая резкость/артефакты — адаптер) */
+  if (analysis.flags && analysis.flags.includes('high_compression')) reasons.push('Экстремальная компрессия — рекомендуется проверить резкость/артефакты');
   if (analysis.upscaled && status === 'suitable') reasons.push('Изображение увеличено — исходная детализация не выросла');
 
   /* апскейл НЕ повышает оценку исходной детализации автоматически (крит. 4/19) */

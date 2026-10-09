@@ -173,6 +173,7 @@ const tgbridge = require('./tgbridge'); /* двусторонний мост Tel
 const mailer = require('./email'); /* SaaS-почта: Atelier-шаблоны (RU/EN) + Resend + конструктор в админке */
 const design = require('./design'); /* Ф1: движок арт-дирекшна подборок (design.js) */
 const presentation = require('./presentation'); /* Конструктор презентаций v2 (ТЗ Lumen_Developer_Package) */
+const media = require('./media'); /* Медиа-движок: отбор/подготовка фото + авто-адаптация логотипа (доп-ТЗ §14) */
 presentation.setTidGetter(() => store.currentTid());
 function baseUrl(req) { const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0] || (req.socket && req.socket.encrypted ? 'https' : 'http'); return `${proto}://${req.headers.host || 'app.lumen247.com'}`; }
 async function qrDataUrl(text) { try { return await require('qrcode').toDataURL(String(text), { margin: 1, width: 320 }); } catch (e) { return ''; } }
@@ -4365,6 +4366,22 @@ async function safeFetch(url, ua) {
     const { rr, finalUrl } = await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': ua || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'ru,en;q=0.8' } });
     const text = (await rr.text()).slice(0, 900000);
     return { text, finalUrl, ok: rr.ok };
+  } finally { clearTimeout(to); }
+}
+/* безопасная загрузка БАЙТОВ изображения (SSRF-гард + лимит размера + проверка типа) — для медиа-анализа */
+async function safeFetchBytes(url, cap) {
+  cap = cap || 20 * 1024 * 1024;
+  const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const { rr } = await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)' } });
+    if (!rr.ok) throw new Error('HTTP ' + rr.status);
+    const mime = (rr.headers.get('content-type') || '').split(';')[0].trim();
+    if (mime && !/^image\//i.test(mime)) throw new Error('не изображение: ' + mime);
+    const len = +(rr.headers.get('content-length') || 0);
+    if (len && len > cap) throw new Error('файл слишком большой');
+    const buf = Buffer.from(await rr.arrayBuffer());
+    if (buf.length > cap) throw new Error('файл слишком большой');
+    return { buf, mime };
   } finally { clearTimeout(to); }
 }
 /* богатое превью ссылки: YouTube/TikTok через oEmbed + детерминированные обложки, Instagram/прочее через og:image.
@@ -13604,6 +13621,48 @@ ${SCR}
       if (chosenCover) { d.covers.push(chosenCover); if (d.covers.length > 4) d.covers.shift(); }
       store.save();
       return json(res, 200, { ok: true, seed: d.seed, sig: chosenSig, cover: chosenCover });
+    }
+    /* ==== МЕДИА-ДВИЖОК: отбор/подготовка фото + авто-адаптация логотипа (media.js) ==== */
+    /* анализ одного изображения по URL → реальные размеры/формат/флаги */
+    if (p === '/api/media/analyze' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 403, { error: 'auth' });
+      const b = await readBody(req);
+      try {
+        const { buf } = await safeFetchBytes(String(b.url || ''), 20 * 1024 * 1024);
+        return json(res, 200, { analysis: media.analyzeAsset(buf, { url: b.url, materialType: b.materialType, sourcePx: b.sourcePx, upscaled: b.upscaled }) });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* пригодность набора изображений под слот+формат + топ-3 обложки (или фолбэк без фото) */
+    const covProp = p.match(/^\/api\/media\/property\/([^/]+)\/covers$/);
+    if ((p === '/api/media/covers' || covProp) && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 403, { error: 'auth' });
+      const b = await readBody(req);
+      let urls = Array.isArray(b.urls) ? b.urls : [];
+      if (covProp) { const pr = (db.properties || []).find(x => x.id === covProp[1]); if (!pr) return json(res, 404, { error: 'объект не найден' }); urls = (pr.images || []).filter(Boolean); }
+      urls = urls.filter(Boolean).slice(0, 12);
+      const slot = { format: b.format || 'portrait_a4', slot: b.slot || 'cover', profile: b.profile === 'print' ? 'print' : 'digital' };
+      const cands = [];
+      for (const url of urls) {
+        try { const { buf } = await safeFetchBytes(String(url), 20 * 1024 * 1024); cands.push({ assetId: url, analysis: media.analyzeAsset(buf, { url }) }); }
+        catch (e) { cands.push({ assetId: url, analysis: { corrupt: true, flags: ['unavailable'], error: e.message } }); }
+      }
+      return json(res, 200, Object.assign({ slot }, media.selectCover(cands, slot)));
+    }
+    /* профиль логотипа агентства + авто-размещение по всем форматам */
+    if (p === '/api/media/logo-profile' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 403, { error: 'auth' });
+      const b = await readBody(req);
+      const url = b.url || ((db.settings.agency || {}).logo);
+      if (!url) return json(res, 400, { error: 'нет логотипа агентства' });
+      try {
+        const { buf } = await safeFetchBytes(String(url), 10 * 1024 * 1024);
+        const profile = media.analyzeLogo(buf, b.meta || {});
+        const placements = {};
+        ['portrait_a4', 'landscape_a4', 'landscape_16_9', 'portrait_9_16'].forEach(f => {
+          placements[f] = media.placeLogo(profile, { onPhoto: b.onPhoto !== false, calmArea: b.calmArea, pageDark: b.pageDark, format: f });
+        });
+        return json(res, 200, { profile, placements, autoLimits: media.LOGO_AUTO });
+      } catch (e) { return json(res, 400, { error: e.message }); }
     }
     /* Ф3: пер-проектный Lock / Regenerate макета одного объекта (только edit-key) */
     if ((m = p.match(/^\/api\/collections\/([^/]+)\/block$/)) && req.method === 'POST') {
