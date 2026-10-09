@@ -104,7 +104,8 @@ function draftFromProperty(db, pr, broker) {
   });
 
   // location — if district with places
-  const places = (pr.district && Array.isArray(pr.district.times)) ? pr.district.times.map(t => ({ name: t.place, distance: t.min != null ? (t.min + ' мин') : '' })) : [];
+  /* ⚠️ «0 мин» не выводим: 0/пусто = время не определено → скрываем (показывали «0 мин» рядом с «350 м»). */
+  const places = (pr.district && Array.isArray(pr.district.times)) ? pr.district.times.map(t => ({ name: t.place, distance: (t.min != null && +t.min > 0) ? (t.min + ' мин') : '' })) : [];
   sections.push({
     id: sid(), family: 'location', enabled: places.length > 0,
     assetRefs: (pr.district && pr.district.mapUrl) ? [{ assetId: 'map', role: 'map' }] : (imgs[2] ? [{ assetId: 'img2', role: 'map' }] : []),
