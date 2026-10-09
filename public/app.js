@@ -6771,6 +6771,24 @@ async function renderChat(id, rebuild) {
   const chn = _selCh;
   pane.className = 'glass chat chat--' + chn + (l.ai.enabled ? ' ai-live' : '');
   const chnMeta = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], viber: ['Viber', '#7360F2'], email: ['E-mail', '#8A90A0'] }[chn] || ['WhatsApp', '#25D366'];
+  /* ⚠️ БЛОК «ЗАПЛАНИРОВАН СОЗВОН»: ближайшая назначенная встреча лида — время (в поясе клиента), платформа
+     (Zoom/Meet по ссылке), кнопка подключения, копирование ссылки и страница встречи (клиентская визитка /m/:id). */
+  const _mNow = Date.now();
+  const _mFmt = (at) => new Date((at || 0) + ((typeof l.tz === 'number' ? l.tz : 0) * 3600e3)).toLocaleString('ru-RU', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const _mtUp = (l.meetings || []).filter(m => m.status === 'scheduled' && (m.at || 0) > _mNow - 30 * 60e3).sort((a, b) => (a.at || 0) - (b.at || 0))[0];
+  const meetBanner = _mtUp ? (() => {
+    const plat = /zoom/i.test(_mtUp.link || '') ? 'Zoom' : /meet\.google/i.test(_mtUp.link || '') ? 'Google Meet' : /teams/i.test(_mtUp.link || '') ? 'Teams' : (_mtUp.kind === 'video' ? 'Видео-созвон' : _mtUp.kind === 'tour' ? 'Показ объекта' : 'Созвон');
+    const soon = (_mtUp.at - _mNow) < 60 * 60e3;
+    return `<div class="chat-meet${soon ? ' soon' : ''}">
+      <div class="cm-ic">${ic(I.cal || I.clock)}</div>
+      <div class="cm-main"><div class="cm-t">Запланирован ${esc(plat)}${soon ? ' · скоро' : ''}</div>
+        <div class="cm-when">${_mFmt(_mtUp.at)}${l.tz != null ? ' · время клиента' : ''}${_mtUp.brokerName ? ' · ' + esc(_mtUp.brokerName) : ''}</div></div>
+      <div class="cm-act">
+        ${_mtUp.link ? `<a class="btn btn-sm btn-accent" href="${esc(_mtUp.link)}" target="_blank" rel="noopener" title="Подключиться к созвону">${ic(I.phone)}Открыть</a>` : ''}
+        ${_mtUp.link ? `<button class="btn btn-sm btn-icon" data-mcopy="${esc(_mtUp.link)}" title="Скопировать ссылку">${ic(I.link || I.copy)}</button>` : ''}
+        <a class="btn btn-sm" href="/m/${esc(_mtUp.id)}" target="_blank" rel="noopener" title="Страница встречи для клиента (визитка со ссылкой)">Визитка</a>
+      </div></div>`;
+  })() : '';
   pane.innerHTML = `
     <div class="chat-head">
       ${avaHtml(l)}
@@ -6785,6 +6803,7 @@ async function renderChat(id, rebuild) {
         <button class="btn btn-sm btn-icon" id="chatOpenLead" title="Открыть полную карточку лида" aria-label="Карточка">${ic(I.user || I.doc)}</button>
       </div>
     </div>
+    ${meetBanner}
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
     ${(() => {
@@ -6829,6 +6848,7 @@ async function renderChat(id, rebuild) {
   });
   $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
   $('#chatHeadId')?.addEventListener('click', () => openLeadModal(l.id));   /* клик по имени/номеру → карточка лида (по инерции) */
+  $$('[data-mcopy]', pane).forEach(b => b.addEventListener('click', async (e) => { const url = e.currentTarget.dataset.mcopy; if (!url) return; try { await navigator.clipboard.writeText(url); toast('Ссылка на созвон скопирована', null, true); } catch (_) { toast('Не удалось скопировать', url); } }));
   $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {
     const ch = b.dataset.ch;
     COMPOSER_CH[id] = ch;

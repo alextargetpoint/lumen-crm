@@ -149,6 +149,15 @@ input, select, textarea {
    (та самая «обрывистая синяя полоска» по всей CRM). Inset рисуется внутри бокса и не клипается нигде. */
 input:focus, select:focus, textarea:focus { border-color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-2), inset 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent); }
 /* индикатор «ИИ ведёт диалог» — тонкая бегущая линия + подпись, БЕЗ белого блока (сидит на фоне чата) */
+/* блок «Запланирован созвон» в диалоге */
+.chat-meet { flex: none; display: flex; align-items: center; gap: 12px; margin: 10px 14px 2px; padding: 11px 14px; border: 1px solid var(--stroke); border-radius: 13px; background: var(--bg-2); }
+.chat-meet.soon { border-color: var(--accent); background: var(--blue-100); }
+.chat-meet .cm-ic { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 9px; display: grid; place-items: center; background: var(--card); color: var(--accent); }
+.chat-meet .cm-ic svg { width: 17px; height: 17px; }
+.chat-meet .cm-main { flex: 1; min-width: 0; }
+.chat-meet .cm-t { font-size: 13px; font-weight: 700; color: var(--navy-900); }
+.chat-meet .cm-when { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; text-transform: capitalize; }
+.chat-meet .cm-act { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .chat-ai-line { flex: none; padding: 6px 0 7px; text-align: center; position: relative; }
 .chat-ai-line::before { content: ''; position: absolute; top: 0; left: 14%; right: 14%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); background-size: 200% 100%; animation: aiFlow 2.4s linear infinite; }
 .chat-ai-line b { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--accent); opacity: .8; display: inline-flex; align-items: center; gap: 5px; }

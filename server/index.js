@@ -1649,6 +1649,10 @@ function leadView(db, l) {
     lastText,
     hint: leadHint(db, l, axesFilled),
     playTip: (playbook.forContext(l, axesFilled)[0] || null),
+    /* встречи лида (для блока «Запланированный созвон» в диалоге): не отменённые, свежие сверху, до 6 */
+    meetings: (db.meetings || []).filter(m => m.leadId === l.id && m.status !== 'canceled')
+      .sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 6)
+      .map(m => ({ id: m.id, at: m.at, dur: m.dur, kind: m.kind, status: m.status, link: m.link || '', zoomMeetingId: m.zoomMeetingId || '', note: m.note || '', brokerName: (db.brokers.find(b => b.id === m.brokerId) || {}).name || null })),
   });
 }
 
@@ -5273,7 +5277,7 @@ const server = http.createServer(async (req, res) => {
           const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
           const when = engine.fmtLeadDT(mt.at, lead.tz, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });   /* пояс лида, не UTC */
           const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
-          engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${abroker.name} — ${when}. Детали и кнопка подключения: ${base}/m/${mt.id} Если время не подойдёт — напишите сюда, перенесём.`, 'human', { channel: 'wa' });
+          engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} — ${when}. Детали и кнопка подключения: ${base}/m/${mt.id} Если время не подойдёт — напишите сюда, перенесём.`, 'human', { channel: 'wa' });
           if (db.settings.ai.autoOff.onHumanReply && lead.ai && lead.ai.enabled) { lead.ai.enabled = false; lead.ai.pausedBy = 'broker'; }
         }
         ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча назначена из бота: ${lead.name} + ${abroker.name} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
@@ -10717,7 +10721,9 @@ const server = http.createServer(async (req, res) => {
         const when = engine.fmtLeadDT(mt.at, lead.tz, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });   /* пояс лида, не UTC */
         const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
         const _solo2 = ((((db.settings.ai || {}).training || {}).handoff) || 'expert') === 'self';
-        const withWho = broker ? ' с ' + broker.name : (_solo2 ? '' : ' с экспертом');
+        /* ⚠️ НЕ представляем брокера по имени («созвон с Илья Игнатик») — клиент уже в диалоге с ним, звучит как чужой
+           + имя не склоняется. Подтверждаем просто созвон и время; знакомство/хендовер — отдельным тёплым сообщением. */
+        const withWho = '';
         engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu}${withWho} — ${when}. Вся информация, напоминание и кнопка подключения: ${base}/m/${mt.id} Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
       }
       ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name}${broker ? ' + ' + broker.name : ''} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
