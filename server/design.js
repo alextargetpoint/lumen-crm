@@ -993,31 +993,44 @@ function renderDesignDoc(db, c, opts) {
       const topRoi = byMax(p => numOf(p.roi));
       const topAppr = byMax(p => numOf(p.appreciation));
       const early = byMin(p => handoverKey(p.handover));
+      /* ⚠️ ПЕРСОНАЛИЗАЦИЯ ПО ЦЕЛИ (ТЗ redesign §7/§8): «для себя/жизни» → вперёд локация/готовность/комфорт,
+         доходность уводим в конец как бонус; «инвестиция»/не указано → инвест-рамка как раньше. */
+      const _purpose = (lead && lead.quals && lead.quals.purpose && lead.quals.purpose.value) ? String(lead.quals.purpose.value).toLowerCase() : '';
+      const lifeFirst = /для себя|для жизн|\bжизн|переезд|зимов|\bсем|прожив|резиден|для детей|пмж/.test(_purpose);
       const pts = [];
-      if (cheapest) pts.push([`Порог входа`, `${esc(cheapest.name)} — самый доступный старт, ${money(cheapest.priceFrom, cheapest)}.`]);
-      if (topRoi && topRoi !== cheapest) pts.push([`Доходность`, `${esc(topRoi.name)} — заявленная доходность ${esc(topRoi.roi)}.`]);
-      else if (topRoi) pts.push([`Доходность`, `У ${esc(topRoi.name)} — ${esc(topRoi.roi)}.`]);
-      if (topAppr) pts.push([`Горизонт роста`, `${esc(topAppr.name)} — прирост ${esc(topAppr.appreciation)}.`]);
-      if (early && /готов|ready|Q[1-4]/i.test(String(early.handover))) pts.push([`Сроки`, `${esc(early.name)} — ближайшая ${/готов|ready/i.test(String(early.handover)) ? 'готовность' : 'сдача'} (${esc(early.handover)}).`]);
+      if (lifeFirst) {
+        const d0 = (props.find(p => (p.district || {}).name) || {}).district;
+        if (d0 && d0.name) pts.push([`Расположение`, `${esc(d0.name)}${d0.blurb ? ' — ' + esc(String(d0.blurb)).slice(0, 120) : ''}.`]);
+        if (early && /готов|ready|Q[1-4]|20\d\d/i.test(String(early.handover))) pts.push([`Когда заехать`, `${esc(early.name)} — ${/готов|ready/i.test(String(early.handover)) ? 'уже готов к заселению' : 'ближайшая сдача'} (${esc(early.handover)}).`]);
+        if (cheapest) pts.push([`Комфортный бюджет`, `${esc(cheapest.name)} — старт от ${money(cheapest.priceFrom, cheapest)}.`]);
+        if (topAppr) pts.push([`На перспективу`, `${esc(topAppr.name)} — потенциал роста стоимости ${esc(topAppr.appreciation)}.`]);
+      } else {
+        if (cheapest) pts.push([`Порог входа`, `${esc(cheapest.name)} — самый доступный старт, ${money(cheapest.priceFrom, cheapest)}.`]);
+        if (topRoi && topRoi !== cheapest) pts.push([`Доходность`, `${esc(topRoi.name)} — заявленная доходность ${esc(topRoi.roi)}.`]);
+        else if (topRoi) pts.push([`Доходность`, `У ${esc(topRoi.name)} — ${esc(topRoi.roi)}.`]);
+        if (topAppr) pts.push([`Горизонт роста`, `${esc(topAppr.name)} — прирост ${esc(topAppr.appreciation)}.`]);
+        if (early && /готов|ready|Q[1-4]/i.test(String(early.handover))) pts.push([`Сроки`, `${esc(early.name)} — ближайшая ${/готов|ready/i.test(String(early.handover)) ? 'готовность' : 'сдача'} (${esc(early.handover)}).`]);
+      }
+      const recCta = lifeFirst ? 'Скажите, что откликается — подберу под ваш образ жизни и отвечу на все вопросы.' : '${recCta}';
       const sAva = signer.photo ? `<div class="rc-ava rc-ava-ph" style="background-image:url('${esc(abs(signer.photo))}')"></div>` : `<div class="rc-ava">${esc(initials(signer.name))}</div>`;
       const sign = `<div class="rc-sign">${sAva}<div><b>${esc(signer.name || AG)}</b><span>${esc(signer.title || 'ваш менеджер')}</span></div></div>`;
       const geo = geoNames[(props[0] || {}).geo] || '';
       const opener = lead ? `${(lead.name || '').split(' ')[0] || ''}, вот что важно из этой подборки${geo ? ' по ' + esc(geo) : ''}.` : `Коротко — что важно из этой подборки.`;
 
       if (pg.v === 'thesis') {
-        return `<section class="page pg rec rec-thesis">${kicker('Инвест-резюме')}<h2 class="h2">Как я вижу выбор</h2>
+        return `<section class="page pg rec rec-thesis">${kicker(lifeFirst ? 'Личная рекомендация' : 'Инвест-резюме')}<h2 class="h2">${lifeFirst ? 'Что подойдёт для жизни' : 'Как я вижу выбор'}</h2>
           <div class="th-grid">${pts.map(([k, v], i) => `<div class="th"><span class="th-no">${num2(i + 1)}</span><span class="th-k">${esc(k)}</span><p class="th-v">${v}</p></div>`).join('')}</div>
           ${sign}${foot('резюме')}</section>`;
       }
       if (pg.v === 'marginNote') {
         return `<section class="page pg rec rec-margin"><div class="mn-l">${kicker('От эксперта')}<h2 class="h2 sm">Короткая рекомендация</h2>${sign}</div>
-          <div class="mn-r">${pts.map(([k, v]) => `<p class="mn-p"><b>${esc(k)}.</b> ${v}</p>`).join('')}${lead ? `<p class="mn-cta">Скажите, что откликается — посчитаю доходность и условия точечно.</p>` : ''}</div>
+          <div class="mn-r">${pts.map(([k, v]) => `<p class="mn-p"><b>${esc(k)}.</b> ${v}</p>`).join('')}${lead ? `<p class="mn-cta">${recCta}</p>` : ''}</div>
           ${foot('рекомендация')}</section>`;
       }
       if (pg.v === 'sidebarNote') {
         /* Ф1+ · заметка на полях: закреплённый сайдбар с подписью + аннотированные пункты */
         return `<section class="page pg rec rec-sidenote">
-          <aside class="sn-side">${kicker('Заметка менеджера')}${sign}${lead ? `<p class="sn-cta">Скажите, что откликается — посчитаю доходность и условия точечно.</p>` : ''}</aside>
+          <aside class="sn-side">${kicker('Заметка менеджера')}${sign}${lead ? `<p class="sn-cta">${recCta}</p>` : ''}</aside>
           <div class="sn-main"><p class="sn-open">${esc(opener)}</p>
             <div class="sn-pts">${pts.map(([k, v]) => `<div class="sn-p"><span class="sn-k">${esc(k)}</span><p>${v}</p></div>`).join('')}</div></div>
           ${foot('рекомендация')}</section>`;
@@ -1026,17 +1039,26 @@ function renderDesignDoc(db, c, opts) {
         /* Ф1+ · «с чего начать» — объект, лидирующий по нескольким ФАКТИЧЕСКИМ критериям (с оговоркой) */
         const wins = {};
         const bump = (p, reason) => { if (!p) return; (wins[p.id] = wins[p.id] || { p, reasons: [] }).reasons.push(reason); };
-        if (cheapest) bump(cheapest, `самый доступный вход — ${money(cheapest.priceFrom, cheapest)}`);
-        if (topRoi) bump(topRoi, `высшая заявленная доходность — ${esc(topRoi.roi)}`);
-        if (topAppr) bump(topAppr, `наибольший заявленный прирост — ${esc(topAppr.appreciation)}`);
-        if (early && /готов|ready/i.test(String(early.handover))) bump(early, `уже готов к заселению`);
-        else if (early && /Q[1-4]/i.test(String(early.handover))) bump(early, `ближайшая сдача — ${esc(early.handover)}`);
+        if (lifeFirst) {
+          const d0p = props.find(p => (p.district || {}).name);
+          if (early && /готов|ready/i.test(String(early.handover))) bump(early, `уже готов к заселению`);
+          else if (early && /Q[1-4]|20\d\d/i.test(String(early.handover))) bump(early, `ближайшая сдача — ${esc(early.handover)}`);
+          if (d0p) bump(d0p, `расположение — ${esc((d0p.district || {}).name)}`);
+          if (cheapest) bump(cheapest, `комфортный старт — ${money(cheapest.priceFrom, cheapest)}`);
+          if (topAppr) bump(topAppr, `сохранность вложений — прирост ${esc(topAppr.appreciation)}`);
+        } else {
+          if (cheapest) bump(cheapest, `самый доступный вход — ${money(cheapest.priceFrom, cheapest)}`);
+          if (topRoi) bump(topRoi, `высшая заявленная доходность — ${esc(topRoi.roi)}`);
+          if (topAppr) bump(topAppr, `наибольший заявленный прирост — ${esc(topAppr.appreciation)}`);
+          if (early && /готов|ready/i.test(String(early.handover))) bump(early, `уже готов к заселению`);
+          else if (early && /Q[1-4]/i.test(String(early.handover))) bump(early, `ближайшая сдача — ${esc(early.handover)}`);
+        }
         const ranked = Object.values(wins).sort((a, b) => b.reasons.length - a.reasons.length);
         const top = ranked[0];
         if (top && top.reasons.length) {
           const rest = ranked.slice(1).filter(x => x.reasons.length);
-          return `<section class="page pg rec rec-pick">${kicker('С чего бы я начал')}<h2 class="h2">Если брать по цифрам</h2>
-            <p class="lede">Один объект лидирует сразу по нескольким фактическим параметрам подборки. Это не «единственно верный» выбор — финал зависит от ваших приоритетов, но начать разговор я бы предложил с него.</p>
+          return `<section class="page pg rec rec-pick">${kicker('С чего бы я начал')}<h2 class="h2">${lifeFirst ? 'Что ближе для жизни' : 'Если брать по цифрам'}</h2>
+            <p class="lede">${lifeFirst ? 'Один объект удачно отвечает вашему запросу сразу с нескольких сторон — расположение, готовность, комфортный бюджет. Это не единственный вариант, но с него я бы начал разговор.' : 'Один объект лидирует сразу по нескольким фактическим параметрам подборки. Это не «единственно верный» выбор — финал зависит от ваших приоритетов, но начать разговор я бы предложил с него.'}</p>
             <div class="pk-card"><div class="pk-h"><b class="pk-nm">${esc(top.p.name)}</b>${top.p.area ? `<span class="pk-mt">${esc(top.p.area)}</span>` : ''}${top.p.priceFrom ? `<span class="pk-pr">от ${money(top.p.priceFrom, top.p)}</span>` : ''}</div>
               <ul class="pk-why">${top.reasons.map(rr => `<li>${rr}</li>`).join('')}</ul></div>
             ${rest.length ? `<p class="pk-rest">Также стоит посмотреть: ${rest.map(x => `<b>${esc(x.p.name)}</b> (${x.reasons[0]})`).join('; ')}.</p>` : ''}
@@ -1050,7 +1072,7 @@ function renderDesignDoc(db, c, opts) {
         <div class="rn-body">${kicker('Заметка менеджера')}
           <p class="rn-open">${esc(opener)}</p>
           <div class="rn-pts">${pts.map(([k, v]) => `<p><b>${esc(k)}.</b> ${v}</p>`).join('')}</div>
-          ${lead ? `<p class="rn-close">Готов созвониться и пройтись по любому из них — с расчётом под ваш бюджет.</p>` : ''}
+          ${lead ? `<p class="rn-close">${lifeFirst ? 'Готов созвониться и пройтись по любому из них — подскажу, что лучше ложится под ваш образ жизни.' : 'Готов созвониться и пройтись по любому из них — с расчётом под ваш бюджет.'}</p>` : ''}
         </div>
         ${sign}${foot('рекомендация')}</section>`;
     },
