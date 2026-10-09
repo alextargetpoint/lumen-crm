@@ -13611,7 +13611,7 @@ ${SCR}
       const c = db.collections.find(x => x.id === m[1]);
       if (!c) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
-      const r = design.blockOp(db, c, String(b.proj || ''), String(b.action || ''));
+      const r = design.blockOp(db, c, String(b.proj || ''), String(b.action || ''), String(b.grammar || ''));
       if (r.error) return json(res, 400, r);
       store.save();
       return json(res, 200, r);
@@ -15655,6 +15655,13 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
       /* Ф1: движок арт-дирекшна — отдельный премиум-рендер того же объекта c (та же ссылка/токен) */
       if (u.searchParams.get('design') === '1' || (c.design && c.design.auto)) {
         const hasKey = u.searchParams.get('key') === db.settings.hooks.secret;
+        /* Библиотека композиций одного проекта (edit-key): живые превью грамматик на его данных */
+        const composePid = u.searchParams.get('compose');
+        if (composePid && hasKey) {
+          const html = design.renderCompose(db, c, composePid, { key: db.settings.hooks.secret });
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+          res.end(html); return;
+        }
         const seedQ = u.searchParams.get('seed');
         const html = design.renderDesignDoc(db, c, {
           print: u.searchParams.get('print') === '1',

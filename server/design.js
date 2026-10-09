@@ -493,7 +493,7 @@ function artDirect(db, c, props, dna, lead, seed) {
 }
 
 /* ---------- Ф3 · Regenerate / Lock одного блока (проекта) ---------- */
-function blockOp(db, c, proj, action) {
+function blockOp(db, c, proj, action, grammar) {
   c.design = c.design || {};
   const d = c.design;
   d.locks = d.locks || {};
@@ -515,6 +515,12 @@ function blockOp(db, c, proj, action) {
   if (action === 'unlock') {
     delete d.locks[proj];
     return { ok: true, action: 'unlock', proj };
+  }
+  if (action === 'set') {                          /* брокер выбрал композицию из библиотеки → фиксируем её */
+    const g = String(grammar || '');
+    if (!ALL_GRAMMARS.includes(g)) return { error: 'bad grammar' };
+    d.locks[proj] = g;
+    return { ok: true, action: 'set', proj, grammar: g };
   }
   if (action === 'regen') {
     delete d.locks[proj];                         /* реген подразумевает свободу менять */
@@ -559,6 +565,12 @@ function renderDesignDoc(db, c, opts) {
   if (opts.brand && AXES.brandMode.opts.some(o => o[0] === opts.brand)) axIn.brandMode = opts.brand;
   const dna = deriveDNA(db, c, props, axIn, seed);
   const plan = artDirect(db, c, props, dna, lead, seed);
+  /* Превью-фрагмент одного проекта в конкретной грамматике (для библиотеки композиций) */
+  if (opts.onlyProject) {
+    let fp = plan.filter(pg => pg.role === 'PROJECT_OVERVIEW' && pg.pid === opts.onlyProject);
+    if (opts.forceGrammar && fp[0]) fp[0] = Object.assign({}, fp[0], { v: opts.forceGrammar, locked: false, repaired: 0 });
+    plan.length = 0; plan.push(...fp);
+  }
   const P = dna.pal;
   const cur = (p) => p && p.currency === 'EUR' ? '€' : '$';
   const money = (n, p) => cur(p) + Number(n || 0).toLocaleString('ru-RU');
@@ -680,6 +692,7 @@ function renderDesignDoc(db, c, opts) {
     if (!opts.canEdit || isPrint) return '';
     const locked = pg.locked;
     return `<div class="blk-ctl" data-proj="${esc(pg.pid)}">`
+      + `<button class="bc-btn" data-compose="${esc(pg.pid)}" title="Выбрать композицию страницы">⊞</button>`
       + `<button class="bc-btn${locked ? ' on' : ''}" data-bact="${locked ? 'unlock' : 'lock'}" title="${locked ? 'Снять фиксацию макета проекта' : 'Зафиксировать макет проекта'}">${locked ? '🔒' : '🔓'}</button>`
       + `<button class="bc-btn" data-bact="regen" title="Другой макет этого проекта">↻</button></div>`;
   };
@@ -1708,6 +1721,8 @@ p{font-size:var(--s-body);line-height:1.6}
 @media print{.vpanel{display:none!important}}
 `;
 
+  if (opts.returnParts) return { css, body };
+
   const canEdit = opts.canEdit;
   /* Проверка перед выпуском — честные замечания в 3 корзины (данные/вёрстка/рекомендации) */
   const vr = (canEdit && !isPrint) ? validateCollection(db, c) : null;
@@ -1733,6 +1748,7 @@ p{font-size:var(--s-body);line-height:1.6}
   const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density} · фото ${dna.ax.imageDom}</span><button id="recompose">Другой вариант</button>${vBtn}<a href="/p/${c.id}?design=1&print=1" target="_blank">Печать / PDF</a></div>${vPanel}
 <script>(function(){var k='${esc(opts.key || '')}';var b=document.getElementById('recompose');if(b)b.onclick=function(){b.textContent='…';fetch('/api/collections/${c.id}/recompose?key='+k,{method:'POST'}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})};
 var vc=document.getElementById('vcheck'),vp=document.getElementById('vpanel'),vx=document.getElementById('vpx');if(vc&&vp){vc.onclick=function(){vp.hidden=!vp.hidden};}if(vx&&vp){vx.onclick=function(){vp.hidden=true};}
+document.addEventListener('click',function(ev){var cb=ev.target.closest('[data-compose]');if(cb){ev.preventDefault();location.href='/p/${c.id}?design=1&compose='+encodeURIComponent(cb.getAttribute('data-compose'))+'&key='+k;}});
 document.addEventListener('click',function(ev){var t=ev.target.closest('[data-bact]');if(!t)return;var w=t.closest('[data-proj]');if(!w)return;var proj=w.getAttribute('data-proj'),act=t.getAttribute('data-bact');t.textContent='…';fetch('/api/collections/${c.id}/block?key='+k,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({proj:proj,action:act})}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})});})();</script>` : '';
 
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1870,4 +1886,117 @@ function applyUnitSel(c, pr) {
   return { ...pr, units };
 }
 
-module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES, applyUnitSel, validateCollection };
+/* ============================================================================
+   БИБЛИОТЕКА КОМПОЗИЦИЙ (макет №2) — «один контент, разные способы подачи».
+   Рендерит все валидные грамматики ОДНОГО проекта на ЕГО реальных данных как
+   живые превью (не абстрактные миниатюры), брокер выбирает → фиксируется lock.
+   ========================================================================== */
+const GNAMES = { singleHero: 'Крупное фото', galleryCurated: 'Галерея', bento: 'Бенто-сетка', metricEditorial: 'Текст и показатели', sidebarRail: 'Рельса слева', figureGround: 'Фото во весь кадр', dataLed: 'Акцент на цифрах' };
+const GDESC = { singleHero: 'Доминантный кадр, заголовок и факты под ним', galleryCurated: 'Сетка из нескольких фото + колонки', bento: 'Модульная сетка: фото, метрики, локация', metricEditorial: 'Редакторский разворот: текст слева, показатели справа', sidebarRail: 'Вертикальная рельса цены/метрик + крупное фото', figureGround: 'Кадр на весь лист + плавающая карточка', dataLed: 'Цифры и оплата главенствуют, фото — поддержка' };
+const GCAT = { singleHero: 'photo', galleryCurated: 'photo', bento: 'photo numbers', metricEditorial: 'photo numbers', sidebarRail: 'photo', figureGround: 'photo', dataLed: 'numbers' };
+
+function renderCompose(db, c, pid, opts) {
+  opts = opts || {};
+  const S = db.settings || {};
+  const AG = (S.agency && S.agency.name) || 'Lumen';
+  const key = opts.key || '';
+  const back = `/p/${c.id}?design=1${key ? '&key=' + encodeURIComponent(key) : ''}`;
+  const pr0 = (db.properties || []).find(x => x.id === pid);
+  if (!pr0) return `<!DOCTYPE html><meta charset="utf-8"><body style="font-family:system-ui;padding:48px;color:#333">Объект не найден. <a href="${esc(back)}">← Назад к подборке</a></body>`;
+  const pr = applyUnitSel(c, pr0);
+  const seed = ((c.design && c.design.seed) || hashStr(c.id)) >>> 0;
+  const dna = deriveDNA(db, c, [pr], c.design || {}, seed);
+  const prof = projProfile(db, c, pr, dna);
+  let grammars = ALL_GRAMMARS.filter(g => validGrammars(prof, dna).includes(g));
+  const pseed = (c.design && c.design.pseed && c.design.pseed[pid]) || 0;
+  const current = (c.design && c.design.locks && c.design.locks[pid]) || decideGrammar(pr, prof, dna, [], seed, pseed, null).v;
+
+  let css = '';
+  const cards = grammars.map(g => {
+    const parts = renderDesignDoc(db, c, { onlyProject: pid, forceGrammar: g, returnParts: true });
+    if (!css) css = parts.css;
+    const isCur = g === current;
+    return `<div class="cp-card${isCur ? ' cur' : ''}" data-cat="${GCAT[g] || 'photo'}" data-g="${esc(g)}">
+      <button class="cp-prevbtn" data-g="${esc(g)}" aria-label="Выбрать ${esc(GNAMES[g] || g)}"><div class="cp-prev"><div class="cp-scale"><div class="doc cp-doc">${parts.body}</div></div></div>${isCur ? '<span class="cp-badge">✓ Текущая</span>' : ''}</button>
+      <div class="cp-meta"><div class="cp-tx"><b>${esc(GNAMES[g] || g)}</b><span>${esc(GDESC[g] || '')}</span></div>
+      <button class="cp-apply${isCur ? ' cur' : ''}" data-g="${esc(g)}">${isCur ? '✓ Применено' : 'Применить'}</button></div>
+    </div>`;
+  }).join('');
+
+  const geo = (S.geoNames || {})[pr.geo] || '';
+  const readout = [['Стиль', dna.styleName], ['Плотность', { light: 'Лёгкая', standard: 'Стандарт', detailed: 'Детальная' }[dna.density] || dna.density], ['Доминанта фото', { low: 'Низкая', medium: 'Средняя', high: 'Высокая' }[dna.imageDom] || dna.imageDom], ['Фотографий', String(prof.nPhotos)], ['Показателей', String(prof.metrics)]];
+  const composeCss = `
+body{background:#F6F4F0;color:#1A1712;font-family:'Manrope',system-ui,-apple-system,sans-serif;line-height:1.5}
+.cp-wrap{min-height:100vh;display:flex;flex-direction:column}
+.cp-top{display:flex;align-items:center;gap:16px;padding:18px 34px;border-bottom:1px solid #E7E1D6;background:#FBFAF7;position:sticky;top:0;z-index:10}
+.cp-logo{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:21px;letter-spacing:.14em}
+.cp-crumb{color:#8A7F6C;font-size:13.5px}.cp-crumb b{color:#1A1712;font-weight:600}
+.cp-back{margin-left:auto;color:#1A1712;font-size:13.5px;font-weight:600;text-decoration:none;border:1px solid #E0D9CB;border-radius:100px;padding:8px 16px}
+.cp-back:hover{background:#F0EBE0}
+.cp-body{display:grid;grid-template-columns:1fr 320px;gap:0;flex:1}
+.cp-main{padding:30px 34px 60px;overflow:auto}
+.cp-head h1{font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-.01em;line-height:1.05}
+.cp-head p{color:#8A7F6C;font-size:15px;margin-top:8px}
+.cp-tabs{display:flex;gap:8px;margin:24px 0 20px;flex-wrap:wrap}
+.cp-tab{border:1px solid #E0D9CB;background:#FBFAF7;color:#5C5444;font-size:13.5px;font-weight:600;padding:8px 16px;border-radius:100px;cursor:pointer}
+.cp-tab.on{background:#1A1712;color:#fff;border-color:#1A1712}
+.cp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+@media(max-width:1100px){.cp-grid{grid-template-columns:repeat(2,1fr)}.cp-body{grid-template-columns:1fr}}
+.cp-card{border:1px solid #E7E1D6;border-radius:16px;background:#fff;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .15s,border-color .15s}
+.cp-card:hover{box-shadow:0 18px 50px -24px rgba(0,0,0,.28)}
+.cp-card.cur{border-color:#8A5A2B;box-shadow:0 0 0 2px rgba(138,90,43,.18)}
+.cp-prevbtn{display:block;width:100%;border:0;background:transparent;padding:0;cursor:pointer;position:relative}
+.cp-prev{position:relative;height:300px;overflow:hidden;background:#EFE9DD;border-bottom:1px solid #E7E1D6}
+.cp-prev::after{content:"";position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(transparent,rgba(255,255,255,.0))}
+.cp-scale{transform:scale(.378);transform-origin:top left;width:265%;pointer-events:none}
+.cp-doc{max-width:none!important;width:794px!important;margin:0!important;padding:0!important}
+.cp-doc .page{margin:0!important;box-shadow:none!important;min-height:0!important}
+.cp-doc .blk-ctl{display:none!important}
+.cp-badge{position:absolute;top:12px;left:12px;background:#8A5A2B;color:#fff;font-size:11px;font-weight:700;letter-spacing:.04em;padding:5px 11px;border-radius:100px}
+.cp-meta{display:flex;align-items:flex-start;gap:12px;padding:16px 18px}
+.cp-tx{flex:1;min-width:0}.cp-tx b{font-size:15px;font-weight:600;display:block}.cp-tx span{font-size:12.5px;color:#8A7F6C;display:block;margin-top:3px;line-height:1.4}
+.cp-apply{flex:0 0 auto;align-self:center;border:0;background:#1A1712;color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:100px;cursor:pointer;white-space:nowrap}
+.cp-apply:hover{background:#000}
+.cp-apply.cur{background:#EFEAE0;color:#8A5A2B}
+.cp-side{border-left:1px solid #E7E1D6;background:#FBFAF7;padding:30px 26px}
+.cp-side h2{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;margin-bottom:4px}
+.cp-side .cp-subtt{color:#8A7F6C;font-size:13px;margin-bottom:22px}
+.cp-ro{display:flex;flex-direction:column;gap:0;border-top:1px solid #E7E1D6}
+.cp-ro-r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:13px 0;border-bottom:1px solid #E7E1D6}
+.cp-ro-k{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8A7F6C;font-weight:700}
+.cp-ro-v{font-size:14px;font-weight:600;text-align:right}
+.cp-note{margin-top:22px;background:#F0EBE0;border-radius:12px;padding:14px 16px;font-size:12.5px;color:#5C5444;line-height:1.5}
+.cp-note b{color:#1A1712}`;
+
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Композиция — ${esc(pr.name || '')} · ${esc(AG)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>${css}
+${composeCss}</style></head>
+<body>
+<div class="cp-wrap">
+  <header class="cp-top"><span class="cp-logo">${esc(AG)}</span><span class="cp-crumb">Композиция · <b>${esc(pr.name || '')}</b>${geo ? ' · ' + esc(geo) : ''}</span><a class="cp-back" href="${esc(back)}">← К подборке</a></header>
+  <div class="cp-body">
+    <main class="cp-main">
+      <div class="cp-head"><h1>Композиция страницы</h1><p>Один контент — разные способы подачи. Выберите готовый результат на данных этого объекта.</p></div>
+      <div class="cp-tabs"><button class="cp-tab on" data-f="all">Все</button><button class="cp-tab" data-f="photo">С фото</button><button class="cp-tab" data-f="numbers">Акцент на цифрах</button></div>
+      <div class="cp-grid">${cards}</div>
+    </main>
+    <aside class="cp-side"><h2>Настройки</h2><div class="cp-subtt">Единая DNA документа — меняется в осях подборки.</div>
+      <div class="cp-ro">${readout.map(([k, v]) => `<div class="cp-ro-r"><span class="cp-ro-k">${esc(k)}</span><span class="cp-ro-v">${esc(v)}</span></div>`).join('')}</div>
+      <div class="cp-note"><b>Текст и данные сохраняются.</b> Смена композиции меняет только способ подачи — ничего не исчезает из-за меньшего числа мест.</div>
+    </aside>
+  </div>
+</div>
+<script>
+var k=${JSON.stringify(key)},cid=${JSON.stringify(c.id)},pid=${JSON.stringify(pid)},back=${JSON.stringify(back)};
+function apply(g,btn){if(btn)btn.textContent='…';fetch('/api/collections/'+cid+'/block?key='+encodeURIComponent(k),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({proj:pid,action:'set',grammar:g})}).then(function(r){return r.json()}).then(function(){location.href=back}).catch(function(){if(btn)btn.textContent='Ошибка'});}
+document.querySelectorAll('.cp-apply').forEach(function(b){b.onclick=function(e){e.stopPropagation();apply(b.getAttribute('data-g'),b)}});
+document.querySelectorAll('.cp-prevbtn').forEach(function(b){b.onclick=function(){apply(b.getAttribute('data-g'),b.closest('.cp-card').querySelector('.cp-apply'))}});
+document.querySelectorAll('.cp-tab').forEach(function(t){t.onclick=function(){document.querySelectorAll('.cp-tab').forEach(function(x){x.classList.remove('on')});t.classList.add('on');var f=t.getAttribute('data-f');document.querySelectorAll('.cp-card').forEach(function(c){c.style.display=(f==='all'||(' '+c.getAttribute('data-cat')+' ').indexOf(' '+f+' ')>=0)?'':'none'});};});
+</script>
+</body></html>`;
+}
+
+module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES, applyUnitSel, validateCollection, renderCompose };
