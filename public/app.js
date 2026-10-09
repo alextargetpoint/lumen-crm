@@ -456,10 +456,28 @@ function enhanceControls(root) {
     const pop = el('<div class="dtp-pop dtp-time"></div>');
     wrap.append(btn);
     const label = () => { btn.querySelector('.cs-val').textContent = inp.value || 'Время'; };
+    /* ручной ввод ТОЧНОГО времени (а не только 30-мин слоты): поле сверху + слоты ниже для быстрого выбора.
+       «1545»/«15.45»/«15 45» → «15:45». Enter/blur применяет. */
+    const applyManual = (raw, close) => {
+      let v = String(raw || '').trim().replace(/[.\s,]+/g, ':').replace(/:+/g, ':').replace(/^:|:$/g, '');
+      if (/^\d{3,4}$/.test(v)) v = v.padStart(4, '0').replace(/(\d{2})(\d{2})/, '$1:$2');
+      const mm2 = v.match(/^(\d{1,2}):(\d{2})$/);
+      if (!mm2) return false;
+      const hh = Math.min(23, +mm2[1]), mn = Math.min(59, +mm2[2]);
+      inp.value = String(hh).padStart(2, '0') + ':' + String(mn).padStart(2, '0');
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+      label();
+      if (close) closePop();
+      return true;
+    };
     const build = () => {
       const slots = [];
       for (let h = 8; h <= 21; h++) for (const mm of ['00', '30']) slots.push(`${String(h).padStart(2, '0')}:${mm}`);
-      pop.innerHTML = slots.map(s => `<button type="button" class="dtp-slot ${inp.value === s ? 'sel' : ''}">${s}</button>`).join('');
+      pop.innerHTML = `<div class="dtp-manual"><input type="text" class="dtp-inp" inputmode="numeric" maxlength="5" placeholder="чч:мм" value="${inp.value || ''}"><span class="dtp-mh">точное время — впишите и Enter</span></div>`
+        + `<div class="dtp-slots">${slots.map(s => `<button type="button" class="dtp-slot ${inp.value === s ? 'sel' : ''}">${s}</button>`).join('')}</div>`;
+      const mi = pop.querySelector('.dtp-inp');
+      mi.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyManual(mi.value, true); } else if (e.key === 'Escape') { e.preventDefault(); closePop(); } });
+      mi.addEventListener('blur', () => applyManual(mi.value, false));
       $$('.dtp-slot', pop).forEach(b => b.addEventListener('click', () => {
         inp.value = b.textContent;
         inp.dispatchEvent(new Event('change', { bubbles: true }));
@@ -469,7 +487,7 @@ function enhanceControls(root) {
     };
     btn.addEventListener('click', () => {
       if (wrap.classList.contains('open')) closePop();
-      else { build(); openPop(wrap, btn, pop); const sel = pop.querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'center' }); }
+      else { build(); openPop(wrap, btn, pop); const mi = pop.querySelector('.dtp-inp'); if (mi) { mi.focus(); try { mi.select(); } catch (_) {} } const sel = pop.querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'center' }); }
     });
     label();
   });
@@ -14316,7 +14334,9 @@ PAGES.tasks = async (root) => {
   $$('[data-wk]', root).forEach(b => b.addEventListener('click', () => { const v = b.dataset.wk; TASK_WEEK = v === '0' ? 0 : v === 'p' ? TASK_WEEK - 1 : TASK_WEEK + 1; render(); }));
 
   $$('[data-sugadd]', root).forEach(b => b.addEventListener('click', async () => { const sg = d.suggestions[+b.dataset.sugadd]; if (!sg) return; try { await api.post('/tasks', { title: sg.title, priority: sg.priority || 'p2', scheduled: sg.scheduled || today, leadId: sg.leadId || null, meetingId: sg.meetingId || null }); toast('Добавлено в задачи', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
-  $$('[data-mtprep]', root).forEach(b => b.addEventListener('click', async (e) => { const blk = e.target.closest('[data-mtid]'); if (!blk) return; const lead = leadMap[blk.dataset.mtlead] || 'клиентом'; try { await api.post('/tasks', { title: `Подготовиться к встрече с ${lead}`, priority: 'p2', scheduled: today, leadId: blk.dataset.mtlead || null, meetingId: blk.dataset.mtid }); toast('Задача-подготовка создана', null, true); render(); } catch (e2) { toast('Не вышло', e2.message); } }));
+  /* «Подготовиться» = открыть карточку лида (заметки/файлы/переписка/подборки) — как в title кнопки.
+     Было сломано: обработчик искал несуществующий [data-mtid]-родитель и молча выходил (return). */
+  $$('[data-mtprep]', root).forEach(b => b.addEventListener('click', (e) => { const id = e.currentTarget.dataset.mtprep; if (!id) return; if (typeof openLeadModal === 'function') openLeadModal(id); else go('leads', { lead: id }); }));
 
   /* строки-списки */
   $$('.tk-row[data-tk]', root).forEach(rowEl => rowEl.addEventListener('click', async (e) => {
