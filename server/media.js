@@ -260,6 +260,7 @@ function newVariant(f) {
   f = f || {};
   return {
     id: f.id || rid('var'), originalAssetId: f.originalAssetId, transformRecipe: f.transformRecipe || { kind: 'original' },
+    recipeKey: f.recipeKey || null, isThumbnail: !!f.isThumbnail,
     processingModelVersion: f.processingModelVersion || null, outputFileId: f.outputFileId || null,
     outputDimensions: f.outputDimensions || null, reviewStatus: f.reviewStatus || 'approved', createdBy: f.createdBy || null, createdAt: f.createdAt || null,
   };
@@ -296,8 +297,102 @@ function cropKeepsProtected(crop, protectedRegions) {
 const SAFE_ENHANCE = { exposure: true, whiteBalance: true, denoise: 'mild', compressionFix: true, sharpen: 'limited',
   forbidden: ['architecture', 'floors', 'windows', 'views', 'sea', 'pool', 'furniture', 'landscape', 'remove_construction', 'outpaint'] };
 
+/* ---------------------------------------------------------------------------
+   8. ПАЙПЛАЙН ОБЛОЖКИ: analyze → жёсткие исключения → рейтинг → топ-3,
+   с честным фолбэком «нет пригодного фото» (крит.21): типографика / маленькое
+   фото / другой ракурс / загрузить — НЕ пустой плейсхолдер и НЕ чужой проект.
+   -------------------------------------------------------------------------- */
+function selectCover(candidates, slot) {
+  const r = rankCovers(candidates, slot);
+  if (r.top.length && r.top[0].status === 'suitable') {
+    return { mode: 'photo', pick: r.top[0], alternatives: r.top.slice(1), excluded: r.excluded, ranked: r.ranked };
+  }
+  /* нет пригодного фото → предлагаем варианты (не подставляем случайное/пустое) */
+  return {
+    mode: 'no_suitable_photo',
+    pick: null, bestEffort: r.ranked[0] || null,
+    suggestions: ['upload_original', 'pick_other_frame', 'cover_without_photo'],   // действия UI (доп-ТЗ §9)
+    coverCompositions: ['typographic', 'small_photo'],                              // слабый исходник → типографика/маленькое фото
+    alternatives: r.ranked.slice(0, 3), excluded: r.excluded,
+  };
+}
+
+/* ---------------------------------------------------------------------------
+   9. ПЕРЕСЧЁТ КРОПА ПОД ФОРМАТ (крит.5/14/18): фокус сохраняется, защищённые
+   зоны не режутся; при невозможности — предлагаем другой макет, не ломаем.
+   Ручные кропы хранятся ОТДЕЛЬНО по формату (layoutsByFormat) — не перетираются.
+   -------------------------------------------------------------------------- */
+function cropForAspect(targetAspect, imgW, imgH, focal, protectedRegions) {
+  const imgAspect = imgW / imgH;
+  let cw, ch;
+  if (targetAspect >= imgAspect) { cw = 1; ch = +(imgAspect / targetAspect).toFixed(4); }
+  else { ch = 1; cw = +(targetAspect / imgAspect).toFixed(4); }
+  const f = focal || { x: 0.5, y: 0.5 };
+  let cx = Math.max(0, Math.min(1 - cw, f.x - cw / 2));
+  let cy = Math.max(0, Math.min(1 - ch, f.y - ch / 2));
+  const crop = { x: +cx.toFixed(4), y: +cy.toFixed(4), w: cw, h: ch };
+  return { crop, keepsProtected: cropKeepsProtected(crop, protectedRegions || []) };
+}
+function recomputeCropForFormat(imgW, imgH, toFormat, slot, focal, protectedRegions, savedCropsByFormat) {
+  /* если под этот формат уже есть ручной кроп — не трогаем (крит.18) */
+  if (savedCropsByFormat && savedCropsByFormat[toFormat] && savedCropsByFormat[toFormat].manual) {
+    return { crop: savedCropsByFormat[toFormat].crop, manual: true, needsAlt: false };
+  }
+  const si = slotInches(toFormat, slot || 'cover');
+  const aspect = si.w / si.h;
+  const { crop, keepsProtected } = cropForAspect(aspect, imgW, imgH, focal, protectedRegions);
+  return keepsProtected
+    ? { crop, aspect: +aspect.toFixed(4), manual: false, needsAlt: false }
+    : { crop, aspect: +aspect.toFixed(4), manual: false, needsAlt: true, reason: 'crop_loses_protected', suggest: 'alternative_layout' };
+}
+
+/* ---------------------------------------------------------------------------
+   10. ПРЕД-ЭКСПОРТНАЯ МЕДИА-ПРОВЕРКА (ТЗ §17, крит.22/23): блокирующие отдельно
+   от рекомендаций. PDF берёт полноразмерную производную, НЕ UI-миниатюру.
+   items: [{slotId, required, variant?, analysis?, suitability?, isCover?}]
+   -------------------------------------------------------------------------- */
+function exportMediaCheck(items) {
+  const blocking = [], recommendations = [];
+  (items || []).forEach(it => {
+    const where = it.slotId || 'slot';
+    const v = it.variant;
+    if (it.required && !v) { blocking.push({ slotId: where, code: 'missing_resource', msg: 'Отсутствует обязательный ресурс' }); return; }
+    if (v) {
+      if (v.unavailable || (it.analysis && it.analysis.corrupt)) blocking.push({ slotId: where, code: 'unavailable', msg: 'Изображение недоступно или повреждено' });
+      if (v.isThumbnail) blocking.push({ slotId: where, code: 'thumbnail_in_pdf', msg: 'В PDF подставлена UI-миниатюра вместо полноразмерной производной' });
+      const rec = v.transformRecipe || {};
+      if (rec.generative && v.reviewStatus !== 'approved') blocking.push({ slotId: where, code: 'unverified_generative', msg: 'Непроверенная генеративная производная' });
+      if (it.projectMismatch) blocking.push({ slotId: where, code: 'project_mismatch', msg: 'Несоответствие проекта' });
+    }
+    if (it.suitability) {
+      if (it.isCover && it.suitability.status === 'not_for_cover') blocking.push({ slotId: where, code: 'unsuitable_cover', msg: 'Фото не подходит для обложки (' + it.suitability.ppi + ' PPI)' });
+      else if (it.suitability.status === 'needs_review') recommendations.push({ slotId: where, code: 'low_quality', msg: 'Качество фото стоит проверить' });
+    }
+  });
+  return { ok: blocking.length === 0, blocking, recommendations };
+}
+
+/* ---------------------------------------------------------------------------
+   11. ПРОИЗВОДНЫЕ: дедуп по рецепту (крит.11 — повтор рецепта без новой платной
+   операции), от ОРИГИНАЛА (крит.8/20 — не перетираем исходник).
+   -------------------------------------------------------------------------- */
+function recipeKey(originalAssetId, recipe) {
+  return sha256(String(originalAssetId) + '|' + JSON.stringify(recipe || {}) + '|v' + ((recipe && recipe.version) || 1));
+}
+function findOrPlanVariant(variants, originalAssetId, recipe) {
+  const key = recipeKey(originalAssetId, recipe);
+  const existing = (variants || []).find(v => v.recipeKey === key);
+  if (existing) return { reused: true, recipeKey: key, variant: existing };
+  return { reused: false, recipeKey: key, plan: newVariant({ originalAssetId, transformRecipe: recipe, recipeKey: key }) };
+}
+function buildEnhanceRecipe(kind, params) {
+  if (kind === 'generative') return Object.assign({ kind: 'generative', generative: true, reviewRequired: true, version: 1 }, params || {});
+  if (kind === 'upscale') return Object.assign({ kind: 'upscale', generative: false, reviewRequired: true, version: 1 }, params || {});
+  return Object.assign({ kind: 'safe', ops: SAFE_ENHANCE, generative: false, reviewRequired: false, version: 1 }, params || {});
+}
+
 /* ============================================================================
-   8. АВТО-АДАПТАЦИЯ ЛОГОТИПА (отдельное доп-ТЗ, 9.10.2026).
+   12. АВТО-АДАПТАЦИЯ ЛОГОТИПА (отдельное доп-ТЗ, 9.10.2026).
    Логотип анализируется ОДИН раз → профиль агентства → движок сам подбирает
    размещение под каждую обложку/фон/формат. Брокер видит готовый результат;
    ручные настройки — только для исключений. Безопасный фолбэк + объяснение,
@@ -441,4 +536,6 @@ module.exports = {
   analyzeAsset, classifyMaterial, suitability, rankCovers, COVER_WEIGHTS,
   newAsset, newVariant, newPlacement, duplicateGroups, cropKeepsProtected, SAFE_ENHANCE,
   analyzeLogo, placeLogo, logoFitsZone, LOGO_AUTO, LOGO_MIN_PT,
+  selectCover, cropForAspect, recomputeCropForFormat, exportMediaCheck,
+  recipeKey, findOrPlanVariant, buildEnhanceRecipe,
 };
