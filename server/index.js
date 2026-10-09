@@ -6638,7 +6638,7 @@ const server = http.createServer(async (req, res) => {
     const studioKeyOk = p.startsWith('/api/studio/') && u.searchParams.get('key') === db.settings.hooks.secret;
     /* Ф3: edit-bar подборки (Перекомпоновать / Lock / Regen) авторизуется тем же edit-ключом,
        что и конструктор /p/:id/blocks — держатель editKey и так может редактировать блоки */
-    const collEditKeyOk = /^\/api\/collections\/[^/]+\/(recompose|block)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
+    const collEditKeyOk = /^\/api\/collections\/[^/]+\/(recompose|block|publish)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
     /* Медиапланы: публичное утверждение/отклонение подрядчиком авторизуется тем же edit-ключом (?key=hooks.secret), что и /mp/:id */
     const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject|contractor-fill|comment)$/.test(p) && (u.searchParams.get('key') === db.settings.hooks.secret || !!u.searchParams.get('t'));
     /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
@@ -10399,7 +10399,7 @@ const server = http.createServer(async (req, res) => {
             if (isVoice && !(_inText && _inText.trim())) { try { const tr = await llm.transcribe(buf, 'voice.ogg', { groqKey: platformGroqKey(), lang: 'ru' }); if (tr) _inText = String(tr).trim().slice(0, 4000); } catch (e) { console.error('[tg voice stt]', e && e.message); } }
           } catch (e) { console.error('[tg media ingest]', e && e.message); }
         }
-        try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media } : {}); } catch (e) { console.error('[inbound tg]', e && e.message); }
+        try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media, channel: 'tg' } : { channel: 'tg' }); } catch (e) { console.error('[inbound tg]', e && e.message); }
         try { const pr = matchPropertyMention(tdb, _inText); const cur = lead.quals && lead.quals.type; if (pr && !(cur && cur.by === 'human')) { if (!cur || !cur.value) { lead.quals = lead.quals || {}; lead.quals.type = { value: pr.name, propertyId: pr.id, by: 'ai', src: 'chat', at: Date.now(), sources: [{ v: pr.name, src: 'chat', at: Date.now() }] }; lead.qualAt = Date.now(); } else if (cur.propertyId !== pr.id && !String(cur.value).toLowerCase().includes(pr.name.toLowerCase())) { const r2 = mergeQualVal(cur, pr.name, 'chat'); const q = r2.q; q.propertyIds = (cur.propertyIds || (cur.propertyId ? [cur.propertyId] : [])).concat(pr.id); delete q.propertyId; lead.quals.type = q; lead.qualAt = Date.now(); } } } catch (_) {}
         store.save();
       });
@@ -13616,6 +13616,18 @@ ${SCR}
       store.save();
       return json(res, 200, r);
     }
+    /* Выпуск: заморозить текущую версию подборки в снапшот (клиент видит именно его) */
+    if ((m = p.match(/^\/api\/collections\/([^/]+)\/publish$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      c.releases = c.releases || [];
+      const rel = { v: c.releases.length + 1, publishedAt: Date.now(), sig: design.collectionSig(db, c), snapshot: design.snapshotCollection(db, c) };
+      c.releases.push(rel);
+      if (c.releases.length > 20) c.releases = c.releases.slice(-20);   /* не копим бесконечно */
+      store.save();
+      return json(res, 200, { ok: true, version: rel.v, publishedAt: rel.publishedAt });
+    }
     if ((m = p.match(/^\/api\/collections\/([^/]+)\/send$/)) && req.method === 'POST') {
       const c = db.collections.find(x => x.id === m[1]);
       if (!c || !c.leadId) return json(res, 400, { error: 'нет лида' });
@@ -15662,14 +15674,20 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
           res.end(html); return;
         }
+        /* Независимость выпусков: клиент видит снапшот последнего выпуска; брокер (key) — живой черновик + сигнал расхождения */
+        const latestRel = design.latestRelease(c);
+        let dbR = db, cR = c, relPublished = !!latestRel, relVersion = latestRel ? latestRel.v : 0, relDiverged = false;
+        if (latestRel && !hasKey) { const v = design.releaseView(db, c, latestRel); dbR = v.db; cR = v.c; }
+        else if (latestRel && hasKey) { relDiverged = design.releaseDiverged(db, c); }
         const seedQ = u.searchParams.get('seed');
-        const html = design.renderDesignDoc(db, c, {
+        const html = design.renderDesignDoc(dbR, cR, {
           print: u.searchParams.get('print') === '1',
           format: u.searchParams.get('format') === 'wide' ? 'wide' : 'a4',
           seed: seedQ != null && /^\d+$/.test(seedQ) ? +seedQ : undefined,
           style: u.searchParams.get('style') || undefined,   /* превью направления (?style=darkluxury/cinematic) */
           brand: u.searchParams.get('brand') || undefined,
           canEdit: hasKey, key: hasKey ? db.settings.hooks.secret : '',
+          published: relPublished, version: relVersion, diverged: relDiverged,
         });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
         res.end(html); return;

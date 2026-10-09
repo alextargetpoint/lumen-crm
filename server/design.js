@@ -1682,6 +1682,9 @@ p{font-size:var(--s-body);line-height:1.6}
 .recompose-bar .fmt-tog{display:inline-flex;border:1px solid rgba(255,255,255,.22);border-radius:100px;overflow:hidden}
 .recompose-bar .fmt-tog a{color:rgba(255,255,255,.6);padding:7px 13px;font-size:12px;font-weight:600}
 .recompose-bar .fmt-tog a.on{background:#fff;color:#111}
+.rc-pub{border:0;background:#C7A667;color:#111;font:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:100px;cursor:pointer}
+.rc-pub.warn{background:#E0A008;color:#1a1a1a}
+.rc-pubst{color:rgba(255,255,255,.7);font-size:12px;font-weight:600;padding:0 6px}
 @media print{.recompose-bar{display:none}}
 /* Ф3 · пер-проектные контролы (только edit-режим) */
 .blk-ctl{position:absolute;top:14px;right:14px;z-index:41;display:flex;gap:7px}
@@ -1780,9 +1783,17 @@ body.fmt-wide .cmp-cards{grid-auto-flow:column}
       : `<div class="vp-foot">Блокирующих проблем нет — подборку можно выпускать.</div>`;
     vPanel = `<div class="vpanel" id="vpanel" hidden><div class="vp-head"><b>Проверка перед выпуском</b><button class="vp-x" id="vpx">✕</button></div>${sum}${body}${foot}</div>`;
   }
-  const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density}</span>${fmtTog}<button id="recompose">Другой вариант</button>${vBtn}<a href="/p/${c.id}?design=1&print=1${format === 'wide' ? '&format=wide' : ''}" target="_blank">Печать / PDF</a></div>${vPanel}
+  /* Контроль выпуска: публикация замораживает снапшот; при расхождении с живыми данными — «Обновить выпуск» */
+  let pubBtn = '';
+  if (canEdit && !isPrint) {
+    if (!opts.published) pubBtn = `<button id="publish" class="rc-pub" title="Зафиксировать текущую версию как выпуск для клиента">Опубликовать</button>`;
+    else if (opts.diverged) pubBtn = `<button id="publish" class="rc-pub warn" title="Данные объектов изменились после выпуска — выпустить новую версию">Обновить выпуск · v${opts.version}</button>`;
+    else pubBtn = `<span class="rc-pubst" title="Клиент видит эту версию">✓ Выпуск v${opts.version}</span>`;
+  }
+  const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density}</span>${fmtTog}<button id="recompose">Другой вариант</button>${vBtn}${pubBtn}<a href="/p/${c.id}?design=1&print=1${format === 'wide' ? '&format=wide' : ''}" target="_blank">Печать / PDF</a></div>${vPanel}
 <script>(function(){var k='${esc(opts.key || '')}';var b=document.getElementById('recompose');if(b)b.onclick=function(){b.textContent='…';fetch('/api/collections/${c.id}/recompose?key='+k,{method:'POST'}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})};
 var vc=document.getElementById('vcheck'),vp=document.getElementById('vpanel'),vx=document.getElementById('vpx');if(vc&&vp){vc.onclick=function(){vp.hidden=!vp.hidden};}if(vx&&vp){vx.onclick=function(){vp.hidden=true};}
+var pb=document.getElementById('publish');if(pb)pb.onclick=function(){pb.textContent='…';fetch('/api/collections/${c.id}/publish?key='+k,{method:'POST'}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})};
 document.addEventListener('click',function(ev){var cb=ev.target.closest('[data-compose]');if(cb){ev.preventDefault();location.href='/p/${c.id}?design=1&compose='+encodeURIComponent(cb.getAttribute('data-compose'))+'&key='+k;}});
 document.addEventListener('click',function(ev){var t=ev.target.closest('[data-bact]');if(!t)return;var w=t.closest('[data-proj]');if(!w)return;var proj=w.getAttribute('data-proj'),act=t.getAttribute('data-bact');t.textContent='…';fetch('/api/collections/${c.id}/block?key='+k,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({proj:proj,action:act})}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})});})();</script>` : '';
 
@@ -1922,6 +1933,48 @@ function applyUnitSel(c, pr) {
 }
 
 /* ============================================================================
+   МОДЕЛЬ ДОКУМЕНТА · ВЕРСИИ · НЕЗАВИСИМОСТЬ ВЫПУСКОВ (приоритет #1 расш. ТЗ)
+   Отправленная клиенту подборка = ЗАМОРОЖЕННЫЙ снапшот. Правка объекта в CRM
+   НЕ меняет уже отправленную ссылку молча: публичный просмотр рендерится из
+   снапшота последнего выпуска; брокеру (edit-key) показываем живой черновик +
+   сигнал «доступно обновление», выпуск новой версии — явное действие.
+   ========================================================================== */
+/* поля подборки, определяющие содержимое выпуска (для сигнатуры расхождения) */
+function collectionSig(db, c) {
+  const props = (c.propertyIds || []).map(pid => { const p = (db.properties || []).find(x => x.id === pid); return p ? applyUnitSel(c, p) : null; }).filter(Boolean);
+  const lead = c.leadId ? (db.leads || []).find(l => l.id === c.leadId) : null;
+  const payload = JSON.stringify(props) + '|' + JSON.stringify(c.design || {}) + '|' + (c.title || '') + '|' + (c.intro || '')
+    + '|' + (lead ? JSON.stringify({ n: lead.name, g: lead.geo, q: lead.quals || {}, b: lead.broker }) : '');
+  return hashStr(payload) >>> 0;
+}
+/* заморозка: глубокие копии данных, нужных рендеру (объекты с применённым выбором юнитов) */
+function snapshotCollection(db, c) {
+  const props = (c.propertyIds || []).map(pid => { const p = (db.properties || []).find(x => x.id === pid); return p ? applyUnitSel(c, p) : null; }).filter(Boolean).map(p => JSON.parse(JSON.stringify(p)));
+  const lead = c.leadId ? (db.leads || []).find(l => l.id === c.leadId) : null;
+  return {
+    properties: props,
+    propertyIds: props.map(p => p.id),
+    design: c.design ? JSON.parse(JSON.stringify(c.design)) : {},
+    title: c.title || '', intro: c.intro || '',
+    lead: lead ? JSON.parse(JSON.stringify({ id: lead.id, name: lead.name, geo: lead.geo, quals: lead.quals || {}, broker: lead.broker })) : null,
+  };
+}
+/* построить view-пару (db, c) из снапшота выпуска — для публичного рендера */
+function releaseView(db, c, rel) {
+  const s = rel.snapshot;
+  const dbR = Object.assign({}, db, { properties: s.properties, leads: s.lead ? [s.lead] : (db.leads || []) });
+  const cR = Object.assign({}, c, { design: s.design, title: s.title, intro: s.intro, propertyIds: s.propertyIds, leadId: s.lead ? s.lead.id : c.leadId });
+  return { db: dbR, c: cR };
+}
+function latestRelease(c) { return (c.releases && c.releases.length) ? c.releases[c.releases.length - 1] : null; }
+/* живые данные разошлись с последним выпуском? */
+function releaseDiverged(db, c) {
+  const rel = latestRelease(c);
+  if (!rel) return false;
+  return collectionSig(db, c) !== rel.sig;
+}
+
+/* ============================================================================
    БИБЛИОТЕКА КОМПОЗИЦИЙ (макет №2) — «один контент, разные способы подачи».
    Рендерит все валидные грамматики ОДНОГО проекта на ЕГО реальных данных как
    живые превью (не абстрактные миниатюры), брокер выбирает → фиксируется lock.
@@ -2034,4 +2087,4 @@ document.querySelectorAll('.cp-tab').forEach(function(t){t.onclick=function(){do
 </body></html>`;
 }
 
-module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES, applyUnitSel, validateCollection, renderCompose };
+module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES, applyUnitSel, validateCollection, renderCompose, snapshotCollection, collectionSig, releaseView, latestRelease, releaseDiverged };
