@@ -135,6 +135,8 @@ const PUBLIC = path.join(__dirname, '..', 'public');
    а DATA_DIR лежит на volume (там же БД тенантов, она переживает деплои). Иначе видео 404 после редеплоя. */
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const CREATIVES_DIR = path.join(DATA_DIR, 'creatives');
+/* отпечаток инстанса — для диагностики мульти-реплики: /healthz отдаёт его, обстрел покажет, одна реплика или несколько */
+const BOOT_ID = (process.env.RAILWAY_REPLICA_ID || process.env.RAILWAY_DEPLOYMENT_ID || 'local').slice(0, 10) + ':pid' + process.pid + ':' + Date.now().toString(36);
 /* ПЕРСИСТЕНТНЫЕ медиа объектов (фото/рендеры/планировки из импорта-обогащения): на volume, переживают деплой.
    Раздаются через /media/* (см. роут ниже). Иначе фото карточек 404 после редеплоя Railway. */
 const MEDIA_DIR = path.join(DATA_DIR, 'media');
@@ -4645,7 +4647,7 @@ const server = http.createServer(async (req, res) => {
   const p = u.pathname;
   /* HEALTHCHECK для zero-downtime деплоя Railway: сверх-лёгкий публичный ответ ДО резолва тенанта/БД/гейтов.
      Railway держит старый контейнер, пока новый не отдаст 200 здесь → окна со страницей ошибки при деплое нет. */
-  if (p === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); res.end('ok'); return; }
+  if (p === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); res.end('ok ' + BOOT_ID); return; }
   /* SaaS: резолв тенанта из глобального реестра (sid→tid), ДО загрузки БД тенанта.
      Нет сессии/маппинга → PRIMARY (обратная совместимость с текущим агентством). */
   const _sidM = (req.headers.cookie || '').match(/lumen_sid=([a-f0-9]{32})/);
