@@ -6625,6 +6625,7 @@ async function openHandoverPreview(id) {
 }
 
 const COMPOSER_CH = {};   /* выбранный канал ручного касания по лиду (переживает ре-рендеры поллинга) */
+const COMPOSER_CH_LASTIN = {};   /* канал последнего ВХОДЯЩЕГО, который мы уже учли — чтобы авто-переключать плашку, когда клиент сменил мессенджер */
 const CH_META = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], email: ['E-mail', '#E8833A'], viber: ['Viber', '#7360F2'] };
 /* ── Голосовой плеер: доступный, со скоростями (1/1.5/2×), дефолт 1.5× (запоминается). ── */
 const VP_PLAY = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
@@ -6740,7 +6741,14 @@ async function renderChat(id, rebuild) {
   const _avail = ['wa', 'tg', 'email', 'viber'].filter(c => _chans[c] && _chans[c].avail && _chans[c].enabled);
   if (!_avail.length) _avail.push('wa');
   const _rec = _avail.find(c => _chans[c] && _chans[c].recommended);
-  let _selCh = COMPOSER_CH[id]; if (!_selCh || !_avail.includes(_selCh)) _selCh = _rec || (l.activeChannel && _avail.includes(l.activeChannel) ? l.activeChannel : _avail[0]);
+  /* ⚠️ АВТО-ДЕТЕКТ МЕССЕНДЖЕРА: клиент написал в Telegram → плашка/композер сами переключаются на Telegram.
+     Берём канал ПОСЛЕДНЕГО входящего; если он новый (клиент сменил мессенджер с прошлого раза) — переключаемся
+     на него, перебивая и ручной выбор, и рекомендацию. Ручной выбор брокера держится, пока клиент не написал
+     снова в другом канале. */
+  const _lastInCh = (l.messages || []).filter(m => m.dir === 'in' && m.channel && _avail.includes(m.channel)).slice(-1)[0];
+  const _lastInChId = _lastInCh ? _lastInCh.channel : null;
+  if (_lastInChId && COMPOSER_CH_LASTIN[id] !== _lastInChId) { COMPOSER_CH[id] = _lastInChId; COMPOSER_CH_LASTIN[id] = _lastInChId; }
+  let _selCh = COMPOSER_CH[id]; if (!_selCh || !_avail.includes(_selCh)) _selCh = (l.activeChannel && _avail.includes(l.activeChannel) ? l.activeChannel : (_rec || _avail[0]));
   COMPOSER_CH[id] = _selCh;
   const chn = _selCh;
   pane.className = 'glass chat chat--' + chn + (l.ai.enabled ? ' ai-live' : '');

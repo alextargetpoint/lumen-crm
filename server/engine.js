@@ -1043,6 +1043,10 @@ function simulateComment(db) {
 function inbound(db, lead, text, opts = {}) {
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'in', via: null, text, at: Date.now(), status: 'received' };
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120) };
+  /* ⚠️ КАНАЛ ВХОДЯЩЕГО: тегируем сообщение и делаем его каналом ДИАЛОГА (activeChannel). Клиент написал в
+     Telegram → переписка переключается на Telegram (и в UI плашка, и для ответов ИИ/менеджера), а не висит
+     на WhatsApp. Раньше входящие шли без канала → интерфейс всегда показывал WhatsApp. */
+  if (opts.channel && ['wa', 'tg', 'viber', 'email'].includes(opts.channel)) { m.channel = opts.channel; lead.activeChannel = opts.channel; }
   db.messages.push(m);
   /* ЗОЛОТОЕ ПРАВИЛО: ответ «стоп/отписаться/stop/unsubscribe» → отписка от рассылок (любой канал) */
   if (/^\s*(стоп|stop|отпис|unsub|не пиш|не писать)/i.test(String(text || '')) && !lead.marketingOptOut) {

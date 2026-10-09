@@ -10492,7 +10492,7 @@ const server = http.createServer(async (req, res) => {
             }
           } catch (e) { console.error('[wa media ingest]', e && e.message); }
         }
-        try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media } : {}); } catch (e) { console.error('[inbound wa]', e && e.message); try { ai.pushEvent(tdb, { type: 'note', leadId: lead.id, text: `⚠️ Сбой обработки входящего (${lead.name}): ${e.message}` }); } catch (_) {} }
+        try { engine.inbound(tdb, lead, String(_inText).slice(0, 4000), _media ? { media: _media, channel: 'wa' } : { channel: 'wa' }); } catch (e) { console.error('[inbound wa]', e && e.message); try { ai.pushEvent(tdb, { type: 'note', leadId: lead.id, text: `⚠️ Сбой обработки входящего (${lead.name}): ${e.message}` }); } catch (_) {} }
         /* ОБЪЕКТ в сообщении (в т.ч. кириллицей) → матчим к базе (латиница), закрываем ось «Объект».
            Умное слияние: другой объект не затирает прежний, а даёт двойное значение (клиент смотрит два). */
         try {
