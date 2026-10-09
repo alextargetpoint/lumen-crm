@@ -16450,8 +16450,9 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
       if (p === '/api/presentations' && req.method === 'GET') {
         const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
         const items = presList().filter(x => R.role === 'owner' || x.brokerId === R.brokerId).map(x => {
-          const pr = (db.properties || []).find(pp => pp.id === x.projectId) || {};
-          return { id: x.id, projectId: x.projectId, title: pr.name || 'Презентация', brokerId: x.brokerId, status: x.status || 'draft', defaultFormat: x.defaultFormat, updatedAt: x.updatedAt, thumb: (pr.images || [])[0] || '', hasPublic: !!x.publicToken };
+          const firstPid = x.projectId || (x.projectIds || [])[0];
+          const pr = (db.properties || []).find(pp => pp.id === firstPid) || {};
+          return { id: x.id, kind: x.kind || 'object', projectId: x.projectId, projectIds: x.projectIds || null, title: x.title || pr.name || 'Презентация', brokerId: x.brokerId, status: x.status || 'draft', defaultFormat: x.defaultFormat, updatedAt: x.updatedAt, thumb: (pr.images || [])[0] || '', objectCount: (x.projectIds && x.projectIds.length) || 1, hasPublic: !!x.publicToken };
         }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
         return json(res, 200, { items });
       }
@@ -16466,6 +16467,23 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         if (!brokerId && b.leadId) { const ld = (db.leads || []).find(l => l.id === b.leadId); if (ld && ld.broker) brokerId = ld.broker; }
         const broker = (db.brokers || []).find(x => x.id === brokerId) || null;
         const pres = presentation.draftFromProperty(db, pr, broker);
+        presList().unshift(pres); store.save();
+        return json(res, 200, pres);
+      }
+      // create MULTI-OBJECT collection from several properties (TZ v3 §9/§10) — отдельный путь, не трогает single
+      if (p === '/api/presentations/collection' && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const b = await readBody(req);
+        const ids = Array.isArray(b.projectIds) ? b.projectIds : [];
+        const props = ids.map(id => (db.properties || []).find(x => x.id === id)).filter(Boolean);
+        if (!props.length) return json(res, 400, { error: 'нет объектов для подборки' });
+        let brokerId = b.brokerId || (R.role === 'broker' ? R.brokerId : null);
+        if (!brokerId && b.leadId) { const ld = (db.leads || []).find(l => l.id === b.leadId); if (ld && ld.broker) brokerId = ld.broker; }
+        const broker = (db.brokers || []).find(x => x.id === brokerId) || null;
+        const pres = presentation.draftCollection(db, props, broker, {
+          title: b.title, clientId: b.clientId || b.leadId || null, clientName: b.clientName,
+          greeting: b.greeting, format: b.format, paletteId: b.paletteId,
+        });
         presList().unshift(pres); store.save();
         return json(res, 200, pres);
       }
@@ -16563,14 +16581,18 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         const STLAB = { draft: 'Черновик', ready: 'Готово', archived: 'Архив' };
         const FLAB = { landscape_16_9: '16:9', portrait_a4: 'A4', landscape_a4: 'A4 гориз.', portrait_9_16: '9:16' };
         const cards = items.map(x => {
-          const pr = (db.properties || []).find(p2 => p2.id === x.projectId) || {};
+          const firstPid = x.projectId || (x.projectIds || [])[0];
+          const pr = (db.properties || []).find(p2 => p2.id === firstPid) || {};
           const img = (pr.images || [])[0] || '';
           const upd = x.updatedAt ? new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
           const pub = x.publicToken ? `<a href="${baseUrl(req)}/pv/${x.publicToken}" target="_blank" class="pub">Публичная ссылка →</a>` : '';
+          const isColl = x.kind === 'collection';
+          const ttl = x.title || pr.name || 'Презентация';
+          const kindTag = isColl ? `Подборка · ${(x.projectIds || []).length} об.` : (FLAB[x.defaultFormat] || x.defaultFormat);
           return `<a class="pc" href="/pres/${x.id}">
             <div class="pc-img" style="${img ? `background-image:url('${esc(img.startsWith('assets/') ? '/' + img : img)}')` : ''}"></div>
-            <div class="pc-b"><div class="pc-t">${esc(pr.name || 'Презентация')}</div>
-            <div class="pc-m"><span class="st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span> · ${FLAB[x.defaultFormat] || x.defaultFormat} · ${esc(upd)}</div>${pub}</div></a>`;
+            <div class="pc-b"><div class="pc-t">${esc(ttl)}</div>
+            <div class="pc-m"><span class="st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span> · ${esc(kindTag)} · ${esc(upd)}</div>${pub}</div></a>`;
         }).join('');
         const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Презентации · Lumen</title>
 <style>body{margin:0;background:#f4f2ec;color:#201c17;font-family:-apple-system,system-ui,sans-serif}.wrap{max-width:960px;margin:0 auto;padding:28px 22px}

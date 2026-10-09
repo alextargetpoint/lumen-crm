@@ -205,7 +205,7 @@ function draftCollection(db, properties, broker, opts) {
     });
   });
   return {
-    id: 'coll_' + hex(5), kind: 'collection', schemaVersion: SCHEMA_VERSION, tenantId: store_currentTid(),
+    id: 'pres_' + hex(5), kind: 'collection', schemaVersion: SCHEMA_VERSION, tenantId: store_currentTid(),
     brokerId: broker ? broker.id : null, clientId: opts.clientId || null,
     projectId: null, projectIds: props.map(p => p.id), title: opts.title || 'Подборка объектов',
     locale: 'ru-RU', draftRevision: 1, sourceRevision: 'crm',
