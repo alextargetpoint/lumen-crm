@@ -3718,27 +3718,28 @@ async function farmReclaimFromTenant(prevTid, phone) {
    - Zoom (свой/платформенный аккаунт) → Zoom ПИШЕТ САМ в облако (auto_recording:cloud), транскрипт заберём
      вебхуком /hooks/zoom бесплатно/дёшево — бот Recall НЕ нужен (zoomMeetingId → по нему вебхук найдёт встречу);
    - иначе бесплатный Jitsi (браузер, без записи). */
-async function genMeetingLink(db, kind, lead, atMs, durMin) {
+async function genMeetingLink(db, kind, lead, atMs, durMin, platform) {
   if (kind !== 'video') return { url: null, zoomMeetingId: '' };
   /* per-broker: если у брокера лида подключён СВОЙ Zoom/Meet — встреча под его аккаунтом (свой хост,
-     параллельные показы, своя запись); иначе фолбэк на аккаунт агентства. */
+     параллельные показы, своя запись); иначе фолбэк на аккаунт агентства.
+     platform ('zoom'|'meet') — предпочтение (выбор при назначении). Если выбранная платформа не подключена —
+     мягкий фолбэк на доступную, в конце бесплатный Jitsi. */
   const broker = lead.broker ? (db.brokers || []).find(b => b.id === lead.broker) : null;
-  if (zoom.ready(db, broker)) {
-    try {
-      const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
-      const r = await zoom.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id, broker });
-      if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: r.meetingId || '' };
-      console.error('[zoom] создать встречу не вышло:', r && r.error);
-    } catch (e) { console.error('[zoom]', e.message); }
-  }
-  if (gmeet.ready(db, broker)) {
-    try {
-      const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
-      const r = await gmeet.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id, broker });
-      if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: '' };   /* matchKeys распарсит Meet-код из ссылки */
-      console.error('[gmeet] создать встречу не вышло:', r && r.error);
-    } catch (e) { console.error('[gmeet]', e.message); }
-  }
+  const topic = (((db.settings.agency && db.settings.agency.name) || 'Встреча') + ' · ' + (lead.name || '')).slice(0, 180);
+  const tryZoom = async () => {
+    if (!zoom.ready(db, broker)) return null;
+    try { const r = await zoom.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id, broker }); if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: r.meetingId || '' }; console.error('[zoom] создать встречу не вышло:', r && r.error); }
+    catch (e) { console.error('[zoom]', e.message); }
+    return null;
+  };
+  const tryMeet = async () => {
+    if (!gmeet.ready(db, broker)) return null;
+    try { const r = await gmeet.createMeeting(db, { topic, startAtMs: atMs, durationMin: durMin, tid: store.currentTid(), leadId: lead.id, broker }); if (r && r.ok && r.joinUrl) return { url: r.joinUrl, zoomMeetingId: '' }; console.error('[gmeet] создать встречу не вышло:', r && r.error); }
+    catch (e) { console.error('[gmeet]', e.message); }
+    return null;
+  };
+  const order = platform === 'meet' ? [tryMeet, tryZoom] : [tryZoom, tryMeet];
+  for (const fn of order) { const r = await fn(); if (r) return r; }
   return { url: `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}`, zoomMeetingId: '' };
 }
 async function maybeScheduleMeetingBot(db, mt) {
@@ -5270,7 +5271,7 @@ const server = http.createServer(async (req, res) => {
           at: +b.at || Date.now() + 24 * 3600e3, kind: ['call', 'video', 'tour'].includes(b.kind) ? b.kind : 'call',
           dur: Math.max(15, Math.min(240, +b.dur || 60)), note: String(b.note || '').slice(0, 400), status: 'scheduled', createdAt: Date.now(),
         };
-        { const _mk = mt.kind === 'video' ? await genMeetingLink(db, 'video', lead, mt.at, mt.dur) : { url: null, zoomMeetingId: '' }; mt.link = _mk.url; if (_mk.zoomMeetingId) mt.zoomMeetingId = _mk.zoomMeetingId; }
+        { const _mk = mt.kind === 'video' ? await genMeetingLink(db, 'video', lead, mt.at, mt.dur, b.platform) : { url: null, zoomMeetingId: '' }; mt.link = _mk.url; if (_mk.zoomMeetingId) mt.zoomMeetingId = _mk.zoomMeetingId; }
         db.meetings = db.meetings || []; db.meetings.push(mt);
         await maybeScheduleMeetingBot(db, mt);   /* Zoom-native (запись в облаке) или бот Recall для Meet/Teams → транскрипт в карточку */
         if (b.confirm !== false) {
@@ -10712,7 +10713,7 @@ const server = http.createServer(async (req, res) => {
            иначе бесплатный Jitsi из коробки (браузер, без записи). Вставленную вручную Meet/Teams-ссылку пишет бот Recall. */
         hideJoin: !!b.hideJoin,   /* версия страницы БЕЗ кнопки «Подключиться» — брокер сам пришлёт ссылку в переписке */
       };
-      { const _mk = (mt.kind === 'video' && !b.link) ? await genMeetingLink(db, 'video', lead, mt.at, Math.max(15, Math.min(240, +b.dur || 60))) : { url: b.link || null, zoomMeetingId: '' }; mt.link = _mk.url; if (_mk.zoomMeetingId) mt.zoomMeetingId = _mk.zoomMeetingId; }
+      { const _mk = (mt.kind === 'video' && !b.link) ? await genMeetingLink(db, 'video', lead, mt.at, Math.max(15, Math.min(240, +b.dur || 60)), b.platform) : { url: b.link || null, zoomMeetingId: '' }; mt.link = _mk.url; if (_mk.zoomMeetingId) mt.zoomMeetingId = _mk.zoomMeetingId; }
       db.meetings = db.meetings || [];
       db.meetings.push(mt);
       await maybeScheduleMeetingBot(db, mt);   /* Zoom-native или бот Recall (Meet/Teams) → транскрипт в карточку */

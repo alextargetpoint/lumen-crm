@@ -5462,11 +5462,13 @@ PAGES.meetings = async (root) => {
           <div class="form-row"><label>Время</label><input id="csTime" type="time" step="900" value="${hh}:${mm}"></div>
           <div class="form-row"><label>Длит.</label><select id="csDur">${[15, 30, 45, 60, 90, 120].map(x => `<option value="${x}" ${x === 60 ? 'selected' : ''}>${x} мин</option>`).join('')}</select></div>
         </div>
+        <div class="form-row" id="csPlatRow" style="display:none"><label>Платформа видео-созвона</label><select id="csPlatform"><option value="">Авто (подключённая)</option><option value="zoom">Zoom</option><option value="meet">Google Meet</option></select></div>
         <div id="csTzHint"></div>`,
       actions: [
         { label: 'Назначить', cls: 'btn-accent', onClick: async (bd) => {
           const at = new Date(day + 'T' + $('#csTime', bd).value).getTime();
-          await api.post('/meetings', { leadId: $('#csLead', bd).value, kind: $('#csKind', bd).value, at, dur: +$('#csDur', bd).value });
+          const _k = $('#csKind', bd).value;
+          await api.post('/meetings', { leadId: $('#csLead', bd).value, kind: _k, at, dur: +$('#csDur', bd).value, platform: (_k === 'video' ? ($('#csPlatform', bd).value || undefined) : undefined) });
           render();
         } },
         { label: 'Отмена' },
@@ -5474,6 +5476,8 @@ PAGES.meetings = async (root) => {
     });
     const paintTz = () => { const l = leads.find(x => x.id === $('#csLead', md).value); const h = $('#csTzHint', md); if (h && l) h.innerHTML = tzHintHtml(day, $('#csTime', md).value, l.tz, l.geoName); };
     $('#csLead', md).addEventListener('change', paintTz); $('#csTime', md).addEventListener('input', paintTz); paintTz();
+    const csKindToggle = () => { const r = $('#csPlatRow', md); if (r) r.style.display = ($('#csKind', md).value === 'video') ? '' : 'none'; };
+    $('#csKind', md)?.addEventListener('change', csKindToggle); csKindToggle();
     /* поиск лида по имени/телефону (при базе 100+ листать неудобно) */
     const csQ = $('#csLeadQ', md);
     if (csQ) csQ.addEventListener('input', () => {
@@ -5524,7 +5528,7 @@ function openMeetingModal(lead, after) {
       <div class="form-row"><label>Тип</label><select id="mtKind">
         <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
       </select></div>
-      <div class="form-row" id="mtLinkRow" style="display:none"><label>Ссылка Zoom / Google Meet <span class="muted" style="font-weight:400">(необязательно)</span></label><input id="mtLink" placeholder="https://zoom.us/j/… или https://meet.google.com/…">
+      <div class="form-row" id="mtLinkRow" style="display:none"><label>Платформа видео-созвона</label><select id="mtPlatform" style="margin-bottom:10px"><option value="">Авто (подключённая)</option><option value="zoom">Zoom</option><option value="meet">Google Meet</option></select><label>Ссылка Zoom / Google Meet <span class="muted" style="font-weight:400">(необязательно — или создадим сами под выбранную платформу)</span></label><input id="mtLink" placeholder="https://zoom.us/j/… или https://meet.google.com/…">
         ${(() => {
           const z = STATE.settings.zoom || {}, g = STATE.settings.gmeet || {};
           const prov = z.connected ? ('Zoom' + (z.email ? ' (' + esc(z.email) + ')' : '')) : g.connected ? ('Google Meet' + (g.email ? ' (' + esc(g.email) + ')' : '')) : null;
@@ -5541,7 +5545,8 @@ function openMeetingModal(lead, after) {
       { label: 'Назначить и подтвердить в WA', cls: 'btn-accent', onClick: async (bd) => {
         const at = new Date($('#mtDate', bd).value + 'T' + $('#mtTime', bd).value).getTime();
         const _lnk = ($('#mtLink', bd) && $('#mtLink', bd).value.trim()) || '';
-        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value, hideJoin: !($('#mtShowJoin', bd) || {}).checked, link: _lnk || undefined });
+        const _k = $('#mtKind', bd).value;
+        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: _k, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value, hideJoin: !($('#mtShowJoin', bd) || {}).checked, link: _lnk || undefined, platform: (_k === 'video' && !_lnk) ? (($('#mtPlatform', bd) || {}).value || undefined) : undefined });
         toast('Встреча назначена', 'Подтверждение отправлено клиенту', true);
         if (after) after();
       } },
