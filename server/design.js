@@ -1933,7 +1933,7 @@ function validateCollection(db, c) {
     if (pr.priceFrom != null && pr.priceFrom !== '' && !(Number(pr.priceFrom) > 0)) {
       data.push(vIssue('data', 'error', 'Некорректная цена «от» — проверьте значение.', { pid: pr.id, projName: nm, field: 'Цена' }));
     } else if (Number(pr.priceFrom) > 0 && !pr.currency) {
-      data.push(vIssue('data', 'warn', 'Не указана валюта цены — по умолчанию показываем $.', { pid: pr.id, projName: nm, field: 'Валюта' }));
+      data.push(vIssue('data', 'warn', 'Не указана валюта цены — укажите валюту объекта, иначе сумма показывается без корректного символа.', { pid: pr.id, projName: nm, field: 'Валюта' }));
     }
     /* локация: расстояние/время перепутаны или неправдоподобны */
     const times = ((pr.district || {}).times || []).filter(t => t && t.place);
@@ -1979,6 +1979,34 @@ function validateCollection(db, c) {
     const names = [...new Set(seenImg[u])];
     if (names.length >= 2) rec.push(vIssue('rec', 'info', `Повторяющаяся фотография в проектах: ${names.join(', ')}.`, { field: 'Фото' }));
   });
+
+  /* ⚠️ СООТВЕТСТВИЕ ЗАПРОСУ ЛИДА (ТЗ redesign II.6): бюджет / тип объекта / сроки. Сигнал БРОКЕРУ перед
+     публикацией — в клиентский текст НЕ вставляется (только в панели проверки). */
+  const _lead = c.leadId ? (db.leads || []).find(l => l.id === c.leadId) : null;
+  if (_lead && props.length) {
+    const qv = (k) => { const q = (_lead.quals || {})[k]; return q == null ? null : (typeof q === 'object' ? q : { value: q }); };
+    const qb = qv('budget');
+    if (qb) {
+      const ceil = Number(qb.numHi) > 0 ? Number(qb.numHi) : (() => { const m = String(qb.value || '').replace(/\s/g, '').match(/(\d[\d.,]{3,})/); return m ? Number(m[1].replace(/[.,]/g, '')) : 0; })();
+      const minPrice = Math.min(...props.map(p => Number(p.priceFrom) || Infinity));
+      if (ceil > 0 && minPrice !== Infinity && minPrice > ceil * 1.05) {
+        const over = minPrice - ceil;
+        data.push(vIssue('data', 'warn', `Бюджет клиента ~${ceil.toLocaleString('ru-RU')}, а самый доступный объект от ${minPrice.toLocaleString('ru-RU')} — превышение на ~${over.toLocaleString('ru-RU')}. Проверьте подбор (видите только вы, в подборку не попадает).`, { field: 'Бюджет клиента' }));
+      }
+    }
+    const qt = qv('type');
+    if (qt && qt.value) {
+      const want = String(qt.value).toLowerCase();
+      const wantKind = ['вилл', 'апарт', 'таунха', 'студи', 'пентха', 'кварт', 'дом', 'участ', 'коммерч'].find(k => want.includes(k));
+      if (wantKind && !props.some(p => String(p.type || '').toLowerCase().includes(wantKind))) {
+        data.push(vIssue('data', 'warn', `Клиент интересовался «${qt.value}», но в подборке таких объектов нет — проверьте соответствие типа.`, { field: 'Тип объекта' }));
+      }
+    }
+    const qtl = qv('timeline');
+    if (qtl && qtl.value && /готов|сейчас|сразу|заселит|ключ/i.test(String(qtl.value)) && props.every(p => p.market === 'offplan')) {
+      data.push(vIssue('data', 'warn', 'Клиент хочет готовое/заехать скоро, а все объекты в подборке — на стадии строительства (off-plan). Проверьте сроки.', { field: 'Сроки клиента' }));
+    }
+  }
 
   const all = data.concat(layout, rec);
   const blocking = all.filter(i => i.level === 'error').length;
