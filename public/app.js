@@ -6991,10 +6991,14 @@ PAGES.waProfile = async (root) => {
     <div class="glass card" style="max-width:860px;margin-bottom:14px;display:flex;align-items:center;gap:16px">
       <img src="/assets/notetaker/icon.png" alt="" style="width:52px;height:52px;border-radius:12px;flex:0 0 auto;box-shadow:0 4px 14px rgba(0,0,0,.12)">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:650;font-size:14px">Нотетейкер звонков <span class="badge" style="margin-left:4px">macOS</span></div>
-        <div class="muted" style="font-size:12px;line-height:1.5;margin-top:2px">Фоновое приложение пишет и расшифровывает ваши звонки и видео-встречи (Zoom/Meet/Teams) <b>локально на маке</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент ничего не видит, плашки записи нет.</div>
+        <div style="font-weight:650;font-size:14px">Нотетейкер звонков <span class="badge" style="margin-left:4px">macOS · Windows</span></div>
+        <div class="muted" style="font-size:12px;line-height:1.5;margin-top:2px">Фоновое приложение пишет и расшифровывает ваши звонки и видео-встречи (Zoom/Meet/Teams) <b>локально</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент ничего не видит, плашки записи нет.</div>
       </div>
-      <a class="btn btn-accent btn-sm" href="/notetaker.html" target="_blank" style="flex:0 0 auto;text-decoration:none">${ic(I.doc)}Установить и гайд</a>
+      <div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto">
+        <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download style="text-decoration:none;justify-content:center">${ic(I.doc)}Скачать для macOS</a>
+        <a class="btn btn-sm" href="/notetaker.html#windows" target="_blank" style="text-decoration:none;justify-content:center">${ic(I.doc)}Windows — как настроить</a>
+        <a class="btn btn-sm" href="/notetaker.html" target="_blank" style="text-decoration:none;justify-content:center;font-size:11.5px">Полный гайд</a>
+      </div>
     </div>
     <div class="glass card" style="max-width:860px;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:4px">${ic(I.phone || I.chat)}Мой номер для звонков (телефония)</div>
@@ -17947,7 +17951,8 @@ PAGES.settings = async (root) => {
         <div style="flex:1;min-width:200px"><div class="muted" style="font-size:12.5px;line-height:1.55">Приложение для мака: пишет и расшифровывает звонки и видео-встречи (Zoom/Meet/Teams) <b>локально</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент не видит плашку записи. Вход — вашим аккаунтом дашборда.</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download style="text-decoration:none">${ic(I.doc)}Скачать для macOS</a>
-          <a class="btn btn-sm" href="/notetaker.html" target="_blank" style="text-decoration:none">Гайд по установке</a>
+          <a class="btn btn-sm" href="/notetaker.html#windows" target="_blank" style="text-decoration:none">${ic(I.doc)}Windows — как настроить</a>
+          <a class="btn btn-sm" href="/notetaker.html" target="_blank" style="text-decoration:none">Полный гайд</a>
         </div>
       </div>`, { open: false })}
 
