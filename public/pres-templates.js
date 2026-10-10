@@ -184,8 +184,25 @@
     const mgrid = metrics.length ? `<div class="lp-hero-metrics">${metrics.map(metricCell).join('')}</div>` : '';
     const brandMark = brand.logoText ? `<div class="lp-brandmark">${esc(brand.logoText)}</div>` : '';
 
+    const presetId = ctx.theme && ctx.theme.presetId;
+    /* Gallery White — обложка-галерея: логотип+крупное название сверху, фото в прямоугольнике снизу, белые поля (ТЗ §3) */
+    if (presetId === 'gallerywhite' && fmt.orient === 'portrait') {
+      return [`<div class="lp-safe lp-hero-gw">
+        <div class="lp-hero-gw-head">${brandMark}${loc}${title}${sub}</div>
+        <div class="lp-hero-gw-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
+      </div>`];
+    }
+    /* Urban Graphite — большое фото + графитовая полоса снизу с названием и логотипом (ТЗ §4) */
+    if (presetId === 'graphite' && fmt.orient === 'portrait') {
+      return [`
+        <div class="lp-bleed" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
+        <div class="lp-hero-ug">
+          ${brandMark}${loc}${title}${sub}
+          ${metrics.length ? `<div class="lp-hero-ug-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}
+        </div>`];
+    }
     /* Terracotta Atelier — split-обложка: цветная текстовая панель ~42% + фото ~58% (ТЗ §5) */
-    if (ctx.theme && ctx.theme.presetId === 'terracotta' && fmt.orient === 'portrait') {
+    if (presetId === 'terracotta' && fmt.orient === 'portrait') {
       return [`
         <div class="lp-hero-split">
           <div class="lp-hero-split-txt">

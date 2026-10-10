@@ -205,6 +205,18 @@
 /* ====== 3 ПРЕСЕТА — КОМПОЗИЦИЯ ГЛУБЖЕ ЦВЕТА (слой 2, ТЗ пресетов §3–§5) ====== */
 /* Gallery White — чистая галерея: тонкий крупный заголовок, акцент точечно (базовая, минимум правил) */
 .lp-preset-gallerywhite .lp-h1{ letter-spacing:-.012em; }
+/* Gallery White обложка: название сверху, фото в прямоугольнике снизу, белые поля */
+.lp-hero-gw{ color:var(--text); justify-content:flex-start; }
+.lp-hero-gw-head .lp-h1{ margin-top:.2em; max-width:11ch; }
+.lp-hero-gw-head .lp-hero-sub{ color:var(--muted); text-shadow:none; margin-top:.7em; max-width:30ch; }
+.lp-hero-gw-photo{ margin-top:auto; width:82%; height:46%; align-self:flex-end; background:var(--surface) center/cover no-repeat; }
+/* Urban Graphite обложка: фото на весь лист + графитовая полоса снизу */
+.lp-hero-ug{ position:absolute; left:0; right:0; bottom:0; z-index:2; background:#24282C; color:#fff; padding:40px 53px 44px; }
+.lp-hero-ug .lp-h1, .lp-hero-ug .lp-brandmark{ color:#fff; }
+.lp-hero-ug .lp-eyebrow{ color:rgba(255,255,255,.8); }
+.lp-hero-ug .lp-hero-sub{ color:rgba(255,255,255,.9); text-shadow:none; margin-top:.5em; }
+.lp-hero-ug-metrics{ display:flex; flex-wrap:wrap; gap:22px 30px; margin-top:20px; }
+.lp-hero-ug .lp-metric-ic{ color:#B9D3DF; } .lp-hero-ug .lp-metric-tx span{ color:rgba(255,255,255,.7); }
 
 /* Urban Graphite — контрастная УЗКАЯ ВЕРХНЕРЕГИСТРОВАЯ типографика + графитовые плашки и тёмный финал брокера */
 .lp-preset-graphite .lp-h1, .lp-preset-graphite .lp-h2{ text-transform:uppercase; letter-spacing:-.004em; font-weight:700; }
