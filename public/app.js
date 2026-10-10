@@ -18378,12 +18378,13 @@ function openNewLeadModal() {
       <div class="form-row"><label>Имя</label><input id="nlName" placeholder="Имя Фамилия"></div>
       <div class="form-row"><label>Телефон (WhatsApp)</label><input id="nlPhone" placeholder="+971 …"></div>
       <div class="form-row"><label>Направление</label><select id="nlGeo">${s.agency.geos.map(g => `<option value="${g}">${s.geoNames[g]}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Источник</label><select id="nlSrc"><option value="meta_form">Meta Lead Form</option><option value="ctwa">Click-to-WhatsApp</option><option value="site">Сайт</option><option value="manual">Вручную</option></select></div>`,
+      <div class="form-row"><label>Источник</label><select id="nlSrc"><option value="meta_form">Meta Lead Form</option><option value="ctwa">Click-to-WhatsApp</option><option value="site">Сайт</option><option value="manual">Вручную</option></select></div>
+      <div class="form-row"><label>Язык общения <span class="sd" style="display:inline">(на нём ИИ ведёт диалог и собирает касания)</span></label><select id="nlLang">${[['ru', 'Русский'], ['en', 'English'], ['it', 'Italiano'], ['es', 'Español'], ['de', 'Deutsch'], ['fr', 'Français'], ['pt', 'Português'], ['ar', 'العربية'], ['tr', 'Türkçe'], ['zh', '中文'], ['th', 'ไทย'], ['hi', 'हिन्दी']].map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>`,
     actions: [
       { label: 'Создать', cls: 'btn-accent', onClick: async (bd) => {
         const name = $('#nlName', bd).value.trim();
         if (!name) { toast('Укажите имя'); return false; }
-        await api.post('/leads', { name, phone: $('#nlPhone', bd).value.trim(), geo: $('#nlGeo', bd).value, source: $('#nlSrc', bd).value });
+        await api.post('/leads', { name, phone: $('#nlPhone', bd).value.trim(), geo: $('#nlGeo', bd).value, source: $('#nlSrc', bd).value, lang: $('#nlLang', bd).value });
         render();
       } },
       { label: 'Отмена' },
