@@ -4949,6 +4949,7 @@ PAGES.funnel = async (root) => {
       <div class="cc-txt"><b>Авто-цепочка на новые лиды</b><i>${autoChains ? 'запускается на каждый новый лид сама' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
       <div class="cc-seqpick ${autoChains ? '' : 'off'}"><span>Запускать</span><select id="ccSeq"><option value="">по направлению</option>${activeSeqs.map(s => `<option value="${s.id}" ${aiSet.defaultSeq === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
       ${(() => { const tm = (STATE.settings.automations || {}).touchMode || 'auto'; return `<div class="cc-seqpick" title="Как уходят касания цепочки"><span>Режим</span><select id="ccTouchMode"><option value="auto" ${tm === 'auto' ? 'selected' : ''}>Авто (сразу)</option><option value="approval" ${tm === 'approval' ? 'selected' : ''}>С одобрением</option><option value="off" ${tm === 'off' ? 'selected' : ''}>Выключено</option></select></div>`; })()}
+      ${(() => { const hn = ((((STATE.settings || {}).ai || {}).training || {}).hideNames) !== false; return `<div class="cc-seqpick" title="Называть ли проект/застройщика в переписке (настройка ИИ). Скрыто = имя только на созвоне — защита от «зашёл узнать проект и слился»"><span>Названия</span><select id="ccHideNames"><option value="hide" ${hn ? 'selected' : ''}>Скрыты до созвона</option><option value="show" ${!hn ? 'selected' : ''}>Можно называть</option></select></div>`; })()}
       <span class="tb-spacer"></span>
       ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : '<span class="cc-hint">Ручной запуск — выдели карточки лидов</span>'}
     </div>
@@ -5035,6 +5036,12 @@ PAGES.funnel = async (root) => {
     try { await api.patch('/settings', { ai: { autoChains: on } }); await loadState();
       toast(on ? 'Авто-цепочка включена' : 'Авто-цепочка выключена', on ? 'Новые лиды пойдут в касания сами' : 'Новые лиды ждут ручного запуска', true); render();
     } catch (er) { toast('Не вышло', er.message); e.target.checked = !on; }
+  });
+  $('#ccHideNames')?.addEventListener('change', async (e) => {
+    const hide = e.target.value === 'hide';
+    try { await api.patch('/settings', { ai: { training: { hideNames: hide } } }); await loadState();
+      toast(hide ? 'Названия проектов скрыты' : 'Названия проектов можно называть', hide ? 'ИИ не назовёт ЖК/застройщика в переписке — только на созвоне' : 'ИИ может упоминать проект в чате', true); render();
+    } catch (er) { toast('Не вышло', er.message); }
   });
   $('#ccTouchMode')?.addEventListener('change', async (e) => {
     const v = e.target.value;
@@ -9517,11 +9524,20 @@ PAGES.presentations = async (root) => {
   $('#presNewColl', root)?.addEventListener('click', () => {
     if (propList.length < 2) { toast('Нужно ≥2 объекта', 'Добавьте объекты в Базе'); return; }
     const sel = new Set();
+    let selPreset = 'gallerywhite';
+    const PRESETS_UI = [
+      { id: 'gallerywhite', name: 'Gallery White', sw: ['#FFFFFF', '#3155E7', '#151515'] },
+      { id: 'graphite', name: 'Urban Graphite', sw: ['#FFFFFF', '#24282C', '#59636A'] },
+      { id: 'terracotta', name: 'Terracotta Atelier', sw: ['#FBF7F2', '#A6533D', '#392D28'] },
+    ];
+    const presetBtns = PRESETS_UI.map(p => `<button class="btn coll-preset" data-preset="${p.id}" style="flex:1;min-width:140px;justify-content:flex-start;gap:8px${p.id === selPreset ? ';background:var(--accent-weak,rgba(120,110,90,.12));border-color:var(--accent,#8a6d3b);font-weight:600' : ''}"><span style="display:inline-flex;gap:2px">${p.sw.map(c => `<i style="width:11px;height:14px;border-radius:2px;background:${c};border:1px solid rgba(0,0,0,.12);display:inline-block"></i>`).join('')}</span>${esc(p.name)}</button>`).join('');
     modal({
-      title: 'Новая подборка', sub: 'Отметьте 2+ объекта, задайте название и клиента', wide: true,
+      title: 'Новая подборка', sub: 'Отметьте 2+ объекта, выберите оформление, задайте клиента', wide: true,
       body: `<div style="display:flex;flex-direction:column;gap:10px">
         <input id="collTitle" class="inp" placeholder="Название подборки (напр. «Пхукет у моря»)" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px">
         <input id="collClient" class="inp" placeholder="Имя клиента (необязательно)" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px">
+        <div class="muted" style="font-size:12px;margin-top:2px">Оформление (пресет):</div>
+        <div id="collPresetRow" style="display:flex;gap:8px;flex-wrap:wrap">${presetBtns}</div>
         <div class="muted" style="font-size:12px;margin-top:2px">Объекты подборки (отметьте):</div>
         <div id="collPick" style="display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto">`
         + propList.slice(0, 60).map(p => `<button class="btn coll-pick" data-pp="${esc(p.id)}" style="justify-content:flex-start">${ic(I.building)}${esc(p.name || p.id)}</button>`).join('')
@@ -9534,11 +9550,16 @@ PAGES.presentations = async (root) => {
         if (sel.has(id)) { sel.delete(id); b.style.background = ''; b.style.borderColor = ''; b.style.fontWeight = ''; }
         else { sel.add(id); b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600'; }
       }));
+      $$('.coll-preset').forEach(b => b.addEventListener('click', () => {
+        selPreset = b.dataset.preset;
+        $$('.coll-preset').forEach(x => { x.style.background = ''; x.style.borderColor = ''; x.style.fontWeight = ''; });
+        b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600';
+      }));
       $('#collCreate')?.addEventListener('click', async () => {
         const ids = [...sel];
         if (ids.length < 2) { toast('Отметьте ≥2 объекта'); return; }
         try {
-          const r = await api.post('/presentations/collection', { projectIds: ids, title: ($('#collTitle') || {}).value || '', clientName: ($('#collClient') || {}).value || '', comparison: true });
+          const r = await api.post('/presentations/collection', { projectIds: ids, title: ($('#collTitle') || {}).value || '', clientName: ($('#collClient') || {}).value || '', presetId: selPreset, comparison: true });
           if (r && r.id) { closeModal(); toast('Подборка создана', null, true); window.open('/pres/' + r.id + '/print?format=portrait_a4', '_blank'); }
           else toast('Не вышло', (r && r.error) || '');
         } catch (e) { toast('Не вышло', e.message); }
