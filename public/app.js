@@ -9538,7 +9538,7 @@ PAGES.presentations = async (root) => {
       <div class="pres-thumb" style="${x.thumb ? `background-image:url('${esc(absU(x.thumb))}')` : ''}"></div>
       <div class="pres-b"><div class="pres-t">${esc(x.title || 'Презентация')}</div>
         <div class="pres-m"><span class="pres-st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span>${x.kind === 'collection' ? ` · Подборка · ${x.objectCount || ''} об.` : ` · ${FLAB[x.defaultFormat] || ''}`}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}</div>
-        <div class="pres-acts"><button class="btn btn-sm btn-accent" data-popen="${x.id}" data-pkind="${x.kind || 'object'}">${ic(I.doc)}${x.kind === 'collection' ? 'Предпросмотр' : 'Открыть'}</button><button class="btn btn-sm" data-ppdf="${x.id}" title="Быстрый PDF">${ic(I.doc)}PDF</button>${x.hasPublic ? `<button class="btn btn-sm" data-ppub="${x.id}">${ic(I.link || I.send)}Ссылка</button>` : ''}</div>
+        <div class="pres-acts"><button class="btn btn-sm btn-accent" data-popen="${x.id}" data-pkind="${x.kind || 'object'}">${ic(I.doc)}${x.kind === 'collection' ? 'Предпросмотр' : 'Открыть'}</button><button class="btn btn-sm" data-ppdf="${x.id}" title="Быстрый PDF">${ic(I.doc)}PDF</button><button class="btn btn-sm" data-pstyle="${x.id}" title="Сменить пресет оформления">${ic(I.sparkle || I.doc)}Стиль</button>${x.hasPublic ? `<button class="btn btn-sm" data-ppub="${x.id}">${ic(I.link || I.send)}Ссылка</button>` : ''}</div>
       </div></div>`).join('');
   root.innerHTML = `
     <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Презентации</h1>
@@ -9548,6 +9548,12 @@ PAGES.presentations = async (root) => {
   $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => { const id = b.dataset.popen; window.open(b.dataset.pkind === 'collection' ? '/pres/' + id + '/print?format=portrait_a4' : '/pres/' + id, '_blank'); }));
   $$('[data-ppdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ppdf + '/print?format=portrait_a4', '_blank')));
   $$('[data-ppub]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.ppub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
+  $$('[data-pstyle]', root).forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.pstyle;
+    const PR = [['gallerywhite', 'Gallery White', ['#FFFFFF', '#3155E7', '#151515']], ['graphite', 'Urban Graphite', ['#FFFFFF', '#24282C', '#59636A']], ['terracotta', 'Terracotta Atelier', ['#FBF7F2', '#A6533D', '#392D28']]];
+    modal({ title: 'Сменить оформление', sub: 'Пресет применится к этой презентации (контент сохранится)', body: '<div style="display:flex;flex-direction:column;gap:8px">' + PR.map(([pid, nm, sw]) => `<button class="btn pstyle-pick" data-pp="${pid}" style="justify-content:flex-start;gap:8px"><span style="display:inline-flex;gap:2px">${sw.map(c => `<i style="width:11px;height:14px;border-radius:2px;background:${c};border:1px solid rgba(0,0,0,.12);display:inline-block"></i>`).join('')}</span>${esc(nm)}</button>`).join('') + '</div>', actions: [{ label: 'Отмена' }] });
+    setTimeout(() => { $$('.pstyle-pick').forEach(pb => pb.addEventListener('click', async () => { try { await api.patch('/presentations/' + id, { changes: { presetId: pb.dataset.pp } }); closeModal(); toast('Оформление изменено — откройте предпросмотр', null, true); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
+  }));
   $('#presNew', root)?.addEventListener('click', () => {
     if (!propList.length) { toast('Нет объектов', 'Добавьте объект в Базе'); return; }
     let selPreset = 'gallerywhite';
