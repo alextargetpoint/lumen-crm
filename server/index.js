@@ -1653,6 +1653,8 @@ function leadView(db, l) {
     meetings: (db.meetings || []).filter(m => m.leadId === l.id && m.status !== 'canceled')
       .sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 6)
       .map(m => ({ id: m.id, at: m.at, dur: m.dur, kind: m.kind, status: m.status, link: m.link || '', zoomMeetingId: m.zoomMeetingId || '', note: m.note || '', brokerName: (db.brokers.find(b => b.id === m.brokerId) || {}).name || null })),
+    /* следующее касание активной цепочки (для панели «Запущена цепочка» в диалоге) */
+    nextTouch: (() => { try { return engine.nextTouchInfo(db, l); } catch (_) { return null; } })(),
   });
 }
 
@@ -7975,6 +7977,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ИИ первое касание: разбор лида + готовое персональное сообщение */
+    /* «Отправить сейчас» следующее касание цепочки из диалога: ставим срок = сейчас + одноразовый обход тихих часов.
+       Движок (tickChains) на ближайшем тике построит текст и отправит с закреплённого номера. */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/touch\/send-now$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const nt = engine.nextTouchInfo(db, lead);
+      if (!nt) return json(res, 400, { error: 'нет активного касания цепочки для этого лида' });
+      lead.ai = lead.ai || {}; lead.ai.enabled = true; lead.ai.nextTouchAt = Date.now(); lead.ai.forceInstant = true;
+      store.save();
+      return json(res, 200, { ok: true, label: nt.label });
+    }
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/first-touch$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });

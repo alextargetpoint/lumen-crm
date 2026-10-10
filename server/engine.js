@@ -429,6 +429,35 @@ function seqSpecificity(seq) {
   return (f.geos.length ? 1 : 0) + (f.sources.length ? 1 : 0) + (f.channels.length ? 1 : 0) + (f.contractors.length ? 1 : 0) + (f.brokers !== 'all' ? 1 : 0);
 }
 
+/* ПРЕВЬЮ СЛЕДУЮЩЕГО КАСАНИЯ для диалога: какая цепочка/шаг у лида сейчас активны, когда уйдёт и что за текст.
+   Повторяет выбор цепочки из tickChains (чтобы совпадало с реальной отправкой). null = активной цепочки нет. */
+function nextTouchInfo(db, lead) {
+  try {
+    if (!lead || !lead.ai || !lead.ai.enabled || lead.marketingOptOut) return null;
+    if (!['new', 'touch'].includes(lead.stage)) return null;
+    if (lead.lastDir === 'in') return null;
+    if ((db.messages || []).some(m => m.leadId === lead.id && m.dir === 'in')) return null;
+    const actives = (db.sequences || []).filter(s => s.active);
+    if (!actives.length) return null;
+    const autoOn = !db.settings.ai || db.settings.ai.autoChains !== false;
+    if (!autoOn && !lead.ai.forced) return null;
+    const defaultSeqId = (db.settings.ai && db.settings.ai.defaultSeq) || null;
+    let seq = lead.ai.forceSeq && actives.find(s => s.id === lead.ai.forceSeq);
+    if (!seq) {
+      const elig = actives.filter(s => (!s.ownerId || s.ownerId === lead.broker) && seqMatchesLead(s, lead));
+      elig.sort((a, b) => { const pa = a.ownerId === lead.broker ? 1 : 0, pb = b.ownerId === lead.broker ? 1 : 0; if (pa !== pb) return pb - pa; const sa = seqSpecificity(a), sb = seqSpecificity(b); if (sa !== sb) return sb - sa; const da = a.id === defaultSeqId ? 1 : 0, dbb = b.id === defaultSeqId ? 1 : 0; return dbb - da; });
+      seq = elig[0];
+    }
+    if (!seq) return null;
+    const steps = (seq.steps || []).filter(s => s.active);
+    const step = steps[lead.ai.chainStep || 0];
+    if (!step) return null;
+    const preview = step.text ? fillVars(db, lead, String(step.text)).slice(0, 240)
+      : (step.creative || step.kind === 'creative') ? '📎 Креатив из рекламы + подпись'
+      : 'ИИ соберёт персональный текст при отправке';
+    return { seqName: seq.name || '', stepNum: (lead.ai.chainStep || 0) + 1, total: steps.length, label: step.label || '', at: lead.ai.nextTouchAt || null, channel: step.channel || lead.activeChannel || 'wa', preview };
+  } catch (_) { return null; }
+}
 function tickChains(db) {
   const nowT = Date.now();
   const actives = db.sequences.filter(s => s.active);
@@ -519,7 +548,8 @@ function tickChains(db) {
     }
     if (nowT < lead.ai.nextTouchAt) continue;
     /* тихие часы: мгновенное первое касание (шаг 0, свежая заявка <30 мин) разрешено — клиент онлайн; остальное ждёт утра */
-    const freshInstant = lead.ai.chainStep === 0 && nowT - lead.createdAt < 30 * 60e3;
+    const freshInstant = (lead.ai.chainStep === 0 && nowT - lead.createdAt < 30 * 60e3) || !!lead.ai.forceInstant;
+    if (lead.ai.forceInstant) delete lead.ai.forceInstant;   /* «Отправить сейчас» из диалога — одноразовый обход тихих часов */
     if (!freshInstant && inQuiet(db, lead)) { lead.ai.nextTouchAt = morningAt(db, lead); continue; }
 
     let text;
@@ -1379,4 +1409,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo };

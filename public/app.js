@@ -6811,6 +6811,21 @@ async function renderChat(id, rebuild) {
         <a class="btn btn-sm" href="/m/${esc(_mtUp.id)}" target="_blank" rel="noopener" title="Страница встречи для клиента (визитка со ссылкой)">Визитка</a>
       </div></div>`;
   })() : '';
+  /* ПАНЕЛЬ «ЗАПУЩЕНА ЦЕПОЧКА»: следующее касание — шаг, когда уйдёт (в поясе клиента), превью текста и «Отправить сейчас». */
+  const chainPanel = (l.nextTouch && l.ai && l.ai.enabled) ? (() => {
+    const nt = l.nextTouch;
+    const when = nt.at ? (nt.at <= _mNow ? 'в ближайшую минуту' : _mFmt(nt.at)) : '—';
+    const chn2 = ({ wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' })[nt.channel] || nt.channel;
+    return `<div class="chat-chain">
+      <div class="cc-ic">${ic(I.spark || I.bolt)}</div>
+      <div class="cc-main">
+        <div class="cc-t">Цепочка касаний · шаг ${nt.stepNum}/${nt.total}${nt.label ? ' · ' + esc(nt.label) : ''}</div>
+        <div class="cc-when">Следующее: ${esc(when)}${(l.tz != null && nt.at > _mNow) ? ' (время клиента)' : ''} · ${esc(chn2)}</div>
+        <div class="cc-prev">${esc(nt.preview)}</div>
+      </div>
+      <div class="cc-act"><button class="btn btn-sm btn-accent" data-touchnow="1" title="Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)">${ic(I.send || I.bolt)}Отправить сейчас</button></div>
+    </div>`;
+  })() : '';
   pane.innerHTML = `
     <div class="chat-head">
       ${avaHtml(l)}
@@ -6826,6 +6841,7 @@ async function renderChat(id, rebuild) {
       </div>
     </div>
     ${meetBanner}
+    ${chainPanel}
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
     ${(() => {
@@ -6873,6 +6889,7 @@ async function renderChat(id, rebuild) {
   $$('[data-mcopy]', pane).forEach(b => b.addEventListener('click', async (e) => { const url = e.currentTarget.dataset.mcopy; if (!url) return; try { await navigator.clipboard.writeText(url); toast('Ссылка на созвон скопирована', null, true); } catch (_) { toast('Не удалось скопировать', url); } }));
   $$('[data-gofix]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); const dst = e.currentTarget.dataset.gofix; if (typeof go === 'function') go(dst || 'numbers'); }));
   $$('[data-gomove]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); openGrayMove(l.id, l.grayPhone, () => { try { render(); } catch (_) {} }); }));
+  $$('[data-touchnow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { const r = await api.post('/leads/' + l.id + '/touch/send-now', {}); toast('Касание отправляется', (r && r.label) ? r.label : 'уйдёт в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 1500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {
     const ch = b.dataset.ch;
     COMPOSER_CH[id] = ch;
@@ -9458,21 +9475,52 @@ PAGES.presentations = async (root) => {
   const cards = items.map(x => `<div class="pres-card">
       <div class="pres-thumb" style="${x.thumb ? `background-image:url('${esc(absU(x.thumb))}')` : ''}"></div>
       <div class="pres-b"><div class="pres-t">${esc(x.title || 'Презентация')}</div>
-        <div class="pres-m"><span class="pres-st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span> · ${FLAB[x.defaultFormat] || ''}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}</div>
-        <div class="pres-acts"><button class="btn btn-sm btn-accent" data-popen="${x.id}">${ic(I.doc)}Открыть</button><button class="btn btn-sm" data-ppdf="${x.id}" title="Быстрый PDF">${ic(I.doc)}PDF</button>${x.hasPublic ? `<button class="btn btn-sm" data-ppub="${x.id}">${ic(I.link || I.send)}Ссылка</button>` : ''}</div>
+        <div class="pres-m"><span class="pres-st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span>${x.kind === 'collection' ? ` · Подборка · ${x.objectCount || ''} об.` : ` · ${FLAB[x.defaultFormat] || ''}`}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}</div>
+        <div class="pres-acts"><button class="btn btn-sm btn-accent" data-popen="${x.id}" data-pkind="${x.kind || 'object'}">${ic(I.doc)}${x.kind === 'collection' ? 'Предпросмотр' : 'Открыть'}</button><button class="btn btn-sm" data-ppdf="${x.id}" title="Быстрый PDF">${ic(I.doc)}PDF</button>${x.hasPublic ? `<button class="btn btn-sm" data-ppub="${x.id}">${ic(I.link || I.send)}Ссылка</button>` : ''}</div>
       </div></div>`).join('');
   root.innerHTML = `
     <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Презентации</h1>
     <div class="muted" style="font-size:13px;margin-bottom:16px;max-width:760px">Конструктор клиентских презентаций объектов: 4 формата (16:9 · A4 · 9:16), палитры и шрифты, PDF и адаптивная веб-ссылка. Создавайте из карточки объекта (кнопка «Презентация») или кнопкой ниже.</div>
-    <div style="margin-bottom:18px"><button class="btn btn-accent" id="presNew">${ic(I.plus)}Новая презентация из объекта</button></div>
+    <div style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-accent" id="presNew">${ic(I.plus)}Новая презентация из объекта</button><button class="btn" id="presNewColl">${ic(I.plus)}Создать подборку</button></div>
     ${items.length ? `<div class="pres-grid">${cards}</div>` : '<div class="muted" style="padding:34px 0;text-align:center;border:1px dashed var(--stroke);border-radius:14px">Пока нет презентаций. Нажмите «Новая презентация из объекта» или откройте объект в Базе → «Презентация».</div>'}`;
-  $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.popen, '_blank')));
+  $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => { const id = b.dataset.popen; window.open(b.dataset.pkind === 'collection' ? '/pres/' + id + '/print?format=portrait_a4' : '/pres/' + id, '_blank'); }));
   $$('[data-ppdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ppdf + '/print?format=portrait_a4', '_blank')));
   $$('[data-ppub]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.ppub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
   $('#presNew', root)?.addEventListener('click', () => {
     if (!propList.length) { toast('Нет объектов', 'Добавьте объект в Базе'); return; }
     modal({ title: 'Новая презентация', sub: 'Выберите объект — соберём черновик и откроем конструктор', body: '<div style="display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto">' + propList.slice(0, 60).map(p => `<button class="btn pres-pick" data-pp="${p.id}" style="justify-content:flex-start">${ic(I.building)}${esc(p.name || p.id)}</button>`).join('') + '</div>', actions: [{ label: 'Отмена' }] });
     setTimeout(() => { $$('.pres-pick').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp }); if (r && r.id) { closeModal(); window.open('/pres/' + r.id, '_blank'); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
+  });
+  $('#presNewColl', root)?.addEventListener('click', () => {
+    if (propList.length < 2) { toast('Нужно ≥2 объекта', 'Добавьте объекты в Базе'); return; }
+    const sel = new Set();
+    modal({
+      title: 'Новая подборка', sub: 'Отметьте 2+ объекта, задайте название и клиента', wide: true,
+      body: `<div style="display:flex;flex-direction:column;gap:10px">
+        <input id="collTitle" class="inp" placeholder="Название подборки (напр. «Пхукет у моря»)" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px">
+        <input id="collClient" class="inp" placeholder="Имя клиента (необязательно)" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px">
+        <div class="muted" style="font-size:12px;margin-top:2px">Объекты подборки (отметьте):</div>
+        <div id="collPick" style="display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto">`
+        + propList.slice(0, 60).map(p => `<button class="btn coll-pick" data-pp="${esc(p.id)}" style="justify-content:flex-start">${ic(I.building)}${esc(p.name || p.id)}</button>`).join('')
+        + `</div><button class="btn btn-accent" id="collCreate" style="margin-top:4px">${ic(I.plus)}Создать подборку</button></div>`,
+      actions: [{ label: 'Отмена' }],
+    });
+    setTimeout(() => {
+      $$('.coll-pick').forEach(b => b.addEventListener('click', () => {
+        const id = b.dataset.pp;
+        if (sel.has(id)) { sel.delete(id); b.style.background = ''; b.style.borderColor = ''; b.style.fontWeight = ''; }
+        else { sel.add(id); b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600'; }
+      }));
+      $('#collCreate')?.addEventListener('click', async () => {
+        const ids = [...sel];
+        if (ids.length < 2) { toast('Отметьте ≥2 объекта'); return; }
+        try {
+          const r = await api.post('/presentations/collection', { projectIds: ids, title: ($('#collTitle') || {}).value || '', clientName: ($('#collClient') || {}).value || '', comparison: true });
+          if (r && r.id) { closeModal(); toast('Подборка создана', null, true); window.open('/pres/' + r.id + '/print?format=portrait_a4', '_blank'); }
+          else toast('Не вышло', (r && r.error) || '');
+        } catch (e) { toast('Не вышло', e.message); }
+      });
+    }, 40);
   });
 };
 PAGES.collections = async (root) => {
