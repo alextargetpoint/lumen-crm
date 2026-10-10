@@ -1193,7 +1193,22 @@ function fireReply(db, lead) {
       }
       if (out) {
         let applied = 0;
-        for (const [axis, v] of Object.entries(out.axes || {})) { if (!l2.quals[axis]) { l2.quals[axis] = v; applied++; } }
+        /* КЛИЕНТ ИСПРАВЛЯЕТ СЕБЯ: ось не только заполняем на пустую, но и ОБНОВЛЯЕМ, если клиент назвал новое
+           значение (новая цитата из его сообщений). Раньше `if(!quals[axis])` намертво фиксировал первое значение —
+           «ой, бюджет вообще-то 350, а не 200» игнорировалось. Пустым не затираем, одинаковое не трогаем (без флапа). */
+        const _norm = s => String(s == null ? '' : (typeof s === 'object' ? (s.value || '') : s)).toLowerCase().replace(/\s+/g, ' ').trim();
+        const _quote = s => String((s && typeof s === 'object' && s.quote) || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        for (const [axis, v] of Object.entries(out.axes || {})) {
+          const cur = l2.quals[axis];
+          const newVal = _norm(v);
+          if (!newVal) continue;                                         /* пустым не затираем */
+          if (!_norm(cur)) { l2.quals[axis] = v; applied++; }            /* было пусто → заполняем */
+          else if (_norm(cur) !== newVal && _quote(v) && _quote(v) !== _quote(cur)) {   /* новое значение + новая цитата клиента = самокоррекция */
+            const oldVal = (cur && typeof cur === 'object') ? (cur.value || '') : cur;
+            l2.quals[axis] = v; applied++;
+            ai.pushEvent(db, { type: 'note', leadId: l2.id, text: `${l2.name}: уточнил «${({ purpose: 'цель', timeline: 'срок', budget: 'бюджет', type: 'тип объекта' })[axis] || axis}» — было «${oldVal}», стало «${(v && v.value) || v}»` });
+          }
+        }
         if (applied) {
           const was = ['qualified', 'handover', 'viewing', 'deal'].includes(l2.stage);
           ai.screen(db, l2);
