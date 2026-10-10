@@ -268,6 +268,12 @@
 .lp-preset-gallerywhite .lp-ben-n{ border-radius:0; background:transparent; border:1px solid var(--line); color:var(--text); }
 .lp-preset-graphite .lp-ben-n{ border-radius:0; background:var(--accent); border:0; color:var(--on-accent); }
 .lp-preset-terracotta .lp-ben-n{ border-radius:0; background:var(--surface); border:0; color:var(--accent); }
+
+/* === Сравнение: шапка таблицы на пресет === */
+.lp-preset-gallerywhite .lp-cmp-head .lp-cmp-th{ color:var(--accent); }
+.lp-preset-graphite .lp-cmp-head{ background:var(--accent); }
+.lp-preset-graphite .lp-cmp-head .lp-cmp-th{ color:var(--on-accent)!important; }
+.lp-preset-terracotta .lp-cmp-head{ background:var(--surface); }
 .lp-preset-terracotta .lp-hero-foot, .lp-preset-terracotta .lp-hero-panel{ background:rgba(166,83,61,.93); color:#FFF9F2; }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-tx span, .lp-preset-terracotta .lp-hero-panel .lp-metric-tx span{ color:rgba(255,249,242,.8); }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-ic, .lp-preset-terracotta .lp-hero-panel .lp-metric-ic{ color:#FFF9F2; }

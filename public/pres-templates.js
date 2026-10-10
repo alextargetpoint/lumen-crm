@@ -477,7 +477,7 @@
     if (!chunks.length) chunks.push([]);
     const bd = 'border-bottom:1px solid rgba(128,128,128,.28)';
     return chunks.map((grp, pi) => {
-      const head = `<tr><th style="text-align:left;padding:9px 12px;${bd};width:28%"></th>${grp.map(o => `<th style="text-align:left;padding:9px 12px;${bd};font-weight:600">${esc(o.name)}</th>`).join('')}</tr>`;
+      const head = `<tr class="lp-cmp-head"><th style="text-align:left;padding:9px 12px;${bd};width:28%"></th>${grp.map(o => `<th class="lp-cmp-th" style="text-align:left;padding:9px 12px;${bd};font-weight:600">${esc(o.name)}</th>`).join('')}</tr>`;
       const rows = crit.map(cr => `<tr><td style="padding:9px 12px;${bd};font-weight:600;opacity:.72">${esc(cr.label)}</td>${grp.map(o => {
         const v = o.values ? o.values[cr.key] : null;
         return `<td style="padding:9px 12px;${bd}">${v == null || v === '' ? '<span style="opacity:.45">Не указано</span>' : esc(v)}</td>`;
