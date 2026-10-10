@@ -6891,6 +6891,7 @@ async function renderChat(id, rebuild) {
       <div class="chat-head-actions">
         <div class="chat-head-chips">
           <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
+          ${l.sendFail ? `<span class="badge bad" data-gomove="1" title="${esc(l.sendFail.reason)} · клик — перевести диалог на другой номер" style="cursor:pointer">⚠ не доходит</span>` : ''}
           <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
           <span class="badge acc">${stageName(l.stage)}</span>
         </div>

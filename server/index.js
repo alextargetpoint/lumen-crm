@@ -1636,9 +1636,14 @@ function creativeForAd(db, ads) {
 }
 function leadView(db, l) {
   if (l.ads) healAdNames(l.ads);   /* лечим имена из полей *_id прямо на лиде (Albato) — идемпотентно */
-  let lastText = null;
+  let lastText = null, sendFail = null, sawOut = false;
   for (let i = db.messages.length - 1; i >= 0; i--) {
-    if (db.messages[i].leadId === l.id) { lastText = db.messages[i].text; break; }
+    const mm = db.messages[i];
+    if (mm.leadId !== l.id) continue;
+    if (lastText == null) lastText = mm.text;
+    /* ПЕРВЫЙ с конца исходящий: если он failed — диалог «залип» (номер не на связи/разлогинен). Показываем бейдж. */
+    if (!sawOut && mm.dir === 'out') { sawOut = true; if (mm.status === 'failed') sendFail = { reason: mm.failReason || 'сообщение не доставлено', at: mm.at }; }
+    if (lastText != null && sawOut) break;
   }
   const axesFilled = ai.AXES.filter(a => l.quals[a]).length;
   return Object.assign({}, l, {
@@ -1655,6 +1660,7 @@ function leadView(db, l) {
       .map(m => ({ id: m.id, at: m.at, dur: m.dur, kind: m.kind, status: m.status, link: m.link || '', zoomMeetingId: m.zoomMeetingId || '', note: m.note || '', brokerName: (db.brokers.find(b => b.id === m.brokerId) || {}).name || null })),
     /* следующее касание активной цепочки (для панели «Запущена цепочка» в диалоге) */
     nextTouch: (() => { try { return engine.nextTouchInfo(db, l); } catch (_) { return null; } })(),
+    sendFail,   /* последнее исходящее не ушло (номер не на связи) → бейдж «не доходит» в диалоге/карточке */
   });
 }
 
