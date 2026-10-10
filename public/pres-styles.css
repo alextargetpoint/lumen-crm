@@ -230,6 +230,19 @@
 .lp-preset-terracotta .lp-h1{ font-style:italic; }
 /* чередование страниц: каждая 2-я контентная — персиковый фон (§5) */
 .lp-preset-terracotta.lp-alt-tint{ background:#F3E4DA; }
+
+/* === пресет-галереи (ТЗ §3/§4/§5) + прямые углы фото === */
+.lp-preset-gallerywhite .lp-gal-big, .lp-preset-gallerywhite .lp-gal-sm,
+.lp-preset-graphite .lp-gal-big, .lp-preset-graphite .lp-gal-sm,
+.lp-preset-terracotta .lp-gal-big, .lp-preset-terracotta .lp-gal-sm{ border-radius:0; }
+/* Gallery White: крупное фото слева + два справа (§3) */
+.lp-preset-gallerywhite.lp-portrait_a4 .lp-gal{ grid-template-columns:1.5fr 1fr; grid-template-rows:1fr 1fr; }
+.lp-preset-gallerywhite.lp-portrait_a4 .lp-gal-big{ grid-column:1; grid-row:1/3; }
+/* Terracotta: крупное вертикальное фото + одна деталь (§5) */
+.lp-preset-terracotta.lp-portrait_a4 .lp-gal, .lp-preset-terracotta.lp-portrait_9_16 .lp-gal{ grid-template-columns:1.55fr 1fr; grid-template-rows:1fr; }
+.lp-preset-terracotta.lp-portrait_a4 .lp-gal-big, .lp-preset-terracotta.lp-portrait_9_16 .lp-gal-big{ grid-column:1; grid-row:1; }
+.lp-preset-terracotta .lp-gal-sm ~ .lp-gal-sm{ display:none; }
+/* Urban — большое горизонтальное сверху + два снизу (дефолт §4, доп. не нужно) */
 .lp-preset-terracotta .lp-hero-foot, .lp-preset-terracotta .lp-hero-panel{ background:rgba(166,83,61,.93); color:#FFF9F2; }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-tx span, .lp-preset-terracotta .lp-hero-panel .lp-metric-tx span{ color:rgba(255,249,242,.8); }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-ic, .lp-preset-terracotta .lp-hero-panel .lp-metric-ic{ color:#FFF9F2; }
