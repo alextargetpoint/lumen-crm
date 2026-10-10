@@ -3342,12 +3342,15 @@ engine.setGraySender((db, lead, m, _opts) => {
      «доставленным», в CRM зелёно, а клиенту в WhatsApp не уходило НИЧЕГО (ни события, ни ретрая).
      Дев/демо без воркера — оставляем мок; реальный тенант с воркером, но сбой — status='failed' + событие в ленту. */
   if (!waWorkerReady(db)) { m.status = 'delivered'; store.save(); return; }   /* воркер не подключён (демо/дев) — мок, поток не ломаем */
-  if (!(g.numbers || []).length || !lead.phone) { m.status = 'failed'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): ${!lead.phone ? 'у лида нет номера' : 'нет подключённых серых номеров'} — проверьте «Номера»` }); store.save(); return; }
-  let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { m.status = 'failed'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): WA-воркер недоступен (${e.message})` }); store.save(); return; }
+  if (!(g.numbers || []).length || !lead.phone) { m.status = 'failed'; m.failReason = !lead.phone ? 'У лида нет номера телефона' : 'Нет подключённых WhatsApp-номеров — проверьте раздел «Номера»'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): ${m.failReason}` }); store.save(); return; }
+  let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { m.status = 'failed'; m.failReason = 'WhatsApp-воркер сейчас недоступен — попробуйте ещё раз через минуту'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): WA-воркер недоступен (${e.message})` }); store.save(); return; }
   const wasNew = !lead.grayPhone;
   const num = pickGrayNumber(db, lead, live);
   if (!num) {   /* был мок «delivered» — теперь честный провал. Диалог НЕ переносим на другой номер автоматически. */
     m.status = 'failed';
+    m.failReason = lead.grayPhone
+      ? `Номер диалога +${lead.grayPhone} не на связи (разлогинен) — переподключите его по QR в «Номера», переписка продолжится с него же`
+      : 'Нет WhatsApp-номера на связи — переподключите по QR в «Номера»';
     const stuck = lead.grayPhone
       ? `номер диалога +${lead.grayPhone} сейчас не на связи. Переподключите его по QR в «Номера» — переписка продолжится с него же. Либо переведите диалог на другой номер вручную (автоматически переписка на другие номера НЕ переносится).`
       : 'нет серого номера на связи — переподключите по QR в «Номера»';
@@ -3360,7 +3363,14 @@ engine.setGraySender((db, lead, m, _opts) => {
     const _mu = /^https?:\/\//i.test(m.media.url) ? m.media.url : (callBase(db) + m.media.url);
     _grayBody.media = { type: m.media.type || 'image', url: _mu, name: m.media.name || '', mimetype: m.media.mimetype || '' };
   }
-  const _sr = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', _grayBody);
+  let _sr;
+  try { _sr = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', _grayBody); }
+  catch (e) {   /* таймаут/ошибка воркера на самой отправке — честный провал с причиной (раньше статус не менялся → висело «✓») */
+    m.status = 'failed'; m.failReason = `Не удалось отправить с +${num.phone}: воркер не ответил (${(e && e.message) || 'таймаут'}). Проверьте номер в «Номера» и попробуйте ещё раз`;
+    ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): ${m.failReason}` });
+    store.save(); return;
+  }
+  if (_sr && _sr.ok === false) { m.status = 'failed'; m.failReason = `Номер +${num.phone} отклонил отправку (${_sr.error || 'возможно, разлогинен'}) — проверьте/переподключите в «Номера»`; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): ${m.failReason}` }); store.save(); return; }
   if (_sr && _sr.id) m.waId = _sr.id;            /* id сообщения воркера — для сверки квитанций (пока grey-квитанций нет) */
   lead.grayPhone = num.phone;                    /* закрепляем номер за лидом — цепочка остаётся на нём */
   if (lead.grayPhoneForce === num.phone) delete lead.grayPhoneForce;   /* ручной перевод выполнен — снимаем флаг */
@@ -3376,7 +3386,7 @@ engine.setGraySender((db, lead, m, _opts) => {
   /* ЧЕСТНЫЙ СТАТУС: воркер вернул ok = сообщение ПЕРЕДАНО в Baileys (не подтверждена доставка устройству).
      Раньше ставили 'delivered' → в CRM «доставлено», хотя у клиента в WhatsApp «Ожидание». Ставим 'sent'
      (отправлено/в пути); 'delivered' выставит реальная квитанция, когда появится grey-receipt-канал. */
-  m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'sent';
+  m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'sent'; delete m.failReason;
   store.save();
   };
   /* сериализация по лиду: следующее сообщение лида стартует только после завершения предыдущего */
@@ -3390,10 +3400,12 @@ engine.setGraySender((db, lead, m, _opts) => {
    Воркер /sessions/:sid/send {to,message} импортит контакт по номеру и шлёт. Лида нет в TG → tg='no', каскад дальше. */
 engine.setTgGraySender(async (db, lead, m) => {
   const g = db.settings.tgGray || {};
-  if (!tgWorkerReady(db) || !(g.numbers || []).length || !lead.phone) { m.status = 'delivered'; store.save(); return; }   /* воркер/аккаунты не готовы — мок, поток не рвём */
-  let live = {}; try { live = (await tgGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) { m.status = 'delivered'; store.save(); return; }
+  /* воркер/аккаунты ВООБЩЕ не настроены (демо/дев) — тихий мок, поток не рвём. Но если воркер НАСТРОЕН,
+     а сессии нет/отвал — честный провал с причиной (как в WhatsApp), а не фейковый «delivered». */
+  if (!tgWorkerReady(db) || !(g.numbers || []).length || !lead.phone) { m.status = 'delivered'; store.save(); return; }
+  let live = {}; try { live = (await tgGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { m.status = 'failed'; m.failReason = 'Telegram-воркер сейчас недоступен — попробуйте ещё раз через минуту'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл в Telegram (${lead.name}): ${m.failReason}` }); store.save(); return; }
   const connected = (g.numbers || []).filter(n => { const s = live[tgGraySid(n.phone)]; return s && s.status === 'connected'; });
-  if (!connected.length) { m.status = 'delivered'; store.save(); return; }
+  if (!connected.length) { m.status = 'failed'; m.failReason = 'Нет Telegram-аккаунта на связи — переподключите по QR в «Номера»'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл в Telegram (${lead.name}): ${m.failReason}` }); store.save(); return; }
   const cap = grayNewLeadCap(db); const today = new Date().toISOString().slice(0, 10);
   const newToday = n => n._tgNewDay === today ? (n._tgNewToday || 0) : 0;
   let num;
@@ -7527,7 +7539,15 @@ const server = http.createServer(async (req, res) => {
          Реал-тайм с рекламы (по 1-3 лида) идёт почти сразу; ручная пачка на 10-30 растягивается на часы. */
       let chainOffset = 15e3;
       const chainBulk = action === 'chain' ? targets.length : 0;
-      const chainGap = () => chainBulk <= 3 ? (30e3 + Math.random() * 60e3) : (120e3 + Math.random() * 180e3);   /* ≤3: 0.5–1.5 мин · пачка: 2–5 мин между лидами */
+      /* ⚠️ АНТИ-БАН (инцидент 10.10: 15 первых касаний разом с одного номера → бан WhatsApp): паузы масштабируем
+         по ДНЕВНОЙ ЁМКОСТИ пула = (кол-во серых номеров × дневной лимит первых касаний). Большая пачка не бластит —
+         размазывается по суткам (≥3 мин между касаниями), ночные касания движок сам сдвигает на утро (тихие часы).
+         Плюс least-loaded в pickGrayNumber даёт ротацию по номерам. */
+      const _wgN = Math.max(1, ((db.settings.waGray || {}).numbers || []).length);
+      const _dayCap = _wgN * grayNewLeadCap(db);                 /* сколько первых касаний безопасно в сутки */
+      const chainGap = () => chainBulk <= 3
+        ? (30e3 + Math.random() * 60e3)                          /* ≤3 лида: 0.5–1.5 мин */
+        : Math.max(180e3, Math.round(86400e3 / _dayCap) * (0.8 + Math.random() * 0.4));   /* пачка: равномерно по дневной ёмкости, ≥3 мин */
       for (const l of targets) {
         if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); markPeakQual(db, l); capi.onStageChange(db, l, l.stage); } done++; }
         else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
@@ -16497,10 +16517,14 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
         if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
         if (u.searchParams.get('full') === '1') {
-          const pr = (db.properties || []).find(x => x.id === pres.projectId) || {};
+          const isColl = pres.kind === 'collection';
+          const pr = (db.properties || []).find(x => x.id === (pres.projectId || (pres.projectIds || [])[0])) || {};
           const broker = presBroker(pres);
           return json(res, 200, {
-            pres, source: pr, assets: presentation.assetsForProperty(pr),
+            pres, kind: pres.kind || 'object',
+            source: isColl ? {} : pr,
+            assets: isColl ? (pres.collectionAssets || {}) : presentation.assetsForProperty(pr),
+            projects: isColl ? (pres.projectIds || []).map(id => { const p = (db.properties || []).find(x => x.id === id) || {}; return { id, name: p.name || '', images: (p.images || []).slice(0, 1) }; }) : undefined,
             brand: presentation.brandFor(db, broker), broker,
             brokers: (db.brokers || []).map(x => ({ id: x.id, name: x.name })),
           });
