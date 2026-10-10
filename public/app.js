@@ -5044,8 +5044,13 @@ PAGES.funnel = async (root) => {
     const ids = launchable.map(l => l.id); if (!ids.length) return;
     const seqId = $('#ccSeq')?.value || '';
     const seqName = seqId ? (activeSeqs.find(s => s.id === seqId) || {}).name : 'по направлению';
-    modal({ title: `Запустить цепочку на ${ids.length} лид(ов)?`, sub: `Отфильтрованным карточкам (новые / первое касание / спящие) уйдут касания по WhatsApp${seqId ? ` — цепочка «${seqName}»` : ' по гео-цепочке'}. Первое касание — в ближайшую минуту.`,
-      actions: [{ label: 'Запустить', cls: 'btn-accent', onClick: async () => { const r = await api.post('/leads/bulk', { ids, action: 'chain', value: seqId }); toast('Цепочка запущена', r.spreadMin > 5 ? `${r.done} лид(ов) — первые касания разложены на ~${r.spreadMin} мин (анти-бан)` : `${r.done} лид(ов) — касания пошли`, true); render(); } }, { label: 'Отмена' }] });
+    const big = ids.length > 5;
+    modal({ title: `Запустить цепочку на ${ids.length} лид(ов)?`,
+      sub: `Отфильтрованным карточкам (новые / первое касание / спящие) уйдут первые касания по WhatsApp${seqId ? ` — цепочка «${seqName}»` : ' по гео-цепочке'}.`,
+      body: big
+        ? `<div style="border:1px solid var(--bad);background:var(--bad-bg);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.55;color:var(--bad)">⚠️ <b>Массовый запуск первых касаний рискует баном WhatsApp</b> (было 10.10: 15 касаний разом с одного номера — номер забанили). Безопаснее, когда лиды приходят постепенно и цепочка стартует на каждого сама.<br><br>Если запускаете пачкой — касания <b>растянутся во времени</b> и <b>ротируются по номерам</b> (не больше дневного лимита на номер), ночные перенесутся на утро.</div>`
+        : '',
+      actions: [{ label: big ? 'Понимаю риск — запустить с растяжкой' : 'Запустить', cls: big ? 'btn-danger' : 'btn-accent', onClick: async () => { const r = await api.post('/leads/bulk', { ids, action: 'chain', value: seqId }); toast('Цепочка запущена', r.spreadMin > 90 ? `${r.done} лид(ов) — касания растянуты на ~${Math.round(r.spreadMin / 60)} ч (анти-бан + ротация по номерам)` : (r.spreadMin > 5 ? `${r.done} лид(ов) — первые касания разложены на ~${r.spreadMin} мин (анти-бан)` : `${r.done} лид(ов) — касания пошли`), true); render(); } }, { label: 'Отмена' }] });
   });
 };
 
@@ -5980,6 +5985,16 @@ function lcCommentsBlock(l) {
     <div class="lc-cmt-add"><input id="lcNote" placeholder="Добавить внутренний комментарий…"><button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.send)}</button></div>
   </div>`;
 }
+/* перевод диалога на другой серый номер (когда текущий забанен/отвалился) — переиспользуется из карточки и из плашки провала в диалоге */
+async function openGrayMove(id, currentPhone, onDone) {
+  let r; try { r = await api.get('/wa/gray/list'); } catch (e) { toast('Не вышло', e.message); return; }
+  const nums = (r.numbers || []).filter(n => n.live && n.live.status === 'connected' && n.phone !== currentPhone);
+  if (!nums.length) { toast('Нет других номеров на связи', 'Подключите/переподключите номер в «Номера»'); return; }
+  modal({ title: 'Перевести диалог на номер', sub: 'Переписка продолжится с выбранного номера. Ручное действие — автопереноса нет.',
+    body: '<div style="display:flex;flex-direction:column;gap:8px">' + nums.map(n => `<button class="btn gm-pick" data-mv="${esc(n.phone)}" style="justify-content:flex-start">${ic(I.chat)}+${esc(n.realPhone || n.phone)}${n.label ? ' · ' + esc(n.label) : ''}</button>`).join('') + '</div>',
+    actions: [{ label: 'Отмена' }] });
+  setTimeout(() => { $$('.gm-pick').forEach(b => b.addEventListener('click', async () => { try { await api.post('/leads/' + id + '/gray-move', { phone: b.dataset.mv }); toast('Диалог переведён', 'Следующее сообщение уйдёт с нового номера', true); closeModal(); if (onDone) onDone(); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
+}
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
@@ -6746,10 +6761,12 @@ async function renderChat(id, rebuild) {
       : (_mt === 'voice' || _mt === 'audio') ? `<div class="vp" data-src="${esc(m.media.url)}" role="group" aria-label="Голосовое сообщение"><button class="vp-play" type="button" aria-label="Воспроизвести голосовое">${VP_PLAY}</button><input class="vp-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Перемотка голосового"><span class="vp-time" aria-hidden="true">0:00</span><button class="vp-rate" type="button" aria-label="Скорость воспроизведения">${(parseFloat(localStorage.getItem('lumen_voiceRate') || '1.5') || 1.5)}×</button></div>`
       : _mt === 'document' ? `<a class="bubble-doc" href="${esc(m.media.url)}" target="_blank" style="color:inherit;display:inline-flex;gap:7px;align-items:center;text-decoration:none;font-weight:600">${ic(I.doc || I.file || I.paper)}${esc(m.media.name || 'файл')}</a>`
       : `<img class="bubble-media" src="${esc(m.media.url)}" loading="lazy" alt="креатив">`) : '';
-    return sep + `<div class="bubble ${m.dir}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
+    const _failed = m.dir === 'out' && m.status === 'failed';
+    const _tick = m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : m.status === 'failed' ? '<span class="bfail-tick">⚠ не ушло</span>' : '✓';
+    return sep + `<div class="bubble ${m.dir}${_failed ? ' failed' : ''}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
       ${media}${m.text ? esc(m.text).replace(/\n/g, '<br>') : (media ? '' : '')}
-      <div class="bmeta">${m.channel && m.channel !== 'wa' ? `<span class="via-tag" style="background:rgba(255,255,255,.3)">${chName[m.channel] || m.channel}</span>` : ''}${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}</span>` : ''}</div>
-    </div>`;
+      <div class="bmeta">${m.channel && m.channel !== 'wa' ? `<span class="via-tag" style="background:rgba(255,255,255,.3)">${chName[m.channel] || m.channel}</span>` : ''}${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${_tick}</span>` : ''}</div>
+    </div>${_failed ? `<div class="bubble-fail"><span>${ic(I.shield || I.spark)}${esc(m.failReason || 'Сообщение не ушло клиенту')}</span><div class="bf-acts"><a class="bf-fix" data-gofix="numbers">Переподключить номер</a><a class="bf-fix bf-move" data-gomove="1">Перевести на другой номер</a></div></div>` : ''}`;
   }).join('');
   /* «ИИ печатает» — клиент написал, ИИ готовит ответ. ⚠️ ТОЛЬКО ~2 мин после сообщения клиента:
      раньше показывалось, пока lastDir==='in' + ИИ вкл — а это весь delay ответа 4-15 мин и дольше →
@@ -6854,6 +6871,8 @@ async function renderChat(id, rebuild) {
   $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
   $('#chatHeadId')?.addEventListener('click', () => openLeadModal(l.id));   /* клик по имени/номеру → карточка лида (по инерции) */
   $$('[data-mcopy]', pane).forEach(b => b.addEventListener('click', async (e) => { const url = e.currentTarget.dataset.mcopy; if (!url) return; try { await navigator.clipboard.writeText(url); toast('Ссылка на созвон скопирована', null, true); } catch (_) { toast('Не удалось скопировать', url); } }));
+  $$('[data-gofix]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); const dst = e.currentTarget.dataset.gofix; if (typeof go === 'function') go(dst || 'numbers'); }));
+  $$('[data-gomove]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); openGrayMove(l.id, l.grayPhone, () => { try { render(); } catch (_) {} }); }));
   $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {
     const ch = b.dataset.ch;
     COMPOSER_CH[id] = ch;
