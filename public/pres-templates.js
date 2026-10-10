@@ -148,7 +148,7 @@
   /* ---------------- page shell ---------------- */
   function pageShell(fmt, theme, inner, opts) {
     opts = opts || {};
-    const cls = `lp-page lp-${fmt.id} lp-${fmt.orient}` + (opts.cls ? ' ' + opts.cls : '');
+    const cls = `lp-page lp-${fmt.id} lp-${fmt.orient}` + (theme && theme.presetId ? ` lp-preset-${theme.presetId}` : '') + (opts.cls ? ' ' + opts.cls : '');
     const style = `width:${fmt.cssW}px;height:${fmt.cssH}px;${TOK.themeStyleStr(theme)}`;
     const footer = opts.footer === false ? '' :
       `<div class="lp-foot">${opts.footerHtml || ''}</div>`;

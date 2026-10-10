@@ -201,3 +201,23 @@
 }
 /* screen preview shadow (never prints) */
 .lp-shadow{ box-shadow:0 18px 60px rgba(20,16,12,.16), 0 2px 8px rgba(20,16,12,.08); }
+
+/* ====== 3 ПРЕСЕТА — КОМПОЗИЦИЯ ГЛУБЖЕ ЦВЕТА (слой 2, ТЗ пресетов §3–§5) ====== */
+/* Gallery White — чистая галерея: тонкий крупный заголовок, акцент точечно (базовая, минимум правил) */
+.lp-preset-gallerywhite .lp-h1{ letter-spacing:-.012em; }
+
+/* Urban Graphite — контрастная УЗКАЯ ВЕРХНЕРЕГИСТРОВАЯ типографика + графитовые плашки и тёмный финал брокера */
+.lp-preset-graphite .lp-h1, .lp-preset-graphite .lp-h2{ text-transform:uppercase; letter-spacing:-.004em; font-weight:700; }
+.lp-preset-graphite .lp-hero-foot, .lp-preset-graphite .lp-hero-panel{ background:rgba(36,40,44,.92); color:#fff; backdrop-filter:blur(3px); }
+.lp-preset-graphite .lp-hero-foot .lp-metric-tx span, .lp-preset-graphite .lp-hero-panel .lp-metric-tx span{ color:rgba(255,255,255,.72); }
+.lp-preset-graphite .lp-hero-foot .lp-metric-ic, .lp-preset-graphite .lp-hero-panel .lp-metric-ic{ color:#B9D3DF; }
+.lp-preset-graphite .lp-hero-land .lp-hero-price, .lp-preset-graphite .lp-hero-foot .lp-hero-price{ color:#fff; }
+.lp-preset-graphite.lp-fam-broker{ background:#24282C; --text:#fff; --muted:rgba(255,255,255,.72); --accent:#B9D3DF; --line:rgba(255,255,255,.2); --surface:#2E3338; }
+
+/* Terracotta Atelier — редакционный КУРСИВ крупного заголовка + терракотовые панели и тёплый финал брокера */
+.lp-preset-terracotta .lp-h1{ font-style:italic; }
+.lp-preset-terracotta .lp-hero-foot, .lp-preset-terracotta .lp-hero-panel{ background:rgba(166,83,61,.93); color:#FFF9F2; }
+.lp-preset-terracotta .lp-hero-foot .lp-metric-tx span, .lp-preset-terracotta .lp-hero-panel .lp-metric-tx span{ color:rgba(255,249,242,.8); }
+.lp-preset-terracotta .lp-hero-foot .lp-metric-ic, .lp-preset-terracotta .lp-hero-panel .lp-metric-ic{ color:#FFF9F2; }
+.lp-preset-terracotta .lp-hero-land .lp-hero-price, .lp-preset-terracotta .lp-hero-foot .lp-hero-price{ color:#FFF9F2; }
+.lp-preset-terracotta.lp-fam-broker{ background:#A6533D; --text:#FFF9F2; --muted:rgba(255,249,242,.8); --accent:#FFF9F2; --line:rgba(255,249,242,.3); --surface:#B5634D; }
