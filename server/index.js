@@ -4913,6 +4913,8 @@ const server = http.createServer(async (req, res) => {
       catch (e) { res.writeHead(404); res.end('not found'); }
       return;
     }
+    /* старая отдельная страница нотетейкера переехала в справочник Lumen — редиректим на /help/notetaker */
+    if ((p === '/notetaker.html' || p === '/notetaker') && req.method === 'GET') { res.writeHead(301, { Location: '/help/notetaker' }); res.end(); return; }
     /* ---------------- публичный справочник (help center), без авторизации ---------------- */
     if ((p === '/help' || p.startsWith('/help/')) && req.method === 'GET') {
       const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0] || ((req.headers.host || '').includes('localhost') ? 'http' : 'https');
@@ -16483,6 +16485,8 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         const pres = presentation.draftCollection(db, props, broker, {
           title: b.title, clientId: b.clientId || b.leadId || null, clientName: b.clientName,
           greeting: b.greeting, format: b.format, paletteId: b.paletteId,
+          comparison: b.comparison !== false && props.length >= 2, recommendation: !!b.recommendation,
+          recommendationText: b.recommendationText, recommendationAuthor: b.recommendationAuthor,
         });
         presList().unshift(pres); store.save();
         return json(res, 200, pres);

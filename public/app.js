@@ -7039,8 +7039,8 @@ PAGES.waProfile = async (root) => {
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto">
         <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download style="text-decoration:none;justify-content:center">${ic(I.doc)}Скачать для macOS</a>
-        <a class="btn btn-sm" href="/notetaker.html#windows" target="_blank" style="text-decoration:none;justify-content:center">${ic(I.doc)}Windows — как настроить</a>
-        <a class="btn btn-sm" href="/notetaker.html" target="_blank" style="text-decoration:none;justify-content:center;font-size:11.5px">Полный гайд</a>
+        <a class="btn btn-sm" href="/assets/notetaker/LumenNotetaker-win.zip" download style="text-decoration:none;justify-content:center">${ic(I.doc)}Скачать для Windows</a>
+        <a class="btn btn-sm" href="/help/notetaker" target="_blank" style="text-decoration:none;justify-content:center;font-size:11.5px">Справочник</a>
       </div>
     </div>
     <div class="glass card" style="max-width:860px;margin-bottom:14px">
@@ -17996,8 +17996,8 @@ PAGES.settings = async (root) => {
         <div style="flex:1;min-width:200px"><div class="muted" style="font-size:12.5px;line-height:1.55">Приложение для мака: пишет и расшифровывает звонки и видео-встречи (Zoom/Meet/Teams) <b>локально</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент не видит плашку записи. Вход — вашим аккаунтом дашборда.</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download style="text-decoration:none">${ic(I.doc)}Скачать для macOS</a>
-          <a class="btn btn-sm" href="/notetaker.html#windows" target="_blank" style="text-decoration:none">${ic(I.doc)}Windows — как настроить</a>
-          <a class="btn btn-sm" href="/notetaker.html" target="_blank" style="text-decoration:none">Полный гайд</a>
+          <a class="btn btn-sm" href="/assets/notetaker/LumenNotetaker-win.zip" download style="text-decoration:none">${ic(I.doc)}Скачать для Windows</a>
+          <a class="btn btn-sm" href="/help/notetaker" target="_blank" style="text-decoration:none">Справочник</a>
         </div>
       </div>`, { open: false })}
 
