@@ -228,6 +228,8 @@
 
 /* Terracotta Atelier — редакционный КУРСИВ крупного заголовка + терракотовые панели и тёплый финал брокера */
 .lp-preset-terracotta .lp-h1{ font-style:italic; }
+/* чередование страниц: каждая 2-я контентная — персиковый фон (§5) */
+.lp-preset-terracotta.lp-alt-tint{ background:#F3E4DA; }
 .lp-preset-terracotta .lp-hero-foot, .lp-preset-terracotta .lp-hero-panel{ background:rgba(166,83,61,.93); color:#FFF9F2; }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-tx span, .lp-preset-terracotta .lp-hero-panel .lp-metric-tx span{ color:rgba(255,249,242,.8); }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-ic, .lp-preset-terracotta .lp-hero-panel .lp-metric-ic{ color:#FFF9F2; }

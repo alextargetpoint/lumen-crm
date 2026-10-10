@@ -518,7 +518,7 @@
     try { inners = fn(ctx); } catch (e) { inners = [`<div class="lp-safe lp-empty">Ошибка макета: ${esc(e.message)}</div>`]; }
     const footHtml = ctx.brand.footer || (ctx.brand.logoText ? `<span>${esc(ctx.brand.logoText)}</span>` : '');
     return inners.map((inner, i) => pageShell(fmt, theme, inner, {
-      cls: `lp-fam-${section.family}` + (i>0?' lp-continuation':''),
+      cls: `lp-fam-${section.family}` + (ctx0.altTint ? ' lp-alt-tint' : '') + (i>0?' lp-continuation':''),
       footer: section.family==='hero' ? false : (ctx.brand.footer!==undefined||ctx.brand.logoText?true:false),
       footerHtml: footHtml,
     }));
@@ -527,9 +527,13 @@
   // render whole document (ordered enabled sections) → flat list of pages
   function renderDocument(doc, ctx0) {
     const sections = (doc.orderedSections || []).filter(s=>s.enabled!==false);
+    const preset = (doc.theme && doc.theme.presetId) || (ctx0.theme && ctx0.theme.presetId);
     const out = [];
+    let cidx = 0;   /* индекс контентных страниц — для чередования Terracotta */
     sections.forEach(s=>{
-      renderSection(s, Object.assign({}, ctx0, { theme: doc.theme || ctx0.theme })).forEach(html=>out.push({ sectionId:s.id, family:s.family, html }));
+      const isContent = ['hero','broker','comparison','recommendation'].indexOf(s.family) < 0;
+      const altTint = preset === 'terracotta' && isContent && ((cidx++) % 2 === 1);
+      renderSection(s, Object.assign({}, ctx0, { theme: doc.theme || ctx0.theme, altTint })).forEach(html=>out.push({ sectionId:s.id, family:s.family, html }));
     });
     return out;
   }
