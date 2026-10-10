@@ -13,6 +13,9 @@ const { isSeedDemoPhone } = require('./seed');
 /* Человеческая задержка ответа ИИ: не «мгновенный бот», а пауза как у живого менеджера.
    Конфигурируется settings.ai.replyDelayMinSec / replyDelayMaxSec (сек). Дефолт 3–12 мин.
    demo.accelerate (сэндбокс) → секунды. Короткий текст/вопрос — не мгновенно, но ближе к низу диапазона. */
+/* окно тишины для анти-дробления: минимум сколько ждём после ПОСЛЕДНЕГО сообщения клиента, прежде чем ответить —
+   чтобы поймать всю пачку сообщений (поток мысли) и ответить одним, а не на каждое. */
+const BURST_SETTLE_MS = 35000;
 function aiReplyDelayMs(db) {
   const a = (db.settings && db.settings.ai) || {};
   if (db.settings && db.settings.demo && db.settings.demo.accelerate) return 3000 + Math.random() * 4000;
@@ -1134,7 +1137,10 @@ function inbound(db, lead, text, opts = {}) {
     lead.ai.pendingReply = { text: reply.text, kind: reply.kind };
     lead.ai.replyInboundAt = Date.now();
     lead.ai.replySimulated = !!opts.simulated;
-    lead.ai.replyDueAt = Date.now() + aiReplyDelayMs(db);
+    /* ⚠️ АНТИ-ДРОБЛЕНИЕ: клиент часто шлёт мысль пачкой (3-7 сообщений подряд). Не отвечаем на каждое —
+       ждём «окно тишины» (≥BURST_SETTLE): каждое новое входящее сдвигает срок, ответ уходит, только когда
+       клиент замолчал. llm.reply на срабатывании читает ВСЮ историю → отвечает на всю пачку одним сообщением. */
+    lead.ai.replyDueAt = Date.now() + Math.max(aiReplyDelayMs(db), BURST_SETTLE_MS);
   }
   store.save();
   return m;
@@ -1153,7 +1159,7 @@ function aiRespondNow(db, lead) {
   lead.ai.pendingReply = reply ? { text: reply.text, kind: reply.kind } : { text: '', kind: '' };
   lead.ai.replyInboundAt = Date.now();
   lead.ai.replySimulated = false;
-  lead.ai.replyDueAt = Date.now() + aiReplyDelayMs(db);
+  lead.ai.replyDueAt = Date.now() + Math.max(aiReplyDelayMs(db), BURST_SETTLE_MS);
   store.save();
   return true;
 }
