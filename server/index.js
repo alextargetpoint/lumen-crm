@@ -7796,11 +7796,12 @@ const server = http.createServer(async (req, res) => {
       if (b.phone != null) {
         const ph = String(b.phone).trim().slice(0, 40);
         if (ph && !/^\+?[0-9\s()\-]{6,25}$/.test(ph)) return json(res, 400, { error: 'Номер в формате +971 … (только цифры, «+», пробелы)' });
-        lead.phone = ph; if (ph) { try { lead.tz = tzFromPhone(ph); } catch (e) {} }
+        lead.phone = ph; if (ph && !lead.tzManual) { try { lead.tz = tzFromPhone(ph); } catch (e) {} }   /* ручной пояс (tzManual) не перетираем сменой номера */
       }
       if (b.geo != null && (db.settings.agency.geos || []).includes(b.geo)) { lead.geo = b.geo; }
+      if (b.tz != null) { const t = Math.round(+b.tz); if (!isNaN(t) && t >= -12 && t <= 14) { lead.tz = t; lead.tzManual = true; } }   /* ручной пояс клиента (клиент назвал своё время) — фиксируем */
       store.save();
-      return json(res, 200, { ok: true, phone: lead.phone, name: lead.name, geo: lead.geo });
+      return json(res, 200, { ok: true, phone: lead.phone, name: lead.name, geo: lead.geo, tz: lead.tz });
     }
     /* редактирование оси квалификации из десктоп-карточки (пробел: раньше правилось только в TG-мини-аппе) */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/qual$/)) && req.method === 'POST') {

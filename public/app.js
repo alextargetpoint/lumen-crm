@@ -5999,6 +5999,35 @@ function lcCommentsBlock(l) {
     <div class="lc-cmt-add"><input id="lcNote" placeholder="Добавить внутренний комментарий…"><button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.send)}</button></div>
   </div>`;
 }
+/* местное время клиента по его поясу (lead.tz — смещение в часах от UTC) */
+function clientTzStr(lead) {
+  const tz = (typeof lead.tz === 'number') ? lead.tz : 0;
+  const t = new Date(Date.now() + tz * 3600e3);
+  return t.toLocaleTimeString('ru-RU', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' });
+}
+function clientTzBadge(lead) {
+  const tz = (typeof lead.tz === 'number') ? lead.tz : 0;
+  return `<span class="lead-tz${lead.tzManual ? ' man' : ''}" data-tzedit="${esc(lead.id)}" title="Местное время клиента (UTC${tz >= 0 ? '+' : ''}${tz})${lead.tzManual ? ' · задано вручную' : ' · по коду номера'} — клик, чтобы изменить">${ic(I.clock)}${clientTzStr(lead)}</span>`;
+}
+/* редактор пояса клиента: брокер вписывает, сколько СЕЙЧАС у клиента → считаем смещение (или клиент назвал время в диалоге) */
+function openTzEdit(id, curTz, onDone) {
+  const now = new Date();
+  const cur = new Date(Date.now() + ((typeof curTz === 'number' ? curTz : 0)) * 3600e3);
+  const curStr = cur.toLocaleTimeString('ru-RU', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' });
+  modal({
+    title: 'Время клиента', sub: 'Впишите, сколько сейчас у клиента — пояс обновится сам (например, клиент назвал своё время в диалоге/на звонке).',
+    body: `<div class="form-row"><label>Сейчас у клиента</label><input id="tzNow" type="time" value="${curStr}"></div>
+      <div class="muted" style="font-size:11.5px">Текущий пояс: UTC${(curTz || 0) >= 0 ? '+' : ''}${curTz || 0} (${curTz != null ? 'по коду номера' : 'не задан'}). Впишете точное время — посчитаем смещение.</div>`,
+    actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+      const v = ($('#tzNow', bd) || {}).value; if (!v) return false;
+      const [h, mm] = v.split(':').map(Number);
+      const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+      let diff = Math.round(((h * 60 + mm) - utcMin) / 60);
+      if (diff > 14) diff -= 24; if (diff < -12) diff += 24;
+      try { await api.post('/leads/' + id + '/update', { tz: diff }); toast('Время клиента обновлено', 'Пояс: UTC' + (diff >= 0 ? '+' : '') + diff, true); if (onDone) onDone(); } catch (e) { toast('Не вышло', e.message); return false; }
+    } }, { label: 'Отмена' }],
+  });
+}
 /* перевод диалога на другой серый номер (когда текущий забанен/отвалился) — переиспользуется из карточки и из плашки провала в диалоге */
 async function openGrayMove(id, currentPhone, onDone) {
   let r; try { r = await api.get('/wa/gray/list'); } catch (e) { toast('Не вышло', e.message); return; }
@@ -6084,7 +6113,7 @@ async function openLeadModal(id) {
 
   const bd = modal({
     title: l.name,
-    sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
+    sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName} ${clientTzBadge(l)} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
     wide: 'card',
     body: `
       <div class="lc-funnel">${FUNNEL_STEPS.map((st, i) => `<div class="lcf-step ${i < stepIdx ? 'done' : ''} ${i === stepIdx ? 'cur' : ''}"><i></i><span>${stageName(st)}</span></div>`).join('')}${l.stage === 'sleeping' ? '<div class="lcf-step warn cur"><i></i><span>Спит</span></div>' : ''}${l.stage === 'lost' ? '<div class="lcf-step bad cur"><i></i><span>Закрыт</span></div>' : ''}</div>
@@ -6239,6 +6268,7 @@ async function openLeadModal(id) {
   });
 
   $('#lcPhone', bd).addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
+  $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id); }); }));
   $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
   $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });
   $('#mBroker', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { broker: e.target.value || null }); });
@@ -6857,7 +6887,7 @@ async function renderChat(id, rebuild) {
   pane.innerHTML = `
     <div class="chat-head">
       ${avaHtml(l)}
-      <div class="chat-head-id" id="chatHeadId" title="Открыть карточку лида"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName}</div></div>
+      <div class="chat-head-id" id="chatHeadId" title="Открыть карточку лида"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName} ${clientTzBadge(l)}</div></div>
       <div class="chat-head-actions">
         <div class="chat-head-chips">
           <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
@@ -6917,6 +6947,7 @@ async function renderChat(id, rebuild) {
   $$('[data-mcopy]', pane).forEach(b => b.addEventListener('click', async (e) => { const url = e.currentTarget.dataset.mcopy; if (!url) return; try { await navigator.clipboard.writeText(url); toast('Ссылка на созвон скопирована', null, true); } catch (_) { toast('Не удалось скопировать', url); } }));
   $$('[data-gofix]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); const dst = e.currentTarget.dataset.gofix; if (typeof go === 'function') go(dst || 'numbers'); }));
   $$('[data-gomove]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); openGrayMove(l.id, l.grayPhone, () => { try { render(); } catch (_) {} }); }));
+  $$('[data-tzedit]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { try { render(); } catch (_) {} }); }));
   $$('[data-touchnow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { const r = await api.post('/leads/' + l.id + '/touch/send-now', {}); toast('Касание отправляется', (r && r.label) ? r.label : 'уйдёт в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 1500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-ptsend]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; const t = (($('#ptText', pane) || {}).innerText || '').trim(); btn.disabled = true; try { await api.post('/leads/' + l.id + '/touch/approve', { text: t }); toast('Касание одобрено и отправлено', null, true); setTimeout(() => { try { render(); } catch (_) {} }, 1200); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-ptskip]', pane).forEach(b => b.addEventListener('click', async (e) => { e.currentTarget.disabled = true; try { await api.post('/leads/' + l.id + '/touch/skip', {}); toast('Касание пропущено', 'Цепочка перейдёт к следующему шагу', true); setTimeout(() => { try { render(); } catch (_) {} }, 800); } catch (err) { e.currentTarget.disabled = false; toast('Не вышло', err.message); } }));
