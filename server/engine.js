@@ -468,6 +468,9 @@ function tickChains(db) {
   const defaultSeqId = (db.settings.ai && db.settings.ai.defaultSeq) || null;
   for (const lead of db.leads) {
     if (!lead.ai.enabled) continue;
+    if (lead.ai.pendingTouch) continue;   /* касание ждёт одобрения брокера (режим «с одобрением») — не трогаем, пока не решит */
+    const _tmode = (db.settings.automations || {}).touchMode || 'auto';
+    if (_tmode === 'off' && !lead.ai.forceInstant) continue;   /* режим «выключено»: проактивных касаний нет (кроме «Отправить сейчас») */
     if (!db._demoSandbox && (lead._demo || isSeedDemoPhone(lead.phone))) continue;   // 🔒 демо-лиды/зашитые демо-номера НЕ получают авто-касаний у реальных тенантов
     if (lead.marketingOptOut) continue;                             // отписался от рассылки — касания не шлём
     if (!autoOn && !lead.ai.forced) continue;                       // авто off → только ручные
@@ -618,6 +621,14 @@ function tickChains(db) {
         text = text.replace(/^\{?name\}?,?\s*/i, '').replace(/😉|👌|🤝|🙏|\)\)/g, '');
       } else if (text && llm.humanize) {
         text = llm.humanize(text);   /* чистим AI-почерк (длинные тире и т.п.) в WhatsApp/мессенджер-касаниях */
+      }
+      /* РЕЖИМ «С ОДОБРЕНИЕМ»: не шлём сами — кладём готовое касание на одобрение брокеру (превью в диалоге:
+         Отправить / Изменить / Пропустить). «Отправить сейчас» (forceInstant) проходит мимо — это явное действие. */
+      if (_tmode === 'approval' && !lead.ai.forceInstant) {
+        lead.ai.pendingTouch = { text: text || '', label: step.label || '', step: lead.ai.chainStep, channel: sendOpts.channel || lead.activeChannel || 'wa', builtAt: nowT, creative: !!stepCreative };
+        ai.pushEvent(db, { type: 'touch_pending', leadId: lead.id, text: `Касание ждёт одобрения: ${lead.name} — ${step.label || ''}` });
+        store.save();
+        continue;
       }
       /* ДЕРЕВО КРЕАТИВОВ: на ПЕРВОМ касании в мессенджере сначала уходит сам креатив (видео/картинка),
          на который человек среагировал, а затем — текстовое касание. */

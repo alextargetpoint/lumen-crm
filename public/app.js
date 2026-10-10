@@ -4948,6 +4948,7 @@ PAGES.funnel = async (root) => {
       <label class="switch cc-sw" title="Автозапуск цепочки на новые лиды"><input type="checkbox" id="ccAuto" ${autoChains ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
       <div class="cc-txt"><b>Авто-цепочка на новые лиды</b><i>${autoChains ? 'запускается на каждый новый лид сама' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
       <div class="cc-seqpick ${autoChains ? '' : 'off'}"><span>Запускать</span><select id="ccSeq"><option value="">по направлению</option>${activeSeqs.map(s => `<option value="${s.id}" ${aiSet.defaultSeq === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
+      ${(() => { const tm = (STATE.settings.automations || {}).touchMode || 'auto'; return `<div class="cc-seqpick" title="Как уходят касания цепочки"><span>Режим</span><select id="ccTouchMode"><option value="auto" ${tm === 'auto' ? 'selected' : ''}>Авто (сразу)</option><option value="approval" ${tm === 'approval' ? 'selected' : ''}>С одобрением</option><option value="off" ${tm === 'off' ? 'selected' : ''}>Выключено</option></select></div>`; })()}
       <span class="tb-spacer"></span>
       ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : '<span class="cc-hint">Ручной запуск — выдели карточки лидов</span>'}
     </div>
@@ -5034,6 +5035,12 @@ PAGES.funnel = async (root) => {
     try { await api.patch('/settings', { ai: { autoChains: on } }); await loadState();
       toast(on ? 'Авто-цепочка включена' : 'Авто-цепочка выключена', on ? 'Новые лиды пойдут в касания сами' : 'Новые лиды ждут ручного запуска', true); render();
     } catch (er) { toast('Не вышло', er.message); e.target.checked = !on; }
+  });
+  $('#ccTouchMode')?.addEventListener('change', async (e) => {
+    const v = e.target.value;
+    try { await api.patch('/settings', { automations: { touchMode: v } }); await loadState();
+      toast(v === 'approval' ? 'Режим «с одобрением»' : v === 'off' ? 'Касания выключены' : 'Режим «авто»', v === 'approval' ? 'Каждое касание цепочки ждёт вашего одобрения в диалоге' : v === 'off' ? 'Проактивные касания не идут — только вручную' : 'Касания уходят по расписанию сами', true); render();
+    } catch (er) { toast('Не вышло', er.message); }
   });
   $('#ccSeq')?.addEventListener('change', async (e) => {
     try { await api.patch('/settings', { ai: { defaultSeq: e.target.value || null } }); if (STATE.settings.ai) STATE.settings.ai.defaultSeq = e.target.value || null;
@@ -6811,8 +6818,22 @@ async function renderChat(id, rebuild) {
         <a class="btn btn-sm" href="/m/${esc(_mtUp.id)}" target="_blank" rel="noopener" title="Страница встречи для клиента (визитка со ссылкой)">Визитка</a>
       </div></div>`;
   })() : '';
-  /* ПАНЕЛЬ «ЗАПУЩЕНА ЦЕПОЧКА»: следующее касание — шаг, когда уйдёт (в поясе клиента), превью текста и «Отправить сейчас». */
-  const chainPanel = (l.nextTouch && l.ai && l.ai.enabled) ? (() => {
+  /* ПАНЕЛЬ «ЗАПУЩЕНА ЦЕПОЧКА»: режим «с одобрением» — касание ждёт решения (редактируемое превью + Отправить/Пропустить);
+     иначе — следующее касание: шаг, когда уйдёт (в поясе клиента), превью текста и «Отправить сейчас». */
+  const _pt = l.ai && l.ai.pendingTouch;
+  const chainPanel = _pt ? `<div class="chat-chain pending">
+      <div class="cc-ic">${ic(I.spark || I.bolt)}</div>
+      <div class="cc-main">
+        <div class="cc-t">Касание готово — одобрите${_pt.label ? ' · ' + esc(_pt.label) : ''}</div>
+        <div class="cc-hint2">Можно отредактировать текст прямо здесь перед отправкой</div>
+        <div class="cc-prev pt-edit" id="ptText" contenteditable="true" spellcheck="false">${esc(_pt.text || '')}</div>
+      </div>
+      <div class="cc-act cc-approve">
+        <button class="btn btn-sm btn-accent" data-ptsend="1">${ic(I.send || I.bolt)}Отправить</button>
+        <button class="btn btn-sm btn-ghost" data-ptskip="1">Пропустить</button>
+      </div>
+    </div>`
+  : (l.nextTouch && l.ai && l.ai.enabled) ? (() => {
     const nt = l.nextTouch;
     const when = nt.at ? (nt.at <= _mNow ? 'в ближайшую минуту' : _mFmt(nt.at)) : '—';
     const chn2 = ({ wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' })[nt.channel] || nt.channel;
@@ -6890,6 +6911,8 @@ async function renderChat(id, rebuild) {
   $$('[data-gofix]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); const dst = e.currentTarget.dataset.gofix; if (typeof go === 'function') go(dst || 'numbers'); }));
   $$('[data-gomove]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); openGrayMove(l.id, l.grayPhone, () => { try { render(); } catch (_) {} }); }));
   $$('[data-touchnow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { const r = await api.post('/leads/' + l.id + '/touch/send-now', {}); toast('Касание отправляется', (r && r.label) ? r.label : 'уйдёт в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 1500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
+  $$('[data-ptsend]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; const t = (($('#ptText', pane) || {}).innerText || '').trim(); btn.disabled = true; try { await api.post('/leads/' + l.id + '/touch/approve', { text: t }); toast('Касание одобрено и отправлено', null, true); setTimeout(() => { try { render(); } catch (_) {} }, 1200); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
+  $$('[data-ptskip]', pane).forEach(b => b.addEventListener('click', async (e) => { e.currentTarget.disabled = true; try { await api.post('/leads/' + l.id + '/touch/skip', {}); toast('Касание пропущено', 'Цепочка перейдёт к следующему шагу', true); setTimeout(() => { try { render(); } catch (_) {} }, 800); } catch (err) { e.currentTarget.disabled = false; toast('Не вышло', err.message); } }));
   $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {
     const ch = b.dataset.ch;
     COMPOSER_CH[id] = ch;

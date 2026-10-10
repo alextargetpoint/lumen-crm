@@ -7988,6 +7988,28 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true, label: nt.label });
     }
+    /* режим «с одобрением»: брокер решает по готовому касанию — Отправить (можно с правкой) / Пропустить.
+       approve → шлём + следующий шаг; skip → следующий шаг без отправки. nextTouchAt=null → движок пересчитает срок. */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/touch\/(approve|skip)$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const pt = lead.ai && lead.ai.pendingTouch;
+      if (!pt) return json(res, 400, { error: 'нет касания на одобрении' });
+      const b = await readBody(req).catch(() => ({}));
+      if (m[2] === 'approve') {
+        const txt = (b.text != null ? String(b.text) : pt.text) || '';
+        engine.send(db, lead, txt, 'chain', pt.channel ? { channel: pt.channel } : undefined);
+        if (lead.stage === 'new') lead.stage = 'touch';
+        ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `Касание одобрено и отправлено: ${lead.name} — ${pt.label || ''}` });
+      } else {
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `Касание пропущено брокером: ${lead.name} — ${pt.label || ''}` });
+      }
+      lead.ai.chainStep = (lead.ai.chainStep || 0) + 1;
+      lead.ai.nextTouchAt = null;
+      delete lead.ai.pendingTouch;
+      store.save();
+      return json(res, 200, { ok: true });
+    }
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/first-touch$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
