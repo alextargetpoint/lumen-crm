@@ -66,7 +66,8 @@ const ov = (v) => ({ mode: 'override', value: v });
 const srcBind = (path, cached) => ({ mode: 'source', sourcePath: path, sourceRevision: 'crm', cachedValue: cached });
 
 /* ---------- ADAPTER: property record → PropertyPresentation draft (TZ §3,§6) ---------- */
-function draftFromProperty(db, pr, broker) {
+function draftFromProperty(db, pr, broker, opts) {
+  opts = opts || {};
   const gi = geoInfo(pr.geo);
   const currency = pr.currency || gi.currency;
   const imgs = (pr.images || []);
@@ -159,7 +160,7 @@ function draftFromProperty(db, pr, broker) {
     id: 'pres_' + hex(5), schemaVersion: SCHEMA_VERSION, tenantId: store_currentTid(),
     brokerId: broker ? broker.id : null, projectId: pr.id, unitId: null,
     locale: 'ru-RU', draftRevision: 1, sourceRevision: 'crm',
-    theme: { paletteId: defaultPalette(pr.geo), fontPairId: 'editorial' },
+    theme: (opts.presetId && TOK.presetTheme(opts.presetId)) || { paletteId: defaultPalette(pr.geo), fontPairId: 'editorial' },
     defaultFormat: 'portrait_a4', status: 'draft',
     orderedSections: sections,
     brokerAppendix: { enabled: !!(broker && broker.name), profileId: broker ? broker.id : null, pageTypes: ['broker_intro', 'broker_contacts'] },

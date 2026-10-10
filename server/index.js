@@ -16541,7 +16541,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         let brokerId = b.brokerId || (R.role === 'broker' ? R.brokerId : null);
         if (!brokerId && b.leadId) { const ld = (db.leads || []).find(l => l.id === b.leadId); if (ld && ld.broker) brokerId = ld.broker; }
         const broker = (db.brokers || []).find(x => x.id === brokerId) || null;
-        const pres = presentation.draftFromProperty(db, pr, broker);
+        const pres = presentation.draftFromProperty(db, pr, broker, { presetId: b.presetId });
         presList().unshift(pres); store.save();
         return json(res, 200, pres);
       }

@@ -9549,8 +9549,26 @@ PAGES.presentations = async (root) => {
   $$('[data-ppub]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.ppub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
   $('#presNew', root)?.addEventListener('click', () => {
     if (!propList.length) { toast('Нет объектов', 'Добавьте объект в Базе'); return; }
-    modal({ title: 'Новая презентация', sub: 'Выберите объект — соберём черновик и откроем конструктор', body: '<div style="display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto">' + propList.slice(0, 60).map(p => `<button class="btn pres-pick" data-pp="${p.id}" style="justify-content:flex-start">${ic(I.building)}${esc(p.name || p.id)}</button>`).join('') + '</div>', actions: [{ label: 'Отмена' }] });
-    setTimeout(() => { $$('.pres-pick').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp }); if (r && r.id) { closeModal(); window.open('/pres/' + r.id, '_blank'); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
+    let selPreset = 'gallerywhite';
+    const PRESETS_UI = [
+      { id: 'gallerywhite', name: 'Gallery White', sw: ['#FFFFFF', '#3155E7', '#151515'] },
+      { id: 'graphite', name: 'Urban Graphite', sw: ['#FFFFFF', '#24282C', '#59636A'] },
+      { id: 'terracotta', name: 'Terracotta Atelier', sw: ['#FBF7F2', '#A6533D', '#392D28'] },
+    ];
+    const presetBtns = PRESETS_UI.map(p => `<button class="btn pres1-preset" data-preset="${p.id}" style="flex:1;min-width:140px;justify-content:flex-start;gap:8px${p.id === selPreset ? ';background:var(--accent-weak,rgba(120,110,90,.12));border-color:var(--accent,#8a6d3b);font-weight:600' : ''}"><span style="display:inline-flex;gap:2px">${p.sw.map(c => `<i style="width:11px;height:14px;border-radius:2px;background:${c};border:1px solid rgba(0,0,0,.12);display:inline-block"></i>`).join('')}</span>${esc(p.name)}</button>`).join('');
+    modal({
+      title: 'Новая презентация', sub: 'Выберите оформление и объект — соберём черновик и откроем конструктор', wide: true,
+      body: `<div style="display:flex;flex-direction:column;gap:8px"><div class="muted" style="font-size:12px">Оформление (пресет):</div><div style="display:flex;gap:8px;flex-wrap:wrap">${presetBtns}</div><div class="muted" style="font-size:12px;margin-top:4px">Объект:</div><div style="display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow:auto">` + propList.slice(0, 60).map(p => `<button class="btn pres-pick" data-pp="${esc(p.id)}" style="justify-content:flex-start">${ic(I.building)}${esc(p.name || p.id)}</button>`).join('') + '</div></div>',
+      actions: [{ label: 'Отмена' }],
+    });
+    setTimeout(() => {
+      $$('.pres1-preset').forEach(b => b.addEventListener('click', () => {
+        selPreset = b.dataset.preset;
+        $$('.pres1-preset').forEach(x => { x.style.background = ''; x.style.borderColor = ''; x.style.fontWeight = ''; });
+        b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600';
+      }));
+      $$('.pres-pick').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp, presetId: selPreset }); if (r && r.id) { closeModal(); window.open('/pres/' + r.id, '_blank'); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } }));
+    }, 40);
   });
   $('#presNewColl', root)?.addEventListener('click', () => {
     if (propList.length < 2) { toast('Нужно ≥2 объекта', 'Добавьте объекты в Базе'); return; }
