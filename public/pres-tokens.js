@@ -39,7 +39,7 @@
     { id:'signature',    name:'Фирменный',       heading:{ family:'Prata',             weights:[400] }, body:{ family:'Manrope',   weights:[400,600] }, character:'Выразительная обложка' },
     /* --- пары под 3 пресета (Terracotta использует editorial) --- */
     { id:'gallery',      name:'Галерейный',      heading:{ family:'Manrope',           weights:[400] }, body:{ family:'Manrope',   weights:[400,600] }, character:'Лёгкая галерейная типографика' },
-    { id:'urban',        name:'Урбан',           heading:{ family:'Inter',             weights:[600] }, body:{ family:'Inter',     weights:[400,500] }, character:'Контрастный городской (узкие верхне-регистровые заголовки)' },
+    { id:'urban',        name:'Урбан',           heading:{ family:'Roboto Condensed',  weights:[700] }, body:{ family:'Inter',     weights:[400,500] }, character:'Контрастный городской (узкие верхне-регистровые заголовки)' },
   ];
   // serif display families use a slightly larger scale (optical) — flagged for layout
   const SERIF_HEADINGS = new Set(['Cormorant Garamond','Prata','EB Garamond']);
