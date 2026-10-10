@@ -21,6 +21,10 @@
     { id: 'powder',   name: 'Пудровый',  c: { background:'#FAF0ED', surface:'#EFDAD3', text:'#3A2A28', accent:'#8A514E', onAccent:'#FFFFFF', mutedText:'#3A2A28', border:'#EFDAD3' } },
     { id: 'sage',     name: 'Шалфей',    c: { background:'#EFF5F0', surface:'#DCE8DF', text:'#23362D', accent:'#426450', onAccent:'#FFFFFF', mutedText:'#23362D', border:'#DCE8DF' } },
     { id: 'butter',   name: 'Сливочный', c: { background:'#FAF6E8', surface:'#EEE5C2', text:'#363222', accent:'#70602F', onAccent:'#FFFFFF', mutedText:'#363222', border:'#EEE5C2' } },
+    /* --- 3 премиум-пресета (ТЗ пресетов 10.2026) --- */
+    { id: 'gallerywhite', name: 'Gallery White',     c: { background:'#FFFFFF', surface:'#F5F5F3', text:'#151515', accent:'#3155E7', onAccent:'#FFFFFF', mutedText:'#656565', border:'#DEDEDA' } },
+    { id: 'graphite',     name: 'Urban Graphite',     c: { background:'#FFFFFF', surface:'#F1F3F4', text:'#151A1E', accent:'#24282C', onAccent:'#FFFFFF', mutedText:'#59636A', border:'#CDD3D7' } },
+    { id: 'terracotta',   name: 'Terracotta Atelier', c: { background:'#FBF7F2', surface:'#F3E4DA', text:'#392D28', accent:'#A6533D', onAccent:'#FFF9F2', mutedText:'#75655C', border:'#D8BCAF' } },
   ];
 
   /* ---- 8 font pairs (TZ §14). families must match self-hosted fonts.css ---- */
@@ -33,6 +37,9 @@
     { id:'soft',         name:'Мягкий',          heading:{ family:'Cormorant Garamond', weights:[500] }, body:{ family:'Onest',    weights:[400,500] }, character:'Мягкий и воздушный' },
     { id:'minimal',      name:'Минимализм',      heading:{ family:'Inter',             weights:[500,600] }, body:{ family:'Inter',    weights:[400] }, character:'Минималистичный' },
     { id:'signature',    name:'Фирменный',       heading:{ family:'Prata',             weights:[400] }, body:{ family:'Manrope',   weights:[400,600] }, character:'Выразительная обложка' },
+    /* --- пары под 3 пресета (Terracotta использует editorial) --- */
+    { id:'gallery',      name:'Галерейный',      heading:{ family:'Manrope',           weights:[400] }, body:{ family:'Manrope',   weights:[400,600] }, character:'Лёгкая галерейная типографика' },
+    { id:'urban',        name:'Урбан',           heading:{ family:'Inter',             weights:[600] }, body:{ family:'Inter',     weights:[400,500] }, character:'Контрастный городской (узкие верхне-регистровые заголовки)' },
   ];
   // serif display families use a slightly larger scale (optical) — flagged for layout
   const SERIF_HEADINGS = new Set(['Cormorant Garamond','Prata','EB Garamond']);
@@ -67,6 +74,16 @@
   const fontPair = (id) => byId(FONT_PAIRS, id) || FONT_PAIRS[0];  // default editorial
   const format = (id) => byId(FORMATS, id) || FORMATS[1];          // default portrait_a4
 
+  /* ---- 3 премиум-пресета: бандл палитра+шрифт-пара+композиц-флаги (ТЗ пресетов §2) ---- */
+  const PRESETS = [
+    { id:'gallerywhite', name:'Gallery White',      paletteId:'gallerywhite', fontPairId:'gallery',   headingCase:'none',  accentUse:'minimal', darkCover:false, note:'Белая архитектурная галерея, синий точечно' },
+    { id:'graphite',     name:'Urban Graphite',     paletteId:'graphite',     fontPairId:'urban',     headingCase:'upper', accentUse:'bars',    darkCover:true,  note:'Графит, контрастная узкая типографика' },
+    { id:'terracotta',   name:'Terracotta Atelier', paletteId:'terracotta',   fontPairId:'editorial', headingCase:'none',  accentUse:'panels',  darkCover:false, alternating:true, italicHeads:true, note:'Терракота/молочный, редакционный курсив' },
+  ];
+  const preset = (id) => byId(PRESETS, id) || null;
+  /* выбор пресета → тема документа (контент/ручные правки не затираются — ТЗ §2) */
+  function presetTheme(id){ const p = preset(id); return p ? { presetId:p.id, paletteId:p.paletteId, fontPairId:p.fontPairId } : null; }
+
   // WCAG relative luminance + contrast ratio (for live contrast check, TZ §13)
   function _lin(c){ c/=255; return c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4); }
   function _lum(hex){ const h=hex.replace('#',''); const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16); return 0.2126*_lin(r)+0.7152*_lin(g)+0.0722*_lin(b); }
@@ -92,7 +109,7 @@
   const scaleFor = (fmt, renderW) => renderW / format(fmt).cssW;
 
   return {
-    MM_PX, mm, PALETTES, FONT_PAIRS, FORMATS, SPACING, RADII, LIMITS, CONTRAST, FAMILIES, SERIF_HEADINGS,
-    palette, fontPair, format, byId, contrast, themeVars, themeStyleStr, scaleFor,
+    MM_PX, mm, PALETTES, FONT_PAIRS, FORMATS, PRESETS, SPACING, RADII, LIMITS, CONTRAST, FAMILIES, SERIF_HEADINGS,
+    palette, fontPair, format, preset, presetTheme, byId, contrast, themeVars, themeStyleStr, scaleFor,
   };
 });
