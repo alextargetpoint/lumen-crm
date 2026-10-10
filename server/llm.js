@@ -847,7 +847,9 @@ async function composeFirstTouch(db, lead, draft, agencyName, styleSamples, opts
   /* умный транскрибатор: что РЕАЛЬНО озвучено в видео-креативе + ручные доп-заметки по проекту */
   const adTranscript = (adRec && adRec.transcript && !/^\(без речи\)?$/i.test(adRec.transcript.trim())) ? String(adRec.transcript).slice(0, 2500) : '';
   const adNotes = (adRec && adRec.notes) ? String(adRec.notes).slice(0, 1500) : '';
-  const LANG = { ru: 'русском', en: 'английском', es: 'испанском', ar: 'арабском', id: 'индонезийском', de: 'немецком', fr: 'французском', it: 'итальянском', tr: 'турецком', pt: 'португальском' }[lead.lang] || 'русском';
+  /* язык первого касания: язык ЦЕПОЧКИ (seq.lang, передаётся в opts.lang) перекрывает язык лида — руку ИИ ведём по языку цепочки,
+     если он задан; иначе по языку лида. Рукописные шаблоны уходят как написаны (сюда не попадают). */
+  const LANG = { ru: 'русском', en: 'английском', es: 'испанском', ar: 'арабском', id: 'индонезийском', de: 'немецком', fr: 'французском', it: 'итальянском', tr: 'турецком', pt: 'португальском' }[((opts && opts.lang) || lead.lang)] || 'русском';
   /* полезная инфа из лид-формы/квалификации/кастомных полей — чтобы зацепить лично */
   const qualLines = [];
   const AXN = { purpose: 'цель', timeline: 'срок', budget: 'бюджет', type: 'тип объекта' };

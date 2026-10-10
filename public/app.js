@@ -5559,14 +5559,36 @@ function openMeetingModal(lead, after) {
         })()}</div>
       <div class="form-row"><label>Эксперт</label><select id="mtBroker">${brokers.map(b => `<option value="${b.id}">${esc(b.name)} · ${STATE.settings.geoNames[b.geo]}</option>`).join('')}</select></div>
       <div class="form-row"><label>Заметка (видна только команде)</label><input id="mtNote" placeholder="например: подготовить 3 варианта под $172k"></div>
-      <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Кнопка «Подключиться» на странице встречи</div><div class="sd">Выкл — на странице не будет кнопки подключения; эксперт сам пришлёт ссылку в переписке</div></div><label class="switch"><input type="checkbox" id="mtShowJoin" checked><span class="tr"></span><span class="th"></span></label></div>`,
+      <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Кнопка «Подключиться» на странице встречи</div><div class="sd">Выкл — на странице не будет кнопки подключения; эксперт сам пришлёт ссылку в переписке</div></div><label class="switch"><input type="checkbox" id="mtShowJoin" checked><span class="tr"></span><span class="th"></span></label></div>
+      <details class="mt-invite" style="margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:0 14px">
+        <summary style="cursor:pointer;padding:12px 0;font-weight:650;font-size:13.5px;list-style:none;display:flex;align-items:center;gap:8px">${ic(I.layers)}Страница встречи для клиента <span class="muted" style="font-weight:400;font-size:12px">— приветствие, план, материалы (необязательно)</span></summary>
+        <div style="padding:2px 0 14px">
+          <div class="form-row"><label>Приветствие <span class="muted" style="font-weight:400">(пусто — соберём автоматически по имени)</span></label><input id="mtGreeting" placeholder="Например: Анна, рад встрече!"></div>
+          <div class="form-row"><label>План встречи <span class="muted" style="font-weight:400">(по одному пункту на строку)</span></label><textarea id="mtAgenda" rows="3" placeholder="Разберём бюджет и сроки&#10;Покажу 3 варианта под запрос&#10;Ответим на вопросы по рассрочке"></textarea></div>
+          <div class="form-row"><label>Короткая визитка эксперта <span class="muted" style="font-weight:400">(покажем на странице; общий профиль не меняется)</span></label><textarea id="mtBlurb" rows="2" placeholder="Веду Пхукет 4 года, помог 120+ семьям…"></textarea></div>
+          <div class="form-row"><label>Материалы <span class="muted" style="font-weight:400">(подпись + ссылка; по одной на строку, формат: Подпись | https://…)</span></label><textarea id="mtMaterials" rows="2" placeholder="Памятка по рассрочке | https://…&#10;Презентация проекта | https://…"></textarea></div>
+          <div class="form-row"><label>Подборка объектов <span class="muted" style="font-weight:400">(ссылка /p/… или ID из раздела «Подборки»)</span></label><input id="mtColl" placeholder="https://…/p/abc123 или abc123"></div>
+          <div class="form-row"><label>Как подключиться <span class="muted" style="font-weight:400">(короткая подсказка)</span></label><input id="mtInstr" placeholder="Откройте ссылку за пару минут до начала"></div>
+          <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Вопрос перед встречей</div><div class="sd">Клиент сможет написать, что хочет обсудить — вопрос упадёт в карточку</div></div><label class="switch"><input type="checkbox" id="mtPreQ"><span class="tr"></span><span class="th"></span></label></div>
+        </div>
+      </details>`,
     actions: [
       { label: 'Назначить и подтвердить в WA', cls: 'btn-accent', onClick: async (bd) => {
         const at = new Date($('#mtDate', bd).value + 'T' + $('#mtTime', bd).value).getTime();
         const _lnk = ($('#mtLink', bd) && $('#mtLink', bd).value.trim()) || '';
         const _k = $('#mtKind', bd).value;
-        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: _k, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value, hideJoin: !($('#mtShowJoin', bd) || {}).checked, link: _lnk || undefined, platform: (_k === 'video' && !_lnk) ? (($('#mtPlatform', bd) || {}).value || undefined) : undefined });
+        /* блоки клиентской страницы-приглашения */
+        const _agenda = ($('#mtAgenda', bd)?.value || '').split(/\n/).map(x => x.trim()).filter(Boolean);
+        const _materials = ($('#mtMaterials', bd)?.value || '').split(/\n/).map(line => {
+          const parts = line.split('|'); const url = (parts.length > 1 ? parts.slice(1).join('|') : parts[0]).trim();
+          return { label: (parts.length > 1 ? parts[0] : '').trim(), url };
+        }).filter(x => /^https?:\/\//i.test(x.url));
+        const _collRaw = ($('#mtColl', bd)?.value || '').trim();
+        const _collId = (_collRaw.match(/\/p\/([\w-]+)/) || [])[1] || _collRaw.replace(/[^\w-]/g, '');
+        const mt = await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: _k, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value, hideJoin: !($('#mtShowJoin', bd) || {}).checked, link: _lnk || undefined, platform: (_k === 'video' && !_lnk) ? (($('#mtPlatform', bd) || {}).value || undefined) : undefined,
+          greeting: $('#mtGreeting', bd)?.value || '', agenda: _agenda, materials: _materials, collectionId: _collId, brokerBlurb: $('#mtBlurb', bd)?.value || '', instructions: $('#mtInstr', bd)?.value || '', preQuestion: !!($('#mtPreQ', bd) || {}).checked });
         toast('Встреча назначена', 'Подтверждение отправлено клиенту', true);
+        if (mt && mt.id) { try { await navigator.clipboard.writeText(location.origin + '/m/' + mt.id); toast('Ссылка на страницу встречи скопирована', null, true); } catch (_) {} }
         if (after) after();
       } },
       { label: 'Отмена' },

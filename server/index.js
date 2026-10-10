@@ -3738,6 +3738,29 @@ async function farmReclaimFromTenant(prevTid, phone) {
    - Zoom (свой/платформенный аккаунт) → Zoom ПИШЕТ САМ в облако (auto_recording:cloud), транскрипт заберём
      вебхуком /hooks/zoom бесплатно/дёшево — бот Recall НЕ нужен (zoomMeetingId → по нему вебхук найдёт встречу);
    - иначе бесплатный Jitsi (браузер, без записи). */
+/* Блоки клиентской страницы-приглашения на встречу (/m/:id) — валидируем то, что присылает брокер из конструктора.
+   patchMode=true → в объект попадают ТОЛЬКО реально присланные поля (для PATCH, чтобы не затирать соседние). */
+function sanitizeInvitePage(b, patchMode) {
+  const out = {};
+  const S = (v, n) => String(v == null ? '' : v).slice(0, n);
+  if (!patchMode || b.greeting != null) out.greeting = S(b.greeting, 300);
+  if (!patchMode || b.brokerBlurb != null) out.brokerBlurb = S(b.brokerBlurb, 600);
+  if (!patchMode || b.instructions != null) out.instructions = S(b.instructions, 400);
+  if (!patchMode || b.collectionId != null) out.collectionId = S(b.collectionId, 60).replace(/[^\w-]/g, '');
+  if (!patchMode || b.preQuestion != null) out.preQuestion = !!b.preQuestion;
+  if (!patchMode || b.agenda != null) {
+    out.agenda = Array.isArray(b.agenda) ? b.agenda.map(x => S(x, 140).trim()).filter(Boolean).slice(0, 8)
+      : S(b.agenda, 1200).split(/\r?\n/).map(x => x.trim()).filter(Boolean).slice(0, 8);
+  }
+  if (!patchMode || b.materials != null) {
+    out.materials = (Array.isArray(b.materials) ? b.materials : []).map(mm => ({
+      label: S(mm && mm.label, 80).trim(),
+      url: S(mm && mm.url, 500).trim(),
+    })).filter(mm => mm.url && /^https?:\/\//i.test(mm.url)).slice(0, 8);
+  }
+  return out;
+}
+
 async function genMeetingLink(db, kind, lead, atMs, durMin, platform) {
   if (kind !== 'video') return { url: null, zoomMeetingId: '' };
   /* per-broker: если у брокера лида подключён СВОЙ Zoom/Meet — встреча под его аккаунтом (свой хост,
@@ -10776,6 +10799,7 @@ const server = http.createServer(async (req, res) => {
         /* видео-встреча: Zoom (свой/платформенный аккаунт → Zoom пишет сам в облако, транскрипт вебхуком),
            иначе бесплатный Jitsi из коробки (браузер, без записи). Вставленную вручную Meet/Teams-ссылку пишет бот Recall. */
         hideJoin: !!b.hideJoin,   /* версия страницы БЕЗ кнопки «Подключиться» — брокер сам пришлёт ссылку в переписке */
+        ...sanitizeInvitePage(b),   /* блоки клиентской страницы-приглашения: приветствие, план, материалы, подборка, визитка брокера, вопрос перед встречей */
       };
       { const _mk = (mt.kind === 'video' && !b.link) ? await genMeetingLink(db, 'video', lead, mt.at, Math.max(15, Math.min(240, +b.dur || 60)), b.platform) : { url: b.link || null, zoomMeetingId: '' }; mt.link = _mk.url; if (_mk.zoomMeetingId) mt.zoomMeetingId = _mk.zoomMeetingId; }
       db.meetings = db.meetings || [];
@@ -10805,8 +10829,15 @@ const server = http.createServer(async (req, res) => {
       if (!mt) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
       if (b.status) mt.status = b.status;
-      if (b.at) { mt.at = +b.at; mt.reminded = false; mt.rem = {}; }
+      /* перенос встречи из CRM: тот же публичный линк остаётся (ТЗ §9), снимаем прежнее подтверждение и запрос переноса,
+         страница сама покажет состояние «перенесена → требуется повторное подтверждение». */
+      if (b.at && +b.at !== mt.at) { mt.at = +b.at; mt.reminded = false; mt.rem = {}; mt.clientConfirmed = false; mt.rescheduleRequested = 0; mt.status = 'scheduled'; mt.wasRescheduled = true; }
+      else if (b.at) { mt.at = +b.at; }
       if (b.dur != null) mt.dur = Math.max(15, Math.min(240, +b.dur));
+      if (b.hideJoin != null) mt.hideJoin = !!b.hideJoin;
+      if (b.link != null) mt.link = String(b.link || '').slice(0, 500) || null;
+      if (b.outcome != null) mt.outcome = String(b.outcome || '').slice(0, 2000);   /* итоги/следующие шаги — показываем в состоянии «завершена» */
+      Object.assign(mt, sanitizeInvitePage(b, true));   /* патчим только присланные блоки страницы-приглашения */
       if (b.status === 'no_show' && db.settings.automations.noShowMessage) {
         const lead = db.leads.find(l => l.id === mt.leadId);
         if (lead && !['deal', 'lost'].includes(lead.stage)) {
@@ -14988,9 +15019,33 @@ if(bk)bk.addEventListener('click',async()=>{
       const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(kindRu + ' · ' + AG)}&dates=${gcalDate(mt.at)}/${gcalDate(mt.at + 3600e3)}&details=${encodeURIComponent((broker.name ? 'Эксперт: ' + broker.name + '. ' : '') + (mt.link ? 'Видеовстреча: ' + mt.link : ''))}`;
       const pf = pubFace(db);            /* палитра/шрифт/видео внешних страниц по теме агентства */
       const star2 = logo ? `<img src="${esc(logo)}" style="max-width:160px;max-height:60px;object-fit:contain">` : `<svg viewBox="0 0 100 120" style="width:30px;height:36px" aria-hidden="true"><path fill="none" stroke="${pf.ink}" stroke-width="3" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>`;
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      /* ===== СОСТОЯНИЕ ВСТРЕЧИ (ТЗ §6): страница меняется вместе со статусом ===== */
+      const _now = Date.now();
+      const _endAt = mt.at + (mt.dur || 60) * 60e3;
+      const stCanceled = mt.status === 'canceled' || mt.status === 'cancelled';
+      const stDone = !stCanceled && (mt.status === 'done' || _now > _endAt);
+      const stReschReq = !stCanceled && !stDone && !!mt.rescheduleRequested && (!mt.at || mt.rescheduleRequested > (mt._reschClearedAt || 0));
+      const needReconfirm = !stCanceled && !stDone && !!mt.wasRescheduled && !mt.clientConfirmed;   /* перенесена → просим подтвердить снова */
+      /* ===== БЛОКИ-ИСТОЧНИКИ (ТЗ §4/§5): пустые не показываем ===== */
+      const agenda = Array.isArray(mt.agenda) ? mt.agenda.filter(Boolean) : [];
+      const materials = Array.isArray(mt.materials) ? mt.materials.filter(x => x && x.url && /^https?:\/\//i.test(x.url)) : [];   /* только http(s) — защита от javascript:/ftp: в старых данных */
+      const coll = mt.collectionId ? (db.collections || []).find(c => c.id === mt.collectionId) : null;
+      const blocksHtml = [
+        agenda.length ? `<div class="mblk"><div class="mblk-t">План встречи</div><ul class="mplan">${agenda.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>` : '',
+        coll ? `<div class="mblk"><div class="mblk-t">Подборка объектов</div><a class="mlink" href="/p/${esc(coll.id)}" target="_blank"><span>${esc(coll.title || 'Ваша персональная подборка')}</span><span class="mlink-go">Открыть →</span></a></div>` : '',
+        materials.length ? `<div class="mblk"><div class="mblk-t">Материалы</div>${materials.map(x => `<a class="mlink" href="${esc(x.url)}" target="_blank" rel="noopener"><span>${esc(x.label || 'Открыть материал')}</span><span class="mlink-go">Открыть →</span></a>`).join('')}</div>` : '',
+        mt.instructions ? `<div class="mblk"><div class="mblk-t">Как подключиться</div><div class="mblk-b">${esc(mt.instructions)}</div></div>` : '',
+      ].filter(Boolean).join('');
+      /* вопрос перед встречей (ТЗ §4): показываем в активных состояниях, не в отменена/завершена */
+      const askHtml = (mt.preQuestion && !stCanceled && !stDone) ? (mt.clientQuestion
+        ? `<div class="mblk"><div class="mblk-t">Ваш вопрос к встрече</div><div class="mblk-b">${esc(mt.clientQuestion)}<br><span style="color:var(--muted);font-size:11.5px">Эксперт увидел его и подготовится.</span></div></div>`
+        : `<div class="mblk" id="askBlk"><div class="mblk-t">Что хотите обсудить?</div><textarea id="askTx" rows="3" placeholder="Например: интересует рассрочка и сроки сдачи" style="width:100%;border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13.5px;background:${pf.chip};color:var(--ink);resize:vertical"></textarea><button class="btn b-ghost" id="askBtn" style="margin-top:8px">Отправить эксперту</button></div>`) : '';
+      /* визитка брокера (ТЗ §4): расширенная, если есть описание */
+      const brokerHtml = broker.name ? `<div class="who">Ваш эксперт — <b>${esc(broker.name)}</b>${broker.title ? ' · ' + esc(broker.title) : ''}${mt.brokerBlurb ? `<div class="note">${esc(mt.brokerBlurb)}</div>` : ''}</div>` : (mt.brokerBlurb ? `<div class="who"><div class="note">${esc(mt.brokerBlurb)}</div></div>` : '');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${kindRu} · ${esc(AG)}</title>
+<meta name="robots" content="noindex,nofollow">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="${pf.gf}" rel="stylesheet">
 <style>
@@ -15033,50 +15088,79 @@ h1{font-family:${pf.display};font-size:36px;font-weight:${pf.dispW};line-height:
 .cal-row{display:flex;gap:10px;margin-top:12px}
 .cal-row a{flex:1;font-size:12px;padding:12px 8px}
 .foot{margin-top:22px;font-size:10.5px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.st-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.02em;padding:5px 11px;border-radius:999px;margin-bottom:14px}
+.st-chip.ok{background:rgba(22,163,74,.12);color:#15803d}
+.st-chip.wait{background:${pf.chip};color:var(--muted);border:1px solid var(--line)}
+.st-chip.warn{background:rgba(201,124,42,.14);color:#b45309}
+.st-chip.bad{background:rgba(190,60,60,.12);color:#b91c1c}
+.banner{background:${pf.chip};border:1px solid var(--line);border-radius:13px;padding:13px 15px;margin:4px 0 16px;font-size:13px;color:var(--ink);text-align:left;line-height:1.5}
+.banner b{font-weight:700}
+.mblk{text-align:left;margin:16px 0 0;padding-top:16px;border-top:1px solid var(--line)}
+.mblk-t{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;font-weight:700}
+.mblk-b{font-size:13.5px;color:var(--ink);line-height:1.55;white-space:pre-line}
+.mplan{list-style:none;margin:0;padding:0}
+.mplan li{position:relative;padding-left:20px;margin:7px 0;font-size:13.5px;color:var(--ink);line-height:1.45}
+.mplan li:before{content:'';position:absolute;left:3px;top:7px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.mlink{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin-top:8px;background:${pf.chip};border:1px solid var(--line);border-radius:12px;text-decoration:none;color:var(--ink);font-size:13.5px;font-weight:600;transition:border-color .15s}
+.mlink:hover{border-color:var(--ink)}
+.mlink-go{color:var(--muted);font-weight:600;font-size:12.5px;flex:none}
 @media(max-width:420px){.card{padding:32px 22px 26px}h1{font-size:31px}.cd div{width:66px}}
 </style></head><body>
 <video class="bgv" autoplay muted loop playsinline poster="${pf.poster}" src="${pf.video}"></video>
 <div class="scrim"></div>
 <div class="card">
   <div class="brand">${star2}${logo ? '' : `<span style="font-family:${pf.display};font-size:20px;font-weight:${pf.dispW}">${esc(AG)}</span>`}</div>
+  ${stCanceled ? `<span class="st-chip bad">Встреча отменена</span>`
+    : stDone ? `<span class="st-chip ok">Встреча завершена</span>`
+    : mt.clientConfirmed ? `<span class="st-chip ok">✓ Участие подтверждено</span>`
+    : `<span class="st-chip wait">Ожидает подтверждения</span>`}
   <div class="kind">${kindRu}</div>
-  <h1>${esc(lead.name ? lead.name.split(' ')[0] + ', ждём вас' : 'Ждём вас')}</h1>
-  <div class="when">${esc(when)}</div>
+  <h1>${esc(mt.greeting || (lead.name ? lead.name.split(' ')[0] + (stDone ? ', спасибо за встречу' : stCanceled ? ', встреча отменена' : ', ждём вас') : (stDone ? 'Спасибо за встречу' : 'Ждём вас')))}</h1>
+  ${stCanceled ? '' : `<div class="when">${esc(when)}</div>`}
   <div class="rule"></div>
+  ${stCanceled ? `<div class="banner">Эта встреча отменена. Если это недоразумение — просто напишите вашему эксперту, и мы подберём новое время.</div>`
+    : `
+  ${needReconfirm ? `<div class="banner">⏱ <b>Время встречи обновлено.</b> Пожалуйста, подтвердите, что новое время вам подходит.</div>` : ''}
+  ${stReschReq ? `<div class="banner">Запрос на перенос отправлен эксперту — он свяжется с вами и предложит новое время. Текущее время пока в силе.</div>` : ''}
   <div class="livebn" id="liveBn"><i></i>Встреча идёт прямо сейчас</div>
-  <div class="cd" id="cd"><div><b id="cdD">–</b><span>дней</span></div><div><b id="cdH">–</b><span>часов</span></div><div><b id="cdM">–</b><span>минут</span></div></div>
-  <div class="who">${broker.name ? 'Ваш эксперт — <b>' + esc(broker.name) + '</b>' : ''}${mt.note ? `<div class="note">${esc(mt.note)}</div>` : ''}</div>
-  ${mt.link && !mt.hideJoin ? `<a class="btn b-video" id="joinBtn" href="${esc(mt.link)}" target="_blank"><span class="ld"></span><span id="joinTx">Подключиться к видеовстрече</span></a>` : (mt.hideJoin ? `<div class="note" style="margin-top:12px">Ссылку на подключение эксперт пришлёт вам в переписке перед встречей.</div>` : '')}
-  <button class="btn b-ok ${mt.clientConfirmed ? 'done' : ''}" id="okBtn">${mt.clientConfirmed ? '✓ Вы подтвердили участие' : 'Подтвердить участие'}</button>
-  <button class="btn b-ghost" id="moveBtn">Попросить перенос</button>
+  ${stDone ? '' : `<div class="cd" id="cd"><div><b id="cdD">–</b><span>дней</span></div><div><b id="cdH">–</b><span>часов</span></div><div><b id="cdM">–</b><span>минут</span></div></div>`}
+  ${brokerHtml}
+  ${mt.link && !mt.hideJoin ? `<a class="btn b-video" id="joinBtn" href="${esc(mt.link)}" target="_blank"><span class="ld"></span><span id="joinTx">${stDone ? 'Открыть комнату встречи' : 'Подключиться к видеовстрече'}</span></a>` : (mt.hideJoin && !stDone ? `<div class="note" style="margin-top:12px">Ссылку на подключение эксперт пришлёт вам в переписке перед встречей.</div>` : '')}
+  ${stDone ? '' : `<button class="btn b-ok ${mt.clientConfirmed ? 'done' : ''}" id="okBtn">${mt.clientConfirmed ? '✓ Вы подтвердили участие' : 'Подтвердить участие'}</button>
+  <button class="btn b-ghost" id="moveBtn">${mt.rescheduleRequested ? 'Перенос запрошен' : 'Предложить другое время'}</button>`}
   <div class="cal-row">
     <a class="btn b-ghost" href="${gcal}" target="_blank">+ Google Календарь</a>
     <a class="btn b-ghost" href="/m/${mt.id}/ics">+ iPhone / Outlook</a>
-  </div>
+  </div>`}
+  ${stDone && mt.outcome ? `<div class="mblk"><div class="mblk-t">Итоги и следующие шаги</div><div class="mblk-b">${esc(mt.outcome)}</div></div>` : ''}
+  ${blocksHtml}
+  ${askHtml}
   <div class="foot">${esc(AG)}${broker.phone ? ' · ' + esc(broker.phone) : ''}</div>
 </div>
 <script>
-const AT=${mt.at},DUR=${mt.dur || 60};
+const AT=${mt.at},DUR=${mt.dur || 60},DONE=${stDone ? 'true' : 'false'},CANCELED=${stCanceled ? 'true' : 'false'};
 const cd=document.getElementById('cd'),liveBn=document.getElementById('liveBn'),jb=document.getElementById('joinBtn'),jt=document.getElementById('joinTx');
 const tick=()=>{
+  if(CANCELED)return;
   const now=Date.now(),d=AT-now,endAt=AT+DUR*6e4;
   /* окно «идёт»: за 5 мин до старта и до конца длительности → живое состояние + пульс на кнопке */
   const live=now>=AT-3e5&&now<=endAt;
   if(live){
-    cd.style.display='none';liveBn.style.display='flex';
+    if(cd)cd.style.display='none';if(liveBn)liveBn.style.display='flex';
     if(jb){jb.classList.add('live');if(jt)jt.textContent='Подключиться — встреча идёт';}
   }else if(now>endAt){
-    cd.style.display='none';liveBn.style.display='none';
+    if(cd)cd.style.display='none';if(liveBn)liveBn.style.display='none';
     if(jb){jb.classList.remove('live');if(jt)jt.textContent='Открыть комнату встречи';}
   }else{
-    liveBn.style.display='none';cd.style.display='';
+    if(liveBn)liveBn.style.display='none';if(cd)cd.style.display='';
     if(jb){jb.classList.remove('live');if(jt)jt.textContent='Подключиться к видеовстрече';}
-    const dd=Math.max(0,d);document.getElementById('cdD').textContent=Math.floor(dd/864e5);document.getElementById('cdH').textContent=Math.floor(dd%864e5/36e5);document.getElementById('cdM').textContent=Math.floor(dd%36e5/6e4);
+    const dd=Math.max(0,d);const eD=document.getElementById('cdD');if(eD){eD.textContent=Math.floor(dd/864e5);document.getElementById('cdH').textContent=Math.floor(dd%864e5/36e5);document.getElementById('cdM').textContent=Math.floor(dd%36e5/6e4);}
   }
 };
 tick();setInterval(tick,5000);
-document.getElementById('okBtn').addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/confirm',{method:'POST'});e.target.textContent='✓ Вы подтвердили участие';e.target.classList.add('done');});
-document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/reschedule',{method:'POST'});e.target.textContent='Передали менеджеру — свяжемся с вами';e.target.disabled=true;});
+var _ok=document.getElementById('okBtn');if(_ok)_ok.addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/confirm',{method:'POST'});e.target.textContent='✓ Вы подтвердили участие';e.target.classList.add('done');});
+var _mv=document.getElementById('moveBtn');if(_mv)_mv.addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/reschedule',{method:'POST'});e.target.textContent='Запрос отправлен — эксперт предложит время';e.target.disabled=true;});
+var _ab=document.getElementById('askBtn');if(_ab)_ab.addEventListener('click',async(e)=>{var t=(document.getElementById('askTx').value||'').trim();if(!t){document.getElementById('askTx').focus();return;}e.target.disabled=true;await fetch('/m/${mt.id}/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});document.getElementById('askBlk').innerHTML='<div class="mblk-t">Ваш вопрос к встрече</div><div class="mblk-b">'+t.replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})+'<br><span style="color:var(--muted);font-size:11.5px">Эксперт увидел его и подготовится.</span></div>';});
 </${'script'}></body></html>`);
       return;
     }
@@ -15093,12 +15177,34 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
     if ((m = p.match(/^\/m\/(mt_[\w]+)\/reschedule$/)) && req.method === 'POST') {
       const mt = (db.meetings || []).find(x => x.id === m[1]);
       if (mt) {
+        /* ТЗ §6: запрос переноса НЕ меняет время сам — помечаем встречу «запрошен перенос», брокер согласует слот.
+           Прежнее время остаётся действующим до согласования; статус встречи как таковой не рушим. */
+        mt.rescheduleRequested = Date.now();
         const lead = db.leads.find(l => l.id === mt.leadId);
         if (lead) {
           lead.tags = [...new Set([...(lead.tags || []), 'нужен человек'])];
           ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `⚠️ ${lead.name} просит перенести встречу — свяжитесь и предложите слоты` });
         }
         store.save();
+      }
+      return json(res, 200, { ok: true });
+    }
+    /* ТЗ §4: «вопрос перед встречей» — клиент пишет, что хочет обсудить; падает событием в карточку лида */
+    if ((m = p.match(/^\/m\/(mt_[\w]+)\/ask$/)) && req.method === 'POST') {
+      if (!rateHit('mask:' + (clientIp(req) || 'x'), 10, 60000)) { res.writeHead(429); res.end('too many'); return; }
+      const mt = (db.meetings || []).find(x => x.id === m[1]);
+      if (mt) {
+        const b = await readBody(req);
+        const q = String((b && b.text) || '').slice(0, 1000).trim();
+        if (q) {
+          mt.clientQuestion = q;
+          const lead = db.leads.find(l => l.id === mt.leadId);
+          if (lead) {
+            lead.tags = [...new Set([...(lead.tags || []), 'нужен человек'])];
+            ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `💬 ${lead.name} оставил вопрос к встрече: «${q.slice(0, 160)}»` });
+          }
+          store.save();
+        }
       }
       return json(res, 200, { ok: true });
     }

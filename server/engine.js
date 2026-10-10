@@ -585,7 +585,7 @@ function tickChains(db) {
           const agencyName = (db.settings.agency && db.settings.agency.name) || 'агентство';
           (async () => {
             try {
-              const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { email: isEmail });
+              const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { email: isEmail, lang: seq.lang || undefined });
               /* ⚠️ пустой message (успех LLM, но пусто) — НЕ оставляем '' (иначе бесконечная регенерация, касание не уйдёт никогда): запасной текст */
               lead.ai[ck] = (out && out.message) ? out.message : fillVars(db, lead, step.text || '{name}, здравствуйте! Вы оставляли заявку по креативу выше — подобрать актуальные варианты под ваш запрос?');
               if (isEmail && out && out.subject) lead.ai._ptEmailSubj = out.subject;
@@ -655,7 +655,7 @@ function tickChains(db) {
           const styleSamples = ((db.touchStyles && (db.touchStyles[lead.broker] || db.touchStyles.owner)) || []).map(x => x.text).filter(Boolean);
           const agencyName = (db.settings.agency && db.settings.agency.name) || 'агентство';
           (async () => {
-            try { const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { email: true });
+            try { const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { email: true, lang: seq.lang || undefined });
               send(db, lead, (out && out.message) || '', 'chain', { channel: 'email', subject: (out && out.subject) || 'По вашей заявке' });
             } catch (e) { /* основной канал уже коснулся — молча */ }
           })();
