@@ -221,3 +221,14 @@
 .lp-preset-terracotta .lp-hero-foot .lp-metric-ic, .lp-preset-terracotta .lp-hero-panel .lp-metric-ic{ color:#FFF9F2; }
 .lp-preset-terracotta .lp-hero-land .lp-hero-price, .lp-preset-terracotta .lp-hero-foot .lp-hero-price{ color:#FFF9F2; }
 .lp-preset-terracotta.lp-fam-broker{ background:#A6533D; --text:#FFF9F2; --muted:rgba(255,249,242,.8); --accent:#FFF9F2; --line:rgba(255,249,242,.3); --surface:#B5634D; }
+/* Terracotta split-обложка: панель 42% (терракота) + фото 58% */
+.lp-hero-split{ position:absolute; inset:0; z-index:2; display:grid; grid-template-columns:42% 58%; }
+.lp-hero-split-txt{ background:#A6533D; color:#FFF9F2; padding:52px 44px; display:flex; flex-direction:column; justify-content:center; }
+.lp-hero-split-txt .lp-h1{ color:#FFF9F2; margin-top:.15em; } .lp-hero-split-txt .lp-brandmark{ color:#FFF9F2; position:absolute; top:52px; left:44px; margin:0; }
+.lp-hero-split{ position:absolute; } .lp-hero-split-txt{ position:relative; }
+.lp-hero-split-txt .lp-eyebrow{ color:rgba(255,249,242,.82); }
+.lp-hero-split-txt .lp-hero-sub{ color:rgba(255,249,242,.92); text-shadow:none; margin-top:.7em; }
+.lp-hero-split-txt .lp-hero-price{ color:#FFF9F2; margin-top:22px; }
+.lp-hero-split-metrics{ display:flex; flex-wrap:wrap; gap:20px 28px; margin-top:26px; }
+.lp-hero-split-txt .lp-metric-ic{ color:#FFF9F2; } .lp-hero-split-txt .lp-metric-tx span{ color:rgba(255,249,242,.78); }
+.lp-hero-split-photo{ background:var(--surface) center/cover no-repeat; }

@@ -184,6 +184,19 @@
     const mgrid = metrics.length ? `<div class="lp-hero-metrics">${metrics.map(metricCell).join('')}</div>` : '';
     const brandMark = brand.logoText ? `<div class="lp-brandmark">${esc(brand.logoText)}</div>` : '';
 
+    /* Terracotta Atelier — split-обложка: цветная текстовая панель ~42% + фото ~58% (ТЗ §5) */
+    if (ctx.theme && ctx.theme.presetId === 'terracotta' && fmt.orient === 'portrait') {
+      return [`
+        <div class="lp-hero-split">
+          <div class="lp-hero-split-txt">
+            ${brandMark}${loc}${title}${sub}
+            ${metrics.length ? `<div class="lp-hero-split-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}
+            ${price}
+          </div>
+          <div class="lp-hero-split-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
+        </div>`];
+    }
+
     if (fmt.orient === 'landscape') {
       // photo full-bleed, title block on a soft panel to the left (TZ §10 hero horizontal)
       return [`
