@@ -246,12 +246,13 @@ function draftCollection(db, properties, broker, opts) {
       contentBindings: { eyebrow: ov('Рекомендация'), title: ov('Рекомендация брокера'), body: ov(opts.recommendationText || ''), author: ov(opts.recommendationAuthor || (broker && broker.name) || '') },
     });
   }
+  const presetTh = opts.presetId ? TOK.presetTheme(opts.presetId) : null;
   return {
     id: 'pres_' + hex(5), kind: 'collection', schemaVersion: SCHEMA_VERSION, tenantId: store_currentTid(),
     brokerId: broker ? broker.id : null, clientId: opts.clientId || null,
     projectId: null, projectIds: props.map(p => p.id), title: opts.title || 'Подборка объектов',
     locale: 'ru-RU', draftRevision: 1, sourceRevision: 'crm',
-    theme: { paletteId: opts.paletteId || defaultPalette(first.geo), fontPairId: 'editorial' },
+    theme: presetTh || { paletteId: opts.paletteId || defaultPalette(first.geo), fontPairId: 'editorial' },
     defaultFormat: opts.format || 'portrait_a4', status: 'draft',
     orderedSections: sections, collectionAssets: assets,
     brokerAppendix: { enabled: !!(broker && broker.name), profileId: broker ? broker.id : null, pageTypes: ['broker_intro', 'broker_contacts'] },

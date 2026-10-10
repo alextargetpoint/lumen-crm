@@ -16556,7 +16556,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         const broker = (db.brokers || []).find(x => x.id === brokerId) || null;
         const pres = presentation.draftCollection(db, props, broker, {
           title: b.title, clientId: b.clientId || b.leadId || null, clientName: b.clientName,
-          greeting: b.greeting, format: b.format, paletteId: b.paletteId,
+          greeting: b.greeting, format: b.format, paletteId: b.paletteId, presetId: b.presetId,
           comparison: b.comparison !== false && props.length >= 2, recommendation: !!b.recommendation,
           recommendationText: b.recommendationText, recommendationAuthor: b.recommendationAuthor,
         });
@@ -16592,6 +16592,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         if (b.expectedRevision != null && +b.expectedRevision !== (pres.draftRevision || 1))
           return json(res, 409, { error: 'VERSION_CONFLICT', currentRevision: pres.draftRevision });
         const ch = b.changes || b.patch || {};
+        if (ch.presetId) { const t = presentation.TOK.presetTheme(ch.presetId); if (t) pres.theme = t; }   /* смена пресета = палитра+шрифт+presetId (контент не трогаем) */
         if (ch.theme && typeof ch.theme === 'object') {
           if (ch.theme.paletteId && TOK_has('palette', ch.theme.paletteId)) pres.theme.paletteId = ch.theme.paletteId;
           if (ch.theme.fontPairId && TOK_has('fontPair', ch.theme.fontPairId)) pres.theme.fontPairId = ch.theme.fontPairId;
