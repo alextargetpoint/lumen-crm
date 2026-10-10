@@ -914,9 +914,15 @@ async function composeChainStep(db, lead, step, agencyName, position, styleSampl
   const adName = ads.adName || '';
   const hideNames = ((((db.settings || {}).ai || {}).training || {}).hideNames) !== false;   /* по умолчанию скрываем название проекта/застройщика до созвона */
   const adRec = ads.adId ? (db.ads || []).find(a => String(a.adId) === String(ads.adId)) : null;
-  const adPoints = (adRec && Array.isArray(adRec.points) && adRec.points.length) ? adRec.points : (Array.isArray(ads.points) ? ads.points : []);
-  const adTranscript = (adRec && adRec.transcript && !/^\(без речи\)?$/i.test(adRec.transcript.trim())) ? String(adRec.transcript).slice(0, 2500) : '';
-  const adNotes = (adRec && adRec.notes) ? String(adRec.notes).slice(0, 1500) : '';
+  /* если на шаге ЗАКРЕПЛЁН конкретный креатив (конструктор цепочки, «Один на всех» из дерева) — понимание проекта
+     берём ИМЕННО с него (его сильные тезисы/транскрипт/заметки), а не с объявления матч-лида. */
+  const pinned = (step && step.creative && (step.creative.adId || (Array.isArray(step.creative.points) && step.creative.points.length))) ? step.creative : null;
+  const pinnedRec = (pinned && pinned.adId) ? (db.ads || []).find(a => String(a.adId) === String(pinned.adId)) : null;
+  const srcRec = pinnedRec || adRec;
+  const adPoints = (pinned && Array.isArray(pinned.points) && pinned.points.length) ? pinned.points
+    : (srcRec && Array.isArray(srcRec.points) && srcRec.points.length) ? srcRec.points : (Array.isArray(ads.points) ? ads.points : []);
+  const adTranscript = (srcRec && srcRec.transcript && !/^\(без речи\)?$/i.test(srcRec.transcript.trim())) ? String(srcRec.transcript).slice(0, 2500) : '';
+  const adNotes = (srcRec && srcRec.notes) ? String(srcRec.notes).slice(0, 1500) : '';
   const LANG = { ru: 'русском', en: 'английском', es: 'испанском', ar: 'арабском', id: 'индонезийском', de: 'немецком', fr: 'французском', it: 'итальянском', tr: 'турецком', pt: 'португальском' }[(langOverride || lead.lang)] || 'русском';   /* язык цепочки перекрывает язык лида */
   const qualLines = [];
   const AXN = { purpose: 'цель', timeline: 'срок', budget: 'бюджет', type: 'тип объекта' };

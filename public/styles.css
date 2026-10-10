@@ -500,7 +500,9 @@ textarea { resize: vertical; min-height: 70px; }
 .crp-card { border: 1px solid var(--stroke); border-radius: 11px; background: var(--card); cursor: pointer; overflow: hidden; padding: 0; display: flex; flex-direction: column; text-align: left; }
 .crp-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
 .crp-th { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--bg-2); }
-.crp-nm { font-size: 11px; color: var(--ink-2); padding: 7px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crp-nm { font-size: 11px; color: var(--ink-2); padding: 7px 9px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crp-pts { font-size: 10px; font-weight: 600; color: var(--accent); padding: 0 9px 7px; display: inline-flex; align-items: center; gap: 3px; }
+.crp-pts svg { width: 11px; height: 11px; }
 .mini-badge.ok { color: var(--ok); background: var(--ok-bg); }
 
 /* ---------- инбокс ---------- */

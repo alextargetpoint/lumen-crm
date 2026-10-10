@@ -7739,7 +7739,7 @@ PAGES.sequences = async (root) => {
               <button type="button" class="btn btn-sm btn-accent" id="seCreaUpload">${ic(needType === 'pdf' ? I.doc : needType === 'video' ? I.play : I.image)}${upLabel}</button>
               ${needType !== 'pdf' ? `<button type="button" class="btn btn-sm" id="seCreaLib">${ic(I.layers)}Из дерева креативов</button>` : ''}
               <input type="file" id="seCreaFile" accept="${acceptBy}" style="display:none">
-              <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или ссылка на файл" class="se2-grow">
+              <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" data-craadid="${esc((st.creative && st.creative.adId) || '')}" data-crapoints="${esc(JSON.stringify((st.creative && st.creative.points) || []))}" placeholder="или ссылка на файл" class="se2-grow">
             </div>
             <div class="se2-mut" style="margin-top:4px">${ic(I.spark)} Этот шаг отправит именно ${esc(need)} (один файл на всех лидов).${needType === 'image' ? ' Фото авто-сжимается.' : needType === 'video' ? ' Видео до 12 МБ.' : ''}</div>
           </div>` : `
@@ -7754,10 +7754,11 @@ PAGES.sequences = async (root) => {
               <button type="button" class="btn btn-sm" id="seCreaUpload">${ic(I.image)}Загрузить фото/видео</button>
               <button type="button" class="btn btn-sm" id="seCreaLib">${ic(I.layers)}Из дерева креативов</button>
               <input type="file" id="seCreaFile" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" style="display:none">
-              <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или вставьте ссылку .mp4 / .jpg" class="se2-grow">
+              <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" data-craadid="${esc((st.creative && st.creative.adId) || '')}" data-crapoints="${esc(JSON.stringify((st.creative && st.creative.points) || []))}" placeholder="или вставьте ссылку .mp4 / .jpg" class="se2-grow">
             </div>
             <div class="se2-mut" style="margin-top:4px">${ic(I.spark)} Фото авто-сжимается перед загрузкой (как в дереве креативов). Видео — до 12 МБ.</div>
           </div>`}
+          <div class="se2-crea-points muted" data-se-crea-points style="margin-top:7px;font-size:11px;line-height:1.5"></div>
         </div>
         <div class="se2-foot">
           <button class="btn btn-accent btn-sm" data-sesave="${i}">${ic(I.check)}Готово</button>
@@ -8196,16 +8197,28 @@ PAGES.sequences = async (root) => {
       if (st.mode === 'creative') {
         const needStep = !!st._need;
         const fixed = needStep || eb.querySelector('[data-creamode="fixed"]')?.checked;
-        const crUrl = (eb.querySelector('#seCreaUrl').value || '').trim();
+        const _cEl = eb.querySelector('#seCreaUrl');
+        const crUrl = (_cEl.value || '').trim();
         const typ = st._needType || (/\.pdf(\?|$)/i.test(crUrl) ? 'pdf' : /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image');
-        st.creative = (fixed && crUrl) ? { url: crUrl.slice(0, 500), type: typ, name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : { auto: true };
+        let _pts = []; try { _pts = JSON.parse(_cEl.dataset.crapoints || '[]'); } catch (_) {}
+        /* сохраняем вместе с медиа «понимание» закреплённого креатива (adId + сильные тезисы) —
+           чтобы «Собрать через ИИ» строил касание из тезисов ИМЕННО этого креатива */
+        st.creative = (fixed && crUrl) ? { url: crUrl.slice(0, 500), type: typ, name: (_cEl.dataset.craname || '').slice(0, 120), adId: _cEl.dataset.craadid || '', points: Array.isArray(_pts) ? _pts.slice(0, 6).map(x => String(x).slice(0, 160)) : [] } : { auto: true };
       } else st.creative = null;
       PAGE_STATE.seqEdit = null;
       await save(); render();
     });
     /* креатив: радио авто/фикс + загрузка файла (авто-сжатие фото) + из дерева + ссылка */
     const seCreaUrl = eb.querySelector('#seCreaUrl'), seCreaPrev = eb.querySelector('#seCreaPrev'), seFixed = eb.querySelector('[data-se-fixed]');
-    const setCrea = (cr) => { if (!seCreaUrl) return; seCreaUrl.value = cr ? cr.url : ''; seCreaUrl.dataset.craname = cr ? (cr.name || '') : ''; if (seCreaPrev) seCreaPrev.innerHTML = cr ? creaThumb(cr) : '<span class="muted" style="font-size:11px">файл не выбран</span>'; };
+    /* подсказка: сколько сильных тезисов привязано к закреплённому креативу (их использует «Собрать через ИИ») */
+    const updateCreaPointsHint = () => {
+      const el = eb.querySelector('[data-se-crea-points]'); if (!el) return;
+      let pts = []; try { pts = JSON.parse((seCreaUrl && seCreaUrl.dataset.crapoints) || '[]'); } catch (_) {}
+      el.innerHTML = (Array.isArray(pts) && pts.length)
+        ? `${ic(I.spark)} К этому креативу привязано <b>${pts.length}</b> ${plural(pts.length, 'сильный тезис', 'сильных тезиса', 'сильных тезисов')} проекта — кнопка «Собрать через ИИ» построит первое касание из них.`
+        : '';
+    };
+    const setCrea = (cr) => { if (!seCreaUrl) return; seCreaUrl.value = cr ? cr.url : ''; seCreaUrl.dataset.craname = cr ? (cr.name || '') : ''; seCreaUrl.dataset.craadid = (cr && cr.adId) ? cr.adId : ''; seCreaUrl.dataset.crapoints = (cr && Array.isArray(cr.points) && cr.points.length) ? JSON.stringify(cr.points) : ''; if (seCreaPrev) seCreaPrev.innerHTML = cr ? creaThumb(cr) : '<span class="muted" style="font-size:11px">файл не выбран</span>'; updateCreaPointsHint(); };
     $$('[data-creamode]', eb).forEach(r => r.addEventListener('change', () => {
       const fixed = eb.querySelector('[data-creamode="fixed"]')?.checked;
       $$('.se2-radio', eb).forEach(l => l.classList.toggle('on', l.contains(l.querySelector(':checked'))));
@@ -8226,7 +8239,8 @@ PAGES.sequences = async (root) => {
       } catch (e2) { toast('Не загрузилось', e2.message); }
       finally { btn.disabled = false; btn.innerHTML = orig; }
     });
-    seCreaUrl && seCreaUrl.addEventListener('input', () => { const u = seCreaUrl.value.trim(); if (seCreaPrev) seCreaPrev.innerHTML = u ? creaThumb({ url: u }) : '<span class="muted" style="font-size:11px">файл не выбран</span>'; });
+    seCreaUrl && seCreaUrl.addEventListener('input', () => { const u = seCreaUrl.value.trim(); seCreaUrl.dataset.craadid = ''; seCreaUrl.dataset.crapoints = ''; updateCreaPointsHint(); if (seCreaPrev) seCreaPrev.innerHTML = u ? creaThumb({ url: u }) : '<span class="muted" style="font-size:11px">файл не выбран</span>'; });
+    updateCreaPointsHint();   /* показать тезисы уже закреплённого креатива при открытии редактора */
     eb.querySelector('[data-secancel]').addEventListener('click', () => { PAGE_STATE.seqEdit = null; render(); });
     eb.querySelector('[data-sedel]').addEventListener('click', async (e) => {
       seq.steps.splice(+e.currentTarget.dataset.sedel, 1);
@@ -12678,12 +12692,12 @@ async function openCreativePicker(onPick) {
   let ads = [];
   try { const d = await api.get('/ads'); ads = d.ads || []; } catch (_) {}
   const byName = {};
-  for (const a of ads) { const n = a.name || a.adId; if (a.media && a.media.url && !byName[n]) byName[n] = { name: n, url: a.media.url, type: a.media.type || (/\.(mp4|webm|mov)(\?|$)/i.test(a.media.url) ? 'video' : 'image') }; }
+  for (const a of ads) { const n = a.name || a.adId; if (a.media && a.media.url && !byName[n]) byName[n] = { name: n, url: a.media.url, type: a.media.type || (/\.(mp4|webm|mov)(\?|$)/i.test(a.media.url) ? 'video' : 'image'), adId: a.adId || '', points: Array.isArray(a.points) ? a.points.slice(0, 6) : [] }; }
   const items = Object.values(byName);
   const box = $('#crpBox', bd); if (!box) return;
   box.classList.remove('muted'); box.style.padding = '0';
   if (!items.length) { box.innerHTML = '<div class="empty" style="padding:26px;text-align:center">В дереве креативов ещё нет загруженных медиа.<br><span class="muted" style="font-size:11px">Загрузите видео/картинки в «Аналитика рекламы → Креативы».</span></div>'; return; }
-  box.innerHTML = `<div class="crp-grid">${items.map((c, i) => `<button type="button" class="crp-card" data-crp="${i}">${c.type === 'video' ? `<video src="${esc(c.url)}" muted class="crp-th"></video>` : `<img src="${esc(c.url)}" class="crp-th">`}<span class="crp-nm">${esc(c.name)}</span></button>`).join('')}</div>`;
+  box.innerHTML = `<div class="crp-grid">${items.map((c, i) => `<button type="button" class="crp-card" data-crp="${i}">${c.type === 'video' ? `<video src="${esc(c.url)}" muted class="crp-th"></video>` : `<img src="${esc(c.url)}" class="crp-th">`}<span class="crp-nm">${esc(c.name)}</span>${(c.points && c.points.length) ? `<span class="crp-pts">${ic(I.spark)}${c.points.length} ${plural(c.points.length, 'тезис', 'тезиса', 'тезисов')}</span>` : ''}</button>`).join('')}</div>`;
   $$('[data-crp]', bd).forEach(b => b.addEventListener('click', () => { const c = items[+b.dataset.crp]; if (typeof closeModal === 'function') closeModal(); if (onPick) onPick(c); }));
 }
 
