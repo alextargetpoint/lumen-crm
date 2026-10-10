@@ -254,6 +254,11 @@
 .lp-preset-graphite .lp-grid2 .lp-metric-tx b{ font-size:1.5em; }
 /* Terracotta — колонки с вертикальными разделителями (§5) */
 .lp-preset-terracotta .lp-grid2 .lp-metric{ padding-left:16px; border-left:1px solid var(--line); }
+
+/* === пресет-оплата: прямоугольные номера этапов (ТЗ «Углы прямые» §3/§4/§5) === */
+.lp-preset-gallerywhite .lp-pay-n{ border-radius:0; background:transparent; border:1px solid var(--line); color:var(--text); }
+.lp-preset-graphite .lp-pay-n{ border-radius:0; background:var(--accent); color:var(--on-accent); }
+.lp-preset-terracotta .lp-pay-n{ border-radius:0; background:var(--surface); color:var(--accent); }
 .lp-preset-terracotta .lp-hero-foot, .lp-preset-terracotta .lp-hero-panel{ background:rgba(166,83,61,.93); color:#FFF9F2; }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-tx span, .lp-preset-terracotta .lp-hero-panel .lp-metric-tx span{ color:rgba(255,249,242,.8); }
 .lp-preset-terracotta .lp-hero-foot .lp-metric-ic, .lp-preset-terracotta .lp-hero-panel .lp-metric-ic{ color:#FFF9F2; }
