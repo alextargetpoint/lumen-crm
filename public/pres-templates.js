@@ -436,6 +436,42 @@
 
   /* ---------------- public API ---------------- */
   // render ONE logical section to its physical page(s)
+  // ---- COMPARISON (мульти-объект, TZ v3 §11) ----
+  F.comparison = (ctx) => {
+    const { c, fmt } = ctx;
+    const crit = Array.isArray(c.criteria) ? c.criteria : [];
+    const objs = Array.isArray(c.objects) ? c.objects : [];
+    const per = fmt.orient === 'portrait' ? 3 : 4;        // §11: 2–3 объекта на страницу, критерии повторяются
+    const chunks = [];
+    for (let i = 0; i < objs.length; i += per) chunks.push(objs.slice(i, i + per));
+    if (!chunks.length) chunks.push([]);
+    const bd = 'border-bottom:1px solid rgba(128,128,128,.28)';
+    return chunks.map((grp, pi) => {
+      const head = `<tr><th style="text-align:left;padding:9px 12px;${bd};width:28%"></th>${grp.map(o => `<th style="text-align:left;padding:9px 12px;${bd};font-weight:600">${esc(o.name)}</th>`).join('')}</tr>`;
+      const rows = crit.map(cr => `<tr><td style="padding:9px 12px;${bd};font-weight:600;opacity:.72">${esc(cr.label)}</td>${grp.map(o => {
+        const v = o.values ? o.values[cr.key] : null;
+        return `<td style="padding:9px 12px;${bd}">${v == null || v === '' ? '<span style="opacity:.45">Не указано</span>' : esc(v)}</td>`;
+      }).join('')}</tr>`).join('');
+      return `<div class="lp-safe lp-cmp">
+        ${eyebrow(c.eyebrow || 'Сравнение')}
+        <h2 class="lp-h2">${nl2br(c.title || 'Сравнение объектов')}${chunks.length > 1 ? ` <span style="opacity:.5;font-size:.6em;font-weight:500">${pi + 1}/${chunks.length}</span>` : ''}</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:14px"><thead>${head}</thead><tbody>${rows}</tbody></table>
+      </div>`;
+    });
+  };
+
+  // ---- RECOMMENDATION (подписанная рекомендация брокера, TZ v3 §11) ----
+  F.recommendation = (ctx) => {
+    const { c } = ctx;
+    const body = nl2br(c.body || c.summary || '');
+    const author = c.author ? `<div style="margin-top:20px;font-weight:600;opacity:.8">— ${esc(c.author)}</div>` : '';
+    return [`<div class="lp-safe lp-rec">
+      ${eyebrow(c.eyebrow || 'Рекомендация')}
+      <h2 class="lp-h2">${nl2br(c.title || 'Рекомендация брокера')}</h2>
+      <div class="lp-body" style="max-width:62ch">${body || '<span style="opacity:.4">Здесь брокер добавит персональную рекомендацию.</span>'}</div>${author}
+    </div>`];
+  };
+
   function renderSection(section, ctx0) {
     const fmt = TOK.format(ctx0.format || (ctx0.fmt && ctx0.fmt.id));
     const theme = ctx0.theme || {};

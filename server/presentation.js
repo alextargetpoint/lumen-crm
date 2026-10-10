@@ -166,6 +166,33 @@ function draftFromProperty(db, pr, broker) {
     updatedAt: Date.now(), updatedBy: null,
   };
 }
+/* сравнение объектов по критериям (ТЗ v3 §11): единицы/валюта явно, «Не указано» вместо 0/выдумки */
+function buildComparison(db, props) {
+  const criteria = [
+    { key: 'location', label: 'Локация' }, { key: 'type', label: 'Тип' },
+    { key: 'price', label: 'Цена от' }, { key: 'area', label: 'Площадь' },
+    { key: 'beds', label: 'Спальни' }, { key: 'handover', label: 'Срок сдачи' },
+  ];
+  const objects = (props || []).map(pr => {
+    const gi = geoInfo(pr.geo);
+    const currency = pr.currency || gi.currency;
+    const areas = (pr.units || []).map(u => +u.area).filter(Boolean);
+    const areaRange = areas.length ? { from: Math.min(...areas), to: Math.max(...areas), unit: 'm2' } : null;
+    return {
+      name: pr.name || 'Объект',
+      values: {
+        location: (pr.district && pr.district.name) || gi.region || null,
+        type: pr.type || null,
+        price: pr.priceFrom ? T.fmtPrice({ kind: 'from', amount: pr.priceFrom, currency }) : null,
+        area: areaRange ? T.fmtArea(areaRange) : null,
+        beds: pr.beds != null ? bedsLabel(pr.beds) : null,
+        handover: pr.handover || null,
+      },
+    };
+  });
+  return { criteria, objects };
+}
+
 /* ---------- ADAPTER: несколько объектов → мульти-объектная подборка (ТЗ v3 §9,§10) ----------
    Переиспользует draftFromProperty для каждого объекта; ассеты неймспейсятся o{k}_ и
    собираются в collectionAssets (одна мердж-карта). Структура §10: Вступление → Объект₁..ₙ →
@@ -204,6 +231,21 @@ function draftCollection(db, properties, broker, opts) {
       }));
     });
   });
+  // Сравнение (явно, при ≥2 объектах — §10/§11)
+  if (opts.comparison && props.length >= 2) {
+    const cmp = buildComparison(db, props);
+    sections.push({
+      id: sid(), family: 'comparison', enabled: true,
+      contentBindings: { eyebrow: ov('Сравнение'), title: ov('Сравнение объектов'), criteria: ov(cmp.criteria), objects: ov(cmp.objects) },
+    });
+  }
+  // Рекомендация брокера (подписанная, §11) — опционально
+  if (opts.recommendation) {
+    sections.push({
+      id: sid(), family: 'recommendation', enabled: true,
+      contentBindings: { eyebrow: ov('Рекомендация'), title: ov('Рекомендация брокера'), body: ov(opts.recommendationText || ''), author: ov(opts.recommendationAuthor || (broker && broker.name) || '') },
+    });
+  }
   return {
     id: 'pres_' + hex(5), kind: 'collection', schemaVersion: SCHEMA_VERSION, tenantId: store_currentTid(),
     brokerId: broker ? broker.id : null, clientId: opts.clientId || null,
