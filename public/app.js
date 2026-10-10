@@ -10386,7 +10386,11 @@ PAGES.automations = async (root) => {
 
 /* ---------------- ПЛЕЙБУК ПРОДАЖ ---------------- */
 PAGES.playbook = async (root) => {
-  const pb = await api.get('/playbook');
+  const _pbr = await api.get('/playbook');
+  const pb = Array.isArray(_pbr) ? _pbr : (_pbr.plays || []);
+  const pbCustom = !Array.isArray(_pbr) && !!_pbr.custom;
+  const pbOwner = !STATE.me || STATE.me.role === 'owner' || STATE.me.role === 'master';
+  const savePb = async (plays) => { const r = await api.post('/playbook', { plays }); return r; };
   const cats = [
     ['first', 'Первое касание', I.bolt, 'Скорость, канал, якорь на объявление'],
     ['followup', 'Фоллоу-апы', I.chain, 'Дожимы, которые не бесят'],
@@ -10401,7 +10405,7 @@ PAGES.playbook = async (root) => {
   const items = pb.filter(x => x.cat === cur);
   root.innerHTML = `
     ${heroArt('assets/art/book.png', `
-      <div class="ha-title">${ic(I.doc)}Плейбук продаж<span class="sub">${pb.length} приёмов · Дубай и США · вшит в промпт ИИ</span></div>
+      <div class="ha-title">${ic(I.doc)}Плейбук продаж<span class="sub">${pb.length} приёмов · ${pbCustom ? 'ваша редакция' : 'редактируется вами'} · вшит в промпт ИИ</span></div>
       <div class="ha-chips">${cats.map(([k, name]) => `<span class="ha-chip" data-ha data-pbgo="${k}" style="cursor:pointer">${name} <b>${pb.filter(x => x.cat === k).length}</b></span>`).join('')}</div>
       <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">ИИ применяет эти приёмы сам — в диалогах и в подсказке «что делать дальше» в карточке лида</span></div>
     `, { v: 'right', hue: '#B87E4B' })}
@@ -10416,23 +10420,41 @@ PAGES.playbook = async (root) => {
         <div class="pb-tipbox">${ic(I.spark)}Приёмы этой вкладки ИИ уже применяет сам в диалогах и в подсказке карточки лида.</div>
       </div>
       <div class="pb-main">
-        <div class="pb-main-hd">${ic((cats.find(c => c[0] === cur) || [])[2])}<b>${(cats.find(c => c[0] === cur) || [])[1]}</b><span>${items.length} приёмов</span></div>
+        <div class="pb-main-hd">${ic((cats.find(c => c[0] === cur) || [])[2])}<b>${(cats.find(c => c[0] === cur) || [])[1]}</b><span>${items.length} приёмов</span>${pbOwner ? `<span class="tb-spacer"></span>${pbCustom ? `<button class="btn btn-sm" data-pbreset title="Вернуть стандартные приёмы агентства">${ic(I.refresh || I.spark)}Сбросить</button>` : ''}<button class="btn btn-sm btn-accent" data-pbadd>${ic(I.plus)}Приём</button>` : ''}</div>
         ${items.map((x, i) => `<div class="pb-acc ${i === 0 ? 'open' : ''}" data-acc>
-          <button class="pb-acc-hd">
+          <div class="pb-acc-hd">
             <span class="pb-num">${String(i + 1).padStart(2, '0')}</span>
-            <span class="pb-acc-t">${esc(x.title)}</span>
-            <span class="chev">${ic(I.chev, 2)}</span>
-          </button>
+            <span class="pb-acc-t" data-acctoggle>${esc(x.title)}</span>
+            ${pbOwner ? `<span class="pb-ed" data-pbedit="${esc(x.id)}" title="Изменить">${ic(I.pencil || I.doc)}</span><span class="pb-ed" data-pbdel="${esc(x.id)}" title="Удалить">${ic(I.x)}</span>` : ''}
+            <span class="chev" data-acctoggle>${ic(I.chev, 2)}</span>
+          </div>
           <div class="pb-acc-body"><div class="pb-acc-inner">
             <div class="pb-b">${esc(x.body)}</div>
-            <div class="pb-tip">${ic(I.spark)}${esc(x.tip)}</div>
+            ${x.tip ? `<div class="pb-tip">${ic(I.spark)}${esc(x.tip)}</div>` : ''}
           </div></div>
         </div>`).join('')}
       </div>
     </div>`;
   $$('.pb-cat', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.pbCat = b.dataset.cat; render(); }));
   $$('[data-pbgo]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.pbCat = b.dataset.pbgo; render(); }));
-  $$('.pb-acc-hd', root).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  $$('[data-acctoggle]', root).forEach(h => h.addEventListener('click', () => h.closest('.pb-acc').classList.toggle('open')));
+  /* правка базы знаний (владелец): добавить / изменить / удалить приём, сбросить к стандартным */
+  const pbUpsert = (play) => { const i = pb.findIndex(x => x.id === play.id); if (i >= 0) pb[i] = play; else pb.push(play); };
+  const pbSaveRender = async () => { try { await savePb(pb); toast('База знаний сохранена', 'ИИ будет применять ваши приёмы', true); render(); } catch (e) { toast('Не вышло', e.message); } };
+  const pbEditModal = (play) => {
+    const isNew = !play;
+    const p = play || { id: 'pb_c' + Date.now().toString(36), cat: cur, title: '', body: '', tip: '' };
+    modal({ title: isNew ? 'Новый приём' : 'Изменить приём', wide: true, body: `
+      <div class="form-row"><label>Категория</label><select id="pbCat">${cats.map(c => `<option value="${c[0]}" ${p.cat === c[0] ? 'selected' : ''}>${c[1]}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Заголовок</label><input id="pbTitle" value="${esc(p.title)}" maxlength="160"></div>
+      <div class="form-row"><label>Суть приёма</label><textarea id="pbBody" rows="5" maxlength="1200">${esc(p.body)}</textarea></div>
+      <div class="form-row"><label>Подсказка (необязательно)</label><textarea id="pbTip" rows="2" maxlength="400">${esc(p.tip)}</textarea></div>`,
+      actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => { const np = { id: p.id, cat: $('#pbCat', bd).value, title: $('#pbTitle', bd).value.trim(), body: $('#pbBody', bd).value.trim(), tip: $('#pbTip', bd).value.trim() }; if (!np.title && !np.body) { toast('Заполните заголовок или суть'); return false; } pbUpsert(np); await pbSaveRender(); } }, { label: 'Отмена' }] });
+  };
+  $$('[data-pbedit]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); const pl = pb.find(x => x.id === e.currentTarget.dataset.pbedit); if (pl) pbEditModal(pl); }));
+  $$('[data-pbdel]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const id = e.currentTarget.dataset.pbdel; if (!await uiConfirm('Удалить приём?', 'Он уйдёт из вашей базы знаний. Можно вернуть «Сбросить к стандартным».')) return; const i = pb.findIndex(x => x.id === id); if (i >= 0) { pb.splice(i, 1); pbSaveRender(); } }));
+  $('[data-pbadd]', root)?.addEventListener('click', () => pbEditModal(null));
+  $('[data-pbreset]', root)?.addEventListener('click', async () => { if (!await uiConfirm('Сбросить к стандартным?', 'Ваши правки приёмов удалятся, вернётся гео-нейтральный набор.')) return; try { await api.post('/playbook', { action: 'reset' }); toast('Вернули стандартные приёмы', null, true); render(); } catch (e) { toast('Не вышло', e.message); } });
 };
 
 /* ---------------- АКАДЕМИЯ ПРОДАЖ (методология Ольги Синенко) ---------------- */

@@ -1648,7 +1648,7 @@ function leadView(db, l) {
     wakeScore: l.stage === 'sleeping' ? engine.wakeScore(db, l) : null,
     lastText,
     hint: leadHint(db, l, axesFilled),
-    playTip: (playbook.forContext(l, axesFilled)[0] || null),
+    playTip: (playbook.forContext(l, axesFilled, playbook.effective(db))[0] || null),
     /* встречи лида (для блока «Запланированный созвон» в диалоге): не отменённые, свежие сверху, до 6 */
     meetings: (db.meetings || []).filter(m => m.leadId === l.id && m.status !== 'canceled')
       .sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 6)
@@ -14091,7 +14091,24 @@ ${SCR}
       return json(res, 200, seatAudit(db));
     }
     if (p === '/api/marketdata' && req.method === 'GET') return json(res, 200, MARKET);
-    if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, playbook.PLAYBOOK);
+    if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, { plays: playbook.effective(db), custom: !!(db.settings.ai && Array.isArray(db.settings.ai.playbook) && db.settings.ai.playbook.length) });
+    /* правка базы знаний (приёмов) агентством — только владелец. value=массив приёмов; action:'reset' → вернуть стандартные. */
+    if (p === '/api/playbook' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      db.settings.ai = db.settings.ai || {};
+      if (b.action === 'reset') { delete db.settings.ai.playbook; store.save(); return json(res, 200, { plays: playbook.effective(db), custom: false }); }
+      if (!Array.isArray(b.plays)) return json(res, 400, { error: 'нужен массив plays' });
+      const clean = b.plays.slice(0, 200).map((x, i) => ({
+        id: String(x.id || ('pb_c' + i)).slice(0, 40).replace(/[^a-z0-9_]/gi, ''),
+        cat: ['first', 'followup', 'call', 'zoom', 'post', 'objections', 'qualify'].includes(x.cat) ? x.cat : 'first',
+        title: String(x.title || '').slice(0, 160),
+        body: String(x.body || '').slice(0, 1200),
+        tip: String(x.tip || '').slice(0, 400),
+      })).filter(x => x.title || x.body);
+      db.settings.ai.playbook = clean; store.save();
+      return json(res, 200, { plays: clean, custom: true });
+    }
 
     /* ===== Академия продаж (методология Ольги Синенко) ===== */
     if (p === '/api/academy' && req.method === 'GET')
