@@ -255,6 +255,13 @@
 /* Terracotta — колонки с вертикальными разделителями (§5) */
 .lp-preset-terracotta .lp-grid2 .lp-metric{ padding-left:16px; border-left:1px solid var(--line); }
 
+/* === пресет-локация (ТЗ §3/§4/§5) — прямые углы карты + раскладка мест === */
+.lp-preset-gallerywhite .lp-map, .lp-preset-graphite .lp-map, .lp-preset-terracotta .lp-map{ border-radius:0; }
+/* Urban: «рядом с объектом» в две колонки (§4) */
+.lp-preset-graphite .lp-places{ display:grid; grid-template-columns:1fr 1fr; gap:2px 30px; }
+/* Terracotta: места строками с тонкими разделителями (§5) */
+.lp-preset-terracotta .lp-places li{ border-bottom:1px solid var(--line); padding-bottom:8px; }
+
 /* === пресет-оплата: прямоугольные номера этапов (ТЗ «Углы прямые» §3/§4/§5) === */
 .lp-preset-gallerywhite .lp-pay-n{ border-radius:0; background:transparent; border:1px solid var(--line); color:var(--text); }
 .lp-preset-graphite .lp-pay-n{ border-radius:0; background:var(--accent); color:var(--on-accent); }
