@@ -226,6 +226,23 @@ function stripLeadGreeting(text) {
   if (m) { const rest = t.slice(m[0].length).trimStart(); if (rest.length >= 5) t = rest.charAt(0).toUpperCase() + rest.slice(1); }
   return t;
 }
+/* FAQ-learning в диалоге: если последний вопрос клиента совпал с отвеченным в базе вопросом —
+   даём ИИ проверенный ответ владельца, но с ПРАВИЛОМ Zoom-first (краткая выжимка + мост на созвон,
+   не вываливать лонгрид текстом — иначе клиент не идёт на звонок). */
+function faqBlock(db, lead) {
+  const faq = (db.faq || []).filter(f => f && f.status === 'answered' && f.answer && f.answer.trim());
+  if (!faq.length) return '';
+  const lastIn = [...db.messages].reverse().find(m => m.leadId === lead.id && m.dir === 'in');
+  if (!lastIn || !lastIn.text || lastIn.text.trim().length < 4) return '';
+  const tk = s => new Set(String(s || '').toLowerCase().replace(/[^0-9a-zа-яё\s]/gi, ' ').split(/\s+/).filter(w => w.length >= 3));
+  const ov = (a, b) => { const A = tk(a), B = tk(b); if (!A.size || !B.size) return 0; let n = 0; for (const w of A) if (B.has(w)) n++; return n / Math.min(A.size, B.size); };
+  const scored = faq.map(f => ({ f, s: Math.max(ov(lastIn.text, f.question), ...(f.variants || []).map(v => ov(lastIn.text, v))) }))
+    .filter(x => x.s >= 0.3).sort((a, b) => b.s - a.s).slice(0, 2);
+  if (!scored.length) return '';
+  return `
+БАЗА ЗНАНИЙ АГЕНТСТВА — ответы владельца на частые вопросы клиентов (ФАКТЫ, их МОЖНО использовать). ⚠️ ZOOM-FIRST: НЕ вываливай весь ответ текстом. Дай КОРОТКУЮ выжимку (1-2 предложения) по сути вопроса и сразу мягко переведи на созвон/показ, где раскроешь детально — клиент охотнее идёт на звонок, чем читает лонгрид.
+${scored.map(x => `- Вопрос клиента: ${x.f.question}\n  Проверенный ответ (перескажи КРАТКО своими словами и веди к созвону, НЕ копируй целиком): ${String(x.f.answer).replace(/\s+/g, ' ').slice(0, 700)}`).join('\n')}`;
+}
 function buildPrompt(db, lead, history, opts = {}) {
   const followup = !!opts.followup;
   const g = db.settings.geoNames[lead.geo] || lead.geo;
@@ -298,7 +315,7 @@ ${alreadyGreeted ? '- ⚠️ ПРИВЕТСТВИЕ УЖЕ БЫЛО в пере�
 
 ПРИЁМЫ ПРОДАЖ (используй уместно, не цитируй дословно):
 ${playbook.forContext(lead, 4 - missing.length).map(p => '- ' + p.title + ': ' + p.tip).join('\n')}
-
+${faqBlock(db, lead)}
 ДИАЛОГ (последние сообщения):
 ${history}
 
@@ -973,6 +990,51 @@ ${qualLines.length ? 'квалификация: ' + qualLines.join('; ') : ''}
   if (!out || typeof out.message !== 'string' || !out.message.trim()) throw new Error('bad chain-step');
   const clean = s => humanize(String(s || '').trim()).slice(0, 900);
   return { message: clean(out.message), variantB: clean(out.variantB), hook: String(out.hook || '').slice(0, 80) };
+}
+
+/* Категории базы вопросов клиентов (FAQ-learning) — общий словарь для кластеризации и UI. */
+const FAQ_CATS = [
+  { key: 'price', name: 'Цена и оплата' },
+  { key: 'location', name: 'Локация и объект' },
+  { key: 'process', name: 'Процесс покупки' },
+  { key: 'legal', name: 'Юридическое / ВНЖ / налоги' },
+  { key: 'income', name: 'Аренда и доходность' },
+  { key: 'timeline', name: 'Сроки и стадия' },
+  { key: 'other', name: 'Прочее' },
+];
+
+/* FAQ-LEARNING: кластеризация реальных вопросов клиентов из переписок в канонические вопросы по категориям.
+   Design-time/owner-triggered (кнопка «Собрать вопросы») — ОДИН батч-вызов LLM на прогон (cost-safe). */
+async function collectFaq(db, questions) {
+  const list = (questions || []).map((q, i) => `${i + 1}. «${String(q.text || '').replace(/\s+/g, ' ').slice(0, 300)}»`).join('\n');
+  if (!list.trim()) return { clusters: [] };
+  const cats = FAQ_CATS.map(c => `${c.key} — ${c.name}`).join('; ');
+  const prompt = `Ты — аналитик базы знаний агентства недвижимости. Ниже РЕАЛЬНЫЕ сообщения от клиентов из переписок. Выдели среди них ВОПРОСЫ клиентов (о покупке/объекте/цене/процессе и т.п.) и сгруппируй повторяющиеся по смыслу в КАНОНИЧЕСКИЕ вопросы. Для каждого канонического вопроса определи категорию.
+
+КАТЕГОРИИ (ключ — название): ${cats}.
+
+ПРАВИЛА:
+- Только настоящие вопросы КЛИЕНТОВ. Игнорируй приветствия, «ок», «спасибо», наши собственные фразы, служебное.
+- Объединяй разные формулировки одного вопроса в один кластер (считай, сколько раз спрашивали).
+- Канонический вопрос — короткий, нейтральный, как в FAQ (без имён и личных данных клиента).
+- Если вопросов нет — верни {"clusters":[]}. Ничего не выдумывай.
+
+СООБЩЕНИЯ КЛИЕНТОВ:
+${list}
+
+Верни строго JSON:
+{"clusters":[{"question":"канонический вопрос","category":"ключ категории из списка","example":"одна короткая дословная цитата клиента","count":число_вхождений}]}`;
+  const out = await callGemini(prompt, 20000, 1400);
+  const valid = new Set(FAQ_CATS.map(c => c.key));
+  const clusters = (out && Array.isArray(out.clusters) ? out.clusters : [])
+    .map(c => ({
+      question: String(c.question || '').trim().slice(0, 240),
+      category: valid.has(c.category) ? c.category : 'other',
+      example: String(c.example || '').trim().slice(0, 300),
+      count: Math.max(1, Math.min(9999, parseInt(c.count, 10) || 1)),
+    }))
+    .filter(c => c.question.length > 3);
+  return { clusters };
 }
 
 /* ПОСТ-ЗВОНКОВОЕ касание: после дозвона ИИ читает транскрипт + как человек общался (психо-паттерны)
@@ -1672,6 +1734,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, followup, followupVariants, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, followup, followupVariants, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

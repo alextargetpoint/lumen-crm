@@ -518,6 +518,7 @@ const NAV = {
   learn:    { name: 'Академия агентства', en: 'Agency academy', icon: I.doc, sub: 'свои уроки: видео + текст, доступ по паролю', subEn: 'your lessons: video + text, password access' },
   studio:   { name: 'Видео-студия', en: 'Video studio', icon: I.play, sub: 'запись презентаций: экран + камера + микрофон', subEn: 'record presentations: screen + camera + mic' },
   callReview: { name: 'Оценка звонка', en: 'Call review', icon: I.phone, sub: 'ИИ-разбор звонка по методологии', subEn: 'AI call analysis by methodology' },
+  faq:      { name: 'Вопросы клиентов', en: 'Client questions', icon: I.chat, sub: 'что спрашивают клиенты · ваши ответы → в базу знаний ИИ', subEn: 'what clients ask · your answers → AI knowledge base' },
   ads:       { name: 'Аналитика рекламы', en: 'Ad analytics', icon: I.bars, sub: 'факт из кабинетов · дерево креативов · настройки', subEn: 'cabinet facts · creatives · settings' },
   mediaplan: { name: 'Медиапланы', en: 'Media plans', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование', subEn: 'traffic contractors · plan/fact · approval' },
   adsAnalytics: { name: 'Реклама · подрядчики', en: 'Ads · contractors', icon: I.bars, sub: 'план/факт по подрядчикам · CPL · воронка', subEn: 'plan/fact by contractor · CPL · funnel' },
@@ -555,10 +556,10 @@ const PARENT_OF = {};
 for (const [ws, def] of Object.entries(WORKSPACES)) for (const pk of def.pages) PARENT_OF[pk] = ws;
 /* СВЁРНУТЫЕ подстраницы → композитная страница + индекс её под-вкладки (реорг 9→5).
    Старые прямые ссылки (go('sequences') из воронки и т.п.) продолжают работать — открывают нужную под-вкладку. */
-const FOLDED = { qualifier: ['autopilot', 0], sequences: ['autopilot', 1], templates: ['autopilot', 2], playbook: ['knowledge', 0], academy: ['knowledge', 1], callReview: ['knowledge', 2] };
+const FOLDED = { qualifier: ['autopilot', 0], sequences: ['autopilot', 1], templates: ['autopilot', 2], playbook: ['knowledge', 0], academy: ['knowledge', 1], callReview: ['knowledge', 2], faq: ['knowledge', 3] };
 const COMPOSITE_TABS = {
   autopilot: [['qualifier', 'Квалификатор'], ['sequences', 'Цепочки касаний'], ['templates', 'Шаблоны']],
-  knowledge: [['playbook', 'Приёмы продаж'], ['academy', 'Академия продаж'], ['callReview', 'Оценка звонка']],
+  knowledge: [['playbook', 'Приёмы продаж'], ['academy', 'Академия продаж'], ['callReview', 'Оценка звонка'], ['faq', 'Вопросы клиентов']],
 };
 
 const BASE_STAGES = [
@@ -2659,6 +2660,7 @@ const DEFAULT_HIDDEN_PAGES = ['academy', 'studio', 'hr', 'social'];
 function pageHiddenForUser(pg) {
   if (COMPOSITE_TABS[pg]) return COMPOSITE_TABS[pg].every(([k]) => pageHiddenForUser(k));   /* композит скрыт, если ВСЕ под-вкладки скрыты */
   if (pg === 'waProfile') return !(STATE && STATE.me && STATE.me.role === 'broker');   /* «Мой WhatsApp» — только брокеру (владелец правит в «Номера») */
+  if (pg === 'faq') return !(STATE && STATE.me && (STATE.me.role === 'owner' || STATE.me.role === 'master'));   /* «Вопросы клиентов» — задача владельца (сбор+канон. ответы), сервер гейтит мутации на owner */
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
   const rt = (me && me.roleType) || 'broker';
@@ -10568,6 +10570,91 @@ PAGES.playbook = async (root) => {
   $$('[data-pbdel]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const id = e.currentTarget.dataset.pbdel; if (!await uiConfirm('Удалить приём?', 'Он уйдёт из вашей базы знаний. Можно вернуть «Сбросить к стандартным».')) return; const i = pb.findIndex(x => x.id === id); if (i >= 0) { pb.splice(i, 1); pbSaveRender(); } }));
   $('[data-pbadd]', root)?.addEventListener('click', () => pbEditModal(null));
   $('[data-pbreset]', root)?.addEventListener('click', async () => { if (!await uiConfirm('Сбросить к стандартным?', 'Ваши правки приёмов удалятся, вернётся гео-нейтральный набор.')) return; try { await api.post('/playbook', { action: 'reset' }); toast('Вернули стандартные приёмы', null, true); render(); } catch (e) { toast('Не вышло', e.message); } });
+};
+
+/* ---------------- ВОПРОСЫ КЛИЕНТОВ (FAQ-learning) ----------------
+   ИИ собирает вопросы клиентов из переписок → группирует по категориям → владелец пишет развёрнутый ответ →
+   ответ вшивается в промпт ИИ с правилом Zoom-first (краткая выжимка + мост на созвон). */
+PAGES.faq = async (root) => {
+  const data = await api.get('/faq');
+  const items = (data.items || []).slice();
+  const cats = data.cats || [];
+  const faqOwner = !STATE.me || STATE.me.role === 'owner' || STATE.me.role === 'master';
+  const open = items.filter(x => x.status !== 'answered');
+  const answered = items.filter(x => x.status === 'answered');
+  const catName = (k) => (cats.find(c => c.key === k) || {}).name || k;
+  if (!PAGE_STATE.faqCat) PAGE_STATE.faqCat = 'all';
+  const curCat = PAGE_STATE.faqCat;
+  const openOnly = !!PAGE_STATE.faqOpenOnly;
+  let list = items.slice();
+  if (curCat !== 'all') list = list.filter(x => x.category === curCat);
+  if (openOnly) list = list.filter(x => x.status !== 'answered');
+  /* без ответа — выше, затем по частоте */
+  list.sort((a, b) => (a.status === 'answered' ? 1 : 0) - (b.status === 'answered' ? 1 : 0) || (b.count || 0) - (a.count || 0));
+  const lastCol = data.lastCollectAt ? tmm(data.lastCollectAt) : '—';
+  const catChips = [['all', 'Все', items.length]].concat(cats.map(c => [c.key, c.name, items.filter(x => x.category === c.key).length]));
+  root.innerHTML = `
+    ${heroArt('assets/art/book.png', `
+      <div class="ha-title">${ic(I.chat)}Вопросы клиентов<span class="sub">${items.length} вопросов · <b>${open.length}</b> без ответа · ответы вшиты в промпт ИИ (Zoom-first)</span></div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">ИИ собирает вопросы из переписок. Ваши ответы ИИ отдаёт клиентам КРАТКО и ведёт на созвон — не лонгридом.</span></div>
+    `, { v: 'right', hue: '#2563EB' })}
+    <div class="pb-layout">
+      <div class="pb-nav glass">
+        <div class="pb-nav-hd">Категории</div>
+        ${catChips.map(([k, name, n]) => `<button class="pb-cat ${k === curCat ? 'active' : ''}" data-faqcat="${k}">
+          <span class="pb-cat-t"><b>${esc(name)}</b></span>
+          <span class="pb-cat-n">${n}</span>
+        </button>`).join('')}
+        <label class="pb-tipbox" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="faqOpenOnly" ${openOnly ? 'checked' : ''} style="width:auto">Только без ответа</label>
+      </div>
+      <div class="pb-main">
+        <div class="pb-main-hd">${ic(I.chat)}<b>${curCat === 'all' ? 'Все вопросы' : esc(catName(curCat))}</b><span>${list.length}</span>
+          <span class="tb-spacer"></span>
+          <span class="muted" style="font-size:11px">сбор: ${lastCol}</span>
+          ${faqOwner ? `<button class="btn btn-sm btn-accent" id="faqCollect">${ic(I.spark)}Собрать вопросы</button>` : ''}
+        </div>
+        ${list.length ? list.map(x => {
+          const ans = x.status === 'answered';
+          return `<div class="pb-acc ${ans ? '' : 'open'}" data-acc>
+            <div class="pb-acc-hd">
+              <span class="faq-badge ${ans ? 'ok' : 'open'}">${ans ? 'в базе' : 'без ответа'}</span>
+              <span class="pb-acc-t" data-acctoggle>${esc(x.question)}</span>
+              <span class="faq-cnt" title="сколько раз спрашивали">${ic(I.users)}${x.count || 1}</span>
+              ${faqOwner ? `<span class="pb-ed" data-faqdel="${esc(x.id)}" title="Удалить">${ic(I.x)}</span>` : ''}
+              <span class="chev" data-acctoggle>${ic(I.chev, 2)}</span>
+            </div>
+            <div class="pb-acc-body"><div class="pb-acc-inner">
+              <div class="muted" style="font-size:11px;margin-bottom:6px">${esc(catName(x.category))}${(x.examples && x.examples.length) ? ' · примеры из переписок:' : ''}</div>
+              ${(x.examples || []).slice(0, 3).map(e => `<div class="faq-ex">«${esc(e)}»</div>`).join('')}
+              ${ans ? `<div class="pb-tip" style="margin-top:8px">${ic(I.spark)}<b>Ответ (ИИ отдаёт кратко + ведёт на созвон):</b><br>${esc(x.answer).replace(/\n/g, '<br>')}</div>` : '<div class="muted" style="font-size:12px;margin-top:6px">Ответа пока нет — ИИ держит общий тон и выводит на созвон. Добавьте развёрнутый ответ, чтобы ИИ отвечал по сути.</div>'}
+              ${faqOwner ? `<div style="margin-top:10px"><button class="btn btn-sm ${ans ? '' : 'btn-accent'}" data-faqans="${esc(x.id)}">${ic(I.pencil || I.doc)}${ans ? 'Изменить ответ' : 'Ответить'}</button></div>` : ''}
+            </div></div>
+          </div>`;
+        }).join('') : `<div class="empty" style="padding:30px;text-align:center">${openOnly ? 'Нет вопросов без ответа в этой категории.' : 'Вопросов пока нет.'}<br><span class="muted" style="font-size:11px">Нажмите «Собрать вопросы» — ИИ пройдёт по входящим перепискам и соберёт, что спрашивают клиенты.</span></div>`}
+      </div>
+    </div>`;
+  $$('[data-faqcat]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.faqCat = b.dataset.faqcat; render(); }));
+  $('#faqOpenOnly', root)?.addEventListener('change', (e) => { PAGE_STATE.faqOpenOnly = e.target.checked; render(); });
+  $$('[data-acctoggle]', root).forEach(h => h.addEventListener('click', () => h.closest('.pb-acc').classList.toggle('open')));
+  $('#faqCollect', root)?.addEventListener('click', async (e) => {
+    const b = e.currentTarget; const orig = b.innerHTML; b.disabled = true; b.innerHTML = ic(I.spark) + 'Собираю…';
+    try { const r = await api.post('/faq/collect', {}); toast('Вопросы собраны', r.added ? `Добавлено ${r.added} новых (просмотрено ${r.scanned} сообщений)` : (r.scanned ? `Новых вопросов не нашлось (просмотрено ${r.scanned})` : 'Новых входящих вопросов нет'), true); render(); }
+    catch (er) { toast('Не вышло', er.message); b.disabled = false; b.innerHTML = orig; }
+  });
+  $$('[data-faqdel]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const id = e.currentTarget.dataset.faqdel; if (!await uiConfirm('Удалить вопрос?', 'Он уйдёт из базы знаний.')) return; try { await api.del('/faq/' + id); toast('Удалено', null, true); render(); } catch (er) { toast('Не вышло', er.message); } }));
+  $$('[data-faqans]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); const x = items.find(i => i.id === e.currentTarget.dataset.faqans); if (x) faqAnswerModal(x, cats); }));
+
+  function faqAnswerModal(x, cats) {
+    modal({ title: 'Ответ на вопрос клиента', wide: true, sub: 'ИИ отдаст его клиенту КРАТКО и выведет на созвон (Zoom-first)', body: `
+      <div class="form-row"><label>Вопрос (канонический)</label><input id="faqQ" value="${esc(x.question)}" maxlength="240"></div>
+      <div class="form-row"><label>Категория</label><select id="faqCatSel">${cats.map(c => `<option value="${c.key}" ${x.category === c.key ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Развёрнутый ответ (факты, условия, детали)</label><textarea id="faqA" rows="7" maxlength="4000" placeholder="Напишите полно и по делу — ИИ сам сократит до 1-2 фраз в переписке и предложит разобрать детально на созвоне.">${esc(x.answer || '')}</textarea></div>
+      <div class="muted" style="font-size:11px">${(x.examples || []).length ? 'Реальные формулировки: ' + (x.examples || []).slice(0, 2).map(e => '«' + esc(e) + '»').join(', ') : ''}</div>`,
+      actions: [{ label: 'Сохранить в базу', cls: 'btn-accent', onClick: async (bd) => {
+        try { await api.post('/faq/' + x.id, { answer: $('#faqA', bd).value, question: $('#faqQ', bd).value.trim(), category: $('#faqCatSel', bd).value }); toast('Сохранено в базу знаний', 'ИИ будет отвечать по сути и вести на созвон', true); render(); }
+        catch (er) { toast('Не вышло', er.message); return false; }
+      } }, { label: 'Отмена' }] });
+  }
 };
 
 /* ---------------- АКАДЕМИЯ ПРОДАЖ (методология Ольги Синенко) ---------------- */

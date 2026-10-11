@@ -14148,6 +14148,63 @@ ${SCR}
       return json(res, 200, { plays: clean, custom: true });
     }
 
+    /* ===== FAQ-learning: база вопросов клиентов (сбор из переписок → ответы владельца → в промпт ИИ) ===== */
+    if (p === '/api/faq' && req.method === 'GET') {
+      db.faq = db.faq || [];
+      return json(res, 200, { items: db.faq, cats: llm.FAQ_CATS || [], lastCollectAt: db.faqCollectedAt || 0 });
+    }
+    /* собрать новые вопросы из входящих переписок (владелец): эвристика-кандидаты → LLM-кластеризация → апсерт.
+       Один батч-вызов LLM на прогон; watermark (faqCollectedAt) исключает двойной подсчёт между прогонами. */
+    if (p === '/api/faq/collect' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      db.faq = db.faq || [];
+      const since = db.faqCollectedAt || 0, now = Date.now();
+      const QWORD = /\?|как\b|кака|какой|какие|сколько|можно ли|есть ли|что по|когда\b|где\b|почему|нужно ли|будет ли|а если|what|how |can i|is there|do you|when |where |why|price|cost/i;
+      const cand = (db.messages || []).filter(mm => mm.dir === 'in' && (mm.at || 0) > since && mm.text && mm.text.trim().length >= 8 && QWORD.test(mm.text))
+        .slice(-150).map(mm => ({ text: mm.text, leadId: mm.leadId }));
+      if (!cand.length) { db.faqCollectedAt = now; store.save(); return json(res, 200, { items: db.faq, added: 0, scanned: 0 }); }
+      let clusters = [];
+      try { const out = await llm.collectFaq(db, cand); clusters = out.clusters || []; }
+      catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+      const norm = s => String(s || '').toLowerCase().replace(/[^a-zа-яё0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+      const tok = s => new Set(norm(s).split(' ').filter(w => w.length >= 4));
+      const sim = (a, b) => { const A = tok(a), B = tok(b); if (!A.size || !B.size) return 0; let n = 0; for (const w of A) if (B.has(w)) n++; return n / Math.min(A.size, B.size); };
+      let added = 0;
+      for (const c of clusters) {
+        const existing = db.faq.find(f => f.category === c.category && sim(f.question, c.question) >= 0.6);
+        if (existing) {
+          existing.count = (existing.count || 1) + (c.count || 1);
+          existing.lastAskedAt = now;
+          if (c.example && !(existing.examples || []).some(e => norm(e) === norm(c.example))) existing.examples = [...(existing.examples || []), c.example].slice(-5);
+          existing.variants = existing.variants || [];
+          if (norm(c.question) !== norm(existing.question) && !existing.variants.some(v => norm(v) === norm(c.question))) existing.variants = [...existing.variants, c.question].slice(0, 8);
+        } else {
+          db.faq.push({ id: 'faq_' + crypto.randomBytes(6).toString('hex'), question: c.question, category: c.category, variants: [], count: c.count || 1, examples: c.example ? [c.example] : [], answer: '', status: 'open', createdAt: now, updatedAt: now, lastAskedAt: now });
+          added++;
+        }
+      }
+      db.faqCollectedAt = now; store.save();
+      return json(res, 200, { items: db.faq, added, scanned: cand.length });
+    }
+    /* владелец пишет/правит ответ (или вопрос/категорию) → answered, идёт в промпт ИИ */
+    if ((m = p.match(/^\/api\/faq\/([^/]+)$/)) && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      db.faq = db.faq || [];
+      const f = db.faq.find(x => x.id === m[1]); if (!f) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.answer != null) { f.answer = String(b.answer).slice(0, 4000); const has = !!f.answer.trim(); f.status = has ? 'answered' : 'open'; f.answeredAt = has ? Date.now() : 0; f.answeredBy = (R && R.name) || 'владелец'; }
+      if (b.question != null) f.question = String(b.question).slice(0, 240);
+      if (b.category != null && (llm.FAQ_CATS || []).some(c => c.key === b.category)) f.category = b.category;
+      f.updatedAt = Date.now(); store.save();
+      return json(res, 200, f);
+    }
+    if ((m = p.match(/^\/api\/faq\/([^/]+)$/)) && req.method === 'DELETE') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      db.faq = (db.faq || []).filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+
     /* ===== Академия продаж (методология Ольги Синенко) ===== */
     if (p === '/api/academy' && req.method === 'GET')
       return json(res, 200, { modules: academy.MODULES, catLabels: academy.CAT_LABELS, rubric: academy.RUBRIC, stats: academy.stats(), vtitles: academy.VTITLES });
