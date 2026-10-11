@@ -2616,6 +2616,8 @@ function mountHeroVideos(root, theme) {
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-mcopy]');
   if (b) { navigator.clipboard.writeText(location.origin + '/m/' + b.dataset.mcopy); toast('Ссылка на страницу встречи скопирована', null, true); }
+  const ed = e.target.closest('[data-medit2]');
+  if (ed) { const id = ed.dataset.medit2; try { closeModal(); } catch (_) {} openMeetingPageEditor(id); }
 });
 /* тест-звонок для проверки номера брокера (первое плечо click-to-call) */
 document.addEventListener('click', async (e) => {
@@ -3421,9 +3423,9 @@ const OV_W = {
     return `<div class="ovx-kpi">
       <button class="ovx-hero" data-ovgo="funnel">
         ${motionSurface('navyHero', { intensity: 'subtle' })}
-        <div class="ovx-hero-top"><span class="ovx-hero-lbl">Новые лиды · 14 дней</span>${deltaChip(wkNow, wkPrev)}</div>
+        <div class="ovx-hero-top"><span class="ovx-hero-lbl">Новые лиды · за неделю</span>${deltaChip(wkNow, wkPrev)}</div>
         <div class="ovx-hero-num">${cup(wkNow)}</div>
-        <div class="ovx-hero-sub">${totalWork} всего в работе</div>
+        <div class="ovx-hero-sub">${totalWork} всего в работе · тренд за 14 дней ниже</div>
         ${heroBars(d14.slice(-10))}
       </button>
       <div class="ovx-kcards">${cards.map(x => `<button class="ovx-kcard" data-ovgo="${x.go}"><span class="ovx-kc-ic cat-${x.cat}">${ic(x.ic)}</span><span class="ovx-kc-b"><span class="ovx-kc-v">${cup(x.v)}</span><span class="ovx-kc-k">${x.k}</span><span class="ovx-kc-s">${x.s}</span></span></button>`).join('')}</div>
@@ -3457,7 +3459,7 @@ const OV_W = {
     const segs = shown.map(s => { const val = f[s.id] || 0; const frac = val / denom; const seg = `<circle class="ovx-donut-seg" cx="60" cy="60" r="${R}" fill="none" stroke="${stageColor(s.id)}" stroke-width="15" stroke-linecap="round" stroke-dasharray="${(frac * C).toFixed(1)} ${C}" stroke-dashoffset="${(-off * C).toFixed(1)}" transform="rotate(-90 60 60)"/>`; off += frac; return seg; }).join('');
     const legend = shown.filter(s => f[s.id]).map(s => `<button class="ov2-dl-row" data-ovgo="funnel"><i style="background:${stageColor(s.id)}"></i><span>${s.name}</span><b>${f[s.id] || 0}</b></button>`).join('');
     return `<div class="ov2-card-hd">${ic(I.funnel)}Статусы лидов<span>по стадиям воронки</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>
-      <div class="ov2-donut"><div class="ov2-donut-c"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--gauge-track)" stroke-width="15"/>${segs}</svg><div class="ov2-donut-mid"><b>${cup(total)}</b><i>лидов</i></div></div><div class="ov2-donut-leg">${legend}</div></div>`;
+      <div class="ov2-donut"><div class="ov2-donut-c"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--gauge-track)" stroke-width="15"/>${segs}</svg><div class="ov2-donut-mid"><b>${cup(total)}</b><i>в воронке</i></div></div><div class="ov2-donut-leg">${legend}</div></div>`;
   } },
   tasks: { name: 'Мои задачи', icon: () => I.task, full: false, render: (c) => {
     const tsk = c.tsk, d2 = c.dstr2;
@@ -3504,7 +3506,7 @@ const OV_W = {
   spark: { name: 'Приток лидов', icon: () => I.plus, full: false, render: (c) => {
     const days = leadsByDay(c.leads, 14);
     const total = days.reduce((a, b) => a + b, 0);
-    const hd = `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>14 дней</span></div>`;
+    const hd = `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>за неделю · тренд 14 дн</span></div>`;
     if (total === 0) return hd + `<div class="ov-metric-empty"><div class="ov-metric-empty-n">0</div><div class="ov-metric-empty-b"><b>новых лидов</b><i>Последние 14 дней · притока нет</i></div><button class="ov-metric-empty-btn" data-ovgo="analytics">${ic(I.target, 2)}Проверить кампании</button></div>`;
     const wk = days.slice(7).reduce((a, b) => a + b, 0), wkPrev = days.slice(0, 7).reduce((a, b) => a + b, 0);
     return hd + `<div class="ov2-spark2"><div class="ov2-spark2-hd"><b>${cup(wk)}</b><span>за неделю ${deltaChip(wk, wkPrev)}</span></div><div class="ov2-spark2-area">${areaChart(days, { w: 280, h: 72 })}</div></div>`;
@@ -3859,7 +3861,7 @@ const OV_W = {
     const reached = L.filter(l => ['dialog', 'qualified', 'handover', 'viewing', 'deal'].includes(l.stage));
     const qual = L.filter(l => QP.includes(l.stage));
     const deal = L.filter(l => l.stage === 'deal');
-    const steps = [['Лиды', active.length, I.plus], ['В диалоге', reached.length, I.chat], ['Квалификация', qual.length, I.spark], ['Сделки', deal.length, I.flame]];
+    const steps = [['Все лиды', active.length, I.plus], ['В диалоге', reached.length, I.chat], ['Квалификация', qual.length, I.spark], ['Сделки', deal.length, I.flame]];
     const hd = `<div class="ov2-card-hd">${ic(I.funnel)}Воронка конверсии<span>лид → диалог → квал → сделка</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>`;
     if (!active.length) return hd + ovEmpty(I.funnel, 'Пока нет лидов', 'Воронка появится с первыми заявками');
     const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
@@ -5431,7 +5433,8 @@ PAGES.meetings = async (root) => {
               <div class="form-row" style="margin-top:6px"><label>Страница встречи для клиента${mt.clientConfirmed ? ' · ✓ подтвердил' : ''}${mt.pageViews ? ' · открывал ' + mt.pageViews + ' раз' : ''}</label>
                 <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${location.origin}/m/${mt.id}</code>
                 <button class="btn btn-sm" data-mcopy="${mt.id}">${ic(I.copy)}</button>
-                <a class="btn btn-sm" href="/m/${mt.id}" target="_blank">${ic(I.eye)}</a></div></div>`,
+                <a class="btn btn-sm" href="/m/${mt.id}" target="_blank">${ic(I.eye)}</a>
+                <button class="btn btn-sm" data-medit2="${mt.id}" title="Редактировать страницу-приглашение">${ic(I.pencil || I.doc)}</button></div></div>`,
             actions: [
               { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
                 const at = new Date($('#emDate', bd).value + 'T' + $('#emTime', bd).value).getTime();
@@ -5601,6 +5604,48 @@ function openMeetingModal(lead, after) {
   $('#mtDate', md).addEventListener('input', paintTz); $('#mtTime', md).addEventListener('input', paintTz); paintTz();
   const syncLinkRow = () => { const r = $('#mtLinkRow', md); if (r) r.style.display = $('#mtKind', md).value === 'video' ? '' : 'none'; };
   $('#mtKind', md)?.addEventListener('change', syncLinkRow); syncLinkRow();
+}
+
+/* Редактор клиентской страницы-приглашения ПОСЛЕ создания встречи (ТЗ §1/§2: Встреча → «Страница клиента» →
+   предпросмотр/правка/публикация). Поля те же, что в модалке назначения, но грузятся из встречи и уходят PATCH-ем. */
+async function openMeetingPageEditor(mtId) {
+  let mt = null;
+  try { const list = await api.get('/meetings'); mt = (list || []).find(x => x.id === mtId); } catch (_) {}
+  if (!mt) { toast('Встреча не найдена'); return; }
+  const url = location.origin + '/m/' + mt.id;
+  const done = mt.status === 'done' || (mt.at + (mt.dur || 60) * 60e3) < Date.now();
+  const matLines = (mt.materials || []).map(x => `${x.label || ''} | ${x.url}`).join('\n');
+  const md = modal({
+    title: 'Страница клиента',
+    sub: `${esc(mt.leadName || 'клиент')} · одна ссылка, обновляется со встречей. Правки видны клиенту сразу.`,
+    wide: true,
+    body: `
+      <div class="form-row"><label>Ссылка клиента <span class="muted" style="font-weight:400">(та же при переносе)</span></label>
+        <div style="display:flex;gap:8px"><input id="mpUrl" value="${esc(url)}" readonly style="flex:1"><button class="btn btn-sm" id="mpCopy" type="button">${ic(I.copy)}Копировать</button><a class="btn btn-sm" href="${esc(url)}" target="_blank" rel="noopener">${ic(I.link || I.eye)}Открыть</a></div></div>
+      <div class="form-row"><label>Приветствие</label><input id="mpGreeting" value="${esc(mt.greeting || '')}" placeholder="Например: Анна, рад встрече!"></div>
+      <div class="form-row"><label>План встречи <span class="muted" style="font-weight:400">(по пункту на строку)</span></label><textarea id="mpAgenda" rows="3" placeholder="Разберём бюджет и сроки&#10;Покажу 3 варианта">${esc((mt.agenda || []).join('\n'))}</textarea></div>
+      <div class="form-row"><label>Короткая визитка эксперта</label><textarea id="mpBlurb" rows="2">${esc(mt.brokerBlurb || '')}</textarea></div>
+      <div class="form-row"><label>Материалы <span class="muted" style="font-weight:400">(Подпись | https://…)</span></label><textarea id="mpMaterials" rows="2" placeholder="Памятка | https://…">${esc(matLines)}</textarea></div>
+      <div class="form-row"><label>Подборка объектов <span class="muted" style="font-weight:400">(/p/… или ID)</span></label><input id="mpColl" value="${esc(mt.collectionId || '')}"></div>
+      <div class="form-row"><label>Как подключиться</label><input id="mpInstr" value="${esc(mt.instructions || '')}" placeholder="Откройте ссылку за пару минут до начала"></div>
+      <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Вопрос перед встречей</div><div class="sd">Клиент напишет, что хочет обсудить</div></div><label class="switch"><input type="checkbox" id="mpPreQ" ${mt.preQuestion ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      ${done ? `<div class="form-row"><label>Итоги и следующие шаги <span class="muted" style="font-weight:400">(видно клиенту на завершённой встрече)</span></label><textarea id="mpOutcome" rows="3" placeholder="Договорились: отправляю подборку до пятницы…">${esc(mt.outcome || '')}</textarea></div>` : ''}
+      ${mt.clientQuestion ? `<div class="muted" style="font-size:12px;padding:8px 10px;background:var(--bg-2,rgba(37,99,235,.05));border-radius:9px">💬 Клиент оставил вопрос: «${esc(mt.clientQuestion)}»</div>` : ''}`,
+    actions: [
+      { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+        const agenda = ($('#mpAgenda', bd)?.value || '').split(/\n/).map(x => x.trim()).filter(Boolean);
+        const materials = ($('#mpMaterials', bd)?.value || '').split(/\n/).map(line => { const p = line.split('|'); const u = (p.length > 1 ? p.slice(1).join('|') : p[0]).trim(); return { label: (p.length > 1 ? p[0] : '').trim(), url: u }; }).filter(x => /^https?:\/\//i.test(x.url));
+        const collRaw = ($('#mpColl', bd)?.value || '').trim();
+        const collectionId = (collRaw.match(/\/p\/([\w-]+)/) || [])[1] || collRaw.replace(/[^\w-]/g, '');
+        const payload = { greeting: $('#mpGreeting', bd)?.value || '', agenda, materials, collectionId, brokerBlurb: $('#mpBlurb', bd)?.value || '', instructions: $('#mpInstr', bd)?.value || '', preQuestion: !!($('#mpPreQ', bd) || {}).checked };
+        if ($('#mpOutcome', bd)) payload.outcome = $('#mpOutcome', bd).value || '';
+        try { await api.patch('/meetings/' + mt.id, payload); toast('Страница обновлена', 'Клиент видит изменения по той же ссылке', true); }
+        catch (e) { toast('Не вышло', e.message); return false; }
+      } },
+      { label: 'Закрыть' },
+    ],
+  });
+  $('#mpCopy', md)?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Ссылка скопирована', null, true); } catch (_) {} });
 }
 
 
@@ -6876,7 +6921,8 @@ async function renderChat(id, rebuild) {
       <div class="cm-act">
         ${_mtUp.link ? `<a class="btn btn-sm btn-accent" href="${esc(_mtUp.link)}" target="_blank" rel="noopener" title="Подключиться к созвону">${ic(I.phone)}Открыть</a>` : ''}
         ${_mtUp.link ? `<button class="btn btn-sm btn-icon" data-mcopy="${esc(_mtUp.link)}" title="Скопировать ссылку">${ic(I.link || I.copy)}</button>` : ''}
-        <a class="btn btn-sm" href="/m/${esc(_mtUp.id)}" target="_blank" rel="noopener" title="Страница встречи для клиента (визитка со ссылкой)">Визитка</a>
+        <a class="btn btn-sm" href="/m/${esc(_mtUp.id)}" target="_blank" rel="noopener" title="Открыть страницу-приглашение клиента">Страница</a>
+        <button class="btn btn-sm btn-icon" data-medit="${esc(_mtUp.id)}" title="Редактировать страницу-приглашение: приветствие, план, материалы, подборка, вопрос">${ic(I.pencil || I.doc)}</button>
       </div></div>`;
   })() : '';
   /* ПАНЕЛЬ «ЗАПУЩЕНА ЦЕПОЧКА»: режим «с одобрением» — касание ждёт решения (редактируемое превью + Отправить/Пропустить);
@@ -6970,6 +7016,7 @@ async function renderChat(id, rebuild) {
   $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
   $('#chatHeadId')?.addEventListener('click', () => openLeadModal(l.id));   /* клик по имени/номеру → карточка лида (по инерции) */
   $$('[data-mcopy]', pane).forEach(b => b.addEventListener('click', async (e) => { const url = e.currentTarget.dataset.mcopy; if (!url) return; try { await navigator.clipboard.writeText(url); toast('Ссылка на созвон скопирована', null, true); } catch (_) { toast('Не удалось скопировать', url); } }));
+  $$('[data-medit]', pane).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openMeetingPageEditor(e.currentTarget.dataset.medit); }));
   $$('[data-gofix]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); const dst = e.currentTarget.dataset.gofix; if (typeof go === 'function') go(dst || 'numbers'); }));
   $$('[data-gomove]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); openGrayMove(l.id, l.grayPhone, () => { try { render(); } catch (_) {} }); }));
   $$('[data-tzedit]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { try { render(); } catch (_) {} }); }));
