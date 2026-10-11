@@ -277,6 +277,37 @@
 .lp-preset-gallerywhite .lp-ben-n{ border:none; background:transparent; width:auto; height:auto; font-size:1.5em; color:var(--accent); align-items:flex-start; }
 /* Urban Graphite: залитый графитовый квадрат (§4 нумерованный список) */
 .lp-preset-graphite .lp-ben-n{ background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+
+/* === финал брокера на пресет — Urban тёмная графитовая контактная страница (ТЗ §4) === */
+.lp-preset-graphite.lp-fam-broker{ background:#23272B; }
+.lp-preset-graphite.lp-fam-broker .lp-h2,
+.lp-preset-graphite.lp-fam-broker .lp-broker-name b,
+.lp-preset-graphite.lp-fam-broker .lp-contact-line a,
+.lp-preset-graphite.lp-fam-broker .lp-broker-points b,
+.lp-preset-graphite.lp-fam-broker .lp-brandmark{ color:#fff; }
+.lp-preset-graphite.lp-fam-broker .lp-eyebrow,
+.lp-preset-graphite.lp-fam-broker .lp-broker-name span,
+.lp-preset-graphite.lp-fam-broker .lp-body,
+.lp-preset-graphite.lp-fam-broker .lp-broker-points span{ color:rgba(255,255,255,.72); }
+.lp-preset-graphite.lp-fam-broker .lp-metric-ic{ color:#B9D3DF; }
+.lp-preset-graphite.lp-fam-broker .lp-ch{ border-color:rgba(255,255,255,.32); color:#fff; }
+.lp-preset-graphite.lp-fam-broker .lp-foot{ color:rgba(255,255,255,.5); }
+.lp-preset-graphite.lp-fam-broker .lp-qr-ph{ border-color:rgba(255,255,255,.26); color:rgba(255,255,255,.5); }
+/* Terracotta финал — терракота color-block + кремовый текст (читаемо, ТЗ контраст) */
+.lp-preset-terracotta.lp-fam-broker{ background:#9E4E39; }
+.lp-preset-terracotta.lp-fam-broker .lp-h2,
+.lp-preset-terracotta.lp-fam-broker .lp-broker-name b,
+.lp-preset-terracotta.lp-fam-broker .lp-contact-line a,
+.lp-preset-terracotta.lp-fam-broker .lp-broker-points b,
+.lp-preset-terracotta.lp-fam-broker .lp-brandmark{ color:#FBF3EC; }
+.lp-preset-terracotta.lp-fam-broker .lp-eyebrow,
+.lp-preset-terracotta.lp-fam-broker .lp-broker-name span,
+.lp-preset-terracotta.lp-fam-broker .lp-body,
+.lp-preset-terracotta.lp-fam-broker .lp-broker-points span{ color:rgba(251,243,236,.78); }
+.lp-preset-terracotta.lp-fam-broker .lp-metric-ic{ color:#E8C9A0; }
+.lp-preset-terracotta.lp-fam-broker .lp-ch{ border-color:rgba(251,243,236,.34); color:#FBF3EC; }
+.lp-preset-terracotta.lp-fam-broker .lp-foot{ color:rgba(251,243,236,.5); }
+.lp-preset-terracotta.lp-fam-broker .lp-qr-ph{ border-color:rgba(251,243,236,.3); color:rgba(251,243,236,.55); }
 /* Преимущества — квадратные номера на пресет (контур/графит/терракота) */
 .lp-preset-gallerywhite .lp-ben-n{ border-radius:0; background:transparent; border:1px solid var(--line); color:var(--text); }
 .lp-preset-graphite .lp-ben-n{ border-radius:0; background:var(--accent); border:0; color:var(--on-accent); }
