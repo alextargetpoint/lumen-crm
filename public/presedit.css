@@ -38,6 +38,18 @@ button{font-family:inherit;cursor:pointer}
 .pe-bulk-acts button:hover{background:var(--pe-hi)}
 .pe-bulk-acts button:last-child:hover{background:#fbeaea;color:#a33;border-color:#e4b8b8}
 .pe-bulk-acts svg{width:16px;height:16px}
+/* ряд пресетов в «Оформление документа» */
+.pe-presetrow{display:flex;flex-direction:column;gap:9px;margin-bottom:18px}
+.pe-presetcard{position:relative;display:flex;flex-direction:column;gap:7px;align-items:flex-start;text-align:left;padding:13px 14px;border:1px solid var(--pe-line);border-radius:12px;background:#fff;cursor:pointer;font:inherit}
+.pe-presetcard:hover{background:var(--pe-hi)}
+.pe-presetcard.on{border-color:#1f1b17;box-shadow:0 0 0 1px #1f1b17}
+.pe-preset-sw{display:flex;gap:3px}
+.pe-preset-sw i{width:26px;height:17px;border-radius:4px;border:1px solid rgba(0,0,0,.1)}
+.pe-preset-nm{font-weight:600;font-size:13.5px}
+.pe-preset-note{color:var(--pe-mut);font-size:11.5px;line-height:1.35}
+.pe-presetcard .ck{position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;background:#1f1b17;color:#fff;display:none;align-items:center;justify-content:center}
+.pe-presetcard .ck svg{width:12px;height:12px}
+.pe-presetcard.on .ck{display:flex}
 /* «+ Добавить блок» на холсте */
 .pe-canvas-add{margin:16px auto 0;max-width:640px;width:calc(100% - 40px);height:46px;border:1.5px dashed #d8c48a;border-radius:11px;background:#fdf8ec;color:#9a7b2e;font-weight:600;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
 .pe-canvas-add:hover{background:#fbf2dc;border-color:#c9ad66}

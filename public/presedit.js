@@ -1025,13 +1025,14 @@
   }
 
   function openStyle() {
-    var sel = { paletteId: S.pres.theme.paletteId, fontPairId: S.pres.theme.fontPairId };
+    var sel = { presetId: S.pres.theme.presetId, paletteId: S.pres.theme.paletteId, fontPairId: S.pres.theme.fontPairId };
     var ov = document.createElement('div'); ov.className = 'pe-overlay'; ov.id = 'peStyleOv';
     function body() {
       var pal = TOK.palette(sel.paletteId);
-      return '<div class="pe-ov-top"><button class="pe-iconbtn" data-x>' + ic('x') + '</button><div class="t">Стиль презентации</div><div class="pe-top-sp" style="flex:1"></div><button class="pe-btn" data-x>Отмена</button><button class="pe-btn pe-btn-primary" data-apply>Применить стиль</button></div>' +
+      return '<div class="pe-ov-top"><button class="pe-iconbtn" data-x>' + ic('x') + '</button><div class="t">Оформление документа</div><div class="pe-top-sp" style="flex:1"></div><button class="pe-btn" data-x>Отмена</button><button class="pe-btn pe-btn-primary" data-apply>Применить оформление</button></div>' +
         '<div class="pe-ov-body">' +
           '<div class="pe-ov-left">' +
+            '<div class="pe-hd">Пресет оформления</div><div class="pe-presetrow">' + TOK.PRESETS.map(presetCard).join('') + '</div>' +
             '<div class="pe-styletabs"><button class="on">Палитры</button><button disabled>Шрифты</button><button disabled>Бренд</button></div>' +
             '<div class="pe-hd">Цвета презентации</div>' +
             swatchRow('Фон', pal.c.background) + swatchRow('Текст', pal.c.text) + swatchRow('Акцент', pal.c.accent) + swatchRow('Поверхность', pal.c.surface) +
@@ -1045,6 +1046,7 @@
           '</div>' +
         '</div>';
     }
+    function presetCard(p) { var c = TOK.palette(p.paletteId).c; return '<button class="pe-presetcard' + (p.id === sel.presetId ? ' on' : '') + '" data-preset="' + p.id + '"><div class="pe-preset-sw">' + [c.background, c.surface, c.accent, c.text].map(function (x) { return '<i style="background:' + x + '"></i>'; }).join('') + '</div><div class="pe-preset-nm">' + esc(p.name) + '</div><div class="pe-preset-note">' + esc(p.note) + '</div><div class="ck">' + ic('check') + '</div></button>'; }
     function palCard(p) { return '<div class="pe-palcard' + (p.id === sel.paletteId ? ' on' : '') + '" data-pal="' + p.id + '"><div class="sw" style="background:' + p.c.surface + '"></div><div class="nm">' + esc(p.name) + '</div><div class="dots"><i style="background:' + p.c.background + '"></i><i style="background:' + p.c.surface + '"></i><i style="background:' + p.c.accent + '"></i><i style="background:' + p.c.text + '"></i></div><div class="ck">' + ic('check') + '</div></div>'; }
     function fontCard(fp) { return '<div class="pe-fontcard' + (fp.id === sel.fontPairId ? ' on' : '') + '" data-fp="' + fp.id + '"><div class="big" style="font-family:\'' + fp.heading.family + '\'">Ваш<br>новый дом</div><div class="sm" style="font-family:\'' + fp.body.family + '\'">Современные решения для жизни</div><div class="nm">' + esc(fp.heading.family) + ' + ' + esc(fp.body.family) + '</div><div class="ck">' + ic('check') + '</div></div>'; }
     function swatchRow(n, hex) { return '<div class="pe-swatch-row"><div class="pe-swatch" style="background:' + hex + '"></div><div class="pe-swatch-tx"><b>' + n + '</b><span>' + hex.toUpperCase() + '</span></div></div>'; }
@@ -1052,8 +1054,9 @@
     function paintPrev() { var prev = document.getElementById('peStylePrev'); if (!prev) return; var f = TOK.format('portrait_a4'); var hero = sections().find(function (s) { return s.family === 'hero'; }) || sections()[0]; var html = T.renderSection(hero, { format: 'portrait_a4', theme: sel, source: S.source, assets: S.assets, brand: brandWithBroker() })[0] || ''; var sc = 0.42; prev.className = 'lp-shadow'; prev.style.cssText = 'width:' + (f.cssW * sc) + 'px;height:' + (f.cssH * sc) + 'px'; prev.innerHTML = '<div style="transform:scale(' + sc + ');transform-origin:top left">' + html + '</div>'; }
     function rewire() {
       ov.querySelectorAll('[data-x]').forEach(function (b) { b.onclick = function () { ov.remove(); }; });
-      ov.querySelector('[data-apply]').onclick = function () { mutate(function () { S.pres.theme.paletteId = sel.paletteId; S.pres.theme.fontPairId = sel.fontPairId; }); ov.remove(); };
-      ov.querySelectorAll('[data-pal]').forEach(function (c) { c.onclick = function () { sel.paletteId = c.getAttribute('data-pal'); refresh(); }; });
+      ov.querySelector('[data-apply]').onclick = function () { mutate(function () { S.pres.theme.presetId = sel.presetId; S.pres.theme.paletteId = sel.paletteId; S.pres.theme.fontPairId = sel.fontPairId; }); ov.remove(); };
+      ov.querySelectorAll('[data-preset]').forEach(function (c) { c.onclick = function () { var t = TOK.presetTheme(c.getAttribute('data-preset')); if (t) { sel.presetId = t.presetId; sel.paletteId = t.paletteId; sel.fontPairId = t.fontPairId; } refresh(); }; });
+      ov.querySelectorAll('[data-pal]').forEach(function (c) { c.onclick = function () { sel.paletteId = c.getAttribute('data-pal'); sel.presetId = null; refresh(); }; });
       ov.querySelectorAll('[data-fp]').forEach(function (c) { c.onclick = function () { sel.fontPairId = c.getAttribute('data-fp'); refresh(); }; });
     }
     function refresh() { ov.innerHTML = body(); rewire(); paintPrev(); }
