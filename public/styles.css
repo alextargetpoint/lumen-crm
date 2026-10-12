@@ -8887,6 +8887,18 @@ body.client-view [data-team]{ display:none !important; }
 .ch-b.bad{color:#b91c1c;background:rgba(190,60,60,.13)}
 .ch-b.unk{color:var(--ink-3);background:var(--bg-2,rgba(0,0,0,.05))}
 #chbWa{cursor:pointer}#chbWa:hover{filter:brightness(.96)}
+/* попап-инструкция установки нотетейкера */
+.nt-steps{display:flex;flex-direction:column;gap:14px;margin:4px 0}
+.nt-step{display:flex;gap:12px;align-items:flex-start}
+.nt-step-n{flex:0 0 24px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.nt-step-b b{display:block;font-size:13.5px;color:var(--ink-1);margin-bottom:3px}
+.nt-step-b>div{font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.nt-kbd{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--bg-2,rgba(0,0,0,.05));border:1px solid var(--stroke);font-size:11.5px;font-weight:600;color:var(--ink-1);white-space:nowrap}
+.nt-dim{color:var(--ink-3);font-size:11.5px}
+.nt-note{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--ink-2);background:var(--bg-2,rgba(37,99,235,.05));border:1px solid var(--stroke);border-radius:11px;padding:11px 13px;margin:12px 0}
+.nt-note svg{width:15px;height:15px;flex:0 0 15px;margin-top:1px;color:var(--accent)}
+.nt-note.warn{background:rgba(201,124,42,.1);border-color:rgba(201,124,42,.28)}
+.nt-note.warn svg{color:#b45309}
 .lc-more{border:1px solid var(--stroke);border-radius:14px;overflow:hidden;margin-bottom:12px}
 .lc-more-hd{width:100%;display:flex;align-items:center;gap:10px;padding:14px 16px;border:0;background:var(--card);cursor:pointer;text-align:left;color:inherit}
 .lc-more-hd>svg:first-child{width:18px;height:18px;color:var(--ink-3);flex:0 0 auto}

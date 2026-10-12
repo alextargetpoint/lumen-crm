@@ -2618,7 +2618,49 @@ document.addEventListener('click', (e) => {
   if (b) { navigator.clipboard.writeText(location.origin + '/m/' + b.dataset.mcopy); toast('Ссылка на страницу встречи скопирована', null, true); }
   const ed = e.target.closest('[data-medit2]');
   if (ed) { const id = ed.dataset.medit2; try { closeModal(); } catch (_) {} openMeetingPageEditor(id); }
+  const ntdl = e.target.closest('[data-ntdl]');
+  if (ntdl) { const plat = ntdl.dataset.ntdl; setTimeout(() => { try { notetakerInstallModal(plat); } catch (_) {} }, 400); }   /* скачивание стартует по href, через миг — попап с инструкцией */
 });
+/* Попап-инструкция по установке нотетейкера (авто-открывается после клика «Скачать»).
+   macOS: не из App Store → Gatekeeper блокирует, разрешение экрана применяется после перезапуска,
+   дубли копий дают «Lumen Notetaker 2/3» и зацикленный запрос — всё учтено. */
+function notetakerInstallModal(platform) {
+  const isMac = platform !== 'win';
+  const step = (n, t, b) => `<div class="nt-step"><span class="nt-step-n">${n}</span><div class="nt-step-b"><b>${t}</b><div>${b}</div></div></div>`;
+  const kbd = (s) => `<span class="nt-kbd">${esc(s)}</span>`;
+  const macBody = `
+    <div class="nt-note warn">${ic(I.shield)}<span>Приложение распространяется <b>напрямую</b> (не через App Store), поэтому macOS при первом запуске его блокирует — это нормально. Ниже по шагам, что нажимать.</span></div>
+    <div class="nt-steps">
+      ${step(1, 'Распакуйте и перенесите в «Программы»', `Двойной клик по скачанному <b>LumenNotetaker-mac.zip</b> → появится «Lumen Notetaker». Перетащите его в папку <b>Программы (Applications)</b>.`)}
+      ${step(2, 'Запустите — появится блокировка', `Откройте приложение. macOS скажет «<i>Mac заблокировал Lumen Notetaker для безопасности</i>» — это ожидаемо, закройте окошко.`)}
+      ${step(3, 'Разрешите запуск в Системных настройках', `Откройте ${kbd('Системные настройки')} → ${kbd('Конфиденциальность и безопасность')}, прокрутите вниз до раздела «Безопасность» → у строки про Lumen Notetaker нажмите ${kbd('Открыть всё равно')} <span class="nt-dim">(в системе на другом языке — та же кнопка: англ. «Open Anyway», ит. «Apri comunque»)</span>. Подтвердите Touch ID / паролем.`)}
+      ${step(4, 'Во всплывшем окне — «Открыть всё равно»', `Появится диалог «Открыть Lumen Notetaker?» → нажмите ${kbd('Открыть всё равно')}. Приложение запустится.`)}
+      ${step(5, 'Войдите аккаунтом дашборда', `Тот же e-mail и пароль, что в этой CRM.`)}
+      ${step(6, 'Дайте доступ к записи экрана', `Приложение попросит «Запись экрана и системного звука» (нужно, чтобы писать звук Zoom/Meet/Teams) → ${kbd('Открыть системные настройки')} → включите тумблер <b>Lumen Notetaker</b>.`)}
+      ${step(7, '⚠️ Перезапустите приложение', `macOS применяет доступ к экрану <b>только после перезапуска</b>. Нажмите <b>«Перезапустить»</b> в приложении (или закройте через «Выйти» в его окне и откройте снова). Без перезапуска запись не включится.`)}
+      ${step(8, 'Готово', `Приложение живёт в менюбаре (иконка звуковой волны). Звонки и встречи пишутся в фоне, транскрипт и квалификация падают прямо в карточку лида. Клиент ничего не видит.`)}
+    </div>
+    <div class="nt-note">${ic(I.spark)}<span><b>Запрос разрешения зациклился / видите «Lumen Notetaker 2» или «3»?</b> Значит на Mac осталось несколько копий. Почините так: закройте приложение (в его окне «Выйти») → удалите <b>все</b> копии Lumen Notetaker (из «Программы», «Загрузки», «Рабочий стол») → в ${kbd('Системные настройки')} → ${kbd('Конфиденциальность')} → ${kbd('Запись экрана')} уберите старые строки «Lumen Notetaker» (минусом) → установите <b>одну</b> свежую копию по шагам выше.</span></div>`;
+  const winBody = `
+    <div class="nt-steps">
+      ${step(1, 'Распакуйте архив', `Распакуйте <b>LumenNotetaker-win.zip</b> в любую папку.`)}
+      ${step(2, 'Запустите', `Запустите <b>run-windows.bat</b> (или LumenNotetaker.exe).`)}
+      ${step(3, 'Пропустите предупреждение Windows', `SmartScreen может показать «Система защитила ваш компьютер» → ${kbd('Подробнее')} → ${kbd('Выполнить в любом случае')} (приложение не из магазина — это нормально).`)}
+      ${step(4, 'Войдите аккаунтом дашборда', `Тот же e-mail и пароль, что в этой CRM.`)}
+      ${step(5, 'Разрешите доступ к звуку', `При запросе разрешите доступ к микрофону. Системный звук пишется через WASAPI — кабель не нужен.`)}
+      ${step(6, 'Готово', `Приложение пишет звонки/встречи в фоне, транскрипт падает в карточку лида. Клиент ничего не видит.`)}
+    </div>`;
+  modal({
+    title: isMac ? 'Установка на macOS — по шагам' : 'Установка на Windows — по шагам',
+    sub: 'Скачивание началось. Пара шагов — и нотетейкер готов писать звонки в карточку.',
+    wide: true,
+    body: (isMac ? macBody : winBody),
+    actions: [
+      { label: 'Полный справочник', onClick: () => { window.open('/help/notetaker', '_blank'); return false; } },
+      { label: 'Понятно', cls: 'btn-accent' },
+    ],
+  });
+}
 /* тест-звонок для проверки номера брокера (первое плечо click-to-call) */
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-phonetest]'); if (!b) return;
@@ -7263,8 +7305,8 @@ PAGES.waProfile = async (root) => {
         <div class="muted" style="font-size:12px;line-height:1.5;margin-top:2px">Фоновое приложение пишет и расшифровывает ваши звонки и видео-встречи (Zoom/Meet/Teams) <b>локально</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент ничего не видит, плашки записи нет.</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto">
-        <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download style="text-decoration:none;justify-content:center">${ic(I.doc)}Скачать для macOS</a>
-        <a class="btn btn-sm" href="/assets/notetaker/LumenNotetaker-win.zip" download style="text-decoration:none;justify-content:center">${ic(I.doc)}Скачать для Windows</a>
+        <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download data-ntdl="mac" style="text-decoration:none;justify-content:center">${ic(I.doc)}Скачать для macOS</a>
+        <a class="btn btn-sm" href="/assets/notetaker/LumenNotetaker-win.zip" download data-ntdl="win" style="text-decoration:none;justify-content:center">${ic(I.doc)}Скачать для Windows</a>
         <a class="btn btn-sm" href="/help/notetaker" target="_blank" style="text-decoration:none;justify-content:center;font-size:11.5px">Справочник</a>
       </div>
     </div>
@@ -18437,8 +18479,8 @@ PAGES.settings = async (root) => {
         <img src="/assets/notetaker/icon.png" alt="" style="width:46px;height:46px;border-radius:11px;flex:0 0 auto">
         <div style="flex:1;min-width:200px"><div class="muted" style="font-size:12.5px;line-height:1.55">Приложение для мака: пишет и расшифровывает звонки и видео-встречи (Zoom/Meet/Teams) <b>локально</b> — транскрипт и квалификация падают прямо в карточку лида. Клиент не видит плашку записи. Вход — вашим аккаунтом дашборда.</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download style="text-decoration:none">${ic(I.doc)}Скачать для macOS</a>
-          <a class="btn btn-sm" href="/assets/notetaker/LumenNotetaker-win.zip" download style="text-decoration:none">${ic(I.doc)}Скачать для Windows</a>
+          <a class="btn btn-accent btn-sm" href="/assets/notetaker/LumenNotetaker-mac.zip" download data-ntdl="mac" style="text-decoration:none">${ic(I.doc)}Скачать для macOS</a>
+          <a class="btn btn-sm" href="/assets/notetaker/LumenNotetaker-win.zip" download data-ntdl="win" style="text-decoration:none">${ic(I.doc)}Скачать для Windows</a>
           <a class="btn btn-sm" href="/help/notetaker" target="_blank" style="text-decoration:none">Справочник</a>
         </div>
       </div>`, { open: false })}
