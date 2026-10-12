@@ -262,6 +262,38 @@ function autofillPlan(candidates, opts) {
 }
 
 /* ---------------------------------------------------------------------------
+   5c. КАДРИРОВАНИЕ ПОД ФОРМАТ (доп-ТЗ §6, экран «Кадрирование под формат»).
+   mode 'fit' = сохранить объект целиком (поля/letterbox); 'fill' = заполнить область (кроп).
+   Возвращает crop 0..1, защиту зон, PPI после кропа и подсказку «лучше с полями».
+   -------------------------------------------------------------------------- */
+function cropForFormat(imgW, imgH, format, slot, opts) {
+  opts = opts || {};
+  const si = slotInches(format || 'portrait_a4', slot || 'cover');
+  const target = si.w / si.h, imgA = (imgW > 0 && imgH > 0) ? imgW / imgH : 1;
+  const focal = opts.focal || { x: 0.5, y: 0.5 };
+  const prot = opts.protectedRegions || [];
+  if (opts.mode === 'fit') {
+    return { mode: 'fit', crop: { x: 0, y: 0, w: 1, h: 1 }, letterbox: Math.abs(imgA - target) > 0.02, keepsProtected: true,
+      ppi: effectivePPI(imgW, imgH, si.w, si.h), slotInches: si };
+  }
+  let cw, ch;
+  if (target >= imgA) { cw = 1; ch = imgA / target; } else { ch = 1; cw = target / imgA; }
+  let cx = focal.x - cw / 2, cy = focal.y - ch / 2;
+  cx = Math.max(0, Math.min(1 - cw, cx)); cy = Math.max(0, Math.min(1 - ch, cy));
+  const crop = { x: +cx.toFixed(4), y: +cy.toFixed(4), w: +cw.toFixed(4), h: +ch.toFixed(4) };
+  const keeps = cropKeepsProtected(crop, prot);
+  const heavyCrop = (crop.w * crop.h) < 0.55;                         // >45% кадра срезано
+  const portraitSlotLandscapePhoto = target < 0.9 && imgA > 1.25;     // гориз. фото в вертик. слот
+  const suggestFit = !keeps || heavyCrop || portraitSlotLandscapePhoto;
+  const reason = !keeps ? 'Кроп обрежет защищённую зону — лучше «сохранить объект целиком» или другой макет'
+    : portraitSlotLandscapePhoto ? 'Для вертикальной обложки лучше макет с полями — так объект сохраняет пропорции'
+      : heavyCrop ? 'Сильный кроп — часть кадра уйдёт; рассмотрите макет с полями' : null;
+  return { mode: 'fill', crop, letterbox: false, keepsProtected: keeps,
+    ppi: effectivePPI(Math.round(crop.w * imgW), Math.round(crop.h * imgH), si.w, si.h),
+    suggestFit, suggestFitReason: reason, slotInches: si };
+}
+
+/* ---------------------------------------------------------------------------
    6. МОДЕЛЬ ДАННЫХ (ТЗ §18) — фабрики, стабильные id, версии.
    -------------------------------------------------------------------------- */
 function rid(p) { return (p || 'm') + '_' + crypto.randomBytes(8).toString('hex'); }
@@ -555,7 +587,7 @@ function logoFitsZone(profile, ctx, strategy) {
 module.exports = {
   sha256, imageDims, imageHasAlpha, FORMAT_PAGE_IN, SLOT_FRACTION, slotInches, PPI, effectivePPI,
   analyzeAsset, classifyMaterial, suitability, rankCovers, COVER_WEIGHTS, autofillPlan,
-  newAsset, newVariant, newPlacement, duplicateGroups, cropKeepsProtected, SAFE_ENHANCE,
+  newAsset, newVariant, newPlacement, duplicateGroups, cropKeepsProtected, cropForFormat, SAFE_ENHANCE,
   analyzeLogo, placeLogo, logoFitsZone, LOGO_AUTO, LOGO_MIN_PT,
   selectCover, cropForAspect, recomputeCropForFormat, exportMediaCheck,
   recipeKey, findOrPlanVariant, buildEnhanceRecipe,
