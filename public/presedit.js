@@ -118,7 +118,9 @@
   function thumbRow(s, i) {
     var title = sectionTitle(s);
     var err = S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; });
-    return '<div class="pe-thumb' + (i === S.pageIdx ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + '" data-pg="' + i + '">' +
+    var msel = S.multiMode && (S.multiSel || []).indexOf(i) >= 0;
+    return '<div class="pe-thumb' + (i === S.pageIdx && !S.multiMode ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + (S.multiMode ? ' multi' : '') + (msel ? ' msel' : '') + '" data-pg="' + i + '">' +
+      (S.multiMode ? '<span class="pe-thumb-cb">' + (msel ? ic('check') : '') + '</span>' : '') +
       '<div class="pe-thumb-hd"><span class="pe-thumb-n">' + pad(i + 1) + '</span>' +
         '<span class="pe-thumb-t">' + esc(title) + '</span>' +
         '<span class="pe-thumb-mini" data-act="pgmenu" data-pg="' + i + '">' + ic('dots') + '</span></div>' +
@@ -161,8 +163,18 @@
   function navigator_() {
     var items = S.isColl ? navCollection() : sections().map(thumbRow).join('');
     var hd = '<div class="pe-nav-hd"><span>' + (S.isColl ? 'Состав подборки' : 'Страницы') + '</span>' +
-      '<button class="pe-nav-add" data-act="' + (S.isColl ? 'addobj' : 'addpage') + '" title="' + (S.isColl ? 'Добавить объекты' : 'Добавить страницу') + '">' + ic('plus') + '</button></div>';
-    return '<div class="pe-nav">' + hd + '<div class="pe-nav-list">' + items + '</div></div>';
+      '<div style="display:flex;gap:4px"><button class="pe-nav-sel' + (S.multiMode ? ' on' : '') + '" data-act="multiToggle">' + (S.multiMode ? 'Готово' : 'Выбрать') + '</button>' +
+      '<button class="pe-nav-add" data-act="' + (S.isColl ? 'addobj' : 'addpage') + '" title="' + (S.isColl ? 'Добавить объекты' : 'Добавить страницу') + '">' + ic('plus') + '</button></div></div>';
+    var bulk = '';
+    if (S.multiMode) {
+      var n = (S.multiSel || []).length;
+      bulk = '<div class="pe-bulk"><div class="pe-bulk-n">' + (n ? 'Выбрано ' + n : 'Отметьте страницы') + '</div>' +
+        (n ? '<div class="pe-bulk-acts">' +
+          '<button data-act="bulkHide" title="Скрыть из выпуска">' + ic('eye') + '</button>' +
+          '<button data-act="bulkDup" title="Дублировать">' + ic('copy') + '</button>' +
+          '<button data-act="bulkDel" title="Удалить">' + ic('trash') + '</button></div>' : '') + '</div>';
+    }
+    return '<div class="pe-nav">' + hd + '<div class="pe-nav-list">' + items + '</div>' + bulk + '</div>';
   }
   function sectionTitle(s) { var t = cval(s, 'title'); if (s.family === 'broker') t = s.pageType === 'broker_contacts' ? 'Контакты брокера' : 'О брокере'; return (typeof t === 'string' && t) ? t.replace(/\n/g, ' ') : FAM_LABEL[s.family] || 'Страница'; }
 
@@ -469,7 +481,7 @@
       el.addEventListener(actEvent(act), function (e) { handle(act, el, e); });
     });
     // page select (плоские миниатюры + строки групп подборки)
-    root.querySelectorAll('.pe-nav-list [data-pg]').forEach(function (el) { if (el.getAttribute('data-act')) return; el.addEventListener('click', function (e) { if (e.target.closest('[data-act]')) return; var v = el.getAttribute('data-pg'); if (v === '') return; S.pageIdx = +v; render(); }); });
+    root.querySelectorAll('.pe-nav-list [data-pg]').forEach(function (el) { if (el.getAttribute('data-act')) return; el.addEventListener('click', function (e) { if (e.target.closest('[data-act]')) return; var v = el.getAttribute('data-pg'); if (v === '') return; var i = +v; if (S.multiMode) { S.multiSel = S.multiSel || []; var at = S.multiSel.indexOf(i); if (at >= 0) S.multiSel.splice(at, 1); else S.multiSel.push(i); render(); return; } S.pageIdx = i; render(); }); });
     // format tabs
     root.querySelectorAll('[data-fmt]').forEach(function (el) { el.addEventListener('click', function () { S.fmt = el.getAttribute('data-fmt'); S.pres.defaultFormat = S.fmt; scheduleSave(); render(); revalidate(); }); });
     // inspector tabs
@@ -617,6 +629,10 @@
       case 'grptoggle': S.openGroups = S.openGroups || {}; var gk = +el.getAttribute('data-gk'); S.openGroups[gk] = !S.openGroups[gk]; render(); break;
       case 'objmenu': objMenu(el, +el.getAttribute('data-gk')); break;
       case 'addobj': toast('Добавить объекты', 'Поиск и выбор объектов — экран в разработке'); break;
+      case 'multiToggle': S.multiMode = !S.multiMode; S.multiSel = []; render(); break;
+      case 'bulkHide': bulkOp('hide'); break;
+      case 'bulkDup': bulkOp('dup'); break;
+      case 'bulkDel': bulkOp('del'); break;
       case 'history': openHistory(); break;
       case 'ovopen': S.ovMode = true; S.addMode = false; S.ovOpt = 'continue'; render(); break;
       case 'ovclose': S.ovMode = false; render(); break;
@@ -748,6 +764,24 @@
       { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
     ]);
   }
+  /* ---------- Массовые действия (§7/§11) — одна отмена на всю операцию ---------- */
+  function bulkOp(op) {
+    var idxs = (S.multiSel || []).slice().sort(function (a, b) { return a - b; });
+    if (!idxs.length) return;
+    mutate(function () {
+      var secs = sections();
+      if (op === 'hide') { idxs.forEach(function (i) { if (secs[i]) secs[i].enabled = false; }); }
+      else if (op === 'dup') {
+        // дублируем по убыванию, чтобы индексы не сдвигались
+        idxs.slice().reverse().forEach(function (i) { var s = secs[i]; if (!s) return; var c = JSON.parse(JSON.stringify(s)); c.id = 's' + Math.random().toString(16).slice(2, 8); secs.splice(i + 1, 0, c); });
+      } else if (op === 'del') { idxs.slice().reverse().forEach(function (i) { secs.splice(i, 1); }); }
+    });
+    var n = idxs.length;
+    S.multiSel = []; if (op === 'del') { S.multiMode = false; S.pageIdx = Math.min(S.pageIdx, sections().length - 1); }
+    render();
+    toast(op === 'hide' ? 'Скрыто из выпуска' : op === 'dup' ? 'Дублировано' : 'Удалено', n + ' ' + plural(n, 'страница', 'страницы', 'страниц') + ' · Ctrl+Z вернёт всё', true);
+  }
+
   /* ---------- Уровни закрепления (§8 доп-ТЗ) — защита ручной работы от автоматизации ---------- */
   function photoPinMenu(anchor, s, idx) {
     var ref = (s.assetRefs || [])[idx] || {};
