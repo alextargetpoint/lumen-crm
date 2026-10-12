@@ -1108,7 +1108,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 /* футер действий ЛИПКИЙ: при длинном теле (превью диалога в карточке лида) кнопки «Открыть диалог» и др.
    раньше уходили за край — модалка скроллилась целиком. Теперь кнопки всегда видны внизу. */
 .m-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; position: sticky; bottom: -24px; z-index: 3; margin: 18px -24px -24px; padding: 15px 24px; background: rgba(255, 255, 255, .97); border-top: 1px solid var(--stroke-soft, #e7e3dd); border-radius: 0 0 var(--r-lg) var(--r-lg); }
-.toasts { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 200; }
+.toasts { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 5000; }   /* ВЫШЕ модалки (оверлей 4000) — иначе тосты прятались под затемняющим фоном карточки/цепочки */
 .toast {
   min-width: 260px; max-width: 360px; padding: 13px 16px; border-radius: var(--r-md);
   font-size: 13px; transform: translateX(26px) scale(.97); opacity: 0; transition: all .38s var(--ease-spring);
