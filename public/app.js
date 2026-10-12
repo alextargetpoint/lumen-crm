@@ -6366,6 +6366,7 @@ async function openLeadModal(id) {
           ${lcTasksBlock(leadTasks)}
           ${lcFactsBlock(l)}
           ${lcCommentsBlock(l)}
+          ${coll('Материалы клиента', '<div id="lcMaterials" class="lc-materials"><div class="muted" style="font-size:12px;padding:4px 0">Загрузка…</div></div>', { open: true, icon: I.layers })}
           <div class="lc-more" id="lcMore">
             <button class="lc-more-hd" id="lcMoreTog" type="button">${ic(I.layers)}<span class="lc-more-t"><b>Дополнительно</b><i>ИИ-помощник, контакты, файлы, поля и встречи</i></span><svg class="lc-more-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
             <div class="lc-more-body" id="lcMoreBody" style="display:none">
@@ -6474,6 +6475,18 @@ async function openLeadModal(id) {
   });
 
   $('#lcPhone', bd).addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
+  /* Материалы клиента (ТЗ v3 §13): связанные подборки/презентации + быстрые действия */
+  (async () => {
+    const box = $('#lcMaterials', bd); if (!box) return;
+    let presItems = [], oldCols = [];
+    try { const d = await api.get('/presentations'); presItems = (d.items || []).filter(x => x.kind === 'collection' && x.status !== 'archived' && x.clientId === l.id); } catch (e) {}
+    try { const c = await api.get('/collections'); oldCols = (c || []).filter(x => x.leadId === l.id && x.status !== 'archived'); } catch (e) {}
+    const rows = presItems.map(x => `<div class="lc-mat-row"><span class="lc-mat-ic">${ic(I.layers)}</span><div class="lc-mat-b"><b>${esc(x.title || 'Подборка')}</b><span>Подборка · ${x.objectCount || (x.projectIds || []).length} об.</span></div><a class="btn btn-sm" href="/pres/${x.id}">Редактировать</a></div>`)
+      .concat(oldCols.map(x => `<div class="lc-mat-row"><span class="lc-mat-ic">${ic(I.layers)}</span><div class="lc-mat-b"><b>${esc(x.title || 'Подборка')}</b><span>Подборка · ${(x.propertyIds || []).length} об. <i class="cc-leg">старая</i></span></div><a class="btn btn-sm" href="/p/${x.id}" target="_blank">Открыть</a></div>`)).join('');
+    box.innerHTML = (rows || '<div class="muted" style="font-size:12px;padding:2px 0 8px">Пока нет материалов для этого клиента.</div>') +
+      `<div class="lc-mat-acts"><button class="btn btn-sm btn-accent" id="lcMatNewColl">${ic(I.plus)}Создать подборку</button></div>`;
+    $('#lcMatNewColl', box)?.addEventListener('click', () => { if (typeof openCollectionCreate === 'function') openCollectionCreate(); });
+  })();
   /* индикатор WhatsApp: клик → перепроверка; авто-проверка при открытии, если не проверяли или устарело (>7 дней) */
   const recheckWa = async (silent) => {
     try { const r = await api.post(`/leads/${id}/wa-check`, {}); if (!silent) toast(r.exists ? '✓ WhatsApp есть' : 'WhatsApp у номера не найден', null, true); openLeadModal(id); }
