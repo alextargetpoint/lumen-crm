@@ -432,7 +432,8 @@
     return '<div class="pe-field"><label>' + esc(label) + '<button class="pe-field-dots" data-act="photoPin" data-idx="' + idx + '" title="Закрепление">' + ic('dots') + '</button></label>' +
       '<div class="pe-photo-prev" data-act="focal" data-idx="' + idx + '">' + (url ? '<img src="' + esc(url) + '">' : '') + ((lk || ck) ? '<span class="pe-lock" title="' + (lk ? 'Фото закреплено — автозамена отключена' : '') + (ck ? ' Кадрирование закреплено' : '') + '">' + ic('lock') + (ck ? '<i>кадр</i>' : '') + '</span>' : '') + '</div>' +
       '<div class="pe-row"><button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="photoBrowser" data-idx="' + idx + '">' + ic('image') + 'Найти фото</button>' +
-      '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="cropFmt" data-idx="' + idx + '"' + (url ? '' : ' disabled') + '>' + ic('crop') + 'Кадрировать</button></div></div>';
+      '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="cropFmt" data-idx="' + idx + '"' + (url ? '' : ' disabled') + '>' + ic('crop') + 'Кадрировать</button></div>' +
+      '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px;margin-top:6px" data-act="enhance" data-idx="' + idx + '"' + (url ? '' : ' disabled') + '>' + ic('sparkle') + 'Улучшить фото' + (ref && ref.enhance ? ' · вкл' : '') + '</button></div>';
   }
   function galleryPicker(s) {
     var imgs = (S.source.images || []);
@@ -655,6 +656,7 @@
       case 'cropFmt': openCropFormat(s, +el.getAttribute('data-idx')); break;
       case 'photoBrowser': openPhotoBrowser(s, +el.getAttribute('data-idx')); break;
       case 'photoPin': photoPinMenu(el, s, +el.getAttribute('data-idx')); break;
+      case 'enhance': openEnhance(s, +el.getAttribute('data-idx')); break;
       case 'focal': setFocal(s, +el.getAttribute('data-idx'), e); break;
       case 'focalHint': toast('Кликните по фото, чтобы задать точку фокуса'); break;
       case 'galtoggle': galToggle(s, el.getAttribute('data-gid')); break;
@@ -780,6 +782,39 @@
     S.multiSel = []; if (op === 'del') { S.multiMode = false; S.pageIdx = Math.min(S.pageIdx, sections().length - 1); }
     render();
     toast(op === 'hide' ? 'Скрыто из выпуска' : op === 'dup' ? 'Дублировано' : 'Удалено', n + ' ' + plural(n, 'страница', 'страницы', 'страниц') + ' · Ctrl+Z вернёт всё', true);
+  }
+
+  /* ---------- «Улучшить фото» До/После (безопасная коррекция — бесплатно, недеструктивно, §9) ---------- */
+  var SAFE_ENHANCE = { exposure: 1.06, contrast: 1.08, saturation: 1.07, warmth: 0.05 };
+  function filterStr(e) { return e ? 'brightness(' + (e.exposure || 1) + ') contrast(' + (e.contrast || 1) + ') saturate(' + (e.saturation || 1) + ')' + (e.warmth ? ' sepia(' + e.warmth + ')' : '') : 'none'; }
+  function openEnhance(s, idx) {
+    var ref = (s.assetRefs || [])[idx]; if (!ref) { toast('Нет фото'); return; }
+    var url = (S.assets[ref.assetId] || {}).url || ref.url; if (!url) { toast('Нет фото'); return; }
+    var e = ref.enhance ? Object.assign({}, ref.enhance) : Object.assign({}, SAFE_ENHANCE);
+    var ov = document.createElement('div'); ov.className = 'pu-overlay';
+    var sliders = [['exposure', 'Экспозиция', 0.8, 1.3], ['contrast', 'Контраст', 0.85, 1.25], ['saturation', 'Насыщенность', 0.8, 1.3], ['warmth', 'Тепло', 0, 0.25]];
+    function paint() {
+      ov.querySelector('.en-after-img').style.filter = filterStr(e);
+      sliders.forEach(function (sl) { var r = ov.querySelector('[data-en="' + sl[0] + '"]'); if (r) r.value = e[sl[0]] || (sl[0] === 'warmth' ? 0 : 1); });
+    }
+    ov.innerHTML = '<div class="pu-box en-box"><div class="pu-hd"><h2>Улучшить фото</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
+      '<div class="en-sub">Безопасная коррекция экспозиции, контраста и баланса. Оригинал сохраняется, архитектура и вид не меняются.</div>' +
+      '<div class="en-grid"><div class="en-compare"><div class="en-col"><div class="en-lbl">До</div><div class="en-ph"><img src="' + esc(url) + '" style="filter:none"></div></div>' +
+      '<div class="en-col"><div class="en-lbl">После</div><div class="en-ph"><img class="en-after-img" src="' + esc(url) + '"></div></div></div>' +
+      '<div class="en-ctrl"><button class="en-auto" data-en-auto>' + ic('sparkle') + 'Безопасная авто-коррекция</button>' +
+      sliders.map(function (sl) { return '<div class="en-slider"><label>' + esc(sl[1]) + '</label><input type="range" min="' + sl[2] + '" max="' + sl[3] + '" step="0.01" data-en="' + sl[0] + '"></div>'; }).join('') +
+      '<div class="en-up"><b>Повысить разрешение (AI)</b><span>Отдельная платная операция — подключается по запросу агентства.</span></div>' +
+      '</div></div>' +
+      '<div class="en-foot"><button class="pe-btn pe-btn-ghost" data-en-revert>Вернуть оригинал</button><div style="flex:1"></div><button class="pe-btn pe-btn-ghost" data-puclose>Отмена</button><button class="pe-btn pe-btn-primary" data-en-apply>Применить</button></div></div>';
+    document.body.appendChild(ov);
+    function close() { ov.remove(); }
+    ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
+    ov.addEventListener('click', function (ev) { if (ev.target === ov) close(); });
+    ov.querySelectorAll('[data-en]').forEach(function (r) { r.addEventListener('input', function () { e[r.getAttribute('data-en')] = +r.value; ov.querySelector('.en-after-img').style.filter = filterStr(e); }); });
+    ov.querySelector('[data-en-auto]').addEventListener('click', function () { e = Object.assign({}, SAFE_ENHANCE); paint(); });
+    ov.querySelector('[data-en-revert]').addEventListener('click', function () { mutate(function () { delete ref.enhance; }); close(); toast('Оригинал восстановлен', null, true); });
+    ov.querySelector('[data-en-apply]').addEventListener('click', function () { mutate(function () { s.assetRefs[idx] = Object.assign({}, ref, { enhance: Object.assign({}, e) }); }); close(); toast('Коррекция применена', 'Оригинал сохранён', true); });
+    paint();
   }
 
   /* ---------- Уровни закрепления (§8 доп-ТЗ) — защита ручной работы от автоматизации ---------- */
@@ -1143,6 +1178,7 @@
       text: '<path d="M4 6h16M4 12h16M4 18h10"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
       pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/>', doc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
       clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', swap: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
+      sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M18 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
       lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     };
     return '<svg viewBox="0 0 24 24" ' + P + ' style="width:1em;height:1em">' + (D[n] || '') + '</svg>';

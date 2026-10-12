@@ -142,7 +142,9 @@
     if (!url) return `<div class="lp-ph ${cls||''}" role="img" aria-label="${esc(alt||'изображение')}"></div>`;
     const fp = ref && ref.focalPoint ? `${Math.round(ref.focalPoint.x*100)}% ${Math.round(ref.focalPoint.y*100)}%` : '50% 50%';
     const fit = (ref && ref.fit) === 'contain' ? 'contain' : 'cover';
-    return `<img class="${cls||''}" src="${esc(url)}" alt="${esc(alt||'')}" style="object-fit:${fit};object-position:${fp}" loading="lazy">`;
+    const e = ref && ref.enhance;   /* безопасная коррекция (недеструктивно, CSS-фильтр — работает и в PDF) */
+    const filt = e ? `;filter:brightness(${e.exposure || 1}) contrast(${e.contrast || 1}) saturate(${e.saturation || 1})${e.warmth ? ' sepia(' + e.warmth + ')' : ''}` : '';
+    return `<img class="${cls||''}" src="${esc(url)}" alt="${esc(alt||'')}" style="object-fit:${fit};object-position:${fp}${filt}" loading="lazy">`;
   }
 
   /* ---------------- page shell ---------------- */
