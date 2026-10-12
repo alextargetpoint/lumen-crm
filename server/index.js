@@ -3108,6 +3108,30 @@ function mergeQualVal(cur, newVal, src, opts) {
 /* Единый разбор извлечённых квалов в карточку (звонок/встреча/нотетейкер). УМНО сливает с уже имеющимися
    (чат+телефон не затирают друг друга — вилка/двойное значение), ручное не трогает. Объект (type) матчим
    по названию из базы (кириллица↔латиница). Возвращает число заполненных полей. */
+/* КАРТОЧНЫЕ ФАКТЫ из транскрибации (ИИ-пометки на утверждение): складываем pending-факты в lead.aiFacts,
+   менеджер их галочкой подтверждает (→ комментарий) или правит/отклоняет. Дедуп по label+value. */
+function storeCardFacts(db, lead, facts, source) {
+  if (!Array.isArray(facts) || !facts.length) return 0;
+  lead.aiFacts = lead.aiFacts || [];
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  let added = 0;
+  for (const f of facts) {
+    if (!f.label || !f.value) continue;
+    if (lead.aiFacts.some(x => norm(x.label) === norm(f.label) && norm(x.value) === norm(f.value))) continue;   /* уже есть (в любом статусе) */
+    lead.aiFacts.unshift({ id: 'fct_' + crypto.randomBytes(5).toString('hex'), label: String(f.label).slice(0, 40), value: String(f.value).slice(0, 300), quote: String(f.quote || '').slice(0, 300), source: source || 'call', status: 'pending', at: Date.now() });
+    added++;
+  }
+  if (lead.aiFacts.length > 60) lead.aiFacts.length = 60;
+  return added;
+}
+async function extractAndStoreCardFacts(db, lead, text, source) {
+  if (!(text && text.length > 30 && llm.available() && llm.extractCardFacts)) return;
+  try {
+    const cf = await llm.extractCardFacts(db, lead, text);
+    const n = storeCardFacts(db, lead, cf && cf.facts, source);
+    if (n) { ai.pushEvent(db, { type: source === 'zoom' ? 'meeting' : 'call', leadId: lead.id, text: `ИИ выделил ${n} ${n === 1 ? 'факт' : n < 5 ? 'факта' : 'фактов'} из разговора — утвердите в карточке` }); store.save(); }
+  } catch (e) { console.error('[card-facts]', e.message); }
+}
 function applyExtractedQuals(db, lead, ex, text, src) {
   lead.quals = lead.quals || {};
   let filled = 0;
@@ -3171,6 +3195,7 @@ function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
           const ex = await llm.extractQuals(db, lead, text);
           if (ex) { const n = applyExtractedQuals(db, lead, ex, text, 'call'); if (n) { ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `ИИ разложил звонок по полям карточки (${['purpose', 'timeline', 'budget', 'type'].filter(k => lead.quals[k] && lead.quals[k].value).length}/4 квала)` }); store.save(); } }
         } catch (e) { console.error('[call-quals]', e.message); }
+        await extractAndStoreCardFacts(db, lead, text, 'call');   /* ИИ-факты из звонка → на утверждение в карточку */
       }
       /* 4) ПОСТ-ЗВОНКОВАЯ РАЗВИЛКА: транскрипт + психо-паттерны → готовое первое касание в WhatsApp
          (дозвон = есть транскрипт). Кладём ЧЕРНОВИК в lead.postCall — брокер отправит его серым способом
@@ -3828,6 +3853,7 @@ async function applyMeetingTranscript(db, mt, text, srcLabel, audioUrl) {
         store.save();
       }
     } catch (_) {}
+    await extractAndStoreCardFacts(db, lead, text, 'zoom');   /* ИИ-факты из встречи/Zoom → на утверждение в карточку */
   }
   return true;
 }
@@ -7676,6 +7702,7 @@ const server = http.createServer(async (req, res) => {
           events: db.events.filter(e => e.leadId === lead.id).slice(0, 60),
           meetings: (db.meetings || []).filter(mt => mt.leadId === lead.id).map(mt => Object.assign({}, mt, { brokerName: (db.brokers.find(x => x.id === mt.brokerId) || {}).name || '—' })),
           chans: engine.channelsFor(db, lead),   /* автодетект доступных каналов касания (WA/TG/email/viber) для ручного выбора */
+          aiFacts: lead.aiFacts || [],            /* ИИ-факты из транскрибации на утверждение (feature: транскрибация → комментарии) */
         }));
       }
       if (req.method === 'PATCH') {
@@ -7799,6 +7826,28 @@ const server = http.createServer(async (req, res) => {
       if (m[2] === 'contacts') lead.contacts = (b.contacts || []).slice(0, 20).map(c => ({ kind: String(c.kind || 'other').slice(0, 20), value: String(c.value || '').slice(0, 200) })).filter(c => c.value);
       store.save();
       return json(res, 200, { notes: lead.notes, contacts: lead.contacts });
+    }
+    /* ИИ-ФАКТЫ ИЗ ТРАНСКРИБАЦИИ: утвердить (→ комментарий) / изменить значение / отклонить. {action, value?, label?} */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/facts\/([^/]+)$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const f = (lead.aiFacts || []).find(x => x.id === m[2]);
+      if (!f) return json(res, 404, { error: 'факт не найден' });
+      const b = await readBody(req);
+      if (b.value != null) f.value = String(b.value).slice(0, 300);   /* правка значения (клиент «тупо вынес» — менеджер поправил) */
+      if (b.label != null) f.label = String(b.label).slice(0, 40);
+      if (b.action === 'approve') {
+        f.status = 'approved'; f.decidedAt = Date.now();
+        lead.notes = lead.notes || [];
+        const _R = sessionRole(req);
+        const _by = (_R && _R.role === 'broker') ? (((db.brokers || []).find(x => x.id === _R.brokerId) || {}).name || 'Брокер') : (((db.settings.agency || {}).manager) || 'Владелец');
+        lead.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: `${f.label}: ${f.value}`, by: _by, fromFact: f.id });
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `В карточку (из разговора): ${f.label} — ${f.value}` });
+      } else if (b.action === 'dismiss') {
+        f.status = 'dismissed'; f.decidedAt = Date.now();
+      }
+      store.save();
+      return json(res, 200, { ok: true, fact: f, notes: lead.notes });
     }
     /* ЗАПЛАНИРОВАТЬ по пожеланию клиента: отложенное сообщение (движок сам отправит) или напоминание брокеру о звонке.
        at — абсолютный UTC-таймстамп, посчитанный на клиенте (знает и tz клиента, и tz брокера). */

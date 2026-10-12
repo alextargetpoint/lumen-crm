@@ -6068,6 +6068,21 @@ function lcCommentsBlock(l) {
     <div class="lc-cmt-add"><input id="lcNote" placeholder="Добавить внутренний комментарий…"><button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.send)}</button></div>
   </div>`;
 }
+/* ИИ-факты из транскрибации (звонок/Zoom) — на утверждение: правим значение → галочка (→ комментарий) или отклоняем */
+function lcFactsBlock(l) {
+  const facts = (l.aiFacts || []).filter(f => f.status === 'pending');
+  if (!facts.length) return '';
+  return `<div class="lc-blk lc-facts">
+    <div class="lc-blk-hd"><b>Из разговора</b><span class="lc-cnt">${facts.length}</span><span class="lc-blk-lock">${ic(I.spark)}ИИ из транскрибации — проверьте и утвердите</span></div>
+    <div class="lc-facts-list">${facts.map(f => `<div class="lc-fact" data-factid="${esc(f.id)}">
+      <div class="lc-fact-top"><span class="lc-fact-lbl">${esc(f.label)}</span>${f.source === 'zoom' ? '<span class="lc-fact-src">Zoom</span>' : '<span class="lc-fact-src">звонок</span>'}</div>
+      <div class="lc-fact-edit"><input class="lc-fact-val" value="${esc(f.value)}" title="Отредактируйте, если ИИ ошибся">
+        <button class="btn btn-sm btn-accent lc-fact-ok" data-factok="${esc(f.id)}" title="Сохранить в комментарии">${ic(I.check)}</button>
+        <button class="btn btn-sm lc-fact-no" data-factno="${esc(f.id)}" title="Отклонить">${ic(I.x)}</button></div>
+      ${f.quote ? `<div class="lc-fact-q" title="что сказал клиент">«${esc(f.quote)}»</div>` : ''}
+    </div>`).join('')}</div>
+  </div>`;
+}
 /* местное время клиента по его поясу (lead.tz — смещение в часах от UTC) */
 function clientTzStr(lead) {
   const tz = (typeof lead.tz === 'number') ? lead.tz : 0;
@@ -6228,6 +6243,7 @@ async function openLeadModal(id) {
         </div>
         <div class="lc-right">
           ${lcTasksBlock(leadTasks)}
+          ${lcFactsBlock(l)}
           ${lcCommentsBlock(l)}
           <div class="lc-more" id="lcMore">
             <button class="lc-more-hd" id="lcMoreTog" type="button">${ic(I.layers)}<span class="lc-more-t"><b>Дополнительно</b><i>ИИ-помощник, контакты, файлы, поля и встречи</i></span><svg class="lc-more-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -6507,6 +6523,20 @@ async function openLeadModal(id) {
     openLeadModal(id);
   };
   $('#lcNoteAdd', bd).addEventListener('click', addNote);
+  /* ИИ-факты из транскрибации: утвердить (с правкой значения) → комментарий, либо отклонить */
+  $$('[data-factok]', bd).forEach(b => b.addEventListener('click', async (e) => {
+    const fid = e.currentTarget.dataset.factok; const row = e.currentTarget.closest('.lc-fact');
+    const val = (row && row.querySelector('.lc-fact-val').value.trim()) || '';
+    if (!val) { row && row.querySelector('.lc-fact-val').focus(); return; }
+    e.currentTarget.disabled = true;
+    try { await api.post(`/leads/${id}/facts/${fid}`, { action: 'approve', value: val }); toast('В комментарии', null, true); openLeadModal(id); }
+    catch (er) { toast('Не вышло', er.message); e.currentTarget.disabled = false; }
+  }));
+  $$('[data-factno]', bd).forEach(b => b.addEventListener('click', async (e) => {
+    const fid = e.currentTarget.dataset.factno;
+    try { await api.post(`/leads/${id}/facts/${fid}`, { action: 'dismiss' }); openLeadModal(id); }
+    catch (er) { toast('Не вышло', er.message); }
+  }));
   /* F: задачи лида прямо в карточке + сворачиваемое «Дополнительно» */
   $('#lcTaskAdd', bd)?.addEventListener('click', () => { openQuickTask({ id: l.id, name: l.name, geoName: l.geoName, geo: l.geo, onDone: () => openLeadModal(id) }); });
   $$('.lc-task-ck[data-ttog]', bd).forEach(b => b.addEventListener('click', async () => {

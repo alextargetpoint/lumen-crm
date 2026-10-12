@@ -8869,6 +8869,16 @@ body.client-view [data-team]{ display:none !important; }
 .lc-cmt-tx{font-size:13px;line-height:1.45;background:var(--bg-2);border-radius:10px;padding:8px 11px;white-space:pre-wrap;word-break:break-word}
 .lc-cmt-add{display:flex;gap:8px;margin-top:12px}
 .lc-cmt-add input{flex:1;border:1px solid var(--stroke);border-radius:9px;padding:9px 11px;font:inherit;background:var(--card);color:inherit}
+/* ИИ-факты из транскрибации (на утверждение) */
+.lc-facts-list{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+.lc-fact{border:1px solid color-mix(in srgb,var(--accent) 30%,var(--stroke));border-radius:11px;padding:10px 11px;background:color-mix(in srgb,var(--accent) 5%,var(--card))}
+.lc-fact-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.lc-fact-lbl{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--accent)}
+.lc-fact-src{margin-left:auto;font-size:10px;color:var(--ink-3);background:var(--bg-2,rgba(0,0,0,.04));padding:2px 7px;border-radius:6px}
+.lc-fact-edit{display:flex;gap:6px;align-items:center}
+.lc-fact-val{flex:1;border:1px solid var(--stroke);border-radius:9px;padding:8px 10px;font:inherit;font-size:13.5px;background:var(--card);color:inherit;min-width:0}
+.lc-fact .lc-fact-ok,.lc-fact .lc-fact-no{flex:none;padding:8px 10px}
+.lc-fact-q{font-size:12px;color:var(--ink-3);font-style:italic;margin-top:7px;line-height:1.45}
 .lc-more{border:1px solid var(--stroke);border-radius:14px;overflow:hidden;margin-bottom:12px}
 .lc-more-hd{width:100%;display:flex;align-items:center;gap:10px;padding:14px 16px;border:0;background:var(--card);cursor:pointer;text-align:left;color:inherit}
 .lc-more-hd>svg:first-child{width:18px;height:18px;color:var(--ink-3);flex:0 0 auto}

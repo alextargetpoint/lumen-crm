@@ -571,6 +571,33 @@ ${String(transcript || '').slice(0, 12000)}`;
   };
 }
 
+/* КАРТОЧНЫЕ ФАКТЫ из транскрибации: ключевые параметры клиента как ГОТОВЫЕ пометки для карточки —
+   менеджер их утверждает/правит галочкой (они становятся комментарием). Шире, чем extractQuals:
+   бюджет, локация/район, срок, тип, цель, оплата, состав, возражение, следующий шаг — каждый с цитатой. */
+async function extractCardFacts(db, lead, transcript) {
+  const geo = (db.settings.geoNames && db.settings.geoNames[lead.geo]) || lead.geo || '';
+  const prompt = `Ты — ассистент CRM агентства недвижимости. Ниже транскрибация разговора с клиентом ${lead.name} (направление: ${geo}). Выдели КЛЮЧЕВЫЕ ПАРАМЕТРЫ КЛИЕНТА как короткие пометки для карточки — то, что менеджеру важно видеть сразу, не перечитывая разговор.
+
+ПРАВИЛА:
+- Только то, что РЕАЛЬНО прозвучало от клиента. Ничего не выдумывай. Нет факта — не включай.
+- Каждый факт: короткий ярлык (label, 1-2 слова), значение (value, кратко и по делу) и дословная цитата клиента (quote).
+- Бюджет — ТОЛЬКО сумма самого клиента (не наши цены, не его вопрос про стоимость).
+- Категории label (бери подходящие, не дублируй): Бюджет, Локация, Срок, Тип объекта, Цель, Оплата, Состав, Приоритет, Возражение, Контакт, Следующий шаг. Можно и другой label, если важное не подошло.
+- До 10 фактов, самые важные первыми.
+
+Верни строго JSON:
+{"facts":[{"label":"Бюджет","value":"до 120к $","quote":"ну тысяч сто двадцать максимум"}]}
+
+ТРАНСКРИБАЦИЯ:
+${String(transcript || '').slice(0, 12000)}`;
+  const out = await callGemini(prompt, 15000, 900);
+  const cl = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
+  const facts = (out && Array.isArray(out.facts) ? out.facts : [])
+    .map(f => ({ label: cl(f.label, 40), value: cl(f.value, 300), quote: cl(f.quote, 300) }))
+    .filter(f => f.label && f.value);
+  return { facts: facts.slice(0, 10) };
+}
+
 /* транскрибация звонка/Zoom. Приоритет: Groq whisper-large-v3-turbo (~$0.04/ч, дёшево+быстро),
    иначе OpenAI Whisper ($0.006/мин). Ключ Groq — платформенный (opts.groqKey из registry или env GROQ_API_KEY). */
 async function transcribe(buf, filename, opts = {}) {
@@ -1734,6 +1761,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, followup, followupVariants, summarize, extractQuals, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, followup, followupVariants, summarize, extractQuals, extractCardFacts, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
