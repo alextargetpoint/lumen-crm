@@ -3889,7 +3889,9 @@ async function transcribeNotetakerAudio(audioUrl) {
     const f = path.join(CREATIVES_DIR, m[1]); if (!fs.existsSync(f)) return '';
     const buf = fs.readFileSync(f);
     const gk = platformGroqKey(); if (!gk && !process.env.OPENAI_API_KEY) return '';
-    return await llm.transcribe(buf, m[1], { groqKey: gk, lang: 'ru' });
+    const raw = String(await llm.transcribe(buf, m[1], { groqKey: gk, lang: 'ru' }) || '').trim();
+    if (!raw) return '';
+    try { return await llm.diarize(raw); } catch (_) { return raw; }   /* разметка по спикерам (Менеджер/Клиент); фолбэк — сплошной текст */
   } catch (e) { console.error('[notetaker stt]', e.message); return ''; }
 }
 /* найти встречу по ЛЮБОМУ ключу: внутренний id, Zoom-номер или Google Meet-код (приложение шлёт то, что прочитало).
@@ -8204,6 +8206,27 @@ const server = http.createServer(async (req, res) => {
       delete lead.ai._reengageText;   /* форсим свежую генерацию */
       store.save();
       return json(res, 200, { ok: true });
+    }
+    /* Правка следующего касания из карточки: свой текст + перенос дня/времени. Применяется и к цепочке
+       (new/touch → _editedText + nextTouchAt), и к авто-дожиму (dialog → _reengageText + reengage.nextAt). */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/next-touch$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req).catch(() => ({}));
+      lead.ai = lead.ai || {}; lead.ai.enabled = true;
+      const hasText = typeof b.text === 'string';
+      const at = (b.at != null && isFinite(+b.at)) ? +b.at : null;
+      if (lead.stage === 'dialog') {                    // авто-дожим
+        lead.ai.reengage = lead.ai.reengage || { attempts: 0, nextAt: null };
+        if (hasText) { lead.ai._reengageText = b.text.slice(0, 2000); delete lead.ai._gReengage; }
+        if (at) lead.ai.reengage.nextAt = at;
+      } else {                                          // касание цепочки
+        if (hasText) { lead.ai._editedText = b.text.slice(0, 2000); delete lead.ai._ptText; delete lead.ai._ptEmail; }  // ручной текст перебивает ИИ-персонализацию
+        if (at) lead.ai.nextTouchAt = at;
+      }
+      store.save();
+      let nt = null; try { nt = engine.nextTouchInfo(db, lead); } catch (_) {}
+      return json(res, 200, { ok: true, nextTouch: nt });
     }
     /* режим «с одобрением»: брокер решает по готовому касанию — Отправить (можно с правкой) / Пропустить.
        approve → шлём + следующий шаг; skip → следующий шаг без отправки. nextTouchAt=null → движок пересчитает срок. */

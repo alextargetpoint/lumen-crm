@@ -7115,6 +7115,10 @@ async function renderChat(id, rebuild) {
     const when = nt.at ? (nt.at <= _mNow ? 'в ближайшую минуту' : _mFmt(nt.at)) : '—';
     const chn2 = ({ wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' })[nt.channel] || nt.channel;
     const title = isRe ? `Авто-дожим ИИ · попытка ${nt.attempt}/${nt.maxAttempts}` : `Цепочка касаний · шаг ${nt.stepNum}/${nt.total}${nt.label ? ' · ' + esc(nt.label) : ''}`;
+    const _ed = new Date((nt.at && nt.at > _mNow) ? nt.at : Date.now() + 3600e3);
+    const _p2 = (n) => String(n).padStart(2, '0');
+    const edDate = `${_ed.getFullYear()}-${_p2(_ed.getMonth() + 1)}-${_p2(_ed.getDate())}`;
+    const edTime = `${_p2(_ed.getHours())}:${_p2(_ed.getMinutes())}`;
     return `<div class="chat-chain${isRe ? ' reengage' : ''}">
       <div class="cc-ic">${ic(I.spark || I.bolt)}</div>
       <div class="cc-main">
@@ -7122,7 +7126,17 @@ async function renderChat(id, rebuild) {
         <div class="cc-when">${isRe ? 'Клиент молчит — ИИ сам вернёт его: ' : 'Следующее: '}${esc(when)}${(l.tz != null && nt.at > _mNow) ? ' (время клиента)' : ''} · ${esc(chn2)}</div>
         <div class="cc-prev">${esc(nt.preview)}</div>
       </div>
-      <div class="cc-act"><button class="btn btn-sm btn-accent" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="${isRe ? 'Дожать клиента сейчас, не дожидаясь срока' : 'Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)'}">${ic(I.send || I.bolt)}${isRe ? 'Дожать сейчас' : 'Отправить сейчас'}</button></div>
+      <div class="cc-act">
+        ${nt.canEdit ? `<button class="btn btn-sm" data-ntedit="1" title="Изменить текст и время отправки">${ic(I.edit || I.doc)}Изменить</button>` : ''}
+        <button class="btn btn-sm btn-accent" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="${isRe ? 'Дожать клиента сейчас, не дожидаясь срока' : 'Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)'}">${ic(I.send || I.bolt)}${isRe ? 'Дожать сейчас' : 'Отправить сейчас'}</button>
+      </div>
+      ${nt.canEdit ? `<div class="cc-edit" hidden>
+        <label class="cc-edit-l">Текст сообщения</label>
+        <textarea id="ntEditText" class="cc-edit-ta" rows="3" placeholder="${isRe ? 'Текст дожима, который уйдёт клиенту…' : 'Текст касания. Пусто — ИИ соберёт сам при отправке.'}">${esc(nt.fullText || '')}</textarea>
+        <div class="cc-edit-when"><div class="cc-edit-f"><label class="cc-edit-l">День</label><input id="ntEditDate" type="date" value="${edDate}"></div>
+          <div class="cc-edit-f"><label class="cc-edit-l">Время</label><input id="ntEditTime" type="time" step="300" value="${edTime}"></div></div>
+        <div class="cc-edit-act"><button class="btn btn-sm" data-ntcancel="1">Отмена</button><button class="btn btn-sm btn-accent" data-ntsave="1">${ic(I.check)}Сохранить</button></div>
+      </div>` : ''}
     </div>`;
   })() : '';
   pane.innerHTML = `
@@ -7193,6 +7207,19 @@ async function renderChat(id, rebuild) {
   $$('[data-tzedit]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { try { render(); } catch (_) {} }); }));
   $$('[data-touchnow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { const r = await api.post('/leads/' + l.id + '/touch/send-now', {}); toast('Касание отправляется', (r && r.label) ? r.label : 'уйдёт в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 1500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-reengagenow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { await api.post('/leads/' + l.id + '/reengage-now', {}); toast('ИИ дожимает', 'Соберёт заход и отправит в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 2500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
+  /* правка следующего касания: свой текст + перенос дня/времени */
+  $$('[data-ntedit]', pane).forEach(b => b.addEventListener('click', (e) => { const box = pane.querySelector('.cc-edit'); if (!box) return; box.hidden = false; e.currentTarget.style.display = 'none'; const ta = box.querySelector('#ntEditText'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }));
+  $$('[data-ntcancel]', pane).forEach(b => b.addEventListener('click', () => { const box = pane.querySelector('.cc-edit'); if (box) box.hidden = true; const eb = pane.querySelector('[data-ntedit]'); if (eb) eb.style.display = ''; }));
+  $$('[data-ntsave]', pane).forEach(b => b.addEventListener('click', async (e) => {
+    const btn = e.currentTarget, box = pane.querySelector('.cc-edit'); if (!box) return;
+    const text = (box.querySelector('#ntEditText') || {}).value || '';
+    const dv = (box.querySelector('#ntEditDate') || {}).value, tv = (box.querySelector('#ntEditTime') || {}).value;
+    let at = null; if (dv && tv) { const ms = new Date(dv + 'T' + tv).getTime(); if (isFinite(ms)) at = ms; }
+    if (at && at < Date.now() - 60e3) { toast('Время в прошлом', 'Выберите будущие день и время'); return; }
+    btn.disabled = true;
+    try { await api.post('/leads/' + l.id + '/next-touch', { text, at }); toast('Сохранено', at ? 'Текст и время касания обновлены' : 'Текст обновлён', true); setTimeout(() => { try { render(); } catch (_) {} }, 800); }
+    catch (err) { btn.disabled = false; toast('Не сохранилось', err.message); }
+  }));
   $$('[data-ptsend]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; const t = (($('#ptText', pane) || {}).innerText || '').trim(); btn.disabled = true; try { await api.post('/leads/' + l.id + '/touch/approve', { text: t }); toast('Касание одобрено и отправлено', null, true); setTimeout(() => { try { render(); } catch (_) {} }, 1200); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-ptskip]', pane).forEach(b => b.addEventListener('click', async (e) => { e.currentTarget.disabled = true; try { await api.post('/leads/' + l.id + '/touch/skip', {}); toast('Касание пропущено', 'Цепочка перейдёт к следующему шагу', true); setTimeout(() => { try { render(); } catch (_) {} }, 800); } catch (err) { e.currentTarget.disabled = false; toast('Не вышло', err.message); } }));
   $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {

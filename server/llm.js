@@ -1761,6 +1761,34 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, followup, followupVariants, summarize, extractQuals, extractCardFacts, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+/* Диаризация транскрипта звонка: раскладываем сплошную расшифровку на реплики по говорящим.
+   Звонок агента недвижимости с клиентом → роли по смыслу (Менеджер ведёт/презентует/квалифицирует;
+   Клиент отвечает/спрашивает цены). Слова НЕ меняем — только расставляем границы реплик и подписи.
+   Фолбэк на исходный текст, если LLM недоступен/обрезал/не разметил. */
+async function diarize(text) {
+  const t = String(text || '').trim();
+  if (!t || t.length < 60 || !available()) return t;
+  const prompt = `Ты — диаризатор расшифровок. Ниже сплошная расшифровка аудиозаписи звонка агента недвижимости с клиентом (возможно несколько участников). Раздели её на РЕПЛИКИ по говорящим.
+
+РОЛИ по смыслу: «Менеджер» ведёт разговор, презентует объекты, задаёт квалифицирующие вопросы, говорит от лица агентства. «Клиент» отвечает, спрашивает цены/условия, описывает пожелания. Явный третий голос — «Участник 3» и т.д.
+ВАЖНО: НЕ придумывай и НЕ меняй слова, НЕ сокращай и НЕ пересказывай — сохрани ВЕСЬ текст дословно, только расставь границы реплик и роли. Где смена говорящего неочевидна — оставь за тем же.
+
+Верни СТРОГО JSON: {"turns":[{"speaker":"Менеджер","text":"дословная реплика"},{"speaker":"Клиент","text":"..."}]}
+
+РАСШИФРОВКА:
+"""${t.slice(0, 28000)}"""`;
+  try {
+    const out = await callGemini(prompt, 40000, 8000);
+    const turns = (out && Array.isArray(out.turns)) ? out.turns : (Array.isArray(out) ? out : null);
+    if (turns && turns.length) {
+      const joined = turns.map(x => `${(String(x.speaker || '').trim() || 'Участник')}: ${String(x.text || '').trim()}`).filter(l => l.length > 4).join('\n');
+      /* sanity: без подписей текст не должен потерять больше ~трети символов (защита от обрезки/пересказа) */
+      if (joined && joined.replace(/^[^:\n]+:\s*/gm, '').length > t.length * 0.6) return joined;
+    }
+  } catch (e) { console.error('[diarize]', e.message); }
+  return t;
+}
+
+module.exports = { available, diarize, reply, followup, followupVariants, summarize, extractQuals, extractCardFacts, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

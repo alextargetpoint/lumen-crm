@@ -418,7 +418,7 @@
     var url = ref ? ((S.assets[ref.assetId] || {}).url || ref.url) : '';
     return '<div class="pe-field"><label>' + esc(label) + '</label>' +
       '<div class="pe-photo-prev" data-act="focal" data-idx="' + idx + '">' + (url ? '<img src="' + esc(url) + '">' : '') + '</div>' +
-      '<div class="pe-row"><button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="replacePhoto" data-idx="' + idx + '">' + ic('image') + 'Заменить</button>' +
+      '<div class="pe-row"><button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="photoBrowser" data-idx="' + idx + '">' + ic('image') + 'Найти фото</button>' +
       '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="cropFmt" data-idx="' + idx + '"' + (url ? '' : ' disabled') + '>' + ic('crop') + 'Кадрировать</button></div></div>';
   }
   function galleryPicker(s) {
@@ -636,6 +636,7 @@
       case 'delStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).slice(); pl.stages.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'replacePhoto': replacePhoto(s, +el.getAttribute('data-idx')); break;
       case 'cropFmt': openCropFormat(s, +el.getAttribute('data-idx')); break;
+      case 'photoBrowser': openPhotoBrowser(s, +el.getAttribute('data-idx')); break;
       case 'focal': setFocal(s, +el.getAttribute('data-idx'), e); break;
       case 'focalHint': toast('Кликните по фото, чтобы задать точку фокуса'); break;
       case 'galtoggle': galToggle(s, el.getAttribute('data-gid')); break;
@@ -745,6 +746,65 @@
       { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
     ]);
   }
+  /* ---------- Фото-панель «Найти фотографии объекта» (CRM-медиа, макет) ---------- */
+  function apiRaw(method, path, body) { return fetch(path, { method: method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' }).then(function (r) { return r.json().then(function (j) { return { status: r.status, json: j }; }); }); }
+  var MAT_LABEL = { photo: 'Фото', render: 'Рендер', interior: 'Интерьер', floorplan: 'Планировка', map: 'Карта', logo: 'Логотип', portrait: 'Портрет', screenshot: 'Скриншот', unknown: 'Уточнить' };
+  var QUAL = { suitable: ['Подходит', 'ok'], needs_review: ['Нужна проверка', 'warn'], not_for_cover: ['Низкое разрешение', 'bad'], error: ['Ошибка', 'bad'] };
+  function openPhotoBrowser(s, idx) {
+    if (document.querySelector('.pb-modal')) return;   /* не открывать повторно */
+    var imgs = (S.source.images || []).map(function (u, i) { return { id: 'img' + i, url: absU(u) }; });
+    (S.source.layouts || []).forEach(function (l, i) { imgs.push({ id: 'plan' + i, url: absU(l.url) }); });
+    photoBrowserModal(s, idx, imgs);
+    if (S.pres.projectId) apiRaw('POST', '/api/media/analyze-property', { propertyId: S.pres.projectId, format: S.fmt, slot: 'cover' }).then(function (r) {
+      if (r.status === 200 && r.json.photos) { window.__pbQual = {}; r.json.photos.forEach(function (ph) { window.__pbQual[ph.url] = ph; }); var box = document.querySelector('.pb-modal'); if (box) box.dispatchEvent(new Event('pbqual')); }
+    }).catch(function () {});
+  }
+  function photoBrowserModal(s, idx, imgs) {
+    var tab = 'card', sel = ((s.assetRefs || [])[idx] || {}).assetId || null;
+    var ov = document.createElement('div'); ov.className = 'pu-overlay';
+    function badge(url) {
+      var q = (window.__pbQual || {})[url]; if (!q) return '';
+      var mat = MAT_LABEL[q.materialType] || 'Фото';
+      var ql = QUAL[q.ok ? q.status : 'error'] || ['', ''];
+      return '<span class="pb-cat">' + esc(mat) + '</span>' + (ql[0] ? '<span class="pb-q pb-q-' + ql[1] + '">' + esc(ql[0]) + (q.width ? ' · ' + q.width + '×' + q.height : '') + '</span>' : '');
+    }
+    function grid() {
+      if (tab !== 'card') return '<div class="pb-stub">' + ic('search') + '<b>' + (tab === 'web' ? 'Поиск в открытых источниках' : 'Загрузка своих фото') + '</b><span>' + (tab === 'web' ? 'Внешний веб-поиск подключается отдельно (требует источника изображений). Сейчас доступны фото из карточки объекта.' : 'Загрузка файлов брокера — скоро. Пока доступны фото из карточки.') + '</span></div>';
+      if (!imgs.length) return '<div class="pb-stub">' + ic('image') + '<b>Нет фотографий</b><span>Добавьте фото в карточке объекта.</span></div>';
+      return '<div class="pb-grid">' + imgs.map(function (im) {
+        return '<button class="pb-cell' + (im.id === sel ? ' on' : '') + '" data-pbid="' + esc(im.id) + '"><div class="pb-img" style="background-image:url(\'' + esc(im.url) + '\')"></div><div class="pb-badges" data-pburl="' + esc(im.url) + '">' + badge(im.url) + '</div>' + (im.id === sel ? '<span class="pb-check">' + ic('check') + '</span>' : '') + '</button>';
+      }).join('') + '</div>';
+    }
+    function paint() {
+      ov.querySelectorAll('.pb-tab').forEach(function (t) { t.classList.toggle('on', t.getAttribute('data-pbtab') === tab); });
+      ov.querySelector('.pb-body').innerHTML = grid();
+      ov.querySelectorAll('[data-pbid]').forEach(function (b) { b.addEventListener('click', function () { sel = b.getAttribute('data-pbid'); paint(); }); });
+      ov.querySelector('.pb-seln').textContent = sel ? '1 фото выбрано' : 'Выберите фото';
+      var ap = ov.querySelector('.pb-apply'); ap.disabled = !sel;
+    }
+    var geo = (S.source.district && S.source.district.name) || '';
+    ov.innerHTML = '<div class="pu-box pb-box pb-modal"><div class="pu-hd"><div><h2>Найти фотографии объекта</h2><div class="pb-obj">' + esc(S.source.name || 'Объект') + (geo ? ' · ' + esc(geo) : '') + '</div></div><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
+      '<div class="pb-tabs"><button class="pb-tab on" data-pbtab="card">Из карточки</button><button class="pb-tab" data-pbtab="web">Открытые источники</button><button class="pb-tab" data-pbtab="up">Загруженные</button></div>' +
+      '<div class="pb-grid2"><div class="pb-body"></div>' +
+      '<div class="pb-side"><div class="pb-side-hd">Проверка проекта</div>' +
+        '<div class="pb-chk"><span class="pb-ic">' + ic('db') + '</span><div><b>Название совпадает</b><span>' + esc(S.source.name || '') + '</span></div><span class="pb-ok">' + ic('check') + '</span></div>' +
+        (geo ? '<div class="pb-chk"><span class="pb-ic">' + ic('pin') + '</span><div><b>Локация совпадает</b><span>' + esc(geo) + '</span></div><span class="pb-ok">' + ic('check') + '</span></div>' : '') +
+        '<div class="pb-chk"><span class="pb-ic">' + ic('image') + '</span><div><b>Принадлежность</b><span>Фото из карточки объекта</span></div><span class="pb-ok">' + ic('check') + '</span></div>' +
+        '<div class="pb-note">Поиск не меняет презентацию. Вы добавляете только выбранное фото.</div></div></div>' +
+      '<div class="pb-foot"><div class="pb-seln">Выберите фото</div><button class="pe-btn pe-btn-primary pb-apply" disabled>Применить фото</button></div></div>';
+    document.body.appendChild(ov);
+    function close() { ov.remove(); window.__pbQual = null; }
+    ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelectorAll('.pb-tab').forEach(function (t) { t.addEventListener('click', function () { tab = t.getAttribute('data-pbtab'); paint(); }); });
+    ov.querySelector('.pb-modal') || ov; ov.querySelector('.pb-box').addEventListener('pbqual', function () { ov.querySelectorAll('[data-pburl]').forEach(function (el) { el.innerHTML = badge(el.getAttribute('data-pburl')); }); });
+    ov.querySelector('.pb-apply').addEventListener('click', function () {
+      if (!sel) return; mutate(function () { s.assetRefs = s.assetRefs || []; s.assetRefs[idx] = Object.assign({}, s.assetRefs[idx], { assetId: sel }); });
+      close(); toast('Фото применено', null, true);
+    });
+    paint();
+  }
+
   /* ---------- «Кадрирование под формат» (макет §6) ---------- */
   var FMT_ASPECT = { portrait_a4: 210 / 297, landscape_a4: 297 / 210, landscape_16_9: 1280 / 720, portrait_9_16: 576 / 1024 };
   var FMT_LABEL2 = { portrait_a4: 'A4 вертикальный', landscape_a4: 'A4 горизонтальный', landscape_16_9: '16:9 горизонтальный', portrait_9_16: '9:16 вертикальный' };

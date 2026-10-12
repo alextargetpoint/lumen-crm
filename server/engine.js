@@ -442,7 +442,7 @@ function nextTouchInfo(db, lead) {
       const at = reengageDue(db, lead);
       if (at == null) return null;
       const re = lead.ai.reengage || {}, cfg = reengageCfg(db);
-      return { kind: 'reengage', at, attempt: (re.attempts || 0) + 1, maxAttempts: cfg.maxAttempts, channel: lead.activeChannel || 'wa', label: 'Авто-дожим ИИ', seqName: '', stepNum: (re.attempts || 0) + 1, total: cfg.maxAttempts, preview: 'ИИ вернёт клиента новым заходом (follow-up) — если продолжит молчать' };
+      return { kind: 'reengage', at, attempt: (re.attempts || 0) + 1, maxAttempts: cfg.maxAttempts, channel: lead.activeChannel || 'wa', label: 'Авто-дожим ИИ', seqName: '', stepNum: (re.attempts || 0) + 1, total: cfg.maxAttempts, preview: 'ИИ вернёт клиента новым заходом (follow-up) — если продолжит молчать', canEdit: true, fullText: lead.ai._reengageText || '' };
     }
     if (!['new', 'touch'].includes(lead.stage)) return null;
     if (lead.lastDir === 'in') return null;
@@ -465,7 +465,13 @@ function nextTouchInfo(db, lead) {
     const preview = step.text ? fillVars(db, lead, String(step.text)).slice(0, 240)
       : (step.creative || step.kind === 'creative') ? '📎 Креатив из рекламы + подпись'
       : 'ИИ соберёт персональный текст при отправке';
-    return { seqName: seq.name || '', stepNum: (lead.ai.chainStep || 0) + 1, total: steps.length, label: step.label || '', at: lead.ai.nextTouchAt || null, channel: step.channel || lead.activeChannel || 'wa', preview };
+    /* полный текст для редактирования: ручная правка → сгенерённый персонализ → шаблон → текст шага */
+    let fullText = '';
+    if (lead.ai._editedText != null) fullText = lead.ai._editedText;
+    else if (lead.ai._ptText) fullText = lead.ai._ptText;
+    else if (step.mode === 'template') { const tpl = (db.templates || []).find(t => t.id === step.templateId); fullText = tpl ? renderTemplate(db, tpl, lead) : ''; }
+    else if (step.text) fullText = fillVars(db, lead, String(step.text));
+    return { seqName: seq.name || '', stepNum: (lead.ai.chainStep || 0) + 1, total: steps.length, label: step.label || '', at: lead.ai.nextTouchAt || null, channel: step.channel || lead.activeChannel || 'wa', preview, canEdit: true, fullText };
   } catch (_) { return null; }
 }
 function tickChains(db) {
@@ -575,7 +581,10 @@ function tickChains(db) {
          активный канал помечен недоступным, касание молча утекает в WhatsApp (повторный WA-контакт). */
       sendOpts.channel = lead.activeChannel;
     }
-    if (step.mode === 'template') {
+    if (lead.ai._editedText != null) {
+      text = fillVars(db, lead, lead.ai._editedText);   /* ручная правка касания из карточки — шлём ровно её, минуя шаблон/ИИ */
+      delete lead.ai._editedText;
+    } else if (step.mode === 'template') {
       const tpl = db.templates.find(t => t.id === step.templateId);
       text = tpl ? renderTemplate(db, tpl, lead) : null;
     } else if (step.mode === 'personalize') {
