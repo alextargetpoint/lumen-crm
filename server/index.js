@@ -3377,7 +3377,14 @@ engine.setGraySender((db, lead, m, _opts) => {
   /* ⚠️ ЧЕСТНЫЙ СТАТУС вместо фейкового «delivered»: раньше при любом сбое отправки сообщение оседало
      «доставленным», в CRM зелёно, а клиенту в WhatsApp не уходило НИЧЕГО (ни события, ни ретрая).
      Дев/демо без воркера — оставляем мок; реальный тенант с воркером, но сбой — status='failed' + событие в ленту. */
-  if (!waWorkerReady(db)) { m.status = 'delivered'; store.save(); return; }   /* воркер не подключён (демо/дев) — мок, поток не ломаем */
+  if (!waWorkerReady(db)) {
+    /* демо-сэндбокс — мок «доставлено» (витрина потока без реального WA). РЕАЛЬНЫЙ тенант без воркера —
+       ЧЕСТНЫЙ провал, а не фейковая галочка: иначе брокер думает, что ушло, а клиенту ничего не пришло. */
+    if (db._demoSandbox) { m.status = 'delivered'; store.save(); return; }
+    m.status = 'failed'; m.failReason = 'WhatsApp не подключён — подключите номер по QR в «Номера». Сообщение НЕ отправлено.';
+    ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ НЕ ушло (${lead.name}): WhatsApp не подключён — подключите номер по QR в «Номера»` });
+    store.save(); return;
+  }
   if (!(g.numbers || []).length || !lead.phone) { m.status = 'failed'; m.failReason = !lead.phone ? 'У лида нет номера телефона' : 'Нет подключённых WhatsApp-номеров — проверьте раздел «Номера»'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): ${m.failReason}` }); store.save(); return; }
   let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { m.status = 'failed'; m.failReason = 'WhatsApp-воркер сейчас недоступен — попробуйте ещё раз через минуту'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): WA-воркер недоступен (${e.message})` }); store.save(); return; }
   const wasNew = !lead.grayPhone;
