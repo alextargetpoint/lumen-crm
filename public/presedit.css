@@ -236,6 +236,15 @@ button{font-family:inherit;cursor:pointer}
 .pb-foot{display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding-top:16px;border-top:1px solid var(--pe-line)}
 .pb-seln{font-weight:600;font-size:14px}
 .pb-apply{height:44px;padding:0 22px}.pb-apply[disabled]{opacity:.5;pointer-events:none}
+/* уровни закрепления */
+.pe-field>label{display:flex;align-items:center;justify-content:space-between}
+.pe-field-dots{border:0;background:transparent;color:var(--pe-mut);width:24px;height:24px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.pe-field-dots:hover{background:var(--pe-hi);color:var(--pe-ink)}
+.pe-field-dots svg{width:15px;height:15px}
+.pe-photo-prev{position:relative}
+.pe-lock{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;background:rgba(20,22,26,.82);color:#fff;border-radius:100px;padding:4px 9px;font-size:11px;font-weight:600;backdrop-filter:blur(4px)}
+.pe-lock svg{width:13px;height:13px}
+.pe-lock i{font-style:normal}
 .pe-top-sp{flex:1}
 .pe-save{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--pe-mut)}
 .pe-save .dot{width:8px;height:8px;border-radius:50%;background:#43a047}

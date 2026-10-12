@@ -416,8 +416,9 @@
   function photoField(s, idx, label) {
     var ref = (s.assetRefs || [])[idx];
     var url = ref ? ((S.assets[ref.assetId] || {}).url || ref.url) : '';
-    return '<div class="pe-field"><label>' + esc(label) + '</label>' +
-      '<div class="pe-photo-prev" data-act="focal" data-idx="' + idx + '">' + (url ? '<img src="' + esc(url) + '">' : '') + '</div>' +
+    var lk = ref && ref.lockedByUser, ck = ref && ref.cropLocked;
+    return '<div class="pe-field"><label>' + esc(label) + '<button class="pe-field-dots" data-act="photoPin" data-idx="' + idx + '" title="Закрепление">' + ic('dots') + '</button></label>' +
+      '<div class="pe-photo-prev" data-act="focal" data-idx="' + idx + '">' + (url ? '<img src="' + esc(url) + '">' : '') + ((lk || ck) ? '<span class="pe-lock" title="' + (lk ? 'Фото закреплено — автозамена отключена' : '') + (ck ? ' Кадрирование закреплено' : '') + '">' + ic('lock') + (ck ? '<i>кадр</i>' : '') + '</span>' : '') + '</div>' +
       '<div class="pe-row"><button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="photoBrowser" data-idx="' + idx + '">' + ic('image') + 'Найти фото</button>' +
       '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="cropFmt" data-idx="' + idx + '"' + (url ? '' : ' disabled') + '>' + ic('crop') + 'Кадрировать</button></div></div>';
   }
@@ -637,6 +638,7 @@
       case 'replacePhoto': replacePhoto(s, +el.getAttribute('data-idx')); break;
       case 'cropFmt': openCropFormat(s, +el.getAttribute('data-idx')); break;
       case 'photoBrowser': openPhotoBrowser(s, +el.getAttribute('data-idx')); break;
+      case 'photoPin': photoPinMenu(el, s, +el.getAttribute('data-idx')); break;
       case 'focal': setFocal(s, +el.getAttribute('data-idx'), e); break;
       case 'focalHint': toast('Кликните по фото, чтобы задать точку фокуса'); break;
       case 'galtoggle': galToggle(s, el.getAttribute('data-gid')); break;
@@ -746,6 +748,15 @@
       { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
     ]);
   }
+  /* ---------- Уровни закрепления (§8 доп-ТЗ) — защита ручной работы от автоматизации ---------- */
+  function photoPinMenu(anchor, s, idx) {
+    var ref = (s.assetRefs || [])[idx] || {};
+    menu(anchor, [
+      { t: (ref.lockedByUser ? '✓ ' : '') + 'Закрепить фото', ic: 'lock', fn: function () { mutate(function () { s.assetRefs[idx] = Object.assign({}, ref, { lockedByUser: !ref.lockedByUser }); }); } },
+      { t: (ref.cropLocked ? '✓ ' : '') + 'Закрепить кадрирование', ic: 'crop', fn: function () { mutate(function () { s.assetRefs[idx] = Object.assign({}, ref, { cropLocked: !ref.cropLocked }); }); } },
+    ]);
+  }
+
   /* ---------- Фото-панель «Найти фотографии объекта» (CRM-медиа, макет) ---------- */
   function apiRaw(method, path, body) { return fetch(path, { method: method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' }).then(function (r) { return r.json().then(function (j) { return { status: r.status, json: j }; }); }); }
   var MAT_LABEL = { photo: 'Фото', render: 'Рендер', interior: 'Интерьер', floorplan: 'Планировка', map: 'Карта', logo: 'Логотип', portrait: 'Портрет', screenshot: 'Скриншот', unknown: 'Уточнить' };
@@ -1095,6 +1106,7 @@
       text: '<path d="M4 6h16M4 12h16M4 18h10"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
       pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/>', doc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
       clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', swap: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
+      lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     };
     return '<svg viewBox="0 0 24 24" ' + P + ' style="width:1em;height:1em">' + (D[n] || '') + '</svg>';
   }
