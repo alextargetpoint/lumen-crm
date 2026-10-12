@@ -669,10 +669,50 @@
   }
   function objMenu(anchor, k) {
     menu(anchor, [
+      { t: 'Проверить обновления', ic: 'db', fn: function () { openObjectUpdates(k); } },
       { t: 'Заменить объект', ic: 'image', fn: function () { toast('Замена объекта', 'Выбор нового объекта на то же место — экран в разработке'); } },
       { t: 'Настроить страницы', ic: 'dots', fn: function () { S.openGroups = S.openGroups || {}; S.openGroups[k] = true; render(); } },
       { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
     ]);
+  }
+  /* ---------- «Обновить данные объекта» — diff подборки ↔ карточка (макет) ---------- */
+  function puFmt(v) { if (v == null || v === '') return 'Нет данных'; if (typeof v === 'number') return v.toLocaleString('ru-RU'); var s = String(v); return s.length > 72 ? s.slice(0, 72) + '…' : s; }
+  function reloadPres() { api('GET', '/' + ID + '?full=1').then(function (r) { if (r.status === 200) { S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {}; S.projects = r.json.projects || S.projects; render(); revalidate(); } }); }
+  function openObjectUpdates(k) {
+    api('POST', '/' + ID + '/object-updates', { index: k }).then(function (r) {
+      if (r.status !== 200) { toast('Не удалось', (r.json && r.json.error) || ''); return; }
+      var data = r.json;
+      if (!data.diffs || !data.diffs.length) { toast('Обновлений нет', 'Данные подборки совпадают с карточкой', true); return; }
+      updatesModal(k, data);
+    });
+  }
+  function updatesModal(k, data) {
+    var rows = data.diffs.map(function (d) {
+      var def = d.edited ? 'keep' : 'update';
+      return '<div class="pu-row"><div class="pu-field">' + esc(d.field) + '</div>' +
+        '<div class="pu-doc">' + esc(puFmt(d.inDoc)) + (d.edited ? '<span class="pu-tag">изменено вручную</span>' : '') + '</div>' +
+        '<div class="pu-card">' + esc(puFmt(d.inCard)) + '</div>' +
+        '<div class="pu-dec"><select data-pukey="' + esc(d.key) + '">' +
+          '<option value="update"' + (def === 'update' ? ' selected' : '') + '>Обновить</option>' +
+          '<option value="keep"' + (def === 'keep' ? ' selected' : '') + '>' + (d.edited ? 'Сохранить мой текст' : 'Оставить') + '</option></select></div></div>';
+    }).join('');
+    var ov = document.createElement('div'); ov.className = 'pu-overlay';
+    ov.innerHTML = '<div class="pu-box"><div class="pu-hd"><h2>Обновить данные объекта</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
+      '<div class="pu-obj"><b>' + esc(data.object) + '</b> · выберите изменения</div>' +
+      '<div class="pu-table"><div class="pu-row pu-head"><div>Поле</div><div>В подборке</div><div>В карточке</div><div>Решение</div></div>' + rows + '</div>' +
+      '<div class="pu-foot"><div class="pu-note"><b class="pu-count"></b><span>Опубликованная версия не изменится</span></div>' +
+      '<div class="pu-acts"><button class="pe-btn pe-btn-primary" data-puapply>Применить к черновику</button><button class="pe-btn pe-btn-ghost" data-puclose>Отмена</button></div></div></div>';
+    document.body.appendChild(ov);
+    function count() { var n = 0; ov.querySelectorAll('[data-pukey]').forEach(function (s) { if (s.value === 'update') n++; }); ov.querySelector('.pu-count').textContent = 'Будут обновлены ' + n + ' ' + plural(n, 'поле', 'поля', 'полей'); }
+    function close() { ov.remove(); }
+    ov.querySelectorAll('[data-pukey]').forEach(function (s) { s.addEventListener('change', count); }); count();
+    ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelector('[data-puapply]').addEventListener('click', function () {
+      var fields = []; ov.querySelectorAll('[data-pukey]').forEach(function (s) { if (s.value === 'update') fields.push(s.getAttribute('data-pukey')); });
+      if (!fields.length) { close(); return; }
+      api('POST', '/' + ID + '/apply-updates', { index: k, fields: fields }).then(function (r) { close(); if (r.status === 200) { toast('Обновлено', 'Применено к черновику', true); reloadPres(); } else toast('Не удалось'); });
+    });
   }
   function addPageMenu(anchor) {
     var fams = ['editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'custom'];

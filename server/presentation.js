@@ -289,6 +289,44 @@ function replaceObjectInCollection(db, coll, oldPid, newPid) {
   coll.updatedAt = Date.now();
   return { ok: true, replaced: { from: oldPid, to: newPid, index: idx, pages: newSecs.length } };
 }
+/* Diff объекта в подборке против живой карточки (ТЗ v3 §14, экран «Обновить данные объекта»).
+   «В подборке» = значение в документе (override если правлено, иначе cached из источника);
+   «В карточке» = живое поле. Возвращает поля с расхождением + было ли правлено вручную. */
+function objSectionsOf(coll, k) { return (coll.orderedSections || []).filter(function (s) { return String(s.id || '').indexOf('o' + k + '_') === 0; }); }
+function readBinding(sec, key) {
+  var b = (sec && sec.contentBindings || {})[key]; if (!b) return null;
+  var docV = b.mode === 'override' ? b.value : (b.cachedValue !== undefined ? b.cachedValue : b.value);
+  return { docV: docV, edited: b.mode === 'override' };
+}
+function objectUpdates(db, coll, k) {
+  if (!coll || coll.kind !== 'collection') return { error: 'not a collection' };
+  var pid = (coll.projectIds || [])[k];
+  var pr = (db.properties || []).find(function (x) { return x.id === pid; }) || {};
+  var secs = objSectionsOf(coll, k);
+  var diffs = [];
+  var ed = secs.filter(function (s) { return s.family === 'editorial'; })[0];
+  var d = ed && readBinding(ed, 'body');
+  if (d && String(d.docV || '') !== String(pr.description || '')) diffs.push({ field: 'Описание', key: 'description', inDoc: d.docV || '—', inCard: pr.description || '—', edited: d.edited });
+  var hero = secs.filter(function (s) { return s.family === 'hero'; })[0];
+  var p = hero && readBinding(hero, 'price');
+  if (p) { var amt = (p.docV && p.docV.amount != null) ? p.docV.amount : null; if (String(amt) !== String(pr.priceFrom == null ? '' : pr.priceFrom)) diffs.push({ field: 'Цена от', key: 'price', inDoc: amt, inCard: pr.priceFrom, edited: p.edited, currency: (p.docV && p.docV.currency) || pr.currency }); }
+  // срок сдачи — ищем метрику с подписью про сдачу
+  var metSec = secs.filter(function (s) { return readBinding(s, 'metrics'); })[0];
+  if (metSec) { var mb = readBinding(metSec, 'metrics'); var arr = (mb && mb.docV) || []; var hv = arr.filter(function (m) { return /сдач/i.test(m.label || ''); })[0]; var docH = hv ? hv.value : ''; if (String(docH || '') !== String(pr.handover || '') && (docH || pr.handover)) diffs.push({ field: 'Срок сдачи', key: 'handover', inDoc: docH || 'Нет данных', inCard: pr.handover || 'Нет данных', edited: false }); }
+  return { object: pr.name || 'Объект', projectId: pid, index: k, diffs: diffs };
+}
+function applyObjectUpdates(db, coll, k, fields) {
+  var pid = (coll.projectIds || [])[k];
+  var pr = (db.properties || []).find(function (x) { return x.id === pid; }) || {};
+  var secs = objSectionsOf(coll, k);
+  var want = {}; (fields || []).forEach(function (f) { want[f] = true; });
+  var applied = 0;
+  if (want.description) { var ed = secs.filter(function (s) { return s.family === 'editorial'; })[0]; if (ed) { ed.contentBindings = ed.contentBindings || {}; ed.contentBindings.body = { mode: 'source', sourcePath: 'description', sourceRevision: 'crm', cachedValue: pr.description || '' }; applied++; } }
+  if (want.price) { var hero = secs.filter(function (s) { return s.family === 'hero'; })[0]; if (hero) { hero.contentBindings = hero.contentBindings || {}; hero.contentBindings.price = { mode: 'override', value: { kind: 'from', amount: pr.priceFrom, currency: pr.currency || 'USD' } }; applied++; } }
+  if (want.handover) { var metSec = secs.filter(function (s) { return readBinding(s, 'metrics'); })[0]; if (metSec) { var mb = readBinding(metSec, 'metrics'); var arr = ((mb && mb.docV) || []).slice(); var found = false; arr = arr.map(function (m) { if (/сдач/i.test(m.label || '')) { found = true; return Object.assign({}, m, { value: String(pr.handover || '') }); } return m; }); if (!found && pr.handover) arr.push({ value: String(pr.handover), label: 'сдача', icon: 'calendar' }); metSec.contentBindings.metrics = { mode: 'override', value: arr }; applied++; } }
+  if (applied) { coll.draftRevision = (coll.draftRevision || 1) + 1; coll.updatedAt = Date.now(); }
+  return { ok: true, applied: applied };
+}
 let _tidGetter = () => 'primary';
 function store_currentTid() { try { return _tidGetter(); } catch { return 'primary'; } }
 function setTidGetter(fn) { _tidGetter = fn; }
@@ -518,7 +556,7 @@ function publicProjection(snap) {
 
 module.exports = {
   SCHEMA_VERSION, RENDERER_VERSION, TOK, T,
-  draftFromProperty, draftCollection, replaceObjectInCollection, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
+  draftFromProperty, draftCollection, replaceObjectInCollection, objectUpdates, applyObjectUpdates, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
 };

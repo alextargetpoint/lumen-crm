@@ -16911,6 +16911,27 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         store.save();
         return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
       }
+      // diff объекта подборки против живой карточки (ТЗ v3 §14 «Обновить данные объекта»)
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/object-updates$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req);
+        const k = Math.max(0, parseInt(b.index, 10) || 0);
+        const r = presentation.objectUpdates(db, pres, k);
+        if (r.error) return json(res, 400, r);
+        return json(res, 200, r);
+      }
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/apply-updates$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req);
+        const k = Math.max(0, parseInt(b.index, 10) || 0);
+        const r = presentation.applyObjectUpdates(db, pres, k, Array.isArray(b.fields) ? b.fields : []);
+        store.save();
+        return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
+      }
       // autofill photos from CRM media (доп-ТЗ §7 приоритет №1) — лучший кадр на обложку, разнообразие в галерею
       if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/autofill-photos$/)) && req.method === 'POST') {
         const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
