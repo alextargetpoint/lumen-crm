@@ -442,7 +442,7 @@ function nextTouchInfo(db, lead) {
       const at = reengageDue(db, lead);
       if (at == null) return null;
       const re = lead.ai.reengage || {}, cfg = reengageCfg(db);
-      return { kind: 'reengage', at, attempt: (re.attempts || 0) + 1, maxAttempts: cfg.maxAttempts, channel: lead.activeChannel || 'wa', label: 'Авто-дожим ИИ', seqName: '', stepNum: (re.attempts || 0) + 1, total: cfg.maxAttempts, preview: 'ИИ вернёт клиента новым заходом (follow-up) — если продолжит молчать', canEdit: true, fullText: lead.ai._reengageText || '' };
+      return { kind: 'reengage', at, attempt: (re.attempts || 0) + 1, maxAttempts: cfg.maxAttempts, channel: lead.activeChannel || 'wa', label: 'Авто-дожим ИИ', seqName: '', stepNum: (re.attempts || 0) + 1, total: cfg.maxAttempts, preview: 'ИИ вернёт клиента новым заходом (follow-up) — если продолжит молчать', canEdit: true, fullText: lead.ai.nextDraft || lead.ai._reengageText || '' };
     }
     if (!['new', 'touch'].includes(lead.stage)) return null;
     if (lead.lastDir === 'in') return null;
@@ -465,9 +465,10 @@ function nextTouchInfo(db, lead) {
     const preview = step.text ? fillVars(db, lead, String(step.text)).slice(0, 240)
       : (step.creative || step.kind === 'creative') ? '📎 Креатив из рекламы + подпись'
       : 'ИИ соберёт персональный текст при отправке';
-    /* полный текст для редактирования: ручная правка → сгенерённый персонализ → шаблон → текст шага */
+    /* полный текст для редактирования: сохранённый черновик → ручная правка → персонализ → шаблон → текст шага */
     let fullText = '';
-    if (lead.ai._editedText != null) fullText = lead.ai._editedText;
+    if (lead.ai.nextDraft != null) fullText = lead.ai.nextDraft;
+    else if (lead.ai._editedText != null) fullText = lead.ai._editedText;
     else if (lead.ai._ptText) fullText = lead.ai._ptText;
     else if (step.mode === 'template') { const tpl = (db.templates || []).find(t => t.id === step.templateId); fullText = tpl ? renderTemplate(db, tpl, lead) : ''; }
     else if (step.text) fullText = fillVars(db, lead, String(step.text));
@@ -477,30 +478,28 @@ function nextTouchInfo(db, lead) {
 /* реальный текст следующего касания для показа/правки в карточке (WYSIWYG): генерит и КЭШИРУЕТ
    ровно тот текст, что уйдёт (дожим → _reengageText, персонализация цепочки → _ptText). Шаблон/текст —
    детерминированы, отдаём из nextTouchInfo. Ручная правка (_editedText) приоритетнее всего. */
-async function nextTouchDraft(db, lead) {
+async function nextTouchDraft(db, lead, opts = {}) {
   try {
     if (!lead || !lead.ai) return '';
-    if (lead.ai._editedText != null) return lead.ai._editedText;
-    const info = nextTouchInfo(db, lead); if (!info) return '';
+    /* СОХРАНЁННЫЙ черновик — показываем его СТАБИЛЬНО, не перегенерируем на каждый перезаход.
+       Перегенерация — только по явному запросу (opts.regenerate, кнопка «Перегенерировать»). */
+    if (!opts.regenerate && lead.ai.nextDraft != null) return lead.ai.nextDraft;
+    const info = nextTouchInfo(db, lead); if (!info) return lead.ai.nextDraft || '';
+    const save = (t) => { if (t) { lead.ai.nextDraft = t; store.save(); } return t; };
     if (info.kind === 'reengage') {
-      if (lead.ai._reengageText) return lead.ai._reengageText;
-      if (!(llm.available && llm.available() && llm.followup)) return '';
-      const out = await llm.followup(db, lead); const t = (out && out.text) || '';
-      if (t) { lead.ai._reengageText = t; store.save(); }
-      return t;
+      if (!(llm.available && llm.available() && llm.followup)) return lead.ai.nextDraft || '';
+      const out = await llm.followup(db, lead, { style: opts.style });
+      return save((out && out.text) || '') || lead.ai.nextDraft || '';
     }
     if (info.mode === 'personalize') {
-      if (lead.ai._ptText) return lead.ai._ptText;
-      if (!(llm.available && llm.available() && llm.composeFirstTouch)) return info.fullText || '';
+      if (!(llm.available && llm.available() && llm.composeFirstTouch)) return lead.ai.nextDraft || info.fullText || '';
       const styleSamples = ((db.touchStyles && (db.touchStyles[lead.broker] || db.touchStyles.owner)) || []).map(x => x.text).filter(Boolean);
       const agencyName = (db.settings.agency && db.settings.agency.name) || 'агентство';
-      const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, {});
-      const t = (out && out.message) || '';
-      if (t) { lead.ai._ptText = t; store.save(); }
-      return t || info.fullText || '';
+      const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, { style: opts.style });
+      return save((out && out.message) || '') || lead.ai.nextDraft || info.fullText || '';
     }
-    return info.fullText || '';   // template / text — детерминированы
-  } catch (_) { return ''; }
+    return info.fullText || '';   // template / text — детерминированы, не кэшируем
+  } catch (_) { return lead.ai.nextDraft || ''; }
 }
 function tickChains(db) {
   const nowT = Date.now();
@@ -609,7 +608,10 @@ function tickChains(db) {
          активный канал помечен недоступным, касание молча утекает в WhatsApp (повторный WA-контакт). */
       sendOpts.channel = lead.activeChannel;
     }
-    if (lead.ai._editedText != null) {
+    if (lead.ai.nextDraft != null) {
+      text = fillVars(db, lead, lead.ai.nextDraft);   /* сохранённый/отредактированный черновик — шлём ровно его */
+      delete lead.ai.nextDraft; delete lead.ai._editedText;
+    } else if (lead.ai._editedText != null) {
       text = fillVars(db, lead, lead.ai._editedText);   /* ручная правка касания из карточки — шлём ровно её, минуя шаблон/ИИ */
       delete lead.ai._editedText;
     } else if (step.mode === 'template') {
@@ -762,7 +764,7 @@ function tickReengage(db) {
     if (re.attempts >= cfg.maxAttempts) {                           /* дожимы исчерпаны → в «Спящие» (дальше — bulk-wake) */
       lead.stage = 'sleeping';
       ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: не отвечает после ${re.attempts} дожимов ИИ → «Спящие»` });
-      lead.ai.reengage = null; delete lead.ai._reengageText; delete lead.ai._gReengage;
+      lead.ai.reengage = null; delete lead.ai._reengageText; delete lead.ai._gReengage; delete lead.ai.nextDraft;
       store.save(); continue;
     }
     if (re.nextAt == null) {                                        /* планируем срок: 1-й дожим от последнего нашего сообщения */
@@ -772,9 +774,10 @@ function tickReengage(db) {
     if (nowT < re.nextAt) continue;
     if (inQuiet(db, lead)) { re.nextAt = morningAt(db, lead); continue; }   /* тихие часы — утром */
     const ck = '_reengageText';
-    if (lead.ai[ck]) {                                              /* текст готов (сгенерён на прошлом тике) → отправляем */
-      const txt = lead.ai[ck]; delete lead.ai[ck];
-      if (txt) send(db, lead, txt, 'ai', (lead.activeChannel && lead.activeChannel !== 'wa') ? { channel: lead.activeChannel } : {});
+    const draftTxt = lead.ai.nextDraft || lead.ai[ck];               /* сохранённый черновик (показан брокеру/отредактирован) приоритетнее свежей генерации */
+    if (draftTxt) {                                                  /* текст готов → отправляем ровно его */
+      delete lead.ai.nextDraft; delete lead.ai[ck];
+      send(db, lead, draftTxt, 'ai', (lead.activeChannel && lead.activeChannel !== 'wa') ? { channel: lead.activeChannel } : {});
       re.attempts += 1; re.lastAt = nowT;
       re.nextAt = nowT + cfg.gapDays[Math.min(re.attempts - 1, cfg.gapDays.length - 1)] * dayMs(db);
       ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `ИИ-дожим ${re.attempts}/${cfg.maxAttempts}: ${lead.name} молчал — отправлен новый заход` });
@@ -1218,7 +1221,7 @@ function inbound(db, lead, text, opts = {}) {
   lead.unread = (lead.unread || 0) + 1;   /* счётчик непрочитанных для брокера (сбрасывается при открытии карточки / ответе человека) */
   lead.lastInboundAt = m.at;
   /* клиент ответил → СБРОС цикла авто-дожима: диалог снова живой, отсчёт тишины начинается заново после нашего ответа */
-  if (lead.ai) { lead.ai.reengage = null; delete lead.ai._reengageText; delete lead.ai._gReengage; }
+  if (lead.ai) { lead.ai.reengage = null; delete lead.ai._reengageText; delete lead.ai._gReengage; delete lead.ai.nextDraft; }
   /* ИИ-автоподхват пояса: клиент явно назвал своё текущее время («у меня сейчас 14:30» / «по моему времени 9:00») →
      пересчитываем lead.tz. Консервативно (нужен HH:MM с двоеточием + маркер «у меня/сейчас/по моему»), иначе не трогаем. */
   try {

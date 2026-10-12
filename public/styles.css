@@ -183,6 +183,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-2); box-s
 .cc-edit-f { display: flex; flex-direction: column; gap: 4px; }
 .cc-edit-f input { padding: 7px 10px; border: 1px solid var(--stroke); border-radius: 9px; background: var(--card); color: var(--ink-1); font: inherit; font-size: 13px; }
 .cc-edit-act { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; }
+.cc-edit-actrow { display: flex; align-items: center; gap: 10px; margin-top: 2px; min-height: 1px; }
+.cc-edit-autosave { font-size: 11px; color: #2FA98C; font-weight: 600; }
 /* плашка следующего касания — горизонтальный бар (по референсу): слева иконка+инфо, справа контролы */
 .chat-chain.ntp2 { display: block; border-left-width: 1px; border-radius: 16px; padding: 14px 16px; background: var(--card); }
 .ntp2-bar { display: flex; align-items: center; gap: 13px; }
