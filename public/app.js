@@ -9384,7 +9384,7 @@ PAGES.properties = async (root) => {
       toast(i >= 0 ? 'Убрано из сравнения' : 'Добавлено в сравнение', PAGE_STATE.compare.length + ' выбрано');
       render();   /* обновит подпись кнопки + панель сравнения (глобальная, из render) */
     });
-    $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
+    $('#pdToColl').addEventListener('click', () => { if (typeof openCollectionCreate === 'function') openCollectionCreate([pr.id]); else { PAGE_STATE.collPreselect = pr.id; go('collections'); } });
     $('#pdPresV2')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget; btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Открываю…';
       try {
@@ -9528,6 +9528,7 @@ PAGES.properties = async (root) => {
       ${(q || advCount) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Поиск и импорт</button>
+      <button class="btn btn-sm" id="prCollect" title="Собрать клиентскую подборку из объектов">${ic(I.layers)}Собрать подборку</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
     <div id="prFiltPanel" class="glass card" style="${F.propFiltersOpen ? '' : 'display:none'};margin:0 0 12px;padding:14px 16px">
@@ -9684,6 +9685,7 @@ PAGES.properties = async (root) => {
     PAGE_STATE.propView = (pr.property || pr).id;
     render();
   });
+  $('#prCollect')?.addEventListener('click', () => { if (typeof openCollectionCreate === 'function') openCollectionCreate(); else go('collections'); });
   $('#prImport').addEventListener('click', () => {
     const reellySet = ((st.inventorySources || {}).reelly || {}).keySet;
     const geoOpts = st.agency.geos.map(g => `<option value="${g}">${st.geoNames[g]}</option>`).join('');
