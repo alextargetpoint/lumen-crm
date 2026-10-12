@@ -16889,7 +16889,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
             <div class="pc-b"><div class="pc-t">${esc(ttl)}</div>
             <div class="pc-m"><span class="st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span> · ${esc(kindTag)} · ${esc(upd)}</div>${pub}</div></a>`;
         }).join('');
-        const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Презентации · Lumen</title>
+        const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Презентации · Lumen</title>${PRES_FAVICON}
 <style>body{margin:0;background:#f4f2ec;color:#201c17;font-family:-apple-system,system-ui,sans-serif}.wrap{max-width:960px;margin:0 auto;padding:28px 22px}
 h1{font-weight:600;font-size:26px;margin:0 0 4px}.sub{color:#8a8178;font-size:13px;margin-bottom:22px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}

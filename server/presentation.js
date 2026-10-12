@@ -366,7 +366,7 @@ function documentHTML(db, pres, broker, opts) {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title>
 ${opts.noindex !== false ? '<meta name="robots" content="noindex,nofollow">' : ''}
-<link rel="stylesheet" href="/pres-styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a1712'/%3E%3Cpath%20d='M16%204.4L18.7%2013.3L27.6%2016L18.7%2018.7L16%2027.6L13.3%2018.7L4.4%2016L13.3%2013.3Z'%20fill='%23ffffff'/%3E%3C/svg%3E"><link rel="stylesheet" href="/pres-styles.css">
 <style>${stageCss}</style>
 </head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script></body></html>`;
 }
@@ -474,7 +474,7 @@ function documentFromSnapshot(snap, opts) {
     @media print{html,body{background:#fff}.lp-doc{gap:0;padding:0}.lp-stage{max-width:none}.lp-fit{transform:none!important;width:${f.cssW}px;height:${f.cssH}px}@page{size:${pageCssSize(snap.format)};margin:0}}`;
   const scaleScript = `(function(){function fit(){var W=document.querySelector('.lp-doc').clientWidth-20;document.querySelectorAll('.lp-stage').forEach(function(st){var s=Math.min(1,Math.min(W,${f.cssW})/${f.cssW});st.firstElementChild.style.transform='scale('+s+')';st.style.height=(${f.cssH}*s)+'px';});}window.addEventListener('resize',fit);window.addEventListener('load',fit);document.fonts&&document.fonts.ready.then(fit);fit();})();`;
   const body = pages.map(p => `<div class="lp-stage"><div class="lp-fit">${p.html}</div></div>`).join('');
-  return `<!doctype html><html lang="${(snap.locale||'ru').slice(0,2)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(opts.title||'Презентация')}</title><meta name="robots" content="noindex,nofollow"><link rel="stylesheet" href="/pres-styles.css"><style>${stageCss}</style></head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script></body></html>`;
+  return `<!doctype html><html lang="${(snap.locale||'ru').slice(0,2)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(opts.title||'Презентация')}</title><meta name="robots" content="noindex,nofollow"><link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a1712'/%3E%3Cpath%20d='M16%204.4L18.7%2013.3L27.6%2016L18.7%2018.7L16%2027.6L13.3%2018.7L4.4%2016L13.3%2013.3Z'%20fill='%23ffffff'/%3E%3C/svg%3E"><link rel="stylesheet" href="/pres-styles.css"><style>${stageCss}</style></head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script></body></html>`;
 }
 
 /* ---------- public projection (TZ §2 — strip private fields) ---------- */
