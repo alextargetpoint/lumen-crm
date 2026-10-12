@@ -471,8 +471,36 @@ function nextTouchInfo(db, lead) {
     else if (lead.ai._ptText) fullText = lead.ai._ptText;
     else if (step.mode === 'template') { const tpl = (db.templates || []).find(t => t.id === step.templateId); fullText = tpl ? renderTemplate(db, tpl, lead) : ''; }
     else if (step.text) fullText = fillVars(db, lead, String(step.text));
-    return { seqName: seq.name || '', stepNum: (lead.ai.chainStep || 0) + 1, total: steps.length, label: step.label || '', at: lead.ai.nextTouchAt || null, channel: step.channel || lead.activeChannel || 'wa', preview, canEdit: true, fullText };
+    return { seqName: seq.name || '', stepNum: (lead.ai.chainStep || 0) + 1, total: steps.length, label: step.label || '', at: lead.ai.nextTouchAt || null, channel: step.channel || lead.activeChannel || 'wa', preview, canEdit: true, fullText, mode: step.mode || 'text' };
   } catch (_) { return null; }
+}
+/* реальный текст следующего касания для показа/правки в карточке (WYSIWYG): генерит и КЭШИРУЕТ
+   ровно тот текст, что уйдёт (дожим → _reengageText, персонализация цепочки → _ptText). Шаблон/текст —
+   детерминированы, отдаём из nextTouchInfo. Ручная правка (_editedText) приоритетнее всего. */
+async function nextTouchDraft(db, lead) {
+  try {
+    if (!lead || !lead.ai) return '';
+    if (lead.ai._editedText != null) return lead.ai._editedText;
+    const info = nextTouchInfo(db, lead); if (!info) return '';
+    if (info.kind === 'reengage') {
+      if (lead.ai._reengageText) return lead.ai._reengageText;
+      if (!(llm.available && llm.available() && llm.followup)) return '';
+      const out = await llm.followup(db, lead); const t = (out && out.text) || '';
+      if (t) { lead.ai._reengageText = t; store.save(); }
+      return t;
+    }
+    if (info.mode === 'personalize') {
+      if (lead.ai._ptText) return lead.ai._ptText;
+      if (!(llm.available && llm.available() && llm.composeFirstTouch)) return info.fullText || '';
+      const styleSamples = ((db.touchStyles && (db.touchStyles[lead.broker] || db.touchStyles.owner)) || []).map(x => x.text).filter(Boolean);
+      const agencyName = (db.settings.agency && db.settings.agency.name) || 'агентство';
+      const out = await llm.composeFirstTouch(db, lead, '', agencyName, styleSamples, {});
+      const t = (out && out.message) || '';
+      if (t) { lead.ai._ptText = t; store.save(); }
+      return t || info.fullText || '';
+    }
+    return info.fullText || '';   // template / text — детерминированы
+  } catch (_) { return ''; }
 }
 function tickChains(db) {
   const nowT = Date.now();
@@ -1539,4 +1567,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, tickReengage, reengageDue };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue };
