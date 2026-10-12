@@ -8879,6 +8879,14 @@ body.client-view [data-team]{ display:none !important; }
 .lc-fact-val{flex:1;border:1px solid var(--stroke);border-radius:9px;padding:8px 10px;font:inherit;font-size:13.5px;background:var(--card);color:inherit;min-width:0}
 .lc-fact .lc-fact-ok,.lc-fact .lc-fact-no{flex:none;padding:8px 10px}
 .lc-fact-q{font-size:12px;color:var(--ink-3);font-style:italic;margin-top:7px;line-height:1.45}
+/* индикаторы мессенджеров (WhatsApp/Telegram) в карточке */
+.ch-badges{display:inline-flex;gap:6px;vertical-align:middle;margin:0 3px}
+.ch-b{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:7px;line-height:1.35;white-space:nowrap}
+.ch-b svg{width:12px;height:12px}
+.ch-b.ok{color:#15803d;background:rgba(22,163,74,.12)}
+.ch-b.bad{color:#b91c1c;background:rgba(190,60,60,.13)}
+.ch-b.unk{color:var(--ink-3);background:var(--bg-2,rgba(0,0,0,.05))}
+#chbWa{cursor:pointer}#chbWa:hover{filter:brightness(.96)}
 .lc-more{border:1px solid var(--stroke);border-radius:14px;overflow:hidden;margin-bottom:12px}
 .lc-more-hd{width:100%;display:flex;align-items:center;gap:10px;padding:14px 16px;border:0;background:var(--card);cursor:pointer;text-align:left;color:inherit}
 .lc-more-hd>svg:first-child{width:18px;height:18px;color:var(--ink-3);flex:0 0 auto}

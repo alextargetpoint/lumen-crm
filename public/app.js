@@ -6083,6 +6083,21 @@ function lcFactsBlock(l) {
     </div>`).join('')}</div>
   </div>`;
 }
+/* индикаторы мессенджеров в карточке: есть ли у номера WhatsApp (проверка onWhatsApp) + Telegram (по активности).
+   WA кликабелен → перепроверка. Так сразу видно, дойдёт ли сообщение, а не «уходит в никуда». */
+function channelBadges(l) {
+  const ch = l.channels || {};
+  const wa = ch.wa;   /* 'yes' | 'no' | undefined(не проверен) */
+  const onTg = l.activeChannel === 'tg' || ch.tg === 'yes';
+  const waCls = wa === 'yes' ? 'ok' : wa === 'no' ? 'bad' : 'unk';
+  const waTitle = wa === 'yes' ? 'У номера есть WhatsApp — сообщения дойдут. Нажмите, чтобы перепроверить.' : wa === 'no' ? 'У номера НЕ найден WhatsApp — сообщения НЕ дойдут. Проверьте номер. Нажмите, чтобы перепроверить.' : 'WhatsApp не проверен — нажмите, чтобы проверить.';
+  const tgCls = onTg ? 'ok' : (ch.tg === 'no' ? 'bad' : 'unk');
+  const tgTitle = onTg ? 'Клиент на связи в Telegram' : (ch.tg === 'no' ? 'Telegram не найден' : 'Telegram — активности не было');
+  return `<span class="ch-badges">
+    <span class="ch-b ${waCls}" id="chbWa" role="button" tabindex="0" title="${waTitle}">${ic(I.chat)}WhatsApp${wa === 'yes' ? ' ✓' : wa === 'no' ? ' ✕' : ' ?'}</span>
+    <span class="ch-b ${tgCls}" title="${tgTitle}">${ic(I.send)}Telegram${onTg ? ' ✓' : ch.tg === 'no' ? ' ✕' : ' ?'}</span>
+  </span>`;
+}
 /* местное время клиента по его поясу (lead.tz — смещение в часах от UTC) */
 function clientTzStr(lead) {
   const tz = (typeof lead.tz === 'number') ? lead.tz : 0;
@@ -6197,7 +6212,7 @@ async function openLeadModal(id) {
 
   const bd = modal({
     title: l.name,
-    sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName} ${clientTzBadge(l)} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
+    sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> ${channelBadges(l)} · ${l.geoName} ${clientTzBadge(l)} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
     wide: 'card',
     body: `
       <div class="lc-funnel">${FUNNEL_STEPS.map((st, i) => `<div class="lcf-step ${i < stepIdx ? 'done' : ''} ${i === stepIdx ? 'cur' : ''}"><i></i><span>${stageName(st)}</span></div>`).join('')}${l.stage === 'sleeping' ? '<div class="lcf-step warn cur"><i></i><span>Спит</span></div>' : ''}${l.stage === 'lost' ? '<div class="lcf-step bad cur"><i></i><span>Закрыт</span></div>' : ''}</div>
@@ -6353,6 +6368,14 @@ async function openLeadModal(id) {
   });
 
   $('#lcPhone', bd).addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
+  /* индикатор WhatsApp: клик → перепроверка; авто-проверка при открытии, если не проверяли или устарело (>7 дней) */
+  const recheckWa = async (silent) => {
+    try { const r = await api.post(`/leads/${id}/wa-check`, {}); if (!silent) toast(r.exists ? '✓ WhatsApp есть' : 'WhatsApp у номера не найден', null, true); openLeadModal(id); }
+    catch (e) { if (!silent) toast('Не вышло проверить', e.message); }
+  };
+  $('#chbWa', bd)?.addEventListener('click', () => recheckWa(false));
+  /* авто-проверка один раз для не проверенных активных лидов (экономим дневной лимит проверок/анти-бан; повтор — кликом по бейджу) */
+  { const ch = l.channels || {}; if (l.phone && !ch.wa && !['lost', 'deal'].includes(l.stage)) recheckWa(true); }
   $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id); }); }));
   $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
   $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });
