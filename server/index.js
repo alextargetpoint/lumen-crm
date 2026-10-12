@@ -5581,7 +5581,7 @@ const server = http.createServer(async (req, res) => {
     /* загрузка аудио-записи (session): data-URL → файл → обычный URL (чтобы НЕ хранить base64 в БД тенанта) */
     if (p === '/api/notetaker/audio' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
-      const b = await readBody(req);
+      const b = await readBodyLarge(req);   // аудио звонка (base64) легко >2МБ — базовый readBody рвал тело → url=nil
       const mm = String((b && b.data) || '').match(/^data:audio\/(m4a|mp4|mpeg|mp3|ogg|webm|wav|x-m4a|aac);base64,(.*)$/i);
       if (!mm) return json(res, 400, { error: 'нужен аудио data-URL' });
       const buf = Buffer.from(mm[2], 'base64');
@@ -16812,6 +16812,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
       const presList = () => (db.presentations = db.presentations || []);
       const presFind = (id) => presList().find(x => x.id === id);
       const presBroker = (pres) => (db.brokers || []).find(b => b.id === pres.brokerId) || null;
+      const presBy = (R) => R && R.role === 'broker' ? (((db.brokers || []).find(x => x.id === R.brokerId) || {}).name || 'Брокер') : 'Владелец';
       let mm;
 
       // catalog
@@ -16886,7 +16887,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         if (b.expectedRevision != null && +b.expectedRevision !== (pres.draftRevision || 1))
           return json(res, 409, { error: 'VERSION_CONFLICT', currentRevision: pres.draftRevision });
         const ch = b.changes || b.patch || {};
-        if (ch.presetId) { const t = presentation.TOK.presetTheme(ch.presetId); if (t) pres.theme = t; }   /* смена пресета = палитра+шрифт+presetId (контент не трогаем) */
+        if (ch.presetId) { const t = presentation.TOK.presetTheme(ch.presetId); if (t) { pres.theme = t; presentation.pushHistory(pres, 'preset', presBy(R), 'Сменён стиль оформления'); } }   /* смена пресета = палитра+шрифт+presetId (контент не трогаем) */
         if (ch.theme && typeof ch.theme === 'object') {
           if (ch.theme.paletteId && TOK_has('palette', ch.theme.paletteId)) pres.theme.paletteId = ch.theme.paletteId;
           if (ch.theme.fontPairId && TOK_has('fontPair', ch.theme.fontPairId)) pres.theme.fontPairId = ch.theme.fontPairId;
@@ -16907,6 +16908,24 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
         const b = await readBody(req);
         const r = presentation.replaceObjectInCollection(db, pres, String(b.oldProjectId || ''), String(b.newProjectId || ''));
+        if (r.error) return json(res, 400, r);
+        presentation.pushHistory(pres, 'replace', presBy(R), 'Заменён объект');
+        store.save();
+        return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
+      }
+      // история версий (ТЗ v3 §6 «История версий»)
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/history$/)) && req.method === 'GET') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        return json(res, 200, presentation.historyList(db, pres));
+      }
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/restore$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req);
+        const r = presentation.restoreVersion(pres, String(b.versionId || ''));
         if (r.error) return json(res, 400, r);
         store.save();
         return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
@@ -16929,6 +16948,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         const b = await readBody(req);
         const k = Math.max(0, parseInt(b.index, 10) || 0);
         const r = presentation.applyObjectUpdates(db, pres, k, Array.isArray(b.fields) ? b.fields : []);
+        if (r.applied) presentation.pushHistory(pres, 'updates', presBy(R), 'Применены обновления из карточки');
         store.save();
         return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
       }
@@ -16992,6 +17012,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         pres.snapshots = (pres.snapshots || []).concat(snap).slice(-10);
         if (!pres.publicToken) pres.publicToken = crypto.randomBytes(8).toString('hex');
         pres.publishedSnapshotId = snap.id; pres.status = 'ready'; pres.updatedAt = Date.now();
+        presentation.pushHistory(pres, 'publish', presBy(R), 'Опубликовано · версия ' + (pres.snapshots || []).length);
         // regenerate QR now that token exists
         if (snap.broker && snap.broker.channels) { try { snap.broker.qr = await qrDataUrl(`${baseUrl(req)}/pv/${pres.publicToken}`); } catch (e) {} }
         store.save();
