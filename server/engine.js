@@ -437,6 +437,13 @@ function seqSpecificity(seq) {
 function nextTouchInfo(db, lead) {
   try {
     if (!lead || !lead.ai || !lead.ai.enabled || lead.marketingOptOut) return null;
+    /* ДИАЛОГ: клиент ответил и молчит → показываем следующий АВТО-ДОЖИМ ИИ (а не касание цепочки) */
+    if (lead.stage === 'dialog') {
+      const at = reengageDue(db, lead);
+      if (at == null) return null;
+      const re = lead.ai.reengage || {}, cfg = reengageCfg(db);
+      return { kind: 'reengage', at, attempt: (re.attempts || 0) + 1, maxAttempts: cfg.maxAttempts, channel: lead.activeChannel || 'wa', label: 'Авто-дожим ИИ', seqName: '', stepNum: (re.attempts || 0) + 1, total: cfg.maxAttempts, preview: 'ИИ вернёт клиента новым заходом (follow-up) — если продолжит молчать' };
+    }
     if (!['new', 'touch'].includes(lead.stage)) return null;
     if (lead.lastDir === 'in') return null;
     if ((db.messages || []).some(m => m.leadId === lead.id && m.dir === 'in')) return null;
@@ -669,6 +676,80 @@ function tickChains(db) {
     const baseGap = next ? Math.max(0, next.day - step.day) * dayMs(db) : dayMs(db);   /* 0 = «сразу после предыдущего» (пол ниже — 2 мин) */
     const jitter = baseGap * (0.75 + (lead.id.charCodeAt(lead.id.length - 1) % 50) / 100);   /* детерминированный по лиду разброс 0.75–1.25× */
     lead.ai.nextTouchAt = nowT + Math.max(120e3, jitter);
+  }
+}
+
+/* ===== АВТО-ДОЖИМ МОЛЧАЩИХ ДИАЛОГОВЫХ ЛИДОВ =====
+   Клиент ответил и пропал → раньше ИИ просто замолкал (дожать можно было только кнопкой «Подтолкнуть»).
+   Теперь ИИ сам возвращает его follow-up'ами: задержка до 1-го дожима + backoff между попытками + потолок
+   попыток → «Спящие». Время следующего дожима видно в диалоге (reengageDue/nextTouchInfo).
+   Настройка: settings.automations.reengage {enabled, firstDelayHours, maxAttempts, gapDays[]}. */
+function reengageCfg(db) {
+  const c = (db.settings.automations && db.settings.automations.reengage) || {};
+  return {
+    enabled: c.enabled !== false,                                  /* по умолчанию ВКЛ */
+    firstHours: Math.max(1, Math.min(720, c.firstDelayHours != null ? +c.firstDelayHours : 20)),
+    maxAttempts: Math.max(1, Math.min(10, c.maxAttempts != null ? +c.maxAttempts : 3)),
+    gapDays: (Array.isArray(c.gapDays) && c.gapDays.length) ? c.gapDays.map(x => Math.max(0.1, +x || 1)) : [1, 2, 4],
+  };
+}
+/* кандидат на авто-дожим? (общий предикат для тика и для видимости) */
+function reengageEligible(db, lead) {
+  if (!lead.ai || !lead.ai.enabled || lead.marketingOptOut) return false;
+  if (lead.stage !== 'dialog') return false;                        /* только живой диалог: цепочка — до ответа; sleeping — bulk-wake */
+  if (lead.lastDir !== 'out') return false;                         /* ждём, только если МЫ писали последними (клиент молчит) */
+  if (!db._demoSandbox && (lead._demo || isSeedDemoPhone(lead.phone))) return false;
+  if (!(db.messages || []).some(m => m.leadId === lead.id && m.dir === 'in')) return false;   /* клиент реально отвечал */
+  return true;
+}
+/* время следующего дожима ИИ (для показа в карточке); null — дожима не будет */
+function reengageDue(db, lead) {
+  const cfg = reengageCfg(db);
+  if (!cfg.enabled) return null;
+  if (((db.settings.automations || {}).touchMode || 'auto') === 'off') return null;
+  if (!reengageEligible(db, lead)) return null;
+  const re = lead.ai.reengage;
+  if (re && re.attempts >= cfg.maxAttempts) return null;
+  if (re && re.nextAt) return re.nextAt;
+  return (lead.lastMsgAt || Date.now()) + cfg.firstHours * 3600e3;   /* прогноз 1-го дожима */
+}
+function tickReengage(db) {
+  const nowT = Date.now();
+  const cfg = reengageCfg(db);
+  if (!cfg.enabled) return;
+  if (((db.settings.automations || {}).touchMode || 'auto') === 'off') return;
+  for (const lead of db.leads) {
+    if (lead.ai && (lead.ai.pendingTouch || lead.ai.pendingReply || lead.ai._replying)) continue;   /* занят: ждёт одобрения/ответа/генерации */
+    if (!reengageEligible(db, lead)) continue;
+    const re = lead.ai.reengage = lead.ai.reengage || { attempts: 0, nextAt: null };
+    if (re.attempts >= cfg.maxAttempts) {                           /* дожимы исчерпаны → в «Спящие» (дальше — bulk-wake) */
+      lead.stage = 'sleeping';
+      ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: не отвечает после ${re.attempts} дожимов ИИ → «Спящие»` });
+      lead.ai.reengage = null; delete lead.ai._reengageText; delete lead.ai._gReengage;
+      store.save(); continue;
+    }
+    if (re.nextAt == null) {                                        /* планируем срок: 1-й дожим от последнего нашего сообщения */
+      re.nextAt = (lead.lastMsgAt || nowT) + (re.attempts === 0 ? cfg.firstHours * 3600e3 : cfg.gapDays[Math.min(re.attempts - 1, cfg.gapDays.length - 1)] * dayMs(db));
+      continue;
+    }
+    if (nowT < re.nextAt) continue;
+    if (inQuiet(db, lead)) { re.nextAt = morningAt(db, lead); continue; }   /* тихие часы — утром */
+    const ck = '_reengageText';
+    if (lead.ai[ck]) {                                              /* текст готов (сгенерён на прошлом тике) → отправляем */
+      const txt = lead.ai[ck]; delete lead.ai[ck];
+      if (txt) send(db, lead, txt, 'ai', (lead.activeChannel && lead.activeChannel !== 'wa') ? { channel: lead.activeChannel } : {});
+      re.attempts += 1; re.lastAt = nowT;
+      re.nextAt = nowT + cfg.gapDays[Math.min(re.attempts - 1, cfg.gapDays.length - 1)] * dayMs(db);
+      ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `ИИ-дожим ${re.attempts}/${cfg.maxAttempts}: ${lead.name} молчал — отправлен новый заход` });
+      store.save();
+    } else if (!lead.ai._gReengage && llm.available && llm.available() && llm.followup) {   /* генерим follow-up асинхронно, отправим на след. тике */
+      lead.ai._gReengage = true;
+      (async () => {
+        try { const out = await llm.followup(db, lead); lead.ai[ck] = (out && out.text) || ''; if (!lead.ai[ck]) re.nextAt = nowT + dayMs(db); }
+        catch (e) { re.nextAt = nowT + dayMs(db); ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `ИИ-дожим не удался (${lead.name}): ${e.message}` }); }
+        finally { lead.ai._gReengage = false; store.save(); }
+      })();
+    }
   }
 }
 
@@ -1099,6 +1180,8 @@ function inbound(db, lead, text, opts = {}) {
   }
   lead.unread = (lead.unread || 0) + 1;   /* счётчик непрочитанных для брокера (сбрасывается при открытии карточки / ответе человека) */
   lead.lastInboundAt = m.at;
+  /* клиент ответил → СБРОС цикла авто-дожима: диалог снова живой, отсчёт тишины начинается заново после нашего ответа */
+  if (lead.ai) { lead.ai.reengage = null; delete lead.ai._reengageText; delete lead.ai._gReengage; }
   /* ИИ-автоподхват пояса: клиент явно назвал своё текущее время («у меня сейчас 14:30» / «по моему времени 9:00») →
      пересчитываем lead.tz. Консервативно (нужен HH:MM с двоеточием + маркер «у меня/сейчас/по моему»), иначе не трогаем. */
   try {
@@ -1437,7 +1520,7 @@ function startLoop() {
           const db = store.get();
           /* per-tick изоляция: сломанный подмодуль (битые данные одного тенанта) не должен
              голодить остальные тики этого же тенанта и не должен терять store.save() */
-          for (const [nm, fn] of [['replies', tickReplies], ['chains', tickChains], ['campaigns', tickCampaigns], ['meetings', tickMeetings], ['sla', tickSla], ['assignNew', tickAssignNew], ['rotation', tickRotation], ['reports', tickReports], ['simulator', tickSimulator], ['control', tickControl], ['scheduled', tickScheduled]]) {
+          for (const [nm, fn] of [['replies', tickReplies], ['chains', tickChains], ['reengage', tickReengage], ['campaigns', tickCampaigns], ['meetings', tickMeetings], ['sla', tickSla], ['assignNew', tickAssignNew], ['rotation', tickRotation], ['reports', tickReports], ['simulator', tickSimulator], ['control', tickControl], ['scheduled', tickScheduled]]) {
             try { fn(db); } catch (e) { console.error('[engine]', tid, nm, e); }
           }
           store.save();
@@ -1447,4 +1530,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, tickReengage, reengageDue };

@@ -6995,16 +6995,18 @@ async function renderChat(id, rebuild) {
     </div>`
   : (l.nextTouch && l.ai && l.ai.enabled) ? (() => {
     const nt = l.nextTouch;
+    const isRe = nt.kind === 'reengage';
     const when = nt.at ? (nt.at <= _mNow ? 'в ближайшую минуту' : _mFmt(nt.at)) : '—';
     const chn2 = ({ wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' })[nt.channel] || nt.channel;
-    return `<div class="chat-chain">
+    const title = isRe ? `Авто-дожим ИИ · попытка ${nt.attempt}/${nt.maxAttempts}` : `Цепочка касаний · шаг ${nt.stepNum}/${nt.total}${nt.label ? ' · ' + esc(nt.label) : ''}`;
+    return `<div class="chat-chain${isRe ? ' reengage' : ''}">
       <div class="cc-ic">${ic(I.spark || I.bolt)}</div>
       <div class="cc-main">
-        <div class="cc-t">Цепочка касаний · шаг ${nt.stepNum}/${nt.total}${nt.label ? ' · ' + esc(nt.label) : ''}</div>
-        <div class="cc-when">Следующее: ${esc(when)}${(l.tz != null && nt.at > _mNow) ? ' (время клиента)' : ''} · ${esc(chn2)}</div>
+        <div class="cc-t">${esc(title)}</div>
+        <div class="cc-when">${isRe ? 'Клиент молчит — ИИ сам вернёт его: ' : 'Следующее: '}${esc(when)}${(l.tz != null && nt.at > _mNow) ? ' (время клиента)' : ''} · ${esc(chn2)}</div>
         <div class="cc-prev">${esc(nt.preview)}</div>
       </div>
-      <div class="cc-act"><button class="btn btn-sm btn-accent" data-touchnow="1" title="Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)">${ic(I.send || I.bolt)}Отправить сейчас</button></div>
+      <div class="cc-act"><button class="btn btn-sm btn-accent" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="${isRe ? 'Дожать клиента сейчас, не дожидаясь срока' : 'Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)'}">${ic(I.send || I.bolt)}${isRe ? 'Дожать сейчас' : 'Отправить сейчас'}</button></div>
     </div>`;
   })() : '';
   pane.innerHTML = `
@@ -7074,6 +7076,7 @@ async function renderChat(id, rebuild) {
   $$('[data-gomove]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); openGrayMove(l.id, l.grayPhone, () => { try { render(); } catch (_) {} }); }));
   $$('[data-tzedit]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { try { render(); } catch (_) {} }); }));
   $$('[data-touchnow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { const r = await api.post('/leads/' + l.id + '/touch/send-now', {}); toast('Касание отправляется', (r && r.label) ? r.label : 'уйдёт в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 1500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
+  $$('[data-reengagenow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { await api.post('/leads/' + l.id + '/reengage-now', {}); toast('ИИ дожимает', 'Соберёт заход и отправит в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 2500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-ptsend]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; const t = (($('#ptText', pane) || {}).innerText || '').trim(); btn.disabled = true; try { await api.post('/leads/' + l.id + '/touch/approve', { text: t }); toast('Касание одобрено и отправлено', null, true); setTimeout(() => { try { render(); } catch (_) {} }, 1200); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-ptskip]', pane).forEach(b => b.addEventListener('click', async (e) => { e.currentTarget.disabled = true; try { await api.post('/leads/' + l.id + '/touch/skip', {}); toast('Касание пропущено', 'Цепочка перейдёт к следующему шагу', true); setTimeout(() => { try { render(); } catch (_) {} }, 800); } catch (err) { e.currentTarget.disabled = false; toast('Не вышло', err.message); } }));
   $$('#chPick .ch-seg').forEach(b => b.addEventListener('click', () => {
@@ -10340,6 +10343,7 @@ PAGES.automations = async (root) => {
         <div class="glass card" data-ag="first">
           <div class="card-title">${ic(I.spark)}Первая линия и ИИ</div>
           ${swRow('Мгновенный ответ + цепочка касаний', '7 касаний / 18 дней, пока клиент не ответил', link('sequences', 'Настроить'))}
+          ${(() => { const re = a.reengage || {}; const on = re.enabled !== false; return swRow('Авто-дожим молчащих диалогов', 'Клиент ответил и пропал → ИИ сам возвращает его (follow-up), а не только кнопкой «Подтолкнуть». Первый дожим через N ч тишины, дальше нарастающие паузы; после лимита попыток → «Спящие». Видно в диалоге, когда ИИ коснётся.', `<span style="display:inline-flex;gap:6px;align-items:center;font-size:12px">через <input id="reFirst" type="number" min="1" max="720" style="width:62px" value="${re.firstDelayHours ?? 20}"> ч · до <input id="reMax" type="number" min="1" max="10" style="width:50px" value="${re.maxAttempts ?? 3}"> попыток <label class="switch"><input type="checkbox" id="reOn" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></span>`); })()}
           ${swRow('ИИ-квалификатор и правила отключения', 'Критерии по гео, стоп-слова, перехват человеком', link('qualifier', 'Настроить'))}
           ${swRow('Реанимация спящих', 'Скоринг + безопасные кампании пачками', link('wake', 'Настроить'))}
         </div>
@@ -10561,6 +10565,8 @@ PAGES.automations = async (root) => {
   }
   const qhSave = () => saveAuto({ quietHours: { enabled: $('#qhOn').checked, from: Math.min(23, Math.max(0, +$('#qhFrom').value || 21)), to: Math.min(23, Math.max(0, +$('#qhTo').value || 9)) } });
   ['qhFrom', 'qhTo', 'qhOn'].forEach(id2 => { const el2 = $('#' + id2); if (el2) el2.addEventListener('change', qhSave); });
+  const reSave = () => saveAuto({ reengage: { enabled: $('#reOn').checked, firstDelayHours: Math.min(720, Math.max(1, +$('#reFirst').value || 20)), maxAttempts: Math.min(10, Math.max(1, +$('#reMax').value || 3)) } });
+  ['reOn', 'reFirst', 'reMax'].forEach(id2 => { const el2 = $('#' + id2); if (el2) el2.addEventListener('change', reSave); });
   const sla = $('#slaMin');
   if (sla) sla.addEventListener('change', () => saveAuto({ brokerSlaMin: +sla.value || 0 }));
   const mc = $('#meetChain');

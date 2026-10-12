@@ -8124,6 +8124,17 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true, label: nt.label });
     }
+    /* дожать молчащего диалогового лида СЕЙЧАС (не дожидаясь срока авто-дожима) */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/reengage-now$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      lead.ai = lead.ai || {}; lead.ai.enabled = true;
+      lead.ai.reengage = lead.ai.reengage || { attempts: 0, nextAt: null };
+      lead.ai.reengage.nextAt = Date.now() - 1000;   /* просрочен → ближайший тик авто-дожима сгенерит+отправит */
+      delete lead.ai._reengageText;   /* форсим свежую генерацию */
+      store.save();
+      return json(res, 200, { ok: true });
+    }
     /* режим «с одобрением»: брокер решает по готовому касанию — Отправить (можно с правкой) / Пропустить.
        approve → шлём + следующий шаг; skip → следующий шаг без отправки. nextTouchAt=null → движок пересчитает срок. */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/touch\/(approve|skip)$/)) && req.method === 'POST') {
