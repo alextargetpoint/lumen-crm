@@ -739,11 +739,66 @@
   function objMenu(anchor, k) {
     menu(anchor, [
       { t: 'Проверить обновления', ic: 'db', fn: function () { openObjectUpdates(k); } },
-      { t: 'Заменить объект', ic: 'image', fn: function () { toast('Замена объекта', 'Выбор нового объекта на то же место — экран в разработке'); } },
+      { t: 'Заменить объект', ic: 'image', fn: function () { openReplaceObject(k); } },
       { t: 'Настроить страницы', ic: 'dots', fn: function () { S.openGroups = S.openGroups || {}; S.openGroups[k] = true; render(); } },
       { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
     ]);
   }
+  /* ---------- «Заменить объект» — пикер объекта (макет §8) ---------- */
+  function openReplaceObject(k) {
+    api('GET', '/objects').then(function (r) {
+      if (r.status !== 200) { toast('Не удалось', (r.json && r.json.error) || ''); return; }
+      var all = r.json.items || [];
+      var inColl = S.pres.projectIds || [];
+      var curPid = inColl[k];
+      var cur = all.filter(function (x) { return x.id === curPid; })[0] || { name: (S.projects[k] && S.projects[k].name) || 'Объект' };
+      var grp = collectionGroups().filter(function (g) { return g.type === 'object' && g.k === k; })[0];
+      var pages = grp ? grp.idx.length : 0;
+      var avail = all.filter(function (x) { return inColl.indexOf(x.id) < 0; });
+      replaceModal(k, curPid, cur, pages, avail);
+    });
+  }
+  function replaceModal(k, curPid, cur, pages, avail) {
+    var selId = null, q = '';
+    var ov = document.createElement('div'); ov.className = 'pu-overlay';
+    function money(o) { var c = o.currency === 'EUR' ? '€' : o.currency === 'THB' ? '฿' : '$'; return o.priceFrom ? 'от ' + c + ' ' + (o.priceFrom).toLocaleString('ru-RU') : ''; }
+    function list() {
+      var items = avail.filter(function (x) { return !q || (x.name + ' ' + x.geoName).toLowerCase().indexOf(q) >= 0; });
+      if (!items.length) return '<div class="pe-bl-empty">Ничего не найдено</div>';
+      return items.map(function (o) {
+        return '<button class="ro-item' + (o.id === selId ? ' on' : '') + '" data-roid="' + esc(o.id) + '">' +
+          '<div class="ro-thumb" style="' + (o.image ? 'background-image:url(\'' + esc(absU(o.image)) + '\')' : '') + '"></div>' +
+          '<div class="ro-b"><b>' + esc(o.name) + '</b><span>' + esc([o.geoName, o.type].filter(Boolean).join(' · ')) + ' · ' + esc(money(o)) + '</span><span class="ro-ph">' + o.photos + ' фото' + '</span></div></button>';
+      }).join('');
+    }
+    function warn() {
+      if (!selId) return '<div class="ro-warn muted">Выберите новый объект — он займёт место текущего.</div>';
+      var n = avail.filter(function (x) { return x.id === selId; })[0] || {};
+      return '<div class="ro-warn"><div class="ro-sw">' + esc(cur.name) + ' <i>' + ic('swap') + '</i> ' + esc(n.name) + '</div>' +
+        '<ul><li>Будет заменено страниц объекта: <b>' + pages + '</b></li>' +
+        '<li>Локальные правки текста и фото этого объекта <b>не переносятся</b></li>' +
+        '<li>Данные и фотографии нового объекта загрузятся заново</li>' +
+        '<li>Сравнение обновит колонку этого объекта</li></ul></div>';
+    }
+    function paint() { ov.querySelector('.ro-list').innerHTML = list(); ov.querySelector('.ro-side').innerHTML = warn() + '<div class="ro-acts"><button class="pe-btn pe-btn-primary ro-apply"' + (selId ? '' : ' disabled') + '>Заменить объект</button><button class="pe-btn pe-btn-ghost" data-puclose>Отмена</button></div>'; wireBody(); }
+    function wireBody() {
+      ov.querySelectorAll('[data-roid]').forEach(function (b) { b.addEventListener('click', function () { selId = b.getAttribute('data-roid'); paint(); }); });
+      ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
+      var ap = ov.querySelector('.ro-apply'); if (ap && selId) ap.addEventListener('click', function () {
+        api('POST', '/' + ID + '/replace-object', { oldProjectId: curPid, newProjectId: selId }).then(function (r) { close(); if (r.status === 200) { toast('Объект заменён', null, true); reloadPres(); } else toast('Не удалось', (r.json && r.json.error) || ''); });
+      });
+    }
+    function close() { ov.remove(); }
+    ov.innerHTML = '<div class="pu-box ro-box"><div class="pu-hd"><h2>Заменить объект</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
+      '<div class="ro-cur">Сейчас: <b>' + esc(cur.name) + '</b> · ' + pages + ' ' + plural(pages, 'страница', 'страницы', 'страниц') + '</div>' +
+      '<div class="ro-grid"><div class="ro-pick"><div class="pe-add-search">' + ic('search') + '<input id="roSearch" placeholder="Поиск объекта…"></div><div class="ro-list"></div></div>' +
+      '<div class="ro-side"></div></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelector('#roSearch').addEventListener('input', function () { q = this.value.toLowerCase(); ov.querySelector('.ro-list').innerHTML = list(); wireBody(); });
+    paint();
+  }
+
   /* ---------- «Обновить данные объекта» — diff подборки ↔ карточка (макет) ---------- */
   function puFmt(v) { if (v == null || v === '') return 'Нет данных'; if (typeof v === 'number') return v.toLocaleString('ru-RU'); var s = String(v); return s.length > 72 ? s.slice(0, 72) + '…' : s; }
   function reloadPres() { api('GET', '/' + ID + '?full=1').then(function (r) { if (r.status === 200) { S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {}; S.projects = r.json.projects || S.projects; render(); revalidate(); } }); }

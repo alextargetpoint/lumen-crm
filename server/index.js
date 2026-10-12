@@ -16921,6 +16921,12 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         presList().unshift(pres); store.save();
         return json(res, 200, pres);
       }
+      // лёгкий список объектов для пикера (замена/добавление объектов)
+      if (p === '/api/presentations/objects' && req.method === 'GET') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const items = (db.properties || []).slice(0, 500).map(pr => ({ id: pr.id, name: pr.name || 'Объект', geo: pr.geo, geoName: (db.settings.geoNames || {})[pr.geo] || pr.geo || '', priceFrom: pr.priceFrom, currency: pr.currency, type: pr.type || '', image: (pr.images || [])[0] || '', photos: (pr.images || []).length }));
+        return json(res, 200, { items });
+      }
       // read (full for editor, or meta)
       if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)$/)) && req.method === 'GET') {
         const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
