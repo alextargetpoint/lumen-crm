@@ -4461,6 +4461,19 @@ async function safeFetchBytes(url, cap) {
     return { buf, mime };
   } finally { clearTimeout(to); }
 }
+/* байты изображения из локального медиа (CRM) или по http (SSRF-гард) — для медиа-анализа */
+async function fetchImageBytes(url) {
+  const s = String(url || '');
+  if (/^https?:\/\//i.test(s)) { const { buf } = await safeFetchBytes(s, 12 * 1024 * 1024); return buf; }
+  let fp = null, m;
+  if ((m = s.match(/^\/?media\/(.+)$/))) { if (m[1].includes('..')) throw new Error('bad path'); fp = path.join(MEDIA_DIR, m[1]); }
+  else if ((m = s.match(/^\/?assets\/(.+)$/))) { if (m[1].includes('..')) throw new Error('bad path'); fp = path.join(UPLOADS_DIR, m[1]); if (!fs.existsSync(fp)) fp = path.join(__dirname, '..', 'public', 'assets', m[1]); }
+  else if (s.startsWith('/') && !s.includes('..')) fp = path.join(__dirname, '..', 'public', s.replace(/^\//, ''));
+  if (!fp || !fs.existsSync(fp)) throw new Error('файл не найден');
+  const buf = fs.readFileSync(fp);
+  if (buf.length > 12 * 1024 * 1024) throw new Error('файл слишком большой');
+  return buf;
+}
 /* богатое превью ссылки: YouTube/TikTok через oEmbed + детерминированные обложки, Instagram/прочее через og:image.
    Возвращает {url, title, image, provider}. Никогда не бросает по мелочи — отдаёт что смог. */
 function ytId(u) {
@@ -17003,6 +17016,40 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
     }
 
 
+    /* МЕДИА-ДВИЖОК (доп-ТЗ §14, приоритет №1): анализ фото объекта из медиатеки CRM —
+       реальные размеры/PPI-под-слот/материал/флаги → бейджи «Проверка проекта», «низкое
+       разрешение», решения кропа. Использует media.js (реальные байты, не имя файла). */
+    if (p === '/api/media/analyze-property' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || (R.role !== 'owner' && R.role !== 'broker')) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const pr = (db.properties || []).find(x => x.id === String(b.propertyId || ''));
+      if (!pr) return json(res, 404, { error: 'property not found' });
+      const fmtOk = ['portrait_a4', 'landscape_a4', 'landscape_16_9', 'portrait_9_16'];
+      const fmt = fmtOk.includes(b.format) ? b.format : 'portrait_a4';
+      const slot = typeof b.slot === 'string' ? b.slot : 'cover';
+      const profile = b.profile === 'print' ? 'print' : 'digital';
+      const urls = (pr.images || []).slice(0, 14);
+      const photos = [], assets = [];
+      for (const url of urls) {
+        try {
+          const buf = await fetchImageBytes(url);
+          const a = media.analyzeAsset(buf, { name: url });
+          const suit = media.suitability(a, { format: fmt, slot, profile });
+          assets.push({ id: url, checksum: a.checksum });
+          photos.push({ url, ok: !!a.ok, width: a.width, height: a.height, mime: a.mime, megapixels: a.megapixels, materialType: a.materialType, status: suit.status, ppi: suit.ppi, reasons: suit.reasons, flags: a.flags || [] });
+        } catch (e) { photos.push({ url, ok: false, status: 'error', error: (e && e.message) || 'недоступно' }); }
+      }
+      const dupes = media.duplicateGroups(assets);
+      photos.forEach(ph => { if (dupes[ph.url]) ph.duplicateGroup = dupes[ph.url]; });
+      const summary = {
+        total: photos.length, analyzed: photos.filter(x => x.ok).length,
+        suitableForCover: photos.filter(x => x.status === 'suitable').length,
+        needsReview: photos.filter(x => x.status === 'needs_review').length,
+        notForCover: photos.filter(x => x.status === 'not_for_cover').length,
+        errors: photos.filter(x => !x.ok).length, duplicates: Object.keys(dupes).length,
+      };
+      return json(res, 200, { project: { id: pr.id, name: pr.name, geo: pr.geo }, format: fmt, slot, photos, summary });
+    }
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 
     /* ---------------- публичная СВОДНАЯ СТРАНИЦА СРАВНЕНИЯ для клиента (/cmp/:id) — премиум + языки ---------------- */
