@@ -2629,21 +2629,20 @@ function notetakerInstallModal(platform) {
   const step = (n, t, b) => `<div class="nt-step"><span class="nt-step-n">${n}</span><div class="nt-step-b"><b>${t}</b><div>${b}</div></div></div>`;
   const kbd = (s) => `<span class="nt-kbd">${esc(s)}</span>`;
   const macBody = `
-    <div class="nt-note warn">${ic(I.shield)}<span><b>Главное:</b> перенесите приложение в «Программы» <b>ДО первого запуска</b>. Если запускать прямо из «Загрузок», macOS прячет его в случайную папку (App Translocation) — тогда доступ к записи экрана <b>не закрепляется, и звук звонков не пишется</b> (пустой файл). Приложение распространяется напрямую (не через App Store), поэтому при первом запуске macOS его блокирует — это нормально, ниже по шагам.</span></div>
+    <div class="nt-note warn">${ic(I.shield)}<span><b>Главное:</b> перенесите приложение в «Программы» <b>ДО первого запуска</b>. Если запускать прямо из «Загрузок», macOS прячет его в случайную папку (App Translocation) — тогда доступ к микрофону <b>не закрепляется, и звук звонков не пишется</b> (пустой файл). Приложение распространяется напрямую (не через App Store), поэтому при первом запуске macOS его блокирует — это нормально, ниже по шагам.</span></div>
     <div class="nt-steps">
       ${step(1, 'Распакуйте и перенесите в «Программы»', `Двойной клик по скачанному <b>LumenNotetaker-mac.zip</b> → появится «Lumen Notetaker». <b>Сразу перетащите его в папку «Программы (Applications)»</b> и держите <b>одну</b> копию. ⚠️ Не оставляйте и не распаковывайте zip повторно в «Загрузки» — macOS плодит там «Lumen Notetaker 2», «3», и разрешения перестают совпадать.`)}
       ${step(2, 'Запустите — появится блокировка', `Откройте приложение. macOS скажет «<i>Mac заблокировал Lumen Notetaker для безопасности</i>» — это ожидаемо, закройте окошко.`)}
       ${step(3, 'Разрешите запуск в Системных настройках', `Откройте ${kbd('Системные настройки')} → ${kbd('Конфиденциальность и безопасность')}, прокрутите вниз до раздела «Безопасность» → у строки про Lumen Notetaker нажмите ${kbd('Открыть всё равно')} <span class="nt-dim">(в системе на другом языке — та же кнопка: англ. «Open Anyway», ит. «Apri comunque»)</span>. Подтвердите Touch ID / паролем.`)}
       ${step(4, 'Во всплывшем окне — «Открыть всё равно»', `Появится диалог «Открыть Lumen Notetaker?» → нажмите ${kbd('Открыть всё равно')}. Приложение запустится.`)}
       ${step(5, 'Войдите аккаунтом дашборда', `Тот же e-mail и пароль, что в этой CRM.`)}
-      ${step(6, 'Дайте доступ к записи экрана', `Приложение попросит «Запись экрана и системного звука» (нужно, чтобы писать звук Zoom/Meet/Teams) → ${kbd('Открыть системные настройки')} → включите тумблер <b>Lumen Notetaker</b>.`)}
-      ${step(7, '⚠️ Перезапустите приложение', `macOS применяет доступ к экрану <b>только после перезапуска</b>. Нажмите <b>«Перезапустить»</b> в приложении (или закройте через «Выйти» в его окне и откройте снова). Без перезапуска запись не включится.`)}
-      ${step(8, 'Готово', `Приложение живёт в менюбаре (иконка звуковой волны). Звонки и встречи пишутся в фоне, транскрипт и квалификация падают прямо в карточку лида. Клиент ничего не видит.`)}
+      ${step(6, 'Разрешите доступ к микрофону', `Приложение попросит <b>микрофон</b> — он нужен, чтобы писать и ваш голос, и голоса собеседников (системный звук Zoom/Meet/Teams идёт через тот же доступ). Нажмите <b>«Разрешить»</b>. <b>«Запись экрана» больше НЕ нужна</b> — запись звонков работает без неё.`)}
+      ${step(7, 'Готово', `Приложение живёт в менюбаре (иконка звуковой волны). Звонки и встречи пишутся в фоне, транскрипт и квалификация падают прямо в карточку лида. Если звонок не привязался к лиду автоматически — расшифровка попадёт в «Неразобранные записи» (раздел «Встречи»), оттуда привяжете вручную. Клиент ничего не видит.`)}
     </div>
     <div class="nt-note warn">${ic(I.shield)}<span><b>Запрос зациклился? В Настройках «Lumen Notetaker 2 / 3», а приложение всё равно просит доступ?</b> Так бывает, когда на Mac <b>несколько копий</b> с разной подписью: галочку вы дали ОДНОЙ копии, а запущена ДРУГАЯ — поэтому не синхронизируется. Лечится полной чисткой:<br>
       1. Закройте приложение («Выйти» в его окне), убедитесь, что ни одна копия не запущена.<br>
       2. Удалите <b>ВСЕ</b> копии Lumen Notetaker — через Spotlight-поиск «Lumen» и в «Программы», «Загрузки», «Рабочий стол» → <b>очистите Корзину</b>.<br>
-      3. В ${kbd('Системные настройки')} → ${kbd('Конфиденциальность')} → ${kbd('Запись экрана')} <i>и</i> ${kbd('Только системный звук')} уберите минусом <b>ВСЕ</b> строки Lumen Notetaker (включая «2»/«3»).<br>
+      3. В ${kbd('Системные настройки')} → ${kbd('Конфиденциальность')} → ${kbd('Микрофон')} уберите минусом <b>ВСЕ</b> строки Lumen Notetaker (включая «2»/«3»).<br>
       4. <b>Перезагрузите Mac</b> — это сбрасывает кэш разрешений (ключевой шаг!).<br>
       5. Установите <b>одну</b> свежую копию в «Программы» и пройдите шаги выше.</span></div>`;
   const winBody = `
@@ -2665,6 +2664,62 @@ function notetakerInstallModal(platform) {
       { label: 'Понятно', cls: 'btn-accent' },
     ],
   });
+}
+
+/* ── Неразобранные записи звонков: расшифровки без авто-привязки к лиду. Можно привязать вручную. ── */
+let _ntPlayAudio = null;
+function ntPlay(url) {
+  try { if (_ntPlayAudio) { _ntPlayAudio.pause(); _ntPlayAudio = null; } } catch (_) {}
+  _ntPlayAudio = new Audio(url); _ntPlayAudio.play().catch(() => toast('Не воспроизвелось'));
+}
+async function openNotetakerInbox() {
+  let d; try { d = await api.get('/notetaker/unassigned'); } catch (e) { toast('Не загрузилось', e.message); return; }
+  const items = d.items || [];
+  const row = (u) => `<div class="nt-ib-row" data-nu="${u.id}">
+    <div class="nt-ib-hd"><span class="nt-ib-when">${ago(u.at)}${u.dur ? ' · ' + Math.round(u.dur) + ' мин' : ''}${u.brokerName ? ' · ' + esc(u.brokerName) : ''}</span>
+      ${u.audio ? `<button class="lc-fv-play" type="button" data-ntplay="${esc(u.audio)}" title="Прослушать">${ic(I.play)}</button>` : ''}</div>
+    <div class="nt-ib-tx">${esc((u.text || '').slice(0, 600))}${(u.text || '').length > 600 ? '…' : ''}</div>
+    <div class="nt-ib-act">
+      <button class="btn btn-sm btn-accent" data-ntassign="${u.id}">${ic(I.handover)}Привязать к лиду</button>
+      <button class="btn btn-sm" data-ntdel2="${u.id}">${ic(I.x)}Удалить</button>
+    </div></div>`;
+  const body = items.length
+    ? `<div class="nt-ib">${items.map(row).join('')}</div>`
+    : `<div class="lc-fv-empty">${ic(I.mic)}Нет неразобранных записей.<br><span class="muted">Сюда падают звонки, которые нотетейкер не смог сам привязать к лиду (ad-hoc-созвон, не создан через CRM). Отсюда их можно отнести к нужному лиду.</span></div>`;
+  const bd = modal({ title: 'Неразобранные записи звонков', sub: 'Звонки без авто-привязки — ничего не теряется, выберите нужного лида.', wide: true, body, actions: [{ label: 'Закрыть' }] });
+  $$('[data-ntplay]', bd).forEach(b => b.addEventListener('click', () => ntPlay(b.dataset.ntplay)));
+  $$('[data-ntdel2]', bd).forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Удалить эту запись безвозвратно?')) return;
+    try { await api.post('/notetaker/unassigned/delete', { id: b.dataset.ntdel2 }); b.closest('.nt-ib-row').remove(); toast('Удалено', null, true); } catch (e) { toast('Не удалилось', e.message); }
+  }));
+  $$('[data-ntassign]', bd).forEach(b => b.addEventListener('click', () => {
+    pickLead('К какому лиду отнести запись?', async (leadId, leadName) => {
+      try { const r = await api.post('/notetaker/unassigned/assign', { id: b.dataset.ntassign, leadId });
+        if (r.ok) { toast('Привязано к ' + (leadName || 'лиду'), 'Транскрипт и запись — в карточке', true); b.closest('.nt-ib-row').remove(); }
+        else toast('Не привязалось'); } catch (e) { toast('Ошибка', e.message); }
+    });
+  }));
+}
+/* Универсальный пикер лида: модалка с поиском по имени/телефону → cb(leadId, leadName) */
+async function pickLead(title, cb) {
+  let leads = []; try { leads = (await api.get('/leads')) || []; } catch (_) {}
+  leads = leads.filter(l => l.stage !== 'lost');
+  const SN = { new: 'Новый', touch: 'Касание', dialog: 'Диалог', qualified: 'Квал', handover: 'У брокера', viewing: 'Показ', deal: 'Сделка', sleeping: 'Спящий' };
+  const bd = modal({ title: title || 'Выберите лида', sub: 'Поиск по имени или телефону', wide: true,
+    body: `<input id="plSearch" placeholder="Начните вводить имя или телефон…" autocomplete="off" style="margin-bottom:12px;width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--stroke,rgba(20,19,17,.16));border-radius:10px;background:var(--bg-2,rgba(255,255,255,.6));color:var(--ink,#141311);outline:none;font-size:14px">
+      <div id="plList" class="nt-pl-list"></div>`, actions: [{ label: 'Отмена' }] });
+  const listEl = $('#plList', bd), inp = $('#plSearch', bd);
+  const paint = (q) => {
+    q = (q || '').trim().toLowerCase();
+    const qd = q.replace(/\D/g, '');   // цифры запроса; пустую строку НЕ матчим по телефону (.includes('') === true у всех)
+    const filt = !q ? leads.slice(0, 40) : leads.filter(l => (l.name || '').toLowerCase().includes(q) || (qd && (l.phone || '').replace(/\D/g, '').includes(qd))).slice(0, 40);
+    listEl.innerHTML = filt.length ? filt.map(l => `<button type="button" class="nt-pl-it" data-plid="${l.id}" data-plnm="${esc(l.name || '')}">
+      <span class="nt-pl-nm">${esc(l.name || 'Без имени')}</span>
+      <span class="nt-pl-mt">${l.phone ? esc(l.phone) + ' · ' : ''}${esc(SN[l.stage] || l.stage || '')}</span></button>`).join('')
+      : `<div class="muted" style="padding:10px">Ничего не найдено</div>`;
+    $$('[data-plid]', listEl).forEach(b => b.addEventListener('click', () => { closeModal(); cb(b.dataset.plid, b.dataset.plnm); }));
+  };
+  paint(''); inp.addEventListener('input', () => paint(inp.value)); setTimeout(() => inp.focus(), 60);
 }
 /* тест-звонок для проверки номера брокера (первое плечо click-to-call) */
 document.addEventListener('click', async (e) => {
@@ -5309,7 +5364,8 @@ function openDupesModal(groups) {
 
 /* ---------- встречи ---------- */
 PAGES.meetings = async (root) => {
-  const [list, tdata] = await Promise.all([api.get('/meetings'), api.get('/tasks').catch(() => ({ tasks: [] }))]);
+  const [list, tdata, ntU] = await Promise.all([api.get('/meetings'), api.get('/tasks').catch(() => ({ tasks: [] })), api.get('/notetaker/unassigned').catch(() => ({ items: [] }))]);
+  const ntCount = (ntU.items || []).length;
   const allTasks = (tdata.tasks || []).filter(t => t.due && t.status !== 'done');   /* личные задачи с дедлайном-временем → блоки в календаре */
   const TASK_MAP = {}; allTasks.forEach(t => TASK_MAP[t.id] = t);
   /* неделя календаря: смещение хранится в PAGE_STATE.calWeek */
@@ -5343,6 +5399,7 @@ PAGES.meetings = async (root) => {
           <b style="color:var(--navy-900)">${mon.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — ${dayCols[6].toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</b>
           <button class="btn btn-sm" id="calNext" style="transform:none">${ic(I.chev)}</button>
           <button class="btn btn-sm" id="mtPrint" title="Печать недели / PDF">${ic(I.doc)}</button>
+          <button class="btn btn-sm ${ntCount ? 'btn-accent' : ''}" id="ntInboxBtn" title="Записи звонков без авто-привязки к лиду">${ic(I.mic)}Неразобранные${ntCount ? ` <b style="margin-left:4px">${ntCount}</b>` : ''}</button>
         </span></div>
       <div class="cal-legend"><span class="cal-lg-i"><span class="cal-lg-dot ev"></span>встречи</span><span class="cal-lg-i"><span class="cal-lg-dot tk"></span>задачи с дедлайном${tasksF.length ? ' · ' + tasksF.length : ''}</span></div>
       <div class="cal-grid" style="--hpx:${HPX}px">
@@ -5398,6 +5455,7 @@ PAGES.meetings = async (root) => {
   }));
   $$('[data-mtprep]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openLeadModal(b.dataset.mtprep); }));
   $('#mtPrint').addEventListener('click', () => window.open('/meetings/print?w=' + (PAGE_STATE.calWeek || 0), '_blank'));
+  { const nb = $('#ntInboxBtn'); if (nb) nb.addEventListener('click', openNotetakerInbox); }
   $('#calPrev').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) - 1; render(); });
   $('#calNext').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) + 1; render(); });
   $('#calBroker').addEventListener('change', (e) => { PAGE_STATE.calBroker = e.target.value; render(); });
@@ -6067,6 +6125,7 @@ function fvBody(l) {
       <div class="lc-fv-vhead"><span class="lc-fv-dur">${fvDur(v.dur)}</span><span class="lc-fv-sub">${v.who ? esc(v.who) + ' · ' : ''}${ago(v.at)}</span></div>
       ${v.transcript ? `<div class="lc-fv-tr">${esc(v.transcript)}</div>` : '<div class="lc-fv-tr muted">расшифровка не распозналась</div>'}
     </div>
+    ${v.meetingId ? `<button class="btn-ghost lc-fv-x" data-vnmove="${v.meetingId}" title="Переместить запись к другому лиду">${ic(I.handover)}</button>` : ''}
     <button class="btn-ghost lc-fv-x" data-vndel="${v.id}" title="Удалить">${ic(I.x)}</button>
   </div>`).join('');
   return `
@@ -6543,6 +6602,16 @@ async function openLeadModal(id) {
       const vid = b.dataset.vndel;
       await fetch(`/api/leads/${l.id}/voice/${vid}`, { method: 'DELETE' });
       l.voiceNotes = (l.voiceNotes || []).filter(v => v.id !== vid); paintFV();
+    }));
+    $$('[data-vnmove]', bd).forEach(b => b.addEventListener('click', () => {
+      const mtId = b.dataset.vnmove;
+      const tr = (l.transcripts || []).find(t => t.meetingId === mtId);
+      if (!tr) { toast('Не нашёл расшифровку для переноса'); return; }
+      pickLead('Переместить запись к другому лиду', async (toLeadId, toName) => {
+        try { const r = await api.post('/notetaker/transcript/reassign', { fromLeadId: l.id, transcriptId: tr.id, toLeadId });
+          if (r.ok) { toast('Перемещено к ' + (toName || 'лиду'), 'Запись и транскрипт теперь в его карточке', true); await loadState(); closeModal(); openLeadModal(toLeadId); }
+          else toast('Не переместилось'); } catch (e) { toast('Ошибка', e.message); }
+      });
     }));
     $$('[data-vnplay]', bd).forEach(b => b.addEventListener('click', () => {
       const url = b.dataset.vnplay;

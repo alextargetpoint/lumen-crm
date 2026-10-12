@@ -8899,6 +8899,19 @@ body.client-view [data-team]{ display:none !important; }
 .nt-note svg{width:15px;height:15px;flex:0 0 15px;margin-top:1px;color:var(--accent)}
 .nt-note.warn{background:rgba(201,124,42,.1);border-color:rgba(201,124,42,.28)}
 .nt-note.warn svg{color:#b45309}
+/* Неразобранные записи звонков (инбокс) */
+.nt-ib{display:flex;flex-direction:column;gap:12px}
+.nt-ib-row{border:1px solid var(--stroke);border-radius:13px;padding:13px 15px;background:var(--card)}
+.nt-ib-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+.nt-ib-when{font-size:12px;color:var(--ink-3);font-weight:600}
+.nt-ib-tx{font-size:13px;line-height:1.55;color:var(--ink-2);max-height:118px;overflow:auto;margin-bottom:11px}
+.nt-ib-act{display:flex;gap:8px}
+/* Пикер лида */
+.nt-pl-list{display:flex;flex-direction:column;gap:5px;max-height:46vh;overflow:auto}
+.nt-pl-it{display:flex;flex-direction:column;gap:2px;text-align:left;width:100%;border:1px solid var(--stroke);background:var(--card);border-radius:10px;padding:9px 12px;cursor:pointer;color:inherit;transition:border-color .12s,background .12s}
+.nt-pl-it:hover{border-color:var(--accent);background:var(--bg-2,rgba(37,99,235,.05))}
+.nt-pl-nm{font-size:13.5px;font-weight:600;color:var(--ink-1)}
+.nt-pl-mt{font-size:12px;color:var(--ink-3)}
 .lc-more{border:1px solid var(--stroke);border-radius:14px;overflow:hidden;margin-bottom:12px}
 .lc-more-hd{width:100%;display:flex;align-items:center;gap:10px;padding:14px 16px;border:0;background:var(--card);cursor:pointer;text-align:left;color:inherit}
 .lc-more-hd>svg:first-child{width:18px;height:18px;color:var(--ink-3);flex:0 0 auto}
