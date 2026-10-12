@@ -16893,6 +16893,34 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         store.save();
         return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
       }
+      // autofill photos from CRM media (доп-ТЗ §7 приоритет №1) — лучший кадр на обложку, разнообразие в галерею
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/autofill-photos$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        if (pres.kind === 'collection') return json(res, 400, { error: 'автозаполнение пока для презентации объекта' });
+        const pr = (db.properties || []).find(x => x.id === pres.projectId);
+        if (!pr) return json(res, 400, { error: 'объект не найден' });
+        const cands = [];
+        const urls = (pr.images || []).slice(0, 14);
+        for (let i = 0; i < urls.length; i++) { try { const buf = await fetchImageBytes(urls[i]); cands.push({ assetId: 'img' + i, analysis: media.analyzeAsset(buf, { name: urls[i] }) }); } catch (e) {} }
+        const plan = media.autofillPlan(cands, { format: pres.defaultFormat || 'portrait_a4' });
+        const assignments = [];
+        const secs = pres.orderedSections || [];
+        const hero = secs.find(s => s.family === 'hero');
+        if (hero && plan.cover && !((hero.assetRefs || [])[0] || {}).lockedByUser) {
+          hero.assetRefs = (hero.assetRefs && hero.assetRefs.length) ? hero.assetRefs : [{ role: 'hero', fit: 'cover', focalPoint: { x: .5, y: .5 } }];
+          hero.assetRefs[0] = Object.assign({}, hero.assetRefs[0], { assetId: plan.cover.assetId });
+          assignments.push({ sectionId: hero.id, slot: 'обложка', assetId: plan.cover.assetId, reason: plan.coverReason });
+        }
+        const gallery = secs.find(s => s.family === 'gallery');
+        if (gallery && plan.gallery.length && !(gallery.assetRefs || []).some(r => r.lockedByUser)) {
+          gallery.assetRefs = plan.gallery.map(id => ({ assetId: id }));
+          assignments.push({ sectionId: gallery.id, slot: 'галерея', count: plan.gallery.length, reason: 'разные ракурсы без повторов' });
+        }
+        if (assignments.length) { pres.draftRevision = (pres.draftRevision || 1) + 1; pres.updatedAt = Date.now(); store.save(); }
+        return json(res, 200, { assigned: assignments.length, assignments, analyzed: cands.length, revision: pres.draftRevision });
+      }
       // validate / preflight
       if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/validate$/)) && req.method === 'POST') {
         const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });

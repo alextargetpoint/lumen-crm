@@ -241,6 +241,27 @@ function rankCovers(candidates, slot) {
 }
 
 /* ---------------------------------------------------------------------------
+   5b. АВТОЗАПОЛНЕНИЕ из медиатеки CRM (доп-ТЗ §7, приоритет №1): лучший кадр на обложку,
+   разнообразные фото в галерею; планировки/карты/портреты/логотипы в фото-слоты не идут.
+   candidates: [{assetId, analysis}]. Чистая функция — без сети, тестируемая.
+   -------------------------------------------------------------------------- */
+function autofillPlan(candidates, opts) {
+  opts = opts || {};
+  const list = (candidates || []).filter(c => c && c.analysis && c.analysis.ok);
+  if (!list.length) return { cover: null, coverReason: null, gallery: [], excluded: [] };
+  const fmt = opts.format || 'portrait_a4';
+  const rank = rankCovers(list.map(c => ({ assetId: c.assetId, analysis: c.analysis })), { format: fmt, slot: opts.slot || 'cover', profile: opts.profile || 'digital' });
+  const cover = (rank.top[0] && rank.top[0].status !== 'not_for_cover') ? rank.top[0] : null;
+  const byId = {}; list.forEach(c => { byId[c.assetId] = c; });
+  const isPhoto = (id) => { const c = byId[id]; return c && (c.analysis.materialType === 'photo' || c.analysis.materialType === 'render' || c.analysis.materialType === 'interior' || c.analysis.materialType === 'unknown'); };
+  const gallery = rank.ranked
+    .filter(r => !cover || r.assetId !== cover.assetId)
+    .filter(r => isPhoto(r.assetId))
+    .slice(0, 5).map(r => r.assetId);
+  return { cover, coverReason: cover ? (cover.reasons || [])[0] || 'лучший кадр для обложки' : null, gallery, excluded: rank.excluded };
+}
+
+/* ---------------------------------------------------------------------------
    6. МОДЕЛЬ ДАННЫХ (ТЗ §18) — фабрики, стабильные id, версии.
    -------------------------------------------------------------------------- */
 function rid(p) { return (p || 'm') + '_' + crypto.randomBytes(8).toString('hex'); }
@@ -533,7 +554,7 @@ function logoFitsZone(profile, ctx, strategy) {
 
 module.exports = {
   sha256, imageDims, imageHasAlpha, FORMAT_PAGE_IN, SLOT_FRACTION, slotInches, PPI, effectivePPI,
-  analyzeAsset, classifyMaterial, suitability, rankCovers, COVER_WEIGHTS,
+  analyzeAsset, classifyMaterial, suitability, rankCovers, COVER_WEIGHTS, autofillPlan,
   newAsset, newVariant, newPlacement, duplicateGroups, cropKeepsProtected, SAFE_ENHANCE,
   analyzeLogo, placeLogo, logoFitsZone, LOGO_AUTO, LOGO_MIN_PT,
   selectCover, cropForAspect, recomputeCropForFormat, exportMediaCheck,
