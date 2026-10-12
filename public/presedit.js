@@ -26,6 +26,7 @@
     if (r.status !== 200) { root.innerHTML = '<div class="pe-loading">Не удалось загрузить презентацию</div>'; return; }
     S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {};
     S.brand = r.json.brand || {}; S.broker = r.json.broker || null; S.brokers = r.json.brokers || [];
+    S.projects = r.json.projects || []; S.isColl = S.pres.kind === 'collection';
     S.fmt = S.pres.defaultFormat || 'portrait_a4';
     document.body.className = 'pe-app-body';
     render(); revalidate();
@@ -68,7 +69,7 @@
       else setSave('err');
     }).catch(function () { setSave('err'); });
   }
-  function setSave(st) { S.save = st; var el = document.querySelector('.pe-save'); if (el) { el.className = 'pe-save' + (st === 'saving' ? ' saving' : st === 'err' ? ' err' : ''); el.querySelector('.tx').textContent = st === 'saving' ? 'Сохраняем…' : st === 'err' ? 'Не сохранено' : 'Сохранено'; } }
+  function setSave(st) { S.save = st; var el = document.querySelector('.pe-save'); if (el) { el.className = 'pe-save' + (st === 'saving' ? ' saving' : st === 'err' ? ' err' : ''); el.querySelector('.tx').textContent = st === 'saving' ? 'Сохраняем…' : st === 'err' ? 'Не сохранено' : 'Черновик сохранён'; } }
 
   function revalidate() { clearTimeout(S._chkT); S._chkT = setTimeout(function () {
     api('POST', '/' + ID + '/validate', { format: S.fmt }).then(function (r) { if (r.status === 200) { S.chk = r.json; paintReadiness(); paintNavErrors(); updatePageCount(); } });
@@ -87,16 +88,18 @@
   }
 
   function topbar() {
-    var name = esc((S.source && S.source.name) || 'Презентация');
+    var coll = S.isColl;
+    var name = esc(S.pres.title || (S.source && S.source.name) || 'Презентация');
+    var crumb = coll ? 'Подборки клиентов' : 'Презентации объектов';
     return '<div class="pe-top">' +
-      '<div class="pe-brand">' + esc((S.brand.logoText || 'LUMEN')) + '</div>' +
-      '<div class="pe-crumbs"><b>Конструктор презентации</b><span>Объекты / ' + name + '</span></div>' +
+      '<a class="pe-back" href="/presentations" title="К каталогу">' + ic('back') + '</a>' +
+      '<div class="pe-crumbs"><span class="c0">База</span><i>/</i><span class="c0">' + crumb + '</span><i>/</i><b>' + name + '</b></div>' +
       '<div class="pe-top-sp"></div>' +
-      '<div class="pe-save"><span class="dot"></span><span class="tx">Сохранено</span></div>' +
       '<button class="pe-iconbtn" data-act="undo" title="Отменить">' + ic('undo') + '</button>' +
       '<button class="pe-iconbtn" data-act="redo" title="Повторить">' + ic('redo') + '</button>' +
+      '<div class="pe-save"><span class="dot"></span><span class="tx">Черновик сохранён</span></div>' +
       '<button class="pe-btn pe-btn-ghost" data-act="preview">' + ic('eye') + 'Предпросмотр</button>' +
-      '<button class="pe-btn pe-btn-primary" data-act="export">' + ic('download') + 'Экспорт</button>' +
+      '<button class="pe-btn pe-btn-primary" data-act="export">PDF / ссылка ' + ic('chev') + '</button>' +
     '</div>';
   }
 
@@ -111,9 +114,9 @@
         '<div class="pe-thumb-prev" data-mini="' + i + '"></div>' +
       '</div>';
     }).join('');
-    return '<div class="pe-nav"><div class="pe-nav-list">' + items +
-      '<button class="pe-add" data-act="addpage">' + ic('plus') + 'Добавить страницу</button>' +
-      '</div></div>';
+    var hd = '<div class="pe-nav-hd"><span>' + (S.isColl ? 'Состав подборки' : 'Страницы') + '</span>' +
+      '<button class="pe-nav-add" data-act="addpage" title="Добавить страницу">' + ic('plus') + '</button></div>';
+    return '<div class="pe-nav">' + hd + '<div class="pe-nav-list">' + items + '</div></div>';
   }
   function sectionTitle(s) { var t = cval(s, 'title'); if (s.family === 'broker') t = s.pageType === 'broker_contacts' ? 'Контакты брокера' : 'О брокере'; return (typeof t === 'string' && t) ? t.replace(/\n/g, ' ') : FAM_LABEL[s.family] || 'Страница'; }
 
@@ -637,6 +640,7 @@
       trash: '<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>', check: '<path d="M4 12l5 5L20 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
       warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', link: '<path d="M9 15l6-6M8 11l-2 2a3 3 0 0 0 4 4l2-2M16 13l2-2a3 3 0 0 0-4-4l-2 2"/>',
       phone: '<path d="M5 4h3l2 5-2 1a9 9 0 0 0 4 4l1-2 5 2v3a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+      back: '<path d="M15 6l-6 6 6 6"/>', chev: '<path d="M6 9l6 6 6-6"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
     };
     return '<svg viewBox="0 0 24 24" ' + P + ' style="width:1em;height:1em">' + (D[n] || '') + '</svg>';
   }

@@ -14,9 +14,15 @@ button{font-family:inherit;cursor:pointer}
 /* ---- top bar ---- */
 .pe-top{height:var(--pe-topbar);flex:0 0 auto;display:flex;align-items:center;gap:18px;padding:0 22px;background:#fff;border-bottom:1px solid var(--pe-line);z-index:30}
 .pe-brand{font-weight:700;letter-spacing:.22em;font-size:15px}
-.pe-crumbs{display:flex;flex-direction:column;line-height:1.25}
-.pe-crumbs b{font-size:15px;font-weight:600}
-.pe-crumbs span{font-size:11.5px;color:var(--pe-mut)}
+.pe-crumbs{display:flex;align-items:center;gap:8px;line-height:1.25;font-size:13.5px}
+.pe-crumbs b{font-weight:600;color:var(--pe-ink)}
+.pe-crumbs .c0{color:var(--pe-mut)}
+.pe-crumbs i{color:var(--pe-line);font-style:normal}
+.pe-back{width:34px;height:34px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;border:1px solid var(--pe-line);border-radius:9px;color:var(--pe-ink);text-decoration:none}
+.pe-back:hover{background:var(--pe-tint,#f4f1ea)}
+.pe-nav-hd{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;font-weight:600;font-size:14px}
+.pe-nav-add{width:28px;height:28px;border:1px solid var(--pe-line);border-radius:8px;background:transparent;color:var(--pe-ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.pe-nav-add:hover{background:var(--pe-tint,#f4f1ea)}
 .pe-top-sp{flex:1}
 .pe-save{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--pe-mut)}
 .pe-save .dot{width:8px;height:8px;border-radius:50%;background:#43a047}
