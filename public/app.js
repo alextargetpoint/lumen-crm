@@ -7223,13 +7223,14 @@ async function renderChat(id, rebuild) {
     const box = pane.querySelector('.cc-edit'); if (!box) return;
     const opening = box.hidden; box.hidden = false;
     const chev = pane.querySelector('.ntp2-chev'); if (chev) chev.classList.add('open');
+    try { enhanceControls(box); } catch (_) {}   /* дата/время → кастомные пикеры CRM (не нативный календарь ОС) */
     const ta = box.querySelector('#ntEditText');
     if (opening && ta && !ta.value && pane.querySelector('[data-ntdraft]')) {
       const loader = box.querySelector('[data-ntmsgload]');
       try { const r = await api.post('/leads/' + l.id + '/next-touch/draft', {}); if (r && r.text) ta.value = r.text; if (loader) loader.hidden = true; if (!r || !r.text) { if (loader) { loader.hidden = false; loader.textContent = 'ИИ соберёт текст при отправке'; } } }
       catch (_) { if (loader) { loader.hidden = false; loader.textContent = 'ИИ соберёт текст при отправке'; } }
     }
-    if (focusTime) { const t = box.querySelector('#ntEditTime'); if (t) t.focus(); }
+    if (focusTime) { const tb = box.querySelector('#ntEditTime'); const cb = tb && tb.closest('.dtp') && tb.closest('.dtp').querySelector('.cs-btn'); if (cb) setTimeout(() => cb.click(), 60); }
     else if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   };
   $$('[data-ntedit]', pane).forEach(b => b.addEventListener('click', (e) => ntExpand(e.currentTarget.dataset.ntedit === 'time')));
