@@ -184,10 +184,10 @@ function presEditorShell(id, title) {
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(tt)}</title>
 ${PRES_FAVICON}
-<link rel="stylesheet" href="/pres-styles.css"><link rel="stylesheet" href="/presedit.css?v=1">
+<link rel="stylesheet" href="/pres-styles.css?v=12"><link rel="stylesheet" href="/presedit.css?v=12">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=1"></script><script src="/pres-templates.js?v=1"></script><script src="/presedit.js?v=1"></script>
+<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=12"></script><script src="/presedit.js?v=12"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
@@ -17237,6 +17237,48 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
         errors: photos.filter(x => !x.ok).length, duplicates: Object.keys(dupes).length,
       };
       return json(res, 200, { project: { id: pr.id, name: pr.name, geo: pr.geo }, format: fmt, slot, photos, summary });
+    }
+    /* Внешний поиск фото (доп-ТЗ §2-§3): Serper image search с идентификацией объекта. 💰cost-safe:
+       1 запрос Serper/поиск (free 2500/мес), за ключом SERPER_API_KEY; без ключа → enabled:false. */
+    if (p === '/api/media/search-photos' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || (R.role !== 'owner' && R.role !== 'broker')) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const pr = (db.properties || []).find(x => x.id === String(b.propertyId || ''));
+      if (!pr) return json(res, 404, { error: 'property not found' });
+      const geoName = (db.settings.geoNames || {})[pr.geo] || pr.geo || '';
+      const q = [pr.name, pr.area || '', (pr.developer && pr.developer !== '—') ? pr.developer : '', geoName, 'жилой комплекс'].filter(Boolean).join(' ');
+      const proj = { name: pr.name, geo: geoName, developer: pr.developer || '' };
+      if (!process.env.SERPER_API_KEY) return json(res, 200, { enabled: false, note: 'Внешний поиск подключается ключом SERPER_API_KEY на сервисе CRM', query: q, project: proj });
+      const okImg2 = (u) => u && /^https?:\/\//.test(u) && !/\.svg(\?|$)/i.test(u);
+      const cand = [];
+      try {
+        const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 14 }) });
+        const j = await r.json().catch(() => ({}));
+        (j.images || []).forEach(it => { const u = it && (it.imageUrl || it.link); if (okImg2(u)) cand.push({ url: u, source: (it.source || it.domain || 'web'), title: it.title || '', thumb: it.thumbnailUrl || u }); });
+      } catch (e) {}
+      const seen = new Set();
+      const out = cand.filter(c => { if (seen.has(c.url)) return false; seen.add(c.url); return true; }).slice(0, 12);
+      return json(res, 200, { enabled: true, query: q, project: proj, candidates: out });
+    }
+    /* Проверить источник / добавить в медиатеку (доп-ТЗ §4): скачать ОРИГИНАЛ (≥720px, провенанс) + анализ */
+    if (p === '/api/media/import-photo' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || (R.role !== 'owner' && R.role !== 'broker')) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const pr = (db.properties || []).find(x => x.id === String(b.propertyId || ''));
+      if (!pr) return json(res, 404, { error: 'property not found' });
+      const url = String(b.url || '');
+      let host = ''; try { host = new URL(url).hostname; } catch (_) {}
+      if (!host || ssrfBlocked(host)) return json(res, 400, { error: 'ссылка недоступна' });
+      let analysis = null;
+      try { const buf = await fetchImageBytes(url); const a = media.analyzeAsset(buf, { name: url, source: 'web' }); const suit = media.suitability(a, { format: 'portrait_a4', slot: 'cover' }); analysis = { ok: a.ok, width: a.width, height: a.height, mime: a.mime, materialType: a.materialType, status: suit.status, ppi: suit.ppi, reasons: suit.reasons }; }
+      catch (e) { return json(res, 400, { error: 'недоступно: ' + ((e && e.message) || '') }); }
+      if (b.add) {
+        const saved = await downloadImageToAsset(url);
+        if (!saved) return json(res, 400, { error: 'не удалось сохранить (низкое разрешение или недоступно)', analysis });
+        pr.images = pr.images || []; if (!pr.images.includes(saved.url)) pr.images.push(saved.url); store.save();
+        return json(res, 200, { ok: true, added: true, url: saved.url, width: saved.w, height: saved.h, analysis });
+      }
+      return json(res, 200, { ok: true, added: false, analysis });
     }
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 

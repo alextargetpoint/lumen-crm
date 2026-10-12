@@ -841,6 +841,7 @@
   }
   function photoBrowserModal(s, idx, imgs) {
     var tab = 'card', sel = ((s.assetRefs || [])[idx] || {}).assetId || null;
+    var web = { done: false, loading: false, enabled: true, note: '', items: [] };
     var ov = document.createElement('div'); ov.className = 'pu-overlay';
     function badge(url) {
       var q = (window.__pbQual || {})[url]; if (!q) return '';
@@ -848,9 +849,30 @@
       var ql = QUAL[q.ok ? q.status : 'error'] || ['', ''];
       return '<span class="pb-cat">' + esc(mat) + '</span>' + (ql[0] ? '<span class="pb-q pb-q-' + ql[1] + '">' + esc(ql[0]) + (q.width ? ' · ' + q.width + '×' + q.height : '') + '</span>' : '');
     }
+    function searchWeb() {
+      if (web.loading || web.done || !S.pres.projectId) return;
+      web.loading = true; paint();
+      apiRaw('POST', '/api/media/search-photos', { propertyId: S.pres.projectId }).then(function (r) {
+        web.loading = false; web.done = true;
+        if (r.status === 200) { web.enabled = r.json.enabled !== false; web.note = r.json.note || ''; web.items = r.json.candidates || []; }
+        else web.note = (r.json && r.json.error) || 'ошибка поиска';
+        paint();
+      }).catch(function () { web.loading = false; web.done = true; web.note = 'ошибка сети'; paint(); });
+    }
     function grid() {
-      if (tab !== 'card') return '<div class="pb-stub">' + ic('search') + '<b>' + (tab === 'web' ? 'Поиск в открытых источниках' : 'Загрузка своих фото') + '</b><span>' + (tab === 'web' ? 'Внешний веб-поиск подключается отдельно (требует источника изображений). Сейчас доступны фото из карточки объекта.' : 'Загрузка файлов брокера — скоро. Пока доступны фото из карточки.') + '</span></div>';
-      if (!imgs.length) return '<div class="pb-stub">' + ic('image') + '<b>Нет фотографий</b><span>Добавьте фото в карточке объекта.</span></div>';
+      if (tab === 'up') return '<div class="pb-stub">' + ic('image') + '<b>Загрузка своих фото</b><span>Загрузка файлов брокера — скоро. Пока доступны фото из карточки и открытых источников.</span></div>';
+      if (tab === 'web') {
+        if (web.loading) return '<div class="pb-stub">' + ic('search') + '<b>Ищем в открытых источниках…</b><span>По названию, локации и застройщику объекта.</span></div>';
+        if (!web.done) return '<div class="pb-stub">' + ic('search') + '<b>Поиск фото в открытых источниках</b><span>По названию, локации и застройщику. Найдём кандидатов — вы проверите источник и добавите нужные.</span><button class="pe-btn pe-btn-primary" data-websearch style="margin-top:14px">Найти фотографии</button></div>';
+        if (!web.enabled) return '<div class="pb-stub">' + ic('search') + '<b>Внешний поиск не подключён</b><span>' + esc(web.note || 'Подключается ключом источника на сервисе.') + ' Сейчас доступны фото из карточки.' + '</span></div>';
+        if (!web.items.length) return '<div class="pb-stub">' + ic('search') + '<b>Ничего не найдено</b><span>' + esc(web.note || 'Попробуйте уточнить карточку объекта (название/застройщик).') + '</span></div>';
+        return '<div class="pb-grid">' + web.items.map(function (it, i) {
+          return '<div class="pb-cell pb-webcell"><div class="pb-img" style="background-image:url(\'' + esc(it.thumb || it.url) + '\')"></div>' +
+            '<div class="pb-badges"><span class="pb-cat">' + esc(it.source || 'web') + '</span></div>' +
+            '<button class="pb-webadd" data-webadd="' + i + '">' + ic('plus') + 'Добавить</button></div>';
+        }).join('') + '</div><div class="pb-webnote">Источник не подтверждён, пока вы не добавите фото. Проверка проекта — справа. Водяные знаки не удаляются.</div>';
+      }
+      if (!imgs.length) return '<div class="pb-stub">' + ic('image') + '<b>Нет фотографий</b><span>Добавьте фото в карточке объекта или найдите в открытых источниках.</span></div>';
       return '<div class="pb-grid">' + imgs.map(function (im) {
         return '<button class="pb-cell' + (im.id === sel ? ' on' : '') + '" data-pbid="' + esc(im.id) + '"><div class="pb-img" style="background-image:url(\'' + esc(im.url) + '\')"></div><div class="pb-badges" data-pburl="' + esc(im.url) + '">' + badge(im.url) + '</div>' + (im.id === sel ? '<span class="pb-check">' + ic('check') + '</span>' : '') + '</button>';
       }).join('') + '</div>';
@@ -859,8 +881,21 @@
       ov.querySelectorAll('.pb-tab').forEach(function (t) { t.classList.toggle('on', t.getAttribute('data-pbtab') === tab); });
       ov.querySelector('.pb-body').innerHTML = grid();
       ov.querySelectorAll('[data-pbid]').forEach(function (b) { b.addEventListener('click', function () { sel = b.getAttribute('data-pbid'); paint(); }); });
-      ov.querySelector('.pb-seln').textContent = sel ? '1 фото выбрано' : 'Выберите фото';
+      var ws = ov.querySelector('[data-websearch]'); if (ws) ws.addEventListener('click', searchWeb);
+      ov.querySelectorAll('[data-webadd]').forEach(function (b) { b.addEventListener('click', function () { importWeb(web.items[+b.getAttribute('data-webadd')], b); }); });
+      ov.querySelector('.pb-seln').textContent = sel ? '1 фото выбрано' : (tab === 'web' ? 'Проверьте источник и добавьте' : 'Выберите фото');
       var ap = ov.querySelector('.pb-apply'); ap.disabled = !sel;
+    }
+    function importWeb(it, btn) {
+      if (!it) return; if (btn) { btn.textContent = 'Проверяю…'; btn.disabled = true; }
+      apiRaw('POST', '/api/media/import-photo', { propertyId: S.pres.projectId, url: it.url, add: true }).then(function (r) {
+        if (r.status === 200 && r.json.added) {
+          S.source.images = S.source.images || []; S.source.images.push(r.json.url);
+          imgs.push({ id: 'img' + (S.source.images.length - 1), url: absU(r.json.url) });
+          toast('Фото добавлено в медиатеку', (r.json.analysis ? r.json.analysis.width + '×' + r.json.analysis.height : ''), true);
+          tab = 'card'; paint();
+        } else { if (btn) { btn.textContent = 'Не вышло'; btn.disabled = false; } toast('Не добавлено', (r.json && r.json.error) || ''); }
+      }).catch(function () { if (btn) { btn.textContent = 'Ошибка'; btn.disabled = false; } });
     }
     var geo = (S.source.district && S.source.district.name) || '';
     ov.innerHTML = '<div class="pu-box pb-box pb-modal"><div class="pu-hd"><div><h2>Найти фотографии объекта</h2><div class="pb-obj">' + esc(S.source.name || 'Объект') + (geo ? ' · ' + esc(geo) : '') + '</div></div><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
