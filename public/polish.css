@@ -563,7 +563,13 @@ input[type=number] { -moz-appearance: textfield; }
   overflow:hidden; padding:16px 0 12px;
   transition:width .18s var(--ease-soft,ease), box-shadow .18s ease;
   will-change:width;
+  /* текст пунктов не обрезается резко, а «растворяется» у правого края полосы */
+  -webkit-mask-image:linear-gradient(to right,#000 56%,transparent 90%);
+  mask-image:linear-gradient(to right,#000 56%,transparent 90%);
 }
+.app.editor-mode .sidebar:hover,
+.app.editor-mode.nav-open .sidebar,
+.app.editor-mode.nav-pinned .sidebar{ -webkit-mask-image:none; mask-image:none; }
 .app.editor-mode .main{ margin-left:48px; transition:margin-left .18s var(--ease-soft,ease); }
 .app.editor-mode .topbar{ display:none; }
 .app.editor-mode .content{ padding:0; overflow:hidden; height:100vh; }

@@ -51,7 +51,7 @@ button{font-family:inherit;cursor:pointer}
 .pe-presetcard .ck svg{width:12px;height:12px}
 .pe-presetcard.on .ck{display:flex}
 /* «+ Добавить блок» на холсте */
-.pe-canvas-add{margin:16px auto 0;max-width:640px;width:calc(100% - 40px);height:46px;border:1.5px dashed #d8c48a;border-radius:11px;background:#fdf8ec;color:#9a7b2e;font-weight:600;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.pe-canvas-add{margin:18px 0 0;width:min(100%,760px);height:46px;border:1.5px dashed #d8c48a;border-radius:11px;background:#fdf8ec;color:#9a7b2e;font-weight:600;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;flex:none}
 .pe-canvas-add:hover{background:#fbf2dc;border-color:#c9ad66}
 /* панель «Добавить блок» */
 .pe-insp-add{padding:0}
@@ -333,8 +333,8 @@ button{font-family:inherit;cursor:pointer}
 .pe-fmt-seg{display:inline-flex;background:#fff;border:1px solid var(--pe-line);border-radius:10px;padding:4px;gap:2px}
 .pe-fmt-seg button{border:0;background:transparent;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;color:var(--pe-mut)}
 .pe-fmt-seg button.on{background:var(--pe-accent);color:#fff}
-.pe-canvas{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px}
-.pe-stage{transform-origin:top center;box-shadow:0 18px 60px rgba(20,16,12,.16),0 2px 8px rgba(20,16,12,.08);position:relative}
+.pe-canvas{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:40px 40px 90px}
+.pe-stage{transform-origin:top left;box-shadow:0 18px 60px rgba(20,16,12,.16),0 2px 8px rgba(20,16,12,.08);position:relative;flex:none}
 .pe-stage .lp-block{outline:0;cursor:pointer}
 .pe-stage [data-field]:hover{outline:2px solid rgba(45,108,223,.4);outline-offset:2px}
 .pe-stage [data-field].sel{outline:2px solid var(--pe-sel);outline-offset:2px}

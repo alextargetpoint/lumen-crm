@@ -486,7 +486,7 @@
     // format tabs
     root.querySelectorAll('[data-fmt]').forEach(function (el) { el.addEventListener('click', function () { S.fmt = el.getAttribute('data-fmt'); S.pres.defaultFormat = S.fmt; scheduleSave(); render(); revalidate(); }); });
     // inspector tabs
-    root.querySelectorAll('[data-tab]').forEach(function (el) { el.addEventListener('click', function () { S.tab = el.getAttribute('data-tab'); var ib = document.getElementById('peInsp'); ib.innerHTML = inspBody(); wireInsp(); mountVarMinis(); }); });
+    root.querySelectorAll('[data-tab]').forEach(function (el) { el.addEventListener('click', function () { S.tab = el.getAttribute('data-tab'); root.querySelectorAll('[data-tab]').forEach(function (t) { t.classList.toggle('on', t === el); }); var ib = document.getElementById('peInsp'); ib.innerHTML = inspBody(); wireInsp(); mountVarMinis(); }); });
     if (S.addMode) wireAddPanel(); else wireInsp();
   }
   function wireAddPanel() {
@@ -712,7 +712,16 @@
   function liveCanvas() { mountCanvas(); }
 
   function curZoom() { var f = TOK.format(S.fmt); var stage = document.getElementById('peStage'); if (!stage) return 1; var m = stage.style.transform.match(/scale\(([\d.]+)\)/); return m ? +m[1] : 1; }
-  function setZoom(z) { z = Math.max(0.25, Math.min(2, z)); S.zoom = z; var stage = document.getElementById('peStage'); if (stage) { stage.style.transform = 'scale(' + z + ')'; } var zl = document.getElementById('peZoomL'); if (zl) zl.textContent = Math.round(z * 100) + '%'; }
+  /* синхронизируем МАКЕТНУЮ коробку листа со scale (transform сам по себе её не сжимает),
+     иначе лист занимает полный размер и кнопка «Добавить блок» уезжает вбок/вниз */
+  function sizeStage(s) {
+    var stage = document.getElementById('peStage'); if (!stage) return;
+    var f = TOK.format(S.fmt);
+    stage.style.width = (f.cssW * s) + 'px';
+    stage.style.height = (f.cssH * s) + 'px';
+    var add = document.querySelector('.pe-canvas-add'); if (add) add.style.width = Math.min(f.cssW * s, 760) + 'px';
+  }
+  function setZoom(z) { z = Math.max(0.25, Math.min(2, z)); S.zoom = z; var stage = document.getElementById('peStage'); if (stage) { stage.style.transform = 'scale(' + z + ')'; sizeStage(z); } var zl = document.getElementById('peZoomL'); if (zl) zl.textContent = Math.round(z * 100) + '%'; }
   function fitCanvas() {
     var stage = document.getElementById('peStage'), canvas = document.getElementById('peCanvas'); if (!stage || !canvas) return;
     var f = TOK.format(S.fmt);
@@ -721,6 +730,7 @@
       var availW = canvas.clientWidth - 80, availH = canvas.clientHeight - 90;
       var s = Math.min(availW / f.cssW, availH / f.cssH, 1.2);
       stage.style.transform = 'scale(' + s + ')';
+      sizeStage(s);
       var zl = document.getElementById('peZoomL'); if (zl) zl.textContent = 'Fit';
     } else setZoom(S.zoom);
   }
