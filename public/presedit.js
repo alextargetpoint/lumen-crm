@@ -118,7 +118,7 @@
     var items = sections().map(function (s, i) {
       var title = sectionTitle(s);
       var err = S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; });
-      return '<div class="pe-thumb' + (i === S.pageIdx ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + '" data-pg="' + i + '">' +
+      return '<div class="pe-thumb' + (i === S.pageIdx ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + '" data-pg="' + i + '">' +
         '<div class="pe-thumb-hd"><span class="pe-thumb-n">' + pad(i + 1) + '</span>' +
           '<span class="pe-thumb-t">' + esc(title) + '</span>' +
           '<span class="pe-thumb-mini" data-act="pgmenu" data-pg="' + i + '">' + ic('dots') + '</span></div>' +
@@ -136,7 +136,9 @@
       '<div class="pe-fmtbar"><div class="pe-fmt-seg">' +
         TOK.FORMATS.map(function (f) { return '<button data-fmt="' + f.id + '"' + (f.id === S.fmt ? ' class="on"' : '') + '>' + esc(f.label) + '</button>'; }).join('') +
       '</div></div>' +
-      '<div class="pe-canvas" id="peCanvas"><div class="pe-stage" id="peStage"></div>' +
+      '<div class="pe-canvas" id="peCanvas">' +
+        (overflowInfo(curSection()) ? '<div class="pe-ov-banner" data-act="ovopen">' + ic('warn') + '<span>Текст не помещается</span><b>Решить</b></div>' : '') +
+        '<div class="pe-stage" id="peStage"></div>' +
         '<button class="pe-canvas-add" data-act="addpage">' + ic('plus') + 'Добавить блок</button>' +
         '<div class="pe-zoom"><button data-act="zoomout">−</button><span id="peZoomL">Fit</span><button data-act="zoomin">+</button><button data-act="zoomfit" style="width:auto;font-size:13px">Fit</button></div>' +
         '<div class="pe-pagecount" id="pePageCount"></div>' +
@@ -144,6 +146,7 @@
   }
 
   function inspector() {
+    if (S.ovMode) return '<div class="pe-insp pe-insp-add">' + overflowPanel() + '</div>';
     if (S.addMode) return '<div class="pe-insp pe-insp-add">' + addBlockPanel() + '</div>';
     return '<div class="pe-insp">' +
       '<div class="pe-insp-tabs">' +
@@ -197,6 +200,55 @@
       sections().splice(at, 0, ns); S.pageIdx = at;
     });
     S.addMode = false; render();
+  }
+
+  /* ---------- переполнение «Текст не помещается» (макет) ---------- */
+  function overflowInfo(s) {
+    if (!s || (s.family !== 'editorial' && s.family !== 'custom')) return null;
+    var body = cval(s, 'body'); if (typeof body !== 'string' || !body.trim()) return null;
+    var budget = S.fmt === 'portrait_a4' ? 640 : S.fmt === 'landscape_16_9' ? 440 : S.fmt === 'portrait_9_16' ? 400 : 540;
+    if (body.length <= budget) return null;
+    var paras = body.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+    if (paras.length < 2) return null;    // один абзац не переносим — это задача сокращения/макета
+    var acc = 0, fit = 0;
+    for (var i = 0; i < paras.length; i++) { acc += paras[i].length + 2; if (acc <= budget || fit === 0) fit++; else break; }
+    var over = paras.length - fit;
+    if (over <= 0) return null;
+    return { paras: paras, fit: fit, over: over, budget: budget };
+  }
+  function overflowPanel() {
+    var info = overflowInfo(curSection()); if (!info) { return '<div class="pe-add-hd"><b>Всё помещается</b><button class="pe-x" data-act="ovclose">' + ic('x') + '</button></div><div class="pe-ov-sub">Текст укладывается на странице.</div>'; }
+    var opt = S.ovOpt || 'continue';
+    var opts = [
+      ['continue', 'Продолжить на новой странице', 'Текст будет перенесён на следующую страницу с таким же оформлением.', true],
+      ['layout', 'Выбрать другой макет', 'Подобрать композицию с бо́льшим местом для текста.', false],
+      ['shorten', 'Предложить сокращение', 'Создать более короткий вариант текста с сохранением смысла.', false],
+    ];
+    var rows = opts.map(function (o) {
+      return '<button class="pe-ov-opt' + (o[0] === opt ? ' on' : '') + '" data-act="ovopt" data-ovopt="' + o[0] + '">' +
+        '<span class="pe-ov-radio"></span><span class="pe-ov-tx"><b>' + esc(o[1]) + (o[3] ? '<em>Рекомендуется</em>' : '') + '</b><span>' + esc(o[2]) + '</span></span></button>';
+    }).join('');
+    return '<div class="pe-add-hd"><b>Текст не помещается</b><button class="pe-x" data-act="ovclose">' + ic('x') + '</button></div>' +
+      '<div class="pe-ov-sub">На странице закончилось место для текста. Нужно перенести ' + info.over + ' ' + plural(info.over, 'абзац', 'абзаца', 'абзацев') + '.</div>' +
+      '<div class="pe-ov-opts">' + rows + '</div>' +
+      '<div class="pe-ov-prev"><div class="pe-ov-pg">Стр. ' + (S.pageIdx + 1) + '<span>сейчас</span></div><i>→</i><div class="pe-ov-pg">Стр. ' + (S.pageIdx + 1) + '<span>после</span></div><div class="pe-ov-pg new">Стр. ' + (S.pageIdx + 2) + '<span>новая</span></div></div>' +
+      '<div class="pe-ov-foot"><button class="pe-btn pe-btn-primary" data-act="ovapply" data-ovopt="' + opt + '">Перенести текст</button><button class="pe-btn pe-btn-ghost" data-act="ovclose">Отмена</button></div>' +
+      '<div class="pe-ov-note">' + ic('check') + 'Текст будет сохранён полностью</div>';
+  }
+  function plural(n, a, b, c) { n = Math.abs(n) % 100; var n1 = n % 10; if (n > 10 && n < 20) return c; if (n1 > 1 && n1 < 5) return b; if (n1 === 1) return a; return c; }
+  function applyOverflow(opt) {
+    var s = curSection(); var info = overflowInfo(s);
+    if (!info) { S.ovMode = false; render(); return; }
+    if (opt === 'layout') { toast('Подбор макета с бо́льшим текстовым полем — в разработке'); S.ovMode = false; render(); return; }
+    if (opt === 'shorten') { toast('AI-сокращение — отдельная операция с подтверждением «До / После»'); S.ovMode = false; render(); return; }
+    mutate(function () {
+      var keep = info.paras.slice(0, info.fit).join('\n\n');
+      var rest = info.paras.slice(info.fit).join('\n\n');
+      setOverride(s, 'body', keep);
+      var ns = { id: 's' + Math.random().toString(16).slice(2, 8), family: 'editorial', enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: (cval(s, 'title') || 'О проекте') + ' · продолжение' }, body: { mode: 'override', value: rest } } };
+      sections().splice(S.pageIdx + 1, 0, ns);
+    });
+    S.ovMode = false; render();
   }
 
   /* ---------- CONTENT TAB (per-family field editors) ---------- */
@@ -459,6 +511,10 @@
       case 'zoomfit': S.zoom = 'fit'; fitCanvas(); document.getElementById('peZoomL').textContent = 'Fit'; break;
       case 'addpage': S.addMode = true; S.addPickKey = S.addPickKey || 'editorial'; S.addQ = ''; render(); break;
       case 'addclose': S.addMode = false; render(); break;
+      case 'ovopen': S.ovMode = true; S.addMode = false; S.ovOpt = 'continue'; render(); break;
+      case 'ovclose': S.ovMode = false; render(); break;
+      case 'ovopt': S.ovOpt = el.getAttribute('data-ovopt'); render(); break;
+      case 'ovapply': applyOverflow(el.getAttribute('data-ovopt') || S.ovOpt || 'continue'); break;
       case 'blpick': S.addPickKey = el.getAttribute('data-blkey'); render(); break;
       case 'blinsert': insertBlock(el.getAttribute('data-blfam')); break;
       case 'pgmenu': pageMenu(el, +el.getAttribute('data-pg')); break;
