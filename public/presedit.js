@@ -114,19 +114,53 @@
     '</div>';
   }
 
-  function navigator_() {
-    var items = sections().map(function (s, i) {
-      var title = sectionTitle(s);
-      var err = S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; });
-      return '<div class="pe-thumb' + (i === S.pageIdx ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + '" data-pg="' + i + '">' +
-        '<div class="pe-thumb-hd"><span class="pe-thumb-n">' + pad(i + 1) + '</span>' +
-          '<span class="pe-thumb-t">' + esc(title) + '</span>' +
-          '<span class="pe-thumb-mini" data-act="pgmenu" data-pg="' + i + '">' + ic('dots') + '</span></div>' +
-        '<div class="pe-thumb-prev" data-mini="' + i + '"></div>' +
-      '</div>';
+  function thumbRow(s, i) {
+    var title = sectionTitle(s);
+    var err = S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; });
+    return '<div class="pe-thumb' + (i === S.pageIdx ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + '" data-pg="' + i + '">' +
+      '<div class="pe-thumb-hd"><span class="pe-thumb-n">' + pad(i + 1) + '</span>' +
+        '<span class="pe-thumb-t">' + esc(title) + '</span>' +
+        '<span class="pe-thumb-mini" data-act="pgmenu" data-pg="' + i + '">' + ic('dots') + '</span></div>' +
+      '<div class="pe-thumb-prev" data-mini="' + i + '"></div>' +
+    '</div>';
+  }
+  function collectionGroups() {
+    var secs = sections(); var groups = []; var objMap = {};
+    secs.forEach(function (s, i) {
+      var m = String(s.id || '').match(/^o(\d+)_/);
+      if (m) { var k = +m[1]; if (!objMap[k]) { objMap[k] = { type: 'object', k: k, label: (S.projects[k] && S.projects[k].name) || ('Объект ' + (k + 1)), idx: [] }; groups.push(objMap[k]); } objMap[k].idx.push(i); }
+      else if (s.family === 'comparison') groups.push({ type: 'comparison', label: 'Сравнение', idx: [i] });
+      else if (s.family === 'broker') { var bg = null; groups.forEach(function (g) { if (g.type === 'broker') bg = g; }); if (!bg) { bg = { type: 'broker', label: 'Контакты брокера', idx: [] }; groups.push(bg); } bg.idx.push(i); }
+      else { var ig = null; groups.forEach(function (g) { if (g.type === 'intro') ig = g; }); if (!ig) { ig = { type: 'intro', label: 'Вступление', idx: [] }; groups.push(ig); } ig.idx.push(i); }
+    });
+    return groups;
+  }
+  function grpIcon(t) { return '<span class="pe-grp-ic">' + ic(t === 'comparison' ? 'grid' : t === 'broker' ? 'phone' : 'text') + '</span>'; }
+  function navCollection() {
+    var groups = collectionGroups();
+    var html = groups.map(function (g) {
+      if (g.type === 'object') {
+        var open = S.openGroups && S.openGroups[g.k];
+        var hasSel = g.idx.indexOf(S.pageIdx) >= 0;
+        var sub = open ? '<div class="pe-grp-pages">' + g.idx.map(function (i) {
+          return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '"><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(sectionTitle(sections()[i])) + '</span></div>';
+        }).join('') + '</div>' : '';
+        return '<div class="pe-grp' + (open ? ' open' : '') + (hasSel ? ' act' : '') + '">' +
+          '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '"><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
+      }
+      var i0 = g.idx[0];
+      return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + '" data-pg="' + i0 + '">' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b></div>';
     }).join('');
+    var hasBroker = false; groups.forEach(function (g) { if (g.type === 'broker') hasBroker = true; });
+    if (S.pres.brokerAppendix && S.pres.brokerAppendix.enabled && !hasBroker) {
+      html += '<div class="pe-grp-single ghost">' + grpIcon('broker') + '<b>Контакты брокера</b><span class="pe-grp-n">в конце</span></div>';
+    }
+    return html;
+  }
+  function navigator_() {
+    var items = S.isColl ? navCollection() : sections().map(thumbRow).join('');
     var hd = '<div class="pe-nav-hd"><span>' + (S.isColl ? 'Состав подборки' : 'Страницы') + '</span>' +
-      '<button class="pe-nav-add" data-act="addpage" title="Добавить страницу">' + ic('plus') + '</button></div>';
+      '<button class="pe-nav-add" data-act="' + (S.isColl ? 'addobj' : 'addpage') + '" title="' + (S.isColl ? 'Добавить объекты' : 'Добавить страницу') + '">' + ic('plus') + '</button></div>';
     return '<div class="pe-nav">' + hd + '<div class="pe-nav-list">' + items + '</div></div>';
   }
   function sectionTitle(s) { var t = cval(s, 'title'); if (s.family === 'broker') t = s.pageType === 'broker_contacts' ? 'Контакты брокера' : 'О брокере'; return (typeof t === 'string' && t) ? t.replace(/\n/g, ' ') : FAM_LABEL[s.family] || 'Страница'; }
@@ -432,8 +466,8 @@
       var act = el.getAttribute('data-act');
       el.addEventListener(actEvent(act), function (e) { handle(act, el, e); });
     });
-    // page select
-    root.querySelectorAll('.pe-thumb').forEach(function (el) { el.addEventListener('click', function (e) { if (e.target.closest('[data-act]')) return; S.pageIdx = +el.getAttribute('data-pg'); S.tab = S.tab; render(); }); });
+    // page select (плоские миниатюры + строки групп подборки)
+    root.querySelectorAll('.pe-nav-list [data-pg]').forEach(function (el) { if (el.getAttribute('data-act')) return; el.addEventListener('click', function (e) { if (e.target.closest('[data-act]')) return; var v = el.getAttribute('data-pg'); if (v === '') return; S.pageIdx = +v; render(); }); });
     // format tabs
     root.querySelectorAll('[data-fmt]').forEach(function (el) { el.addEventListener('click', function () { S.fmt = el.getAttribute('data-fmt'); S.pres.defaultFormat = S.fmt; scheduleSave(); render(); revalidate(); }); });
     // inspector tabs
@@ -511,6 +545,9 @@
       case 'zoomfit': S.zoom = 'fit'; fitCanvas(); document.getElementById('peZoomL').textContent = 'Fit'; break;
       case 'addpage': S.addMode = true; S.addPickKey = S.addPickKey || 'editorial'; S.addQ = ''; render(); break;
       case 'addclose': S.addMode = false; render(); break;
+      case 'grptoggle': S.openGroups = S.openGroups || {}; var gk = +el.getAttribute('data-gk'); S.openGroups[gk] = !S.openGroups[gk]; render(); break;
+      case 'objmenu': objMenu(el, +el.getAttribute('data-gk')); break;
+      case 'addobj': toast('Добавить объекты', 'Поиск и выбор объектов — экран в разработке'); break;
       case 'ovopen': S.ovMode = true; S.addMode = false; S.ovOpt = 'continue'; render(); break;
       case 'ovclose': S.ovMode = false; render(); break;
       case 'ovopt': S.ovOpt = el.getAttribute('data-ovopt'); render(); break;
@@ -628,6 +665,13 @@
       { t: 'Вниз', ic: 'down', fn: function () { if (i < sections().length - 1) mutate(function () { sections().splice(i + 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i + 1; }); } },
       { sep: 1 },
       { t: 'Удалить', ic: 'trash', danger: 1, fn: function () { mutate(function () { sections().splice(i, 1); S.pageIdx = Math.max(0, S.pageIdx - (i <= S.pageIdx ? 1 : 0)); }); } },
+    ]);
+  }
+  function objMenu(anchor, k) {
+    menu(anchor, [
+      { t: 'Заменить объект', ic: 'image', fn: function () { toast('Замена объекта', 'Выбор нового объекта на то же место — экран в разработке'); } },
+      { t: 'Настроить страницы', ic: 'dots', fn: function () { S.openGroups = S.openGroups || {}; S.openGroups[k] = true; render(); } },
+      { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
     ]);
   }
   function addPageMenu(anchor) {
