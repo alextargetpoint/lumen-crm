@@ -20,6 +20,17 @@
   var FAM_LABEL = { hero: 'Обложка', editorial: 'О проекте', metrics: 'Показатели', gallery: 'Галерея',
     location: 'Локация', floorplan: 'Планировка', payment: 'План оплаты', comparison: 'Сравнение',
     benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная' };
+  /* библиотека блоков (макет «Добавить блок») — key уникален, f = family движка */
+  var BLOCK_TYPES = [
+    { key: 'editorial', f: 'editorial', label: 'Текст', ic: 'text' },
+    { key: 'photo', f: 'gallery', label: 'Фото', ic: 'image' },
+    { key: 'gallery', f: 'gallery', label: 'Галерея', ic: 'image' },
+    { key: 'metrics', f: 'metrics', label: 'Характеристики', ic: 'grid' },
+    { key: 'floorplan', f: 'floorplan', label: 'Планировка', ic: 'crop' },
+    { key: 'payment', f: 'payment', label: 'Условия оплаты', ic: 'doc' },
+    { key: 'location', f: 'location', label: 'Расположение', ic: 'pin' },
+    { key: 'broker', f: 'broker', label: 'Контакты', ic: 'phone' },
+  ];
 
   /* ---------- boot ---------- */
   api('GET', '/' + ID + '?full=1').then(function (r) {
@@ -126,18 +137,67 @@
         TOK.FORMATS.map(function (f) { return '<button data-fmt="' + f.id + '"' + (f.id === S.fmt ? ' class="on"' : '') + '>' + esc(f.label) + '</button>'; }).join('') +
       '</div></div>' +
       '<div class="pe-canvas" id="peCanvas"><div class="pe-stage" id="peStage"></div>' +
+        '<button class="pe-canvas-add" data-act="addpage">' + ic('plus') + 'Добавить блок</button>' +
         '<div class="pe-zoom"><button data-act="zoomout">−</button><span id="peZoomL">Fit</span><button data-act="zoomin">+</button><button data-act="zoomfit" style="width:auto;font-size:13px">Fit</button></div>' +
         '<div class="pe-pagecount" id="pePageCount"></div>' +
       '</div></div>';
   }
 
   function inspector() {
+    if (S.addMode) return '<div class="pe-insp pe-insp-add">' + addBlockPanel() + '</div>';
     return '<div class="pe-insp">' +
       '<div class="pe-insp-tabs">' +
         ['content|Содержание', 'composition|Композиция', 'style|Стиль'].map(function (t) { var p = t.split('|'); return '<button data-tab="' + p[0] + '"' + (S.tab === p[0] ? ' class="on"' : '') + '>' + p[1] + '</button>'; }).join('') +
       '</div><div class="pe-insp-body" id="peInsp">' + inspBody() + '</div></div>';
   }
   function inspBody() { return S.tab === 'content' ? contentTab() : S.tab === 'composition' ? compositionTab() : styleTab(); }
+
+  /* ---------- «Добавить блок» — библиотека блоков (макет) ---------- */
+  function addBlockPanel() {
+    var q = (S.addQ || '').toLowerCase();
+    var list = BLOCK_TYPES.filter(function (b) { return !q || b.label.toLowerCase().indexOf(q) >= 0; });
+    var pickKey = S.addPickKey || (list[0] && list[0].key) || 'editorial';
+    var grid = list.map(function (b) {
+      return '<button class="pe-bl' + (b.key === pickKey ? ' on' : '') + '" data-act="blpick" data-blkey="' + b.key + '">' + ic(b.ic) + '<span>' + esc(b.label) + '</span></button>';
+    }).join('');
+    var sel = BLOCK_TYPES.filter(function (b) { return b.key === pickKey; })[0] || BLOCK_TYPES[0];
+    return '<div class="pe-add-hd"><b>Добавить блок</b><button class="pe-x" data-act="addclose" title="Закрыть">' + ic('x') + '</button></div>' +
+      '<div class="pe-add-search">' + ic('search') + '<input id="peBlSearch" placeholder="Поиск блоков…" value="' + esc(S.addQ || '') + '"></div>' +
+      '<div class="pe-bl-grid">' + grid + '</div>' +
+      '<div class="pe-bl-prevhd"><b>' + esc(sel.label) + '</b><span>Данные из карточки</span></div>' +
+      '<div class="pe-bl-prev">' + blockPreview(sel.f) + '</div>' +
+      '<button class="pe-btn pe-btn-primary pe-bl-insert" data-act="blinsert" data-blfam="' + sel.f + '">Вставить на страницу</button>';
+  }
+  function blockPreview(fam) {
+    var s = S.source || {};
+    if (fam === 'metrics') {
+      var cells = [];
+      if (s.beds != null) cells.push(['' + s.beds, 'спальни']);
+      var ar = (s.units || []).map(function (u) { return +u.area; }).filter(Boolean);
+      if (ar.length) cells.push([Math.min.apply(null, ar) + ' м²', 'площадь']);
+      if (s.handover) cells.push(['' + s.handover, 'сдача']);
+      if (!cells.length) return '<div class="pe-bl-empty">Нет показателей в карточке</div>';
+      return '<div class="pe-bl-cells">' + cells.slice(0, 3).map(function (c) { return '<div><b>' + esc(c[0]) + '</b><span>' + esc(c[1]) + '</span></div>'; }).join('') + '</div>';
+    }
+    if (fam === 'gallery' || fam === 'floorplan') {
+      var imgs = (s.images || []).slice(0, 3);
+      if (!imgs.length) return '<div class="pe-bl-empty">Нет фотографий — добавьте в карточке</div>';
+      return '<div class="pe-bl-thumbs">' + imgs.map(function (u) { return '<div style="background-image:url(\'' + esc(absU(u)) + '\')"></div>'; }).join('') + '</div>';
+    }
+    if (fam === 'location') { var d = s.district || {}; return d.name ? '<div class="pe-bl-cells"><div><b>' + esc(d.name) + '</b><span>район</span></div><div><b>' + ((d.times || []).length) + '</b><span>мест рядом</span></div></div>' : '<div class="pe-bl-empty">Нет локации в карточке</div>'; }
+    if (fam === 'payment') { var n = (s.paymentRows || []).length; return n ? '<div class="pe-bl-cells"><div><b>' + n + '</b><span>этапов оплаты</span></div></div>' : '<div class="pe-bl-empty">Нет плана оплаты</div>'; }
+    if (fam === 'editorial') { return s.description ? '<div class="pe-bl-text">' + esc(String(s.description).slice(0, 120)) + '…</div>' : '<div class="pe-bl-empty">Нет описания в карточке</div>'; }
+    if (fam === 'broker') { return '<div class="pe-bl-cells"><div><b>' + esc(((S.broker || {}).name) || 'Брокер') + '</b><span>контакты</span></div></div>'; }
+    return '<div class="pe-bl-empty">Блок с текущими данными объекта</div>';
+  }
+  function insertBlock(fam) {
+    mutate(function () {
+      var ns = { id: 's' + Math.random().toString(16).slice(2, 8), family: fam, enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: FAM_LABEL[fam] || 'Блок' } } };
+      var at = Math.min(sections().length, S.pageIdx + 1);
+      sections().splice(at, 0, ns); S.pageIdx = at;
+    });
+    S.addMode = false; render();
+  }
 
   /* ---------- CONTENT TAB (per-family field editors) ---------- */
   function contentTab() {
@@ -326,7 +386,14 @@
     root.querySelectorAll('[data-fmt]').forEach(function (el) { el.addEventListener('click', function () { S.fmt = el.getAttribute('data-fmt'); S.pres.defaultFormat = S.fmt; scheduleSave(); render(); revalidate(); }); });
     // inspector tabs
     root.querySelectorAll('[data-tab]').forEach(function (el) { el.addEventListener('click', function () { S.tab = el.getAttribute('data-tab'); var ib = document.getElementById('peInsp'); ib.innerHTML = inspBody(); wireInsp(); mountVarMinis(); }); });
-    wireInsp();
+    if (S.addMode) wireAddPanel(); else wireInsp();
+  }
+  function wireAddPanel() {
+    var s = document.getElementById('peBlSearch'); if (!s) return;
+    s.addEventListener('input', function () {
+      var v = s.value.toLowerCase();
+      document.querySelectorAll('.pe-bl').forEach(function (b) { b.style.display = b.textContent.toLowerCase().indexOf(v) >= 0 ? '' : 'none'; });
+    });
   }
   function actEvent(a) { return 'click'; }
 
@@ -390,7 +457,10 @@
       case 'zoomin': setZoom(curZoom() + 0.1); break;
       case 'zoomout': setZoom(curZoom() - 0.1); break;
       case 'zoomfit': S.zoom = 'fit'; fitCanvas(); document.getElementById('peZoomL').textContent = 'Fit'; break;
-      case 'addpage': addPageMenu(el); break;
+      case 'addpage': S.addMode = true; S.addPickKey = S.addPickKey || 'editorial'; S.addQ = ''; render(); break;
+      case 'addclose': S.addMode = false; render(); break;
+      case 'blpick': S.addPickKey = el.getAttribute('data-blkey'); render(); break;
+      case 'blinsert': insertBlock(el.getAttribute('data-blfam')); break;
       case 'pgmenu': pageMenu(el, +el.getAttribute('data-pg')); break;
       case 'addMetric': mutate(function () { var k = el.getAttribute('data-key'); var arr = (cval(s, k) || []).slice(); arr.push({ value: '', label: '' }); setOverride(s, k, arr); }); break;
       case 'delMetric': mutate(function () { var arr = (cval(s, 'metrics') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'metrics', arr); }); break;
@@ -641,6 +711,8 @@
       warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', link: '<path d="M9 15l6-6M8 11l-2 2a3 3 0 0 0 4 4l2-2M16 13l2-2a3 3 0 0 0-4-4l-2 2"/>',
       phone: '<path d="M5 4h3l2 5-2 1a9 9 0 0 0 4 4l1-2 5 2v3a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
       back: '<path d="M15 6l-6 6 6 6"/>', chev: '<path d="M6 9l6 6 6-6"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
+      text: '<path d="M4 6h16M4 12h16M4 18h10"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+      pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/>', doc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     };
     return '<svg viewBox="0 0 24 24" ' + P + ' style="width:1em;height:1em">' + (D[n] || '') + '</svg>';
   }

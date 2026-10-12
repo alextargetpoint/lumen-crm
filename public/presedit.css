@@ -23,6 +23,36 @@ button{font-family:inherit;cursor:pointer}
 .pe-nav-hd{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;font-weight:600;font-size:14px}
 .pe-nav-add{width:28px;height:28px;border:1px solid var(--pe-line);border-radius:8px;background:transparent;color:var(--pe-ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .pe-nav-add:hover{background:var(--pe-tint,#f4f1ea)}
+/* «+ Добавить блок» на холсте */
+.pe-canvas-add{margin:16px auto 0;max-width:640px;width:calc(100% - 40px);height:46px;border:1.5px dashed #d8c48a;border-radius:11px;background:#fdf8ec;color:#9a7b2e;font-weight:600;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.pe-canvas-add:hover{background:#fbf2dc;border-color:#c9ad66}
+/* панель «Добавить блок» */
+.pe-insp-add{padding:0}
+.pe-add-hd{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 12px;font-size:16px}
+.pe-add-hd b{font-weight:600}
+.pe-x{width:30px;height:30px;border:0;background:transparent;color:var(--pe-mut);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.pe-x:hover{background:var(--pe-hi)}
+.pe-add-search{display:flex;align-items:center;gap:8px;margin:0 20px 14px;padding:9px 12px;border:1px solid var(--pe-line);border-radius:10px;color:var(--pe-mut)}
+.pe-add-search input{flex:1;border:0;outline:0;background:transparent;font:inherit;font-size:13.5px;color:var(--pe-ink)}
+.pe-bl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 20px}
+.pe-bl{display:flex;align-items:center;gap:9px;padding:12px 13px;border:1px solid var(--pe-line);border-radius:10px;background:#fff;color:var(--pe-ink);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;text-align:left}
+.pe-bl svg{width:17px;height:17px;color:var(--pe-mut);flex:0 0 auto}
+.pe-bl:hover{background:var(--pe-hi)}
+.pe-bl.on{border-color:#d8b24a;background:#fdf7e8;font-weight:600}
+.pe-bl.on svg{color:#b8871f}
+.pe-bl-prevhd{display:flex;align-items:baseline;justify-content:space-between;margin:20px 20px 10px;padding-top:16px;border-top:1px solid var(--pe-line)}
+.pe-bl-prevhd b{font-weight:600;font-size:14px}
+.pe-bl-prevhd span{color:var(--pe-mut);font-size:11.5px}
+.pe-bl-prev{margin:0 20px}
+.pe-bl-cells{display:flex;gap:10px}
+.pe-bl-cells>div{flex:1;background:var(--pe-hi);border:1px solid var(--pe-line);border-radius:9px;padding:12px 10px;text-align:center}
+.pe-bl-cells b{display:block;font-size:17px;font-weight:600}
+.pe-bl-cells span{font-size:11px;color:var(--pe-mut)}
+.pe-bl-thumbs{display:flex;gap:7px}
+.pe-bl-thumbs>div{flex:1;aspect-ratio:1;border-radius:8px;background:#eee center/cover no-repeat;border:1px solid var(--pe-line)}
+.pe-bl-text{background:var(--pe-hi);border:1px solid var(--pe-line);border-radius:9px;padding:12px;font-size:12.5px;color:var(--pe-mut);line-height:1.45}
+.pe-bl-empty{background:var(--pe-hi);border:1px dashed var(--pe-line);border-radius:9px;padding:16px;font-size:12.5px;color:var(--pe-mut);text-align:center}
+.pe-bl-insert{margin:18px 20px 20px;width:calc(100% - 40px);justify-content:center;height:44px}
 .pe-top-sp{flex:1}
 .pe-save{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--pe-mut)}
 .pe-save .dot{width:8px;height:8px;border-radius:50%;background:#43a047}
