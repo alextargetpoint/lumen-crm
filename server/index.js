@@ -178,11 +178,14 @@ presentation.setTidGetter(() => store.currentTid());
 function baseUrl(req) { const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0] || (req.socket && req.socket.encrypted ? 'https' : 'http'); return `${proto}://${req.headers.host || 'app.lumen247.com'}`; }
 async function qrDataUrl(text) { try { return await require('qrcode').toDataURL(String(text), { margin: 1, width: 320 }); } catch (e) { return ''; } }
 function TOK_has(kind, id) { const K = presentation.TOK; const arr = kind === 'palette' ? K.PALETTES : kind === 'fontPair' ? K.FONT_PAIRS : K.FORMATS; return arr.some(x => x.id === id); }
-function presEditorShell(id) {
+const PRES_FAVICON = `<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a1712'/%3E%3Cpath%20d='M16%204.4L18.7%2013.3L27.6%2016L18.7%2018.7L16%2027.6L13.3%2018.7L4.4%2016L13.3%2013.3Z'%20fill='%23ffffff'/%3E%3C/svg%3E">`;
+function presEditorShell(id, title) {
+  const tt = title ? (String(title).slice(0, 60) + ' · Lumen') : 'Конструктор · Lumen';
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Конструктор презентации · Lumen</title>
+<title>${esc(tt)}</title>
+${PRES_FAVICON}
 <link rel="stylesheet" href="/pres-styles.css"><link rel="stylesheet" href="/presedit.css?v=1">
-<script>window.__PRES_ID=${JSON.stringify(id)};</script></head>
+<script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
 <script src="/pres-tokens.js?v=1"></script><script src="/pres-templates.js?v=1"></script><script src="/presedit.js?v=1"></script>
 </body></html>`;
@@ -6059,6 +6062,19 @@ const server = http.createServer(async (req, res) => {
       out.expectedWebhook = base.replace(/\/$/, '') + '/tg/webhook';
       try { const reg = store.getRegistry(); out.tokenSource = process.env.LUMEN_TG_BRIDGE_TOKEN ? 'env' : ((reg.platformBridge && reg.platformBridge.token) ? 'registry' : 'none'); out.centralBot = reg.platformBridge && reg.platformBridge.username; } catch (_) {}
       if (req.method === 'POST') { try { out.rehook = await tgbridge.setupPlatformWebhook(base); } catch (e) { out.rehookError = e.message; } }
+      /* ДИАГНОСТИКА РОУТИНГА: ?testcode=XXX → проверяем, в какой тенант/брокера разрезолвится /start XXX
+         (ровно та логика, что в центральном вебхуке). Помогает понять «Код не найден» без Telegram. */
+      const _tc = String((u.searchParams.get('testcode') || '')).trim().toLowerCase();
+      if (_tc) {
+        out.testcode = _tc;
+        const _tid = findTenant(() => {
+          const d = store.get();
+          if (String((d.settings && d.settings.ownerTgCode) || '').toLowerCase() === _tc) return true;
+          return (d.brokers || []).some(b => String(b.tgBindCode || '').toLowerCase() === _tc);
+        });
+        out.resolvesToTenant = _tid || null;
+        if (_tid) { try { out.resolvesToBroker = store.runInTenant(_tid, () => { const d = store.get(); const b = (d.brokers || []).find(x => String(x.tgBindCode || '').toLowerCase() === _tc); return b ? { id: b.id, name: b.name, bound: !!b.tgChatId } : (String((d.settings.ownerTgCode || '')).toLowerCase() === _tc ? { owner: true } : null); }); } catch (e) {} }
+      }
       /* getWebhookInfo через платформенный токен (сам токен не раскрываем) */
       try { const info = await tgbridge.webhookInfo(); out.webhookInfo = info; } catch (e) { out.webhookInfoError = e.message; }
       return json(res, 200, out);
@@ -16901,7 +16917,7 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
         if (!R) { res.writeHead(302, { Location: '/' }); res.end(); return; }
         if (!pres || !presCanEdit(R, pres)) { res.writeHead(404); res.end('not found'); return; }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-        res.end(presEditorShell(pres.id));
+        res.end(presEditorShell(pres.id, presentation.titleOf(db, pres)));
         return;
       }
       // print view (live draft) for Save-as-PDF
