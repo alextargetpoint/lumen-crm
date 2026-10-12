@@ -183,22 +183,30 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-2); box-s
 .cc-edit-f { display: flex; flex-direction: column; gap: 4px; }
 .cc-edit-f input { padding: 7px 10px; border: 1px solid var(--stroke); border-radius: 9px; background: var(--card); color: var(--ink-1); font: inherit; font-size: 13px; }
 .cc-edit-act { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; }
-/* переоформленная плашка следующего касания: текст сообщения — главный (в пузыре) */
-.chat-chain.ntp { display: block; }
-.ntp-top { display: flex; align-items: flex-start; gap: 12px; }
-.ntp-ic { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 9px; display: grid; place-items: center; background: rgba(124,92,255,.12); color: #7C5CFF; }
-.ntp-ic svg { width: 16px; height: 16px; }
-.ntp-hd { flex: 1; min-width: 0; }
-.ntp-title { font-size: 13px; font-weight: 700; color: var(--navy-900); }
-.ntp-sub { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
-.ntp-msg { margin: 9px 0 9px; padding: 11px 14px; border-radius: 13px; border-top-left-radius: 4px; background: var(--card); border: 1px solid var(--stroke); font-size: 13px; line-height: 1.52; color: var(--ink-1); white-space: pre-wrap; word-break: break-word; }
-.ntp-msg-ph { color: var(--ink-3); font-style: italic; }
-.ntp-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; }
-.ntp-when { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-3); }
-.ntp-when svg { width: 13px; height: 13px; flex: 0 0 auto; }
-.chat-chain.ntp .cc-act { flex: 0 1 auto; margin-top: 0; }
-.chat-chain.ntp.reengage { border-left-color: #E8A84B; }
-.chat-chain.ntp.reengage .ntp-ic { background: rgba(232,138,75,.14); color: #D97A3D; }
+/* плашка следующего касания — горизонтальный бар (по референсу): слева иконка+инфо, справа контролы */
+.chat-chain.ntp2 { display: block; border-left-width: 1px; border-radius: 16px; padding: 14px 16px; background: var(--card); }
+.ntp2-bar { display: flex; align-items: center; gap: 13px; }
+.ntp2-ic { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 12px; display: grid; place-items: center; background: var(--bg-2, rgba(124,92,255,.08)); color: #7C5CFF; }
+.ntp2-ic svg { width: 20px; height: 20px; }
+.ntp2-info { flex: 1; min-width: 0; }
+.ntp2-l1 { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.ntp2-l1 b { font-size: 15px; font-weight: 700; color: var(--navy-900); letter-spacing: -.01em; }
+.ntp2-badge { font-size: 11px; font-weight: 600; color: var(--ink-3); background: var(--bg-2, rgba(20,19,17,.05)); border: 1px solid var(--stroke); border-radius: 999px; padding: 2px 9px; }
+.ntp2-l2 { font-size: 12.5px; color: var(--ink-2); margin-top: 3px; }
+.ntp2-l3 { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.ntp2-ctrls { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.ntp2-cbtn { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 999px; border: 1px solid var(--stroke); background: var(--card); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; transition: background .14s, color .14s, border-color .14s; }
+.ntp2-cbtn:hover { background: var(--bg-2); color: var(--ink-1); border-color: var(--ink-3); }
+.ntp2-cbtn svg { width: 18px; height: 18px; }
+.ntp2-chev svg { transition: transform .2s; transform: rotate(90deg); }
+.ntp2-chev.open svg { transform: rotate(-90deg); }
+.ntp2-send { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 18px; border-radius: 999px; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.ntp2-send svg { width: 16px; height: 16px; }
+.ntp2 .cc-edit { margin-top: 13px; }
+.ntp2-load { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-3); font-style: italic; padding: 4px 0; }
+.ntp2-load svg { width: 14px; height: 14px; }
+.chat-chain.ntp2.reengage .ntp2-ic { background: rgba(232,138,75,.12); color: #D97A3D; }
+@media (max-width: 640px) { .ntp2-bar { flex-wrap: wrap; } .ntp2-ctrls { width: 100%; justify-content: flex-end; } }
 .chat-chain.pending { border-left-color: #C9A25A; background: rgba(201,162,90,.07); align-items: stretch; }
 .chat-chain.pending .cc-ic { background: rgba(201,162,90,.15); color: #B07E2A; }
 .chat-chain .cc-hint2 { font-size: 10.5px; color: var(--ink-3); margin: 1px 0 6px; }

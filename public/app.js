@@ -500,9 +500,9 @@ const NAV = {
   feed:      { name: 'Лента', en: 'Feed', icon: I_FEED, sub: '' },
   funnel:    { name: 'Воронка', en: 'Pipeline', icon: I.funnel, sub: '' },
   inbox:     { name: 'Диалоги', en: 'Inbox', icon: I.chat, sub: '' },
-  properties: { name: 'Объекты', en: 'Properties', icon: I.building, sub: '' },
-  collections: { name: 'Подборки', en: 'Collections', icon: I.layers, sub: '' },
-  presentations: { name: 'Презентации', en: 'Presentations', icon: I.doc, sub: 'конструктор презентаций и PDF объектов', subEn: 'presentation builder & object PDFs' },
+  properties: { name: 'Объекты', en: 'Properties', icon: I.building, sub: 'карточки недвижимости · список и карта', subEn: 'property cards · list & map' },
+  presentations: { name: 'Презентации объектов', en: 'Object presentations', icon: I.doc, sub: 'готовое оформление каждого объекта · PDF и ссылка', subEn: 'ready-made per-object presentation · PDF & link' },
+  collections: { name: 'Подборки клиентов', en: 'Client collections', icon: I.layers, sub: 'несколько объектов под запрос клиента · один PDF/ссылка', subEn: 'several objects for a client · one PDF/link' },
   autopilot: { name: 'Автопилот', en: 'Autopilot', icon: I.spark, sub: 'квалификатор · цепочки · шаблоны', subEn: 'qualifier · chains · templates' },
   knowledge: { name: 'База знаний ИИ', en: 'AI knowledge', icon: I.flame, sub: 'приёмы · академия · оценка звонка', subEn: 'plays · academy · call review' },
   qualifier: { name: 'ИИ-квалификатор', en: 'AI Qualifier', icon: I.spark, sub: '' },
@@ -7114,28 +7114,31 @@ async function renderChat(id, rebuild) {
     const isRe = nt.kind === 'reengage';
     const when = nt.at ? (nt.at <= _mNow ? 'в ближайшую минуту' : _mFmt(nt.at)) : '—';
     const chn2 = ({ wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' })[nt.channel] || nt.channel;
-    const title = isRe ? `Авто-дожим ИИ · попытка ${nt.attempt}/${nt.maxAttempts}` : `Цепочка касаний · шаг ${nt.stepNum}/${nt.total}${nt.label ? ' · ' + esc(nt.label) : ''}`;
+    const badge = isRe ? `Попытка ${nt.attempt} из ${nt.maxAttempts}` : `Шаг ${nt.stepNum} из ${nt.total}`;
+    const caption = isRe ? 'Отправится, если клиент не ответит' : (nt.label ? esc(nt.label) : 'Автоматическое касание цепочки');
     const _ed = new Date((nt.at && nt.at > _mNow) ? nt.at : Date.now() + 3600e3);
     const _p2 = (n) => String(n).padStart(2, '0');
     const edDate = `${_ed.getFullYear()}-${_p2(_ed.getMonth() + 1)}-${_p2(_ed.getDate())}`;
     const edTime = `${_p2(_ed.getHours())}:${_p2(_ed.getMinutes())}`;
     const needDraft = nt.canEdit && !nt.fullText;
-    return `<div class="chat-chain ntp${isRe ? ' reengage' : ''}" ${needDraft ? 'data-ntdraft="1"' : ''}>
-      <div class="ntp-top">
-        <span class="ntp-ic">${ic(I.spark || I.bolt)}</span>
-        <div class="ntp-hd"><div class="ntp-title">${isRe ? 'ИИ вернёт клиента' : 'ИИ запланировал сообщение'}</div>
-          <div class="ntp-sub">${esc(title)}</div></div>
-      </div>
-      <div class="ntp-msg" data-ntmsg>${nt.fullText ? esc(nt.fullText) : `<span class="ntp-msg-ph">${needDraft ? 'ИИ готовит текст…' : esc(nt.preview)}</span>`}</div>
-      <div class="ntp-foot">
-        <span class="ntp-when">${ic(I.clock || I.cal)} ${esc(when)}${(l.tz != null && nt.at > _mNow) ? ' · время клиента' : ''} · ${esc(chn2)}</span>
-        <div class="cc-act">
-          ${nt.canEdit ? `<button class="btn btn-sm" data-ntedit="1" title="Изменить текст и время отправки">${ic(I.edit || I.doc)}Изменить</button>` : ''}
-          <button class="btn btn-sm btn-accent" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="${isRe ? 'Дожать клиента сейчас, не дожидаясь срока' : 'Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)'}">${ic(I.send || I.bolt)}${isRe ? 'Дожать сейчас' : 'Отправить сейчас'}</button>
+    return `<div class="chat-chain ntp2${isRe ? ' reengage' : ''}" ${needDraft ? 'data-ntdraft="1"' : ''}>
+      <div class="ntp2-bar">
+        <span class="ntp2-ic">${ic(I.spark || I.bolt)}</span>
+        <div class="ntp2-info">
+          <div class="ntp2-l1"><b>ИИ запланировал сообщение</b><span class="ntp2-badge">${esc(badge)}</span></div>
+          <div class="ntp2-l2">${esc(when)}${(l.tz != null && nt.at > _mNow) ? ' · По времени клиента' : ''} · ${esc(chn2)}</div>
+          <div class="ntp2-l3">${caption}</div>
+        </div>
+        <div class="ntp2-ctrls">
+          ${nt.canEdit ? `<button class="ntp2-cbtn" data-ntedit="time" title="Перенести день и время">${ic(I.clock)}</button>` : ''}
+          <button class="ntp2-cbtn" data-ntpause="1" title="Поставить ИИ на паузу">${ic(I.pause)}</button>
+          <button class="btn btn-accent ntp2-send" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="${isRe ? 'Дожать клиента сейчас, не дожидаясь срока' : 'Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)'}">${ic(I.send || I.bolt)}Отправить сейчас</button>
+          ${nt.canEdit ? `<button class="ntp2-cbtn ntp2-chev" data-ntedit="toggle" title="Показать и изменить текст">${ic(I.chev)}</button>` : ''}
         </div>
       </div>
       ${nt.canEdit ? `<div class="cc-edit" hidden>
         <label class="cc-edit-l">Текст сообщения${isRe ? ' (его отправит ИИ)' : ''}</label>
+        <div class="ntp2-load" data-ntmsgload ${needDraft ? '' : 'hidden'}>${ic(I.spark || I.bolt)} ИИ готовит текст…</div>
         <textarea id="ntEditText" class="cc-edit-ta" rows="4" placeholder="${isRe ? 'Текст дожима, который уйдёт клиенту…' : 'Текст касания. Пусто — ИИ соберёт сам при отправке.'}">${esc(nt.fullText || '')}</textarea>
         <div class="cc-edit-when"><div class="cc-edit-f"><label class="cc-edit-l">День</label><input id="ntEditDate" type="date" value="${edDate}"></div>
           <div class="cc-edit-f"><label class="cc-edit-l">Время</label><input id="ntEditTime" type="time" step="300" value="${edTime}"></div></div>
@@ -7211,17 +7214,23 @@ async function renderChat(id, rebuild) {
   $$('[data-tzedit]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { try { render(); } catch (_) {} }); }));
   $$('[data-touchnow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { const r = await api.post('/leads/' + l.id + '/touch/send-now', {}); toast('Касание отправляется', (r && r.label) ? r.label : 'уйдёт в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 1500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-reengagenow]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { await api.post('/leads/' + l.id + '/reengage-now', {}); toast('ИИ дожимает', 'Соберёт заход и отправит в ближайшую минуту', true); setTimeout(() => { try { render(); } catch (_) {} }, 2500); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
-  /* авто-подгрузка реального текста касания/дожима (WYSIWYG): показываем, что уйдёт, сразу */
-  { const wrap = pane.querySelector('[data-ntdraft]'); if (wrap) { (async () => {
-    try { const r = await api.post('/leads/' + l.id + '/next-touch/draft', {});
-      const msg = wrap.querySelector('[data-ntmsg]'), ta = wrap.querySelector('#ntEditText');
-      if (r && r.text) { if (msg) msg.textContent = r.text; if (ta && !ta.value) ta.value = r.text; }
-      else if (msg) msg.innerHTML = '<span class="ntp-msg-ph">ИИ соберёт текст при отправке</span>';
-    } catch (_) { const msg = wrap.querySelector('[data-ntmsg]'); if (msg) msg.innerHTML = '<span class="ntp-msg-ph">ИИ соберёт текст при отправке</span>'; }
-  })(); } }
-  /* правка следующего касания: свой текст + перенос дня/времени */
-  $$('[data-ntedit]', pane).forEach(b => b.addEventListener('click', (e) => { const box = pane.querySelector('.cc-edit'); if (!box) return; box.hidden = false; e.currentTarget.style.display = 'none'; const ta = box.querySelector('#ntEditText'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }));
-  $$('[data-ntcancel]', pane).forEach(b => b.addEventListener('click', () => { const box = pane.querySelector('.cc-edit'); if (box) box.hidden = true; const eb = pane.querySelector('[data-ntedit]'); if (eb) eb.style.display = ''; }));
+  /* развернуть редактор (⌄ / 🕐) + при первом раскрытии подтянуть реальный текст, что уйдёт (WYSIWYG) */
+  const ntExpand = async (focusTime) => {
+    const box = pane.querySelector('.cc-edit'); if (!box) return;
+    const opening = box.hidden; box.hidden = false;
+    const chev = pane.querySelector('.ntp2-chev'); if (chev) chev.classList.add('open');
+    const ta = box.querySelector('#ntEditText');
+    if (opening && ta && !ta.value && pane.querySelector('[data-ntdraft]')) {
+      const loader = box.querySelector('[data-ntmsgload]');
+      try { const r = await api.post('/leads/' + l.id + '/next-touch/draft', {}); if (r && r.text) ta.value = r.text; if (loader) loader.hidden = true; if (!r || !r.text) { if (loader) { loader.hidden = false; loader.textContent = 'ИИ соберёт текст при отправке'; } } }
+      catch (_) { if (loader) { loader.hidden = false; loader.textContent = 'ИИ соберёт текст при отправке'; } }
+    }
+    if (focusTime) { const t = box.querySelector('#ntEditTime'); if (t) t.focus(); }
+    else if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  };
+  $$('[data-ntedit]', pane).forEach(b => b.addEventListener('click', (e) => ntExpand(e.currentTarget.dataset.ntedit === 'time')));
+  $$('[data-ntcancel]', pane).forEach(b => b.addEventListener('click', () => { const box = pane.querySelector('.cc-edit'); if (box) box.hidden = true; const chev = pane.querySelector('.ntp2-chev'); if (chev) chev.classList.remove('open'); }));
+  $$('[data-ntpause]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { await api.patch('/leads/' + l.id, { ai: { enabled: false } }); toast('ИИ на паузе', 'Автосообщения не уйдут. Вернуть — тумблером «Автопилот».', true); setTimeout(() => { try { render(); } catch (_) {} }, 600); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-ntsave]', pane).forEach(b => b.addEventListener('click', async (e) => {
     const btn = e.currentTarget, box = pane.querySelector('.cc-edit'); if (!box) return;
     const text = (box.querySelector('#ntEditText') || {}).value || '';
