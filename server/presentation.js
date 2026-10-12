@@ -260,6 +260,35 @@ function draftCollection(db, properties, broker, opts) {
     updatedAt: Date.now(), updatedBy: null,
   };
 }
+/* Замена объекта в подборке (ТЗ v3 §8): новый объект занимает МЕСТО старого, его страницы/
+   ассеты пересобираются заново; локальные тексты старого объекта НЕ переносятся. Остальные
+   объекты и их правки не трогаются. Контакты брокера (финал) не затрагиваются. */
+function replaceObjectInCollection(db, coll, oldPid, newPid) {
+  if (!coll || coll.kind !== 'collection') return { error: 'not a collection' };
+  const idx = (coll.projectIds || []).indexOf(oldPid);
+  if (idx < 0) return { error: 'object not in collection' };
+  if ((coll.projectIds || []).includes(newPid)) return { error: 'object already in collection' };
+  const newPr = (db.properties || []).find(x => x.id === newPid);
+  if (!newPr) return { error: 'new property not found' };
+  const ns = 'o' + idx + '_';
+  coll.orderedSections = coll.orderedSections || [];
+  coll.collectionAssets = coll.collectionAssets || {};
+  const insertAt = coll.orderedSections.findIndex(s => String(s.id || '').startsWith(ns));
+  coll.orderedSections = coll.orderedSections.filter(s => !String(s.id || '').startsWith(ns));
+  Object.keys(coll.collectionAssets).forEach(k => { if (k.startsWith(ns)) delete coll.collectionAssets[k]; });
+  const amap = assetsForProperty(newPr);
+  Object.keys(amap).forEach(key => { coll.collectionAssets[ns + key] = amap[key]; });
+  const d = draftFromProperty(db, newPr, null);
+  const newSecs = (d.orderedSections || []).filter(s => s.family !== 'broker').map(s => Object.assign({}, s, {
+    id: ns + s.id, assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })),
+  }));
+  const at = insertAt < 0 ? coll.orderedSections.length : insertAt;
+  coll.orderedSections.splice(at, 0, ...newSecs);
+  coll.projectIds[idx] = newPid;
+  coll.draftRevision = (coll.draftRevision || 1) + 1;
+  coll.updatedAt = Date.now();
+  return { ok: true, replaced: { from: oldPid, to: newPid, index: idx, pages: newSecs.length } };
+}
 let _tidGetter = () => 'primary';
 function store_currentTid() { try { return _tidGetter(); } catch { return 'primary'; } }
 function setTidGetter(fn) { _tidGetter = fn; }
@@ -489,7 +518,7 @@ function publicProjection(snap) {
 
 module.exports = {
   SCHEMA_VERSION, RENDERER_VERSION, TOK, T,
-  draftFromProperty, draftCollection, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
+  draftFromProperty, draftCollection, replaceObjectInCollection, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
 };

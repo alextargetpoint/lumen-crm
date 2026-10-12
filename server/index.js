@@ -16820,6 +16820,17 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         store.save();
         return json(res, 200, { ok: true, revision: pres.draftRevision });
       }
+      // replace object in a collection (TZ v3 §8) — new object takes old one's place
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/replace-object$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req);
+        const r = presentation.replaceObjectInCollection(db, pres, String(b.oldProjectId || ''), String(b.newProjectId || ''));
+        if (r.error) return json(res, 400, r);
+        store.save();
+        return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
+      }
       // validate / preflight
       if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/validate$/)) && req.method === 'POST') {
         const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
