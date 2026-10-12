@@ -103,7 +103,7 @@
     var name = esc(S.pres.title || (S.source && S.source.name) || 'Презентация');
     var crumb = coll ? 'Подборки клиентов' : 'Презентации объектов';
     return '<div class="pe-top">' +
-      '<a class="pe-back" href="/presentations" title="К каталогу">' + ic('back') + '</a>' +
+      '<button class="pe-back" data-act="back" title="Назад в каталог">' + ic('back') + '</button>' +
       '<div class="pe-crumbs"><span class="c0">База</span><i>/</i><span class="c0">' + crumb + '</span><i>/</i><b>' + name + '</b></div>' +
       '<div class="pe-top-sp"></div>' +
       '<button class="pe-iconbtn" data-act="undo" title="Отменить">' + ic('undo') + '</button>' +
@@ -617,6 +617,10 @@
   function handle(act, el, e) {
     var s = curSection();
     switch (act) {
+      case 'back':   /* встроен в CRM (iframe) → просим оболочку вернуться; иначе — каталог */
+        if (window.self !== window.top) { try { window.parent.postMessage('lumen:editor-back', '*'); } catch (_) {} }
+        else location.href = '/presentations';
+        break;
       case 'undo': doUndo(); break;
       case 'redo': doRedo(); break;
       case 'preview': window.open('/pres/' + ID + '/print?format=' + S.fmt, '_blank'); break;
@@ -744,7 +748,8 @@
   function paintNavTitle() { var el = document.querySelector('.pe-thumb[data-pg="' + S.pageIdx + '"] .pe-thumb-t'); if (el) el.textContent = sectionTitle(curSection()); mountNavMinis(); }
   function paintNavErrors() { sections().forEach(function (s, i) { var el = document.querySelector('.pe-thumb[data-pg="' + i + '"]'); if (!el) return; var err = S.chk && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; }); el.classList.toggle('err', !!err); }); }
   function paintReadiness() { var el = document.getElementById('peReady'); if (el && S.tab === 'content') { var tmp = document.createElement('div'); tmp.innerHTML = readinessCard(); if (tmp.firstChild) el.replaceWith(tmp.firstChild); } }
-  function updatePageCount() { var el = document.getElementById('pePageCount'); if (el && S.chk) el.textContent = S.chk.pageCount + ' физических страниц'; }
+  function plPages(n) { var a = n % 10, b = n % 100; if (a === 1 && b !== 11) return 'страница'; if (a >= 2 && a <= 4 && (b < 10 || b >= 20)) return 'страницы'; return 'страниц'; }
+  function updatePageCount() { var el = document.getElementById('pePageCount'); if (el && S.chk) el.textContent = S.chk.pageCount + ' ' + plPages(S.chk.pageCount); }
 
   /* ---------- menus ---------- */
   function pageMenu(anchor, i) {

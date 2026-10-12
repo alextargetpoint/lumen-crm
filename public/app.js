@@ -3080,6 +3080,7 @@ function navProgressDone() { const b = $('#navprog'); if (b) { b.classList.remov
 /* ripple убран: Material-волна «раскрывала» кнопки/пункты меню при клике — не в стиле продукта */
 
 function go(page) {
+  if (_editorId) leaveEditor();   /* клик по пункту меню из редактора → выходим в раздел CRM */
   /* реорг 9→5: прямой заход на свёрнутую страницу открывает её композит + нужную под-вкладку */
   if (FOLDED[page]) { const [comp, idx] = FOLDED[page]; PAGE_STATE[comp + 'Tab'] = idx; page = comp; }
   CUR = page;
@@ -3100,6 +3101,55 @@ function go(page) {
      иначе старый раздел мигал (fade-out) пока грузился новый. Флаг снимается в render(). */
   go._wave = true;
   return render();
+}
+
+/* ── Встроенный редактор презентаций/подборок ─────────────────────────────
+   Документ открывается В ТОЙ ЖЕ вкладке CRM, внутри оболочки: основное меню
+   сворачивается в узкую полосу (48px, раскрытие по наведению/нажатию),
+   сам редактор живёт в iframe на всю рабочую область. «Назад» браузера и
+   клик по пункту меню возвращают в CRM. Два типа документа (презентация
+   объекта / подборка клиента) используют ОДИН встроенный редактор — состав
+   и действия различаются внутри него, не в способе открытия. */
+let _editorId = null;
+function openEditor(id) {
+  if (!id) return;
+  _editorId = id;
+  if (location.hash === '#pres/' + id) mountEditor();
+  else location.hash = '#pres/' + id;   /* → hashchange → mountEditor (одна запись истории) */
+}
+function mountEditor() {
+  const app = document.querySelector('.app'); if (!app || !_editorId) return;
+  app.classList.add('editor-mode');
+  closeModal(true);
+  document.getElementById('bulkBar')?.remove();
+  document.documentElement.setAttribute('data-page', 'properties');
+  $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.ws ? (WORKSPACES[b.dataset.ws] && WORKSPACES[b.dataset.ws].pages.includes('properties')) : b.dataset.page === 'properties'));
+  const c = $('#content');
+  if (c && c.getAttribute('data-editor') !== _editorId) {
+    c.setAttribute('data-editor', _editorId);
+    c.innerHTML = '<iframe class="pe-frame" src="/pres/' + _editorId + '?embed=1" title="Редактор документа" allow="clipboard-write"></iframe>';
+  }
+  if (!mountEditor._wired) {
+    mountEditor._wired = true;
+    /* Escape закрывает незакреплённое меню; клик по полосе (планшеты/без мыши) раскрывает */
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { const a = document.querySelector('.app.editor-mode'); if (a) a.classList.remove('nav-open'); }
+    });
+    document.querySelector('.sidebar')?.addEventListener('click', e => {
+      const a = document.querySelector('.app.editor-mode'); if (!a) return;
+      if (e.target.closest('.nav-item, .agency, #navSearch, .navsearch-res')) return;  /* реальные действия меню — не тоггл */
+      a.classList.toggle('nav-open');
+    });
+    /* «Назад» внутри iframe-редактора → выходим из редактора в предыдущий раздел */
+    window.addEventListener('message', e => {
+      if (e && e.data === 'lumen:editor-back') history.back();
+    });
+  }
+}
+function leaveEditor() {
+  _editorId = null;
+  const app = document.querySelector('.app'); if (app) app.classList.remove('editor-mode', 'nav-open', 'nav-pinned');
+  const c = $('#content'); if (c) c.removeAttribute('data-editor');
 }
 
 /* count-up крупных цифр в волну входа */
@@ -6481,11 +6531,12 @@ async function openLeadModal(id) {
     let presItems = [], oldCols = [];
     try { const d = await api.get('/presentations'); presItems = (d.items || []).filter(x => x.kind === 'collection' && x.status !== 'archived' && x.clientId === l.id); } catch (e) {}
     try { const c = await api.get('/collections'); oldCols = (c || []).filter(x => x.leadId === l.id && x.status !== 'archived'); } catch (e) {}
-    const rows = presItems.map(x => `<div class="lc-mat-row"><span class="lc-mat-ic">${ic(I.layers)}</span><div class="lc-mat-b"><b>${esc(x.title || 'Подборка')}</b><span>Подборка · ${x.objectCount || (x.projectIds || []).length} об.</span></div><a class="btn btn-sm" href="/pres/${x.id}">Редактировать</a></div>`)
+    const rows = presItems.map(x => `<div class="lc-mat-row"><span class="lc-mat-ic">${ic(I.layers)}</span><div class="lc-mat-b"><b>${esc(x.title || 'Подборка')}</b><span>Подборка · ${x.objectCount || (x.projectIds || []).length} об.</span></div><button class="btn btn-sm" data-edit="${x.id}">Редактировать</button></div>`)
       .concat(oldCols.map(x => `<div class="lc-mat-row"><span class="lc-mat-ic">${ic(I.layers)}</span><div class="lc-mat-b"><b>${esc(x.title || 'Подборка')}</b><span>Подборка · ${(x.propertyIds || []).length} об. <i class="cc-leg">старая</i></span></div><a class="btn btn-sm" href="/p/${x.id}" target="_blank">Открыть</a></div>`)).join('');
     box.innerHTML = (rows || '<div class="muted" style="font-size:12px;padding:2px 0 8px">Пока нет материалов для этого клиента.</div>') +
       `<div class="lc-mat-acts"><button class="btn btn-sm btn-accent" id="lcMatNewColl">${ic(I.plus)}Создать подборку</button></div>`;
     $('#lcMatNewColl', box)?.addEventListener('click', () => { if (typeof openCollectionCreate === 'function') openCollectionCreate(); });
+    $$('[data-edit]', box).forEach(b => b.addEventListener('click', () => openEditor(b.dataset.edit)));
   })();
   /* индикатор WhatsApp: клик → перепроверка; авто-проверка при открытии, если не проверяли или устарело (>7 дней) */
   const recheckWa = async (silent) => {
@@ -9389,7 +9440,7 @@ PAGES.properties = async (root) => {
       const btn = e.currentTarget; btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Открываю…';
       try {
         const r = await api.post('/presentations', { projectId: pr.id });
-        if (r && r.id) { window.open('/pres/' + r.id, '_blank'); toast('Конструктор презентации открыт', 'в новой вкладке — форматы, стиль, PDF и ссылка', true); }
+        if (r && r.id) { openEditor(r.id); }
         else toast('Не вышло', (r && r.error) || 'ошибка');
       } catch (err) { toast('Не вышло', err.message); }
       btn.disabled = false; btn.innerHTML = old;
@@ -9904,7 +9955,7 @@ PAGES.presentations = async (root) => {
     <div class="muted" style="font-size:13px;margin-bottom:16px;max-width:760px">Готовое оформление каждого отдельного объекта — настраивается один раз, затем переиспользуется в подборках. 4 формата (A4 · 16:9 · 9:16), PDF и адаптивная веб-ссылка. Создавайте из карточки объекта (кнопка «Презентация объекта») или кнопкой ниже.</div>
     <div style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-accent" id="presNew">${ic(I.plus)}Новая презентация из объекта</button></div>
     ${items.length ? `<div class="pres-grid">${cards}</div>` : '<div class="muted" style="padding:34px 0;text-align:center;border:1px dashed var(--stroke);border-radius:14px">Пока нет презентаций. Нажмите «Новая презентация из объекта» или откройте объект в Базе → «Презентация».</div>'}`;
-  $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => { const id = b.dataset.popen; window.open(b.dataset.pkind === 'collection' ? '/pres/' + id + '/print?format=portrait_a4' : '/pres/' + id, '_blank'); }));
+  $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => { openEditor(b.dataset.popen); }));
   $$('[data-ppdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ppdf + '/print?format=portrait_a4', '_blank')));
   $$('[data-ppub]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.ppub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
   $$('[data-pstyle]', root).forEach(b => b.addEventListener('click', () => {
@@ -9933,7 +9984,7 @@ PAGES.presentations = async (root) => {
         $$('.pres1-preset').forEach(x => { x.style.background = ''; x.style.borderColor = ''; x.style.fontWeight = ''; });
         b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600';
       }));
-      $$('.pres-pick').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp, presetId: selPreset }); if (r && r.id) { closeModal(); window.open('/pres/' + r.id, '_blank'); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } }));
+      $$('.pres-pick').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp, presetId: selPreset }); if (r && r.id) { closeModal(); openEditor(r.id); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } }));
     }, 40);
   });
   $('#presNewColl', root)?.addEventListener('click', () => {
@@ -9975,7 +10026,7 @@ PAGES.presentations = async (root) => {
         if (ids.length < 2) { toast('Отметьте ≥2 объекта'); return; }
         try {
           const r = await api.post('/presentations/collection', { projectIds: ids, title: ($('#collTitle') || {}).value || '', clientName: ($('#collClient') || {}).value || '', presetId: selPreset, comparison: true });
-          if (r && r.id) { closeModal(); toast('Подборка создана', null, true); window.open('/pres/' + r.id + '/print?format=portrait_a4', '_blank'); }
+          if (r && r.id) { closeModal(); toast('Подборка создана', null, true); openEditor(r.id); }
           else toast('Не вышло', (r && r.error) || '');
         } catch (e) { toast('Не вышло', e.message); }
       });
@@ -10024,7 +10075,7 @@ async function openCollectionCreate(preselectIds) {
       if (ids.length < 2) { toast('Отметьте ≥2 объекта'); return; }
       try {
         const r = await api.post('/presentations/collection', { projectIds: ids, title: ($('#collTitle') || {}).value || '', clientName: ($('#collClient') || {}).value || '', presetId: selPreset, comparison: true });
-        if (r && r.id) { closeModal(); location.href = '/pres/' + r.id; }
+        if (r && r.id) { closeModal(); openEditor(r.id); }
         else toast('Не вышло', (r && r.error) || '');
       } catch (e) { toast('Не вышло', e.message); }
     });
@@ -10046,7 +10097,7 @@ PAGES.collections = async (root) => {
   const STLAB = { draft: 'Черновик', ready: 'Готово', published: 'Опубликовано' };
   const rows = items.map(x => {
     const acts = x.kind === 'new'
-      ? '<a class="btn btn-sm btn-accent" href="/pres/' + x.id + '">Редактировать</a><button class="btn btn-sm" data-ccpdf="' + x.id + '">PDF</button><button class="btn btn-sm" data-ccpub="' + x.id + '">Поделиться</button>'
+      ? '<button class="btn btn-sm btn-accent" data-edit="' + x.id + '">Редактировать</button><button class="btn btn-sm" data-ccpdf="' + x.id + '">PDF</button><button class="btn btn-sm" data-ccpub="' + x.id + '">Поделиться</button>'
       : '<a class="btn btn-sm" href="/p/' + x.id + '" target="_blank">Открыть</a>';
     const dt = x.updatedAt ? new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
     return '<tr><td class="cc-nm"><b>' + esc(x.title) + '</b>' + (x.legacy ? '<span class="cc-leg">старая</span>' : '') + '</td>' +
@@ -10064,6 +10115,7 @@ PAGES.collections = async (root) => {
       ? '<table class="cc-table"><thead><tr><th>Название</th><th>Клиент</th><th>Объекты</th><th>Статус</th><th>Изменено</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
       : '<div class="cc-empty">Пока нет подборок. Нажмите «Создать подборку» или выделите объекты в «Объектах» → «Собрать подборку».</div>');
   $('#ccNew', root)?.addEventListener('click', () => openCollectionCreate());
+  $$('[data-edit]', root).forEach(b => b.addEventListener('click', () => openEditor(b.dataset.edit)));
   $$('[data-ccpdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ccpdf + '/print?format=portrait_a4', '_blank')));
   $$('[data-ccpub]', root).forEach(b => b.addEventListener('click', async () => {
     try { const r = await api.post('/presentations/' + b.dataset.ccpub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); }
@@ -18954,7 +19006,10 @@ document.getElementById('agencyMenuBtn')?.addEventListener('click', (e) => {
 /* стартовый раздел — из hash (переживает F5); битый hash → обзор */
 const startPage = () => (NAV[location.hash.slice(1)] ? location.hash.slice(1) : 'overview');
 window.addEventListener('hashchange', () => {
-  const p = location.hash.slice(1);
+  const h = location.hash.slice(1);
+  if (h.indexOf('pres/') === 0) { _editorId = h.slice(5); mountEditor(); return; }   /* #pres/<id> → встроенный редактор */
+  if (_editorId) leaveEditor();
+  const p = h;
   if (NAV[p] && p !== CUR) go(p);
   else if (!NAV[p]) history.replaceState(null, '', '#' + CUR);
 });
@@ -18989,7 +19044,13 @@ window.addEventListener('popstate', () => {
     }
     return;
   }
-  await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
+  const _bootHash = location.hash.slice(1);
+  if (_bootHash.indexOf('pres/') === 0) {   /* прямой адрес редактора → открыть внутри оболочки CRM */
+    const _eid = _bootHash.slice(5);
+    await go('properties');                 /* раздел-основа под редактором: replaceState(#properties) */
+    history.pushState(null, '', '#pres/' + _eid);   /* запись редактора поверх → «Назад» вернёт в Базу */
+    _editorId = _eid; mountEditor();
+  } else await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
   /* возврат с Zoom OAuth → тост + чистим query, чтобы не повторялось на F5 */
   try {
     const qp = new URLSearchParams(location.search);

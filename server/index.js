@@ -183,11 +183,14 @@ function presEditorShell(id, title) {
   const tt = title ? (String(title).slice(0, 60) + ' · Lumen') : 'Конструктор · Lumen';
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(tt)}</title>
+<script>/* прямой адрес редактора в ВЕРХНЕМ окне → открыть внутри оболочки CRM (та же вкладка).
+  В iframe (window.self!==window.top) не срабатывает — так встраивается в CRM. */
+try{if(window.self===window.top){location.replace('/#pres/'+${JSON.stringify(id)});}}catch(_){}</script>
 ${PRES_FAVICON}
 <link rel="stylesheet" href="/pres-styles.css?v=12"><link rel="stylesheet" href="/presedit.css?v=12">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=12"></script><script src="/presedit.js?v=12"></script>
+<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=12"></script><script src="/presedit.js?v=13"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
