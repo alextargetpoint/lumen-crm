@@ -171,6 +171,38 @@ button{font-family:inherit;cursor:pointer}
 .ro-acts{margin-top:auto;padding-top:16px;display:flex;flex-direction:column;gap:8px}
 .ro-acts .pe-btn{width:100%;justify-content:center;height:42px}
 .ro-apply[disabled]{opacity:.5;pointer-events:none}
+/* модалка «Кадрирование под формат» */
+.cf-box{max-width:1040px}
+.cf-grid{display:grid;grid-template-columns:1fr 440px;gap:22px;margin-top:16px}
+.cf-main{position:relative;border-radius:13px;overflow:hidden;background:#20242a;aspect-ratio:3/2}
+.cf-main-img{position:absolute;inset:0;background-position:center;background-repeat:no-repeat}
+.cf-cropframe{position:absolute;inset:14%;border:2px solid rgba(255,255,255,.9);box-shadow:0 0 0 2000px rgba(20,22,26,.28);pointer-events:none}
+.cf-cropframe:before,.cf-cropframe:after{content:"";position:absolute;width:12px;height:12px;border:2px solid #fff}
+.cf-cropframe:before{top:-2px;left:-2px;border-right:0;border-bottom:0}
+.cf-cropframe:after{bottom:-2px;right:-2px;border-left:0;border-top:0}
+.cf-src{margin:11px 0 16px;color:var(--pe-mut);font-size:12.5px}
+.cf-modes{display:flex;flex-direction:column;gap:9px}
+.cf-mode{display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid var(--pe-line);border-radius:11px;background:#fff;cursor:pointer;text-align:left;font:inherit}
+.cf-mode:hover{background:var(--pe-hi)}
+.cf-mode.on{border-color:#1f1b17;background:#faf8f3}
+.cf-radio{flex:0 0 auto;width:17px;height:17px;border-radius:50%;border:1.5px solid var(--pe-line);margin-top:2px;position:relative}
+.cf-mode.on .cf-radio{border-color:var(--pe-ink)}
+.cf-mode.on .cf-radio:after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--pe-ink)}
+.cf-mode-tx b{display:block;font-weight:600;font-size:13.5px}
+.cf-mode-tx span{display:block;color:var(--pe-mut);font-size:12px;margin-top:3px;line-height:1.4}
+.cf-prevs{display:flex;gap:16px}
+.cf-fmt{flex:1}
+.cf-fmt-hd{font-size:12.5px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.cf-warn-dot{width:7px;height:7px;border-radius:50%;background:#e0a008}
+.cf-fmt-frame{background:#eee;border:1px solid var(--pe-line);border-radius:8px;overflow:hidden;position:relative}
+.cf-fmt-frame.port{aspect-ratio:210/297}.cf-fmt-frame.land{aspect-ratio:16/9}
+.cf-fmt-img{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;background-color:#dfdbd2}
+.cf-fmt-ex{margin-top:7px;color:var(--pe-mut);font-size:11.5px}
+.cf-warn{display:flex;gap:10px;background:#fdf3d6;border:1px solid #e9cf86;border-radius:11px;padding:13px 14px;margin-top:18px}
+.cf-warn svg{width:18px;height:18px;color:#b4870f;flex:0 0 auto}
+.cf-warn b{display:block;font-size:13px;color:#7a5e12}
+.cf-warn span{display:block;color:#98792a;font-size:12px;margin-top:2px;line-height:1.4}
+.cf-acts{display:flex;gap:10px;margin-top:20px}.cf-acts .pe-btn{flex:1;justify-content:center;height:44px}
 .pe-top-sp{flex:1}
 .pe-save{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--pe-mut)}
 .pe-save .dot{width:8px;height:8px;border-radius:50%;background:#43a047}

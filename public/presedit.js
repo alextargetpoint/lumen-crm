@@ -419,7 +419,7 @@
     return '<div class="pe-field"><label>' + esc(label) + '</label>' +
       '<div class="pe-photo-prev" data-act="focal" data-idx="' + idx + '">' + (url ? '<img src="' + esc(url) + '">' : '') + '</div>' +
       '<div class="pe-row"><button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="replacePhoto" data-idx="' + idx + '">' + ic('image') + 'Заменить</button>' +
-      '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="focalHint" data-idx="' + idx + '">' + ic('crop') + 'Фокус</button></div></div>';
+      '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px" data-act="cropFmt" data-idx="' + idx + '"' + (url ? '' : ' disabled') + '>' + ic('crop') + 'Кадрировать</button></div></div>';
   }
   function galleryPicker(s) {
     var imgs = (S.source.images || []);
@@ -635,6 +635,7 @@
       case 'addStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).concat({ name: '', percent: '' }); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'delStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).slice(); pl.stages.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'replacePhoto': replacePhoto(s, +el.getAttribute('data-idx')); break;
+      case 'cropFmt': openCropFormat(s, +el.getAttribute('data-idx')); break;
       case 'focal': setFocal(s, +el.getAttribute('data-idx'), e); break;
       case 'focalHint': toast('Кликните по фото, чтобы задать точку фокуса'); break;
       case 'galtoggle': galToggle(s, el.getAttribute('data-gid')); break;
@@ -744,6 +745,62 @@
       { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
     ]);
   }
+  /* ---------- «Кадрирование под формат» (макет §6) ---------- */
+  var FMT_ASPECT = { portrait_a4: 210 / 297, landscape_a4: 297 / 210, landscape_16_9: 1280 / 720, portrait_9_16: 576 / 1024 };
+  var FMT_LABEL2 = { portrait_a4: 'A4 вертикальный', landscape_a4: 'A4 горизонтальный', landscape_16_9: '16:9 горизонтальный', portrait_9_16: '9:16 вертикальный' };
+  var FMT_EX = { portrait_a4: '210 × 297 мм', landscape_a4: '297 × 210 мм', landscape_16_9: '1920 × 1080', portrait_9_16: '1080 × 1920' };
+  function openCropFormat(s, idx) {
+    var ref = (s.assetRefs || [])[idx]; if (!ref) { toast('Нет фото'); return; }
+    var url = (S.assets[ref.assetId] || {}).url || ref.url; if (!url) { toast('Нет фото'); return; }
+    var img = new Image();
+    img.onload = function () { cropFmtModal(s, idx, ref, url, img.naturalWidth || 1600, img.naturalHeight || 1067); };
+    img.onerror = function () { cropFmtModal(s, idx, ref, url, 1600, 1067); };
+    img.src = url;
+  }
+  function cropFmtModal(s, idx, ref, url, iw, ih) {
+    var mode = ref.fit === 'contain' ? 'fit' : 'fill';
+    var imgA = iw / ih;
+    var ov = document.createElement('div'); ov.className = 'pu-overlay';
+    function suggestFit(fmtA) { return fmtA < 0.9 && imgA > 1.25; }
+    function fmtPrev(fmt) {
+      var a = FMT_ASPECT[fmt]; var fit = mode === 'fit';
+      var portrait = a < 1;
+      return '<div class="cf-fmt"><div class="cf-fmt-hd">' + esc(FMT_LABEL2[fmt]) + (suggestFit(a) && !fit ? '<span class="cf-warn-dot"></span>' : '') + '</div>' +
+        '<div class="cf-fmt-frame' + (portrait ? ' port' : ' land') + '"><div class="cf-fmt-img" style="background-image:url(\'' + esc(url) + '\');background-size:' + (fit ? 'contain' : 'cover') + '"></div></div>' +
+        '<div class="cf-fmt-ex">' + esc(FMT_EX[fmt]) + '</div></div>';
+    }
+    function warnBox() {
+      var curA = FMT_ASPECT[S.fmt] || 0.707;
+      if (mode === 'fill' && suggestFit(curA)) return '<div class="cf-warn">' + ic('warn') + '<div><b>Для вертикальной обложки лучше макет с полями.</b><span>Так объект выглядит гармоничнее и сохраняются пропорции.</span></div></div>';
+      return '';
+    }
+    function paint() {
+      ov.querySelector('.cf-main-img').style.backgroundSize = (mode === 'fit' ? 'contain' : 'cover');
+      ov.querySelectorAll('[data-cfmode]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-cfmode') === mode); });
+      ov.querySelector('.cf-prevs').innerHTML = fmtPrev('portrait_a4') + fmtPrev('landscape_16_9');
+      ov.querySelector('.cf-warnbox').innerHTML = warnBox();
+    }
+    var modes = [['fill', 'Заполнить область', 'Приоритет на крупный план, часть фото может быть обрезана'], ['fit', 'Сохранить объект целиком', 'На фото останется весь объект, без обрезки важных элементов']];
+    ov.innerHTML = '<div class="pu-box cf-box"><div class="pu-hd"><h2>Кадрирование под формат</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
+      '<div class="cf-grid"><div class="cf-left">' +
+        '<div class="cf-main"><div class="cf-main-img" style="background-image:url(\'' + esc(url) + '\')"></div><div class="cf-cropframe"></div></div>' +
+        '<div class="cf-src">Исходное фото · ' + iw + ' × ' + ih + '</div>' +
+        '<div class="cf-modes">' + modes.map(function (m) { return '<button class="cf-mode" data-cfmode="' + m[0] + '"><span class="cf-radio"></span><span class="cf-mode-tx"><b>' + esc(m[1]) + '</b><span>' + esc(m[2]) + '</span></span></button>'; }).join('') + '</div>' +
+      '</div><div class="cf-right"><div class="cf-prevs"></div><div class="cf-warnbox"></div>' +
+        '<div class="cf-acts"><button class="pe-btn pe-btn-primary" data-cfapply>Применить кадрирование</button><button class="pe-btn pe-btn-ghost" data-puclose>Выбрать другой макет</button></div>' +
+      '</div></div></div>';
+    document.body.appendChild(ov);
+    function close() { ov.remove(); }
+    ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelectorAll('[data-cfmode]').forEach(function (b) { b.addEventListener('click', function () { mode = b.getAttribute('data-cfmode'); paint(); }); });
+    ov.querySelector('[data-cfapply]').addEventListener('click', function () {
+      mutate(function () { ref.fit = mode === 'fit' ? 'contain' : 'cover'; ref.cropsByFormat = ref.cropsByFormat || {}; ref.cropsByFormat[S.fmt] = { mode: mode }; });
+      close(); toast('Кадрирование применено', null, true);
+    });
+    paint();
+  }
+
   /* ---------- «Заменить объект» — пикер объекта (макет §8) ---------- */
   function openReplaceObject(k) {
     api('GET', '/objects').then(function (r) {
