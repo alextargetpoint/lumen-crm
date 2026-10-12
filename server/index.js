@@ -8216,24 +8216,21 @@ const server = http.createServer(async (req, res) => {
       lead.ai = lead.ai || {}; lead.ai.enabled = true;
       const hasText = typeof b.text === 'string';
       const at = (b.at != null && isFinite(+b.at)) ? +b.at : null;
-      if (lead.stage === 'dialog') {                    // авто-дожим
-        lead.ai.reengage = lead.ai.reengage || { attempts: 0, nextAt: null };
-        if (hasText) { lead.ai._reengageText = b.text.slice(0, 2000); delete lead.ai._gReengage; }
-        if (at) lead.ai.reengage.nextAt = at;
-      } else {                                          // касание цепочки
-        if (hasText) { lead.ai._editedText = b.text.slice(0, 2000); delete lead.ai._ptText; delete lead.ai._ptEmail; }  // ручной текст перебивает ИИ-персонализацию
-        if (at) lead.ai.nextTouchAt = at;
-      }
+      // единый СОХРАНЁННЫЙ черновик (переживает перезаходы, его же шлёт движок); чистим старые кэши
+      if (hasText) { lead.ai.nextDraft = b.text.slice(0, 2000); delete lead.ai._gReengage; delete lead.ai._reengageText; delete lead.ai._editedText; delete lead.ai._ptText; delete lead.ai._ptEmail; }
+      if (lead.stage === 'dialog') { lead.ai.reengage = lead.ai.reengage || { attempts: 0, nextAt: null }; if (at) lead.ai.reengage.nextAt = at; }
+      else if (at) lead.ai.nextTouchAt = at;
       store.save();
       let nt = null; try { nt = engine.nextTouchInfo(db, lead); } catch (_) {}
       return json(res, 200, { ok: true, nextTouch: nt });
     }
-    /* реальный текст следующего касания (генерит+кэширует, если нужно) — для показа/правки в карточке */
+    /* реальный текст следующего касания (сохранённый черновик; regenerate=1 — перегенерировать) */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/next-touch\/draft$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req).catch(() => ({}));
       let text = '';
-      try { text = await engine.nextTouchDraft(db, lead); } catch (e) { return json(res, 200, { text: '', error: e.message }); }
+      try { text = await engine.nextTouchDraft(db, lead, { regenerate: !!b.regenerate, style: b.style }); } catch (e) { return json(res, 200, { text: '', error: e.message }); }
       return json(res, 200, { text: text || '' });
     }
     /* режим «с одобрением»: брокер решает по готовому касанию — Отправить (можно с правкой) / Пропустить.
@@ -16929,6 +16926,9 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         let brokerId = b.brokerId || (R.role === 'broker' ? R.brokerId : null);
         if (!brokerId && b.leadId) { const ld = (db.leads || []).find(l => l.id === b.leadId); if (ld && ld.broker) brokerId = ld.broker; }
         const broker = (db.brokers || []).find(x => x.id === brokerId) || null;
+        /* ТЗ v3 §4: один объект = одна презентация-объекта — повторный клик открывает существующую, не плодит дубли */
+        const existing = presList().find(x => x.projectId === pr.id && x.kind !== 'collection' && x.status !== 'archived');
+        if (existing && !b.forceNew) return json(res, 200, Object.assign({ reused: true }, existing));
         const pres = presentation.draftFromProperty(db, pr, broker, { presetId: b.presetId });
         presList().unshift(pres); store.save();
         return json(res, 200, pres);

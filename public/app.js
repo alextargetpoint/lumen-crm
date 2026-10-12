@@ -7112,7 +7112,10 @@ async function renderChat(id, rebuild) {
   : (l.nextTouch && l.ai && l.ai.enabled) ? (() => {
     const nt = l.nextTouch;
     const isRe = nt.kind === 'reengage';
-    const when = nt.at ? (nt.at <= _mNow ? 'в ближайшую минуту' : _mFmt(nt.at)) : '—';
+    const _tzKnown = typeof l.tz === 'number';
+    const _whenFmt = (at) => _tzKnown ? _mFmt(at) : new Date(at).toLocaleString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const when = nt.at ? (nt.at <= _mNow ? 'в ближайшую минуту' : _whenFmt(nt.at)) : '—';
+    const tzLabel = (nt.at > _mNow) ? (_tzKnown ? ` · время клиента${l.geoName ? ' (' + esc(l.geoName) + ')' : ''}` : ' · ваше время (CRM)') : '';
     const chn2 = ({ wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' })[nt.channel] || nt.channel;
     const badge = isRe ? `Попытка ${nt.attempt} из ${nt.maxAttempts}` : `Шаг ${nt.stepNum} из ${nt.total}`;
     const caption = isRe ? 'Отправится, если клиент не ответит' : (nt.label ? esc(nt.label) : 'Автоматическое касание цепочки');
@@ -7126,7 +7129,7 @@ async function renderChat(id, rebuild) {
         <span class="ntp2-ic">${ic(I.spark || I.bolt)}</span>
         <div class="ntp2-info">
           <div class="ntp2-l1"><b>ИИ запланировал сообщение</b><span class="ntp2-badge">${esc(badge)}</span></div>
-          <div class="ntp2-l2">${esc(when)}${(l.tz != null && nt.at > _mNow) ? ' · По времени клиента' : ''} · ${esc(chn2)}</div>
+          <div class="ntp2-l2" title="${_tzKnown ? 'Время отправки — в часовом поясе клиента (тихие часы тоже считаются по клиенту)' : 'Часовой пояс клиента неизвестен — показано ваше время из CRM'}">${esc(when)}${tzLabel} · ${esc(chn2)}</div>
           <div class="ntp2-l3">${caption}</div>
         </div>
         <div class="ntp2-ctrls">
@@ -7142,6 +7145,7 @@ async function renderChat(id, rebuild) {
         <textarea id="ntEditText" class="cc-edit-ta" rows="4" placeholder="${isRe ? 'Текст дожима, который уйдёт клиенту…' : 'Текст касания. Пусто — ИИ соберёт сам при отправке.'}">${esc(nt.fullText || '')}</textarea>
         <div class="cc-edit-when"><div class="cc-edit-f"><label class="cc-edit-l">День</label><input id="ntEditDate" type="date" value="${edDate}"></div>
           <div class="cc-edit-f"><label class="cc-edit-l">Время</label><input id="ntEditTime" type="time" step="300" value="${edTime}"></div></div>
+        <div class="cc-edit-actrow">${isRe || nt.mode === 'personalize' ? `<button class="btn btn-sm" data-ntregen="1" title="Сгенерировать другой вариант текста">${ic(I.spark)}Перегенерировать</button><span class="cc-edit-autosave" data-ntautosave hidden>сохранено</span>` : ''}</div>
         <div class="cc-edit-act"><button class="btn btn-sm" data-ntcancel="1">Отмена</button><button class="btn btn-sm btn-accent" data-ntsave="1">${ic(I.check)}Сохранить</button></div>
       </div>` : ''}
     </div>`;
@@ -7230,6 +7234,16 @@ async function renderChat(id, rebuild) {
   };
   $$('[data-ntedit]', pane).forEach(b => b.addEventListener('click', (e) => ntExpand(e.currentTarget.dataset.ntedit === 'time')));
   $$('[data-ntcancel]', pane).forEach(b => b.addEventListener('click', () => { const box = pane.querySelector('.cc-edit'); if (box) box.hidden = true; const chev = pane.querySelector('.ntp2-chev'); if (chev) chev.classList.remove('open'); }));
+  /* перегенерировать текст (другой вариант) — сохранится как черновик автоматически */
+  $$('[data-ntregen]', pane).forEach(b => b.addEventListener('click', async (e) => {
+    const btn = e.currentTarget, ta = pane.querySelector('#ntEditText'); btn.disabled = true; const o = btn.innerHTML; btn.innerHTML = ic(I.spark) + ' Генерирую…';
+    try { const r = await api.post('/leads/' + l.id + '/next-touch/draft', { regenerate: true }); if (r && r.text && ta) { ta.value = r.text; const sv = pane.querySelector('[data-ntautosave]'); if (sv) { sv.textContent = 'новый вариант'; sv.hidden = false; } } else toast('Не вышло перегенерировать'); }
+    catch (err) { toast('Ошибка', err.message); } finally { btn.disabled = false; btn.innerHTML = o; }
+  }));
+  /* автосохранение правки текста (дебаунс) — чтобы не потерялось без «Сохранить» */
+  { const ta = pane.querySelector('#ntEditText'); if (ta) { let _t = null; ta.addEventListener('input', () => { clearTimeout(_t); _t = setTimeout(async () => {
+    try { await api.post('/leads/' + l.id + '/next-touch', { text: ta.value }); const sv = pane.querySelector('[data-ntautosave]'); if (sv) { sv.textContent = 'сохранено'; sv.hidden = false; } } catch (_) {}
+  }, 1100); }); } }
   $$('[data-ntpause]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { await api.patch('/leads/' + l.id, { ai: { enabled: false } }); toast('ИИ на паузе', 'Автосообщения не уйдут. Вернуть — тумблером «Автопилот».', true); setTimeout(() => { try { render(); } catch (_) {} }, 600); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
   $$('[data-ntsave]', pane).forEach(b => b.addEventListener('click', async (e) => {
     const btn = e.currentTarget, box = pane.querySelector('.cc-edit'); if (!box) return;
@@ -9054,7 +9068,7 @@ PAGES.properties = async (root) => {
               <div class="pd2-lang" id="pdLangDD"><select id="pdLang" title="Язык карточки — перевод для просмотра и шеринга клиенту">${CARD_LANGS.map(([c, n, fl]) => `<option value="${c}" ${c === CARD_LANG ? 'selected' : ''}>${fl} ${n}</option>`).join('')}</select></div>
               <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm ${(PAGE_STATE.compare || []).includes(pr.id) ? 'btn-accent' : 'pd2-ghost'}" id="pdCompare" title="Добавить в сравнение (до 3 объектов)">${ic(I.grid || I.layers)}${(PAGE_STATE.compare || []).includes(pr.id) ? 'В сравнении ✓' : 'Сравнить'}</button>
-              <button class="btn btn-sm btn-accent" id="pdPresV2" title="Открыть конструктор презентаций: 4 формата (16:9/A4/9:16), палитры, шрифты, PDF и веб-ссылка">${ic(I.spark)}Презентация</button>
+              <button class="btn btn-sm btn-accent" id="pdPresV2" title="Готовое оформление этого объекта: редактор, 4 формата, PDF и веб-ссылка">${ic(I.spark)}Презентация объекта</button>
               <button class="btn btn-sm pd2-ghost" id="pdPresPdf" title="Быстрый PDF этого объекта (без редактирования)">${ic(I.doc)}PDF объекта</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
@@ -9858,7 +9872,7 @@ async function openDesignModal(id, title) {
 }
 PAGES.presentations = async (root) => {
   const [d, props] = await Promise.all([api.get('/presentations').catch(() => ({ items: [] })), api.get('/properties').catch(() => [])]);
-  const items = (d.items || []).filter(x => x.status !== 'archived');
+  const items = (d.items || []).filter(x => x.status !== 'archived' && x.kind !== 'collection');   /* только презентации объектов — подборки в своей вкладке */
   const propList = Array.isArray(props) ? props : (props.items || props.properties || []);
   const STLAB = { draft: 'Черновик', ready: 'Готово' };
   const FLAB = { landscape_16_9: '16:9', portrait_a4: 'A4', landscape_a4: 'A4 гориз.', portrait_9_16: '9:16' };
@@ -9870,9 +9884,9 @@ PAGES.presentations = async (root) => {
         <div class="pres-acts"><button class="btn btn-sm btn-accent" data-popen="${x.id}" data-pkind="${x.kind || 'object'}">${ic(I.doc)}${x.kind === 'collection' ? 'Предпросмотр' : 'Открыть'}</button><button class="btn btn-sm" data-ppdf="${x.id}" title="Быстрый PDF">${ic(I.doc)}PDF</button><button class="btn btn-sm" data-pstyle="${x.id}" title="Сменить пресет оформления">${ic(I.sparkle || I.doc)}Стиль</button>${x.hasPublic ? `<button class="btn btn-sm" data-ppub="${x.id}">${ic(I.link || I.send)}Ссылка</button>` : ''}</div>
       </div></div>`).join('');
   root.innerHTML = `
-    <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Презентации</h1>
-    <div class="muted" style="font-size:13px;margin-bottom:16px;max-width:760px">Конструктор клиентских презентаций объектов: 4 формата (16:9 · A4 · 9:16), палитры и шрифты, PDF и адаптивная веб-ссылка. Создавайте из карточки объекта (кнопка «Презентация») или кнопкой ниже.</div>
-    <div style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-accent" id="presNew">${ic(I.plus)}Новая презентация из объекта</button><button class="btn" id="presNewColl">${ic(I.plus)}Создать подборку</button></div>
+    <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Презентации объектов</h1>
+    <div class="muted" style="font-size:13px;margin-bottom:16px;max-width:760px">Готовое оформление каждого отдельного объекта — настраивается один раз, затем переиспользуется в подборках. 4 формата (A4 · 16:9 · 9:16), PDF и адаптивная веб-ссылка. Создавайте из карточки объекта (кнопка «Презентация объекта») или кнопкой ниже.</div>
+    <div style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-accent" id="presNew">${ic(I.plus)}Новая презентация из объекта</button></div>
     ${items.length ? `<div class="pres-grid">${cards}</div>` : '<div class="muted" style="padding:34px 0;text-align:center;border:1px dashed var(--stroke);border-radius:14px">Пока нет презентаций. Нажмите «Новая презентация из объекта» или откройте объект в Базе → «Презентация».</div>'}`;
   $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => { const id = b.dataset.popen; window.open(b.dataset.pkind === 'collection' ? '/pres/' + id + '/print?format=portrait_a4' : '/pres/' + id, '_blank'); }));
   $$('[data-ppdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ppdf + '/print?format=portrait_a4', '_blank')));
