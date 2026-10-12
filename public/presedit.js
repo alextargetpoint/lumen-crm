@@ -108,6 +108,7 @@
       '<div class="pe-top-sp"></div>' +
       '<button class="pe-iconbtn" data-act="undo" title="Отменить">' + ic('undo') + '</button>' +
       '<button class="pe-iconbtn" data-act="redo" title="Повторить">' + ic('redo') + '</button>' +
+      '<button class="pe-iconbtn" data-act="history" title="История версий">' + ic('clock') + '</button>' +
       '<div class="pe-save"><span class="dot"></span><span class="tx">Черновик сохранён</span></div>' +
       '<button class="pe-btn pe-btn-ghost" data-act="preview">' + ic('eye') + 'Предпросмотр</button>' +
       '<button class="pe-btn pe-btn-primary" data-act="export">PDF / ссылка ' + ic('chev') + '</button>' +
@@ -531,6 +532,73 @@
   function defineProp(k, v) { var o = {}; o[k] = v; return o; }
   function updateStageSum() { var s = curSection(); var pl = cval(s, 'plan') || { stages: [] }; var sum = (pl.stages || []).reduce(function (a, x) { return a + (+x.percent || 0); }, 0); var lab = document.querySelector('[data-stages]'); if (lab) { var l = lab.previousElementSibling ? null : null; var f = document.querySelector('.pe-field label'); } var hdr = document.querySelector('[data-stages]').closest('.pe-field').querySelector('label'); if (hdr) hdr.textContent = 'Этапы оплаты · сумма ' + sum + '%'; }
 
+  /* ---------- «История версий» (макет) ---------- */
+  function hTime(ts) {
+    var d = new Date(ts), now = new Date();
+    var hhmm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var sameDay = d.toDateString() === now.toDateString();
+    var yest = new Date(now); yest.setDate(now.getDate() - 1);
+    if (sameDay) return 'Сегодня, ' + hhmm;
+    if (d.toDateString() === yest.toDateString()) return 'Вчера, ' + hhmm;
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ', ' + hhmm;
+  }
+  function objCards(objs) {
+    if (!objs || !objs.length) return '<div class="pe-bl-empty">Нет объектов</div>';
+    return objs.map(function (o) {
+      var cur = o.currency === 'EUR' ? '€' : o.currency === 'THB' ? '฿' : '$';
+      return '<div class="hv-obj"><div class="hv-obj-nm">' + esc(o.name) + '</div><div class="hv-obj-m">' + (o.priceFrom ? 'от ' + cur + ' ' + (o.priceFrom).toLocaleString('ru-RU') : '') + '</div></div>';
+    }).join('');
+  }
+  function openHistory() {
+    api('GET', '/' + ID + '/history').then(function (r) {
+      if (r.status !== 200) { toast('Не удалось', (r.json && r.json.error) || ''); return; }
+      historyModal(r.json);
+    });
+  }
+  function historyModal(data) {
+    var versions = data.versions || [];
+    var sel = 0;   // индекс выбранной версии (0 = самая свежая)
+    var ov = document.createElement('div'); ov.className = 'pu-overlay';
+    function listHtml() {
+      var cur = '<div class="hv-item hv-cur' + (sel === -1 ? ' on' : '') + '" data-hsel="-1"><div class="hv-dot"></div><div class="hv-it-b"><b>Текущий черновик</b><span>' + (data.current.objects.length) + ' ' + plural(data.current.objects.length, 'объект', 'объекта', 'объектов') + '</span></div></div>';
+      var items = versions.map(function (v, i) {
+        return '<div class="hv-item' + (i === sel ? ' on' : '') + '" data-hsel="' + i + '"><div class="hv-dot"></div><div class="hv-it-b"><b>' + esc(hTime(v.at)) + (v.by ? ' · ' + esc(v.by) : '') + '</b><span>' + esc(v.label || v.type) + '</span></div></div>';
+      }).join('');
+      return cur + items;
+    }
+    function paint() {
+      var v = versions[sel];
+      var selObjs = v ? v.objects : data.current.objects;
+      var selTitle = v ? hTime(v.at) + (v.by ? ' · ' + v.by : '') : 'Текущий черновик';
+      var diff = v ? v.diff : [];
+      ov.querySelector('.hv-list').innerHTML = listHtml();
+      ov.querySelectorAll('[data-hsel]').forEach(function (el) { el.addEventListener('click', function () { sel = +el.getAttribute('data-hsel'); paint(); }); });
+      ov.querySelector('.hv-selhd').textContent = selObjs === data.current.objects && sel !== -1 ? 'Версия' : 'Выбранная версия';
+      ov.querySelector('.hv-seltt').textContent = selTitle;
+      ov.querySelector('.hv-selobjs').innerHTML = objCards(selObjs);
+      ov.querySelector('.hv-curobjs').innerHTML = objCards(data.current.objects);
+      ov.querySelector('.hv-diff').innerHTML = diff.length ? diff.map(function (d) { return '<div class="hv-chg">' + ic(d.icon || 'db') + '<div><b>' + esc(d.title) + '</b><span>' + esc(d.sub || '') + '</span></div></div>'; }).join('') : '<div class="pe-bl-empty">Это текущая версия</div>';
+      var rbtn = ov.querySelector('.hv-restore'); rbtn.style.display = (v ? '' : 'none');
+      rbtn.setAttribute('data-vid', v ? v.id : '');
+    }
+    ov.innerHTML = '<div class="pu-box hv-box"><div class="pu-hd"><h2>История версий</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
+      '<div class="hv-grid">' +
+        '<div class="hv-col hv-listcol"><div class="hv-list"></div></div>' +
+        '<div class="hv-col"><div class="hv-colhd hv-selhd">Выбранная версия</div><div class="hv-seltt"></div><div class="hv-selobjs"></div></div>' +
+        '<div class="hv-col"><div class="hv-colhd">Текущий черновик</div><div class="hv-seltt">' + esc(data.current.title || '') + '</div><div class="hv-curobjs"></div></div>' +
+        '<div class="hv-col hv-diffcol"><div class="hv-colhd">Что изменилось</div><div class="hv-diff"></div><button class="pe-btn pe-btn-primary hv-restore" style="width:100%;justify-content:center;margin-top:16px">Восстановить в черновик</button></div>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    function close() { ov.remove(); }
+    ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelector('.hv-restore').addEventListener('click', function () {
+      var vid = this.getAttribute('data-vid'); if (!vid) return;
+      api('POST', '/' + ID + '/restore', { versionId: vid }).then(function (r) { close(); if (r.status === 200) { toast('Восстановлено', 'Новый черновик из версии', true); reloadPres(); } else toast('Не удалось'); });
+    });
+    paint();
+  }
+
   /* ---------- action handlers ---------- */
   function handle(act, el, e) {
     var s = curSection();
@@ -548,6 +616,7 @@
       case 'grptoggle': S.openGroups = S.openGroups || {}; var gk = +el.getAttribute('data-gk'); S.openGroups[gk] = !S.openGroups[gk]; render(); break;
       case 'objmenu': objMenu(el, +el.getAttribute('data-gk')); break;
       case 'addobj': toast('Добавить объекты', 'Поиск и выбор объектов — экран в разработке'); break;
+      case 'history': openHistory(); break;
       case 'ovopen': S.ovMode = true; S.addMode = false; S.ovOpt = 'continue'; render(); break;
       case 'ovclose': S.ovMode = false; render(); break;
       case 'ovopt': S.ovOpt = el.getAttribute('data-ovopt'); render(); break;
@@ -853,6 +922,7 @@
       back: '<path d="M15 6l-6 6 6 6"/>', chev: '<path d="M6 9l6 6 6-6"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
       text: '<path d="M4 6h16M4 12h16M4 18h10"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
       pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/>', doc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+      clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', swap: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
     };
     return '<svg viewBox="0 0 24 24" ' + P + ' style="width:1em;height:1em">' + (D[n] || '') + '</svg>';
   }

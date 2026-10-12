@@ -121,6 +121,32 @@ button{font-family:inherit;cursor:pointer}
 .pu-note b{display:block;font-weight:600;font-size:14px}
 .pu-note span{color:var(--pe-mut);font-size:12.5px}
 .pu-acts{display:flex;gap:10px}.pu-acts .pe-btn{height:44px;padding:0 20px}
+/* модалка «История версий» */
+.hv-box{max-width:1180px}
+.hv-grid{display:grid;grid-template-columns:260px 1fr 1fr 290px;gap:16px;margin-top:18px}
+.hv-col{background:#fff;border:1px solid var(--pe-line);border-radius:13px;padding:16px}
+.hv-listcol{background:transparent;border:0;padding:0}
+.hv-colhd{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--pe-mut);font-weight:600;margin-bottom:4px}
+.hv-seltt{font-size:13px;color:var(--pe-mut);margin-bottom:14px}
+.hv-list{display:flex;flex-direction:column;position:relative}
+.hv-item{display:flex;gap:12px;padding:12px 13px;border-radius:11px;cursor:pointer;align-items:flex-start}
+.hv-item:hover{background:#fff}
+.hv-item.on{background:#fff;border:1px solid #d8c48a;box-shadow:0 8px 24px -14px rgba(120,90,20,.4)}
+.hv-dot{flex:0 0 auto;width:11px;height:11px;border-radius:50%;background:var(--pe-line);margin-top:4px;position:relative}
+.hv-item.on .hv-dot{background:var(--pe-ink)}
+.hv-cur .hv-dot{background:var(--pe-ink)}
+.hv-it-b b{display:block;font-weight:600;font-size:13.5px}
+.hv-it-b span{color:var(--pe-mut);font-size:12px}
+.hv-obj{padding:11px 0;border-bottom:1px solid var(--pe-line)}
+.hv-obj:last-child{border-bottom:0}
+.hv-obj-nm{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:15px}
+.hv-obj-m{color:var(--pe-mut);font-size:12.5px;margin-top:2px}
+.hv-chg{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--pe-line)}
+.hv-chg:last-of-type{border-bottom:0}
+.hv-chg svg{width:17px;height:17px;color:var(--pe-mut);flex:0 0 auto;margin-top:1px}
+.hv-chg b{display:block;font-weight:600;font-size:13px}
+.hv-chg span{color:var(--pe-mut);font-size:12px;line-height:1.4}
+@media(max-width:1100px){.hv-grid{grid-template-columns:1fr 1fr}}
 .pe-top-sp{flex:1}
 .pe-save{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--pe-mut)}
 .pe-save .dot{width:8px;height:8px;border-radius:50%;background:#43a047}

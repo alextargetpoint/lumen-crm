@@ -5602,12 +5602,75 @@ const server = http.createServer(async (req, res) => {
       let lead = mt ? (db.leads || []).find(l => l.id === mt.leadId) : null;
       if (!lead && b.leadId) lead = (db.leads || []).find(l => l.id === b.leadId);
       if (!lead && b.phone) { const d = String(b.phone).replace(/\D/g, ''); if (d.length >= 7) lead = (db.leads || []).find(l => l.phone && l.phone.replace(/\D/g, '').endsWith(d.slice(-9))); }
-      if (!lead) return json(res, 404, { error: 'лид не найден' });
+      if (!lead) {
+        // лид не найден (ad-hoc звонок / авто-детект не сработал) — НЕ теряем расшифровку: кладём в
+        // «Неразобранные записи», брокер потом привяжет к нужному лиду вручную из дашборда.
+        db.notetakerUnassigned = db.notetakerUnassigned || [];
+        const uid = 'nu_' + crypto.randomBytes(6).toString('hex');
+        db.notetakerUnassigned.unshift({ id: uid, text: text.slice(0, 40000), audio: b.audio || null,
+          dur: Math.max(1, Math.min(240, +b.dur || 0)), at: +b.startedAt || Date.now(), createdAt: Date.now(),
+          label: b.label || 'локальная запись', brokerId: (R.role === 'broker' ? R.brokerId : null),
+          hintPhone: b.phone || '', hintName: b.hintName || '' });
+        store.save();
+        ai.pushEvent(db, { type: 'meeting', text: 'Запись звонка без привязки к лиду — в «Неразобранных» (привяжите вручную)' });
+        return json(res, 200, { ok: true, unassigned: true, id: uid });
+      }
       if (R.role === 'broker' && lead.broker !== R.brokerId) { audit(db, req, 'нотетейкер: чужой лид', { leadId: lead.id }); return json(res, 403, { error: 'чужой лид' }); }   /* брокер пишет только в своих лидов (canSeeLead определён ниже — TDZ, проверяем ролью напрямую) */
       if (!mt) mt = (db.meetings || []).filter(m => m.leadId === lead.id && m.transcriptStatus !== 'done').sort((a, c) => (c.at || 0) - (a.at || 0))[0] || null;
       if (!mt) { mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: (R.role === 'broker' ? R.brokerId : lead.broker) || null, at: +b.startedAt || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, +b.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' }; db.meetings = db.meetings || []; db.meetings.push(mt); }
       const ok = await applyMeetingTranscript(db, mt, text, b.label || 'локальная запись', b.audio || null);
       return json(res, ok ? 200 : 409, { ok, leadId: lead.id, meetingId: mt.id });
+    }
+    /* ── Неразобранные записи звонков (без привязки к лиду) ── */
+    if (p === '/api/notetaker/unassigned' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      let items = (db.notetakerUnassigned || []).slice();
+      if (R.role === 'broker') items = items.filter(u => !u.brokerId || u.brokerId === R.brokerId);
+      const brName = id => ((db.brokers || []).find(b => b.id === id) || {}).name || '';
+      return json(res, 200, { items: items.map(u => ({ ...u, brokerName: brName(u.brokerId) })) });
+    }
+    if (p === '/api/notetaker/unassigned/assign' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const u = (db.notetakerUnassigned || []).find(x => x.id === b.id);
+      if (!u) return json(res, 404, { error: 'запись не найдена' });
+      const lead = (db.leads || []).find(l => l.id === b.leadId);
+      if (!lead) return json(res, 404, { error: 'лид не найден' });
+      if (R.role === 'broker' && lead.broker !== R.brokerId) return json(res, 403, { error: 'чужой лид' });
+      const mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: (R.role === 'broker' ? R.brokerId : lead.broker) || null, at: u.at || Date.now(), kind: 'video', dur: Math.max(5, Math.min(240, u.dur || 60)), status: 'done', createdAt: Date.now(), source: 'notetaker' };
+      db.meetings = db.meetings || []; db.meetings.push(mt);
+      const ok = await applyMeetingTranscript(db, mt, u.text, u.label || 'привязано вручную', u.audio || null);
+      if (ok) { db.notetakerUnassigned = (db.notetakerUnassigned || []).filter(x => x.id !== u.id); store.save(); }
+      return json(res, ok ? 200 : 409, { ok, leadId: lead.id, meetingId: mt.id });
+    }
+    if (p === '/api/notetaker/unassigned/delete' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const u = (db.notetakerUnassigned || []).find(x => x.id === b.id);
+      if (R.role === 'broker' && u && u.brokerId && u.brokerId !== R.brokerId) return json(res, 403, { error: 'чужая запись' });
+      db.notetakerUnassigned = (db.notetakerUnassigned || []).filter(x => x.id !== b.id);
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* Перенести расшифровку (и парный голосовой + встречу) из одной карточки лида в другую */
+    if (p === '/api/notetaker/transcript/reassign' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const from = (db.leads || []).find(l => l.id === b.fromLeadId);
+      const to = (db.leads || []).find(l => l.id === b.toLeadId);
+      if (!from || !to) return json(res, 404, { error: 'лид не найден' });
+      if (from.id === to.id) return json(res, 400, { error: 'тот же лид' });
+      if (R.role === 'broker' && (from.broker !== R.brokerId || to.broker !== R.brokerId)) return json(res, 403, { error: 'чужой лид' });
+      const tr = (from.transcripts || []).find(t => t.id === b.transcriptId);
+      if (!tr) return json(res, 404, { error: 'транскрипт не найден' });
+      from.transcripts = (from.transcripts || []).filter(t => t.id !== tr.id);
+      to.transcripts = to.transcripts || []; to.transcripts.push(tr);
+      const vn = (from.voiceNotes || []).find(v => (tr.meetingId && v.meetingId === tr.meetingId) || (tr.audio && v.url === tr.audio));
+      if (vn) { from.voiceNotes = (from.voiceNotes || []).filter(v => v !== vn); to.voiceNotes = to.voiceNotes || []; to.voiceNotes.unshift(vn); }
+      if (tr.meetingId) { const mt = (db.meetings || []).find(m => m.id === tr.meetingId); if (mt) { mt.leadId = to.id; mt.brokerId = to.broker || mt.brokerId; } }
+      store.save();
+      if (llm.available()) { try { const s = await llm.summarize(db, to); if (s) { to.summary = s; to.summaryAt = Date.now(); store.save(); } } catch (_) {} }
+      return json(res, 200, { ok: true, toLeadId: to.id });
     }
     /* Повестка нотетейкера: что у брокера сейчас/скоро по видео-встречам — ground truth для АВТО-привязки
        звонка к карточке (матч по zoomMeetingId, иначе по «идёт сейчас» времени). ?key=<hooks.secret>&broker=<id> */

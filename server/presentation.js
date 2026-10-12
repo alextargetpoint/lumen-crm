@@ -327,6 +327,51 @@ function applyObjectUpdates(db, coll, k, fields) {
   if (applied) { coll.draftRevision = (coll.draftRevision || 1) + 1; coll.updatedAt = Date.now(); }
   return { ok: true, applied: applied };
 }
+/* История версий (ТЗ v3 §6, экран «История версий»). Версия пишется на КЛЮЧЕВЫХ действиях
+   (публикация/замена/обновления/пресет/восстановление), не на каждом автосейве. */
+function snapOf(coll) {
+  return { orderedSections: JSON.parse(JSON.stringify(coll.orderedSections || [])), theme: JSON.parse(JSON.stringify(coll.theme || {})), title: coll.title || '', projectIds: (coll.projectIds || []).slice() };
+}
+function pushHistory(coll, type, by, label) {
+  coll.history = coll.history || [];
+  coll.history.push({ id: 'v' + hex(5), at: Date.now(), by: by || '', type: type, label: label || '', snap: snapOf(coll) });
+  if (coll.history.length > 40) coll.history = coll.history.slice(-40);
+}
+function snapObjectNames(db, snap) {
+  return (snap.projectIds || []).map(function (pid) { var p = (db.properties || []).find(function (x) { return x.id === pid; }); return { id: pid, name: (p && p.name) || 'Объект', priceFrom: p && p.priceFrom, currency: p && p.currency, geo: p && p.geo }; });
+}
+function historyDiff(db, a, b) {   /* a = старая версия, b = текущая */
+  var nm = function (pid) { var p = (db.properties || []).find(function (x) { return x.id === pid; }); return (p && p.name) || pid; };
+  var fromN = (a.projectIds || []).length, toN = (b.projectIds || []).length, out = [];
+  out.push({ icon: 'grid', title: 'Объектов: ' + fromN + ' → ' + toN, sub: fromN === toN ? 'Количество объектов не изменилось' : 'Состав изменился' });
+  var repl = [], n = Math.max(fromN, toN);
+  for (var i = 0; i < n; i++) { var pa = (a.projectIds || [])[i], pb = (b.projectIds || [])[i]; if (pa && pb && pa !== pb) repl.push([pa, pb]); }
+  if (repl.length) out.push({ icon: 'image', title: 'Заменён ' + repl.length + ' ' + (repl.length === 1 ? 'объект' : 'объекта'), sub: repl.map(function (r) { return nm(r[0]) + ' → ' + nm(r[1]); }).join(', ') });
+  if ((a.title || '') !== (b.title || '')) out.push({ icon: 'text', title: 'Изменено название подборки', sub: (a.title || '—') + ' → ' + (b.title || '—') });
+  var introA = JSON.stringify((a.orderedSections || []).filter(function (s) { return !/^o\d+_/.test(s.id || ''); }).slice(0, 1));
+  var introB = JSON.stringify((b.orderedSections || []).filter(function (s) { return !/^o\d+_/.test(s.id || ''); }).slice(0, 1));
+  if (introA !== introB) out.push({ icon: 'text', title: 'Изменено вступление', sub: 'Обновлён текст или акценты в описании подборки' });
+  if (out.length === 1 && fromN === toN) out.push({ icon: 'db', title: 'Правки содержания', sub: 'Тексты, фото или оформление страниц' });
+  return out;
+}
+function historyList(db, coll) {
+  var cur = snapOf(coll);
+  var versions = (coll.history || []).slice().reverse().map(function (h) {
+    return { id: h.id, at: h.at, by: h.by, type: h.type, label: h.label, objects: snapObjectNames(db, h.snap), diff: historyDiff(db, h.snap, cur) };
+  });
+  return { current: { title: cur.title, objects: snapObjectNames(db, cur) }, versions: versions };
+}
+function restoreVersion(coll, versionId) {
+  var h = (coll.history || []).filter(function (x) { return x.id === versionId; })[0];
+  if (!h) return { error: 'version not found' };
+  pushHistory(coll, 'restore', coll._by || '', 'Восстановлено из версии');   /* фиксируем текущее перед откатом */
+  coll.orderedSections = JSON.parse(JSON.stringify(h.snap.orderedSections || []));
+  coll.theme = JSON.parse(JSON.stringify(h.snap.theme || {}));
+  coll.title = h.snap.title || coll.title;
+  coll.projectIds = (h.snap.projectIds || []).slice();
+  coll.draftRevision = (coll.draftRevision || 1) + 1; coll.updatedAt = Date.now();
+  return { ok: true, restored: versionId };
+}
 let _tidGetter = () => 'primary';
 function store_currentTid() { try { return _tidGetter(); } catch { return 'primary'; } }
 function setTidGetter(fn) { _tidGetter = fn; }
@@ -556,7 +601,7 @@ function publicProjection(snap) {
 
 module.exports = {
   SCHEMA_VERSION, RENDERER_VERSION, TOK, T,
-  draftFromProperty, draftCollection, replaceObjectInCollection, objectUpdates, applyObjectUpdates, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
+  draftFromProperty, draftCollection, replaceObjectInCollection, objectUpdates, applyObjectUpdates, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
 };
