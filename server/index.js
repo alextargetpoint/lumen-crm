@@ -6063,6 +6063,28 @@ const server = http.createServer(async (req, res) => {
       try { const info = await tgbridge.webhookInfo(); out.webhookInfo = info; } catch (e) { out.webhookInfoError = e.message; }
       return json(res, 200, out);
     }
+    /* ОТВЯЗКА Telegram: брокер отвязывает СВОЙ бот (или владелец — любого брокера по brokerId).
+       Чистим tgChatId + индекс чата центрального бота; код привязки сохраняем (можно сразу подключиться
+       с ДРУГОГО Telegram-аккаунта тем же /start <код>). rotate:true — ещё и выдаём новый код. */
+    if (p === '/api/tgbridge/unbind' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req).catch(() => ({}));
+      let broker;
+      if (R.role === 'broker') broker = (db.brokers || []).find(x => x.id === R.brokerId);
+      else if (R.role === 'owner' || R.role === 'master') broker = (db.brokers || []).find(x => x.id === b.brokerId);
+      else return json(res, 403, { error: 'недоступно для вашей роли' });
+      if (!broker) return json(res, 404, { error: 'брокер не найден' });
+      const oldChat = broker.tgChatId;
+      broker.tgChatId = null;
+      if (b.rotate) broker.tgBindCode = crypto.randomBytes(3).toString('hex');   /* новый код → старые ссылки/аккаунты больше не привяжутся */
+      store.save();
+      if (oldChat) {
+        try { const reg = store.getRegistry(); if (reg.tgChatIndex && reg.tgChatIndex[oldChat]) { delete reg.tgChatIndex[oldChat]; store.saveRegistry(); } } catch (_) {}
+        try { await tgbridge.notify(db, oldChat, '🔌 Этот Telegram отвязан от CRM. Чтобы подключиться снова — пришлите /start <код> из CRM → «Мои подключения».'); } catch (_) {}
+      }
+      ai.pushEvent(db, { type: 'note', text: `Telegram отвязан у брокера ${broker.name}${b.rotate ? ' (код обновлён)' : ''}` });
+      return json(res, 200, { ok: true, code: broker.tgBindCode, bound: false });
+    }
     if (p === '/api/tgbridge/regen-owner' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       if (((sessionRole(req) || {}).role) === 'broker') return json(res, 403, { error: 'только владелец' }); /* SEC (IS_BROKER тут в TDZ) */
@@ -6074,7 +6096,13 @@ const server = http.createServer(async (req, res) => {
     if ((tgm = p.match(/^\/api\/brokers\/([^/]+)\/tg-unbind$/)) && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const br = db.brokers.find(x => x.id === tgm[1]); if (!br) return json(res, 404, { error: 'not found' });
+      const oldChat = br.tgChatId;
       br.tgChatId = null; br.tgActiveLeadId = null; store.save();
+      /* чистим индекс чата центрального бота + уведомляем старый Telegram (как в /api/tgbridge/unbind) */
+      if (oldChat) {
+        try { const reg = store.getRegistry(); if (reg.tgChatIndex && reg.tgChatIndex[oldChat]) { delete reg.tgChatIndex[oldChat]; store.saveRegistry(); } } catch (_) {}
+        try { await tgbridge.notify(db, oldChat, '🔌 Этот Telegram отвязан от CRM руководителем. Чтобы подключиться снова — пришлите /start <код> из CRM → «Мои подключения».'); } catch (_) {}
+      }
       return json(res, 200, { ok: true });
     }
     /* ПРОВЕРКА ICS-ссылки календаря брокера: тянем, парсим, отдаём «нашли N событий, ближайшее занятое окно».

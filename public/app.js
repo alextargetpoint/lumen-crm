@@ -7273,19 +7273,43 @@ PAGES.waProfile = async (root) => {
   $('#myGmeetConnect', root)?.addEventListener('click', () => connectOAuth('gmeet'));
   $('#myZoomDisc', root)?.addEventListener('click', () => discOAuth('zoom', 'Zoom'));
   $('#myGmeetDisc', root)?.addEventListener('click', () => discOAuth('gmeet', 'Google Meet'));
-  (async () => { const box = $('#myTgBox', root); if (!box) return;
-    try { const t = await api.get('/tgbridge'); const bot = t.centralBot, code = t.me && t.me.code, bound = t.me && t.me.bound;
-      if (bound) { box.innerHTML = '<span class="badge ok">подключено ✓</span> приложение привязано к твоему Telegram.'; return; }
-      if (!bot || !code) { box.innerHTML = 'Telegram-бот пока не настроен платформой — обратись к руководителю.'; return; }
-      const link = 'https://t.me/' + bot + '?start=' + encodeURIComponent(code);
-      box.innerHTML = `<div style="display:flex;flex-direction:column;gap:9px">
-        <a class="btn btn-accent btn-sm" href="${link}" target="_blank" style="align-self:flex-start">${ic(I.send)}Открыть бота и подключиться</a>
-        <div style="font-size:12px">Или вручную: открой <b>@${esc(bot)}</b> и отправь команду <code class="pill" style="padding:3px 8px;cursor:pointer" id="myTgCode">/start ${esc(code)}</code></div>
-        <div class="muted" style="font-size:11.5px">Код привязывает приложение именно к тебе. Никому не передавай.</div>
-      </div>`;
-      $('#myTgCode', box)?.addEventListener('click', function () { navigator.clipboard.writeText('/start ' + code); toast('Скопировано', 'Вставь боту в Telegram', true); });
-    } catch (e) { box.textContent = 'Не удалось загрузить код: ' + e.message; }
-  })();
+  { const box = $('#myTgBox', root);
+    const paintTg = async () => { if (!box) return;
+      try { const t = await api.get('/tgbridge'); const bot = t.centralBot, code = t.me && t.me.code, bound = t.me && t.me.bound;
+        if (!bot) { box.innerHTML = 'Telegram-бот пока не настроен платформой — обратись к руководителю.'; return; }
+        if (bound) {
+          /* ПОДКЛЮЧЕНО: даём отвязать (и перепривязать на другой аккаунт) прямо здесь */
+          box.innerHTML = `<div style="display:flex;flex-direction:column;gap:9px">
+            <div><span class="badge ok">подключено ✓</span> приложение привязано к твоему Telegram.</div>
+            <div class="muted" style="font-size:11.5px">Чтобы перепривязать на <b>другой</b> Telegram-аккаунт — сначала отвяжи здесь, потом открой бота и подключись уже с нужного аккаунта.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" id="myTgUnbind" style="align-self:flex-start">${ic(I.x || I.link)}Отвязать</button>
+              <button class="btn btn-sm" id="myTgUnbindRot" title="Отвязать и выдать НОВЫЙ код — старый аккаунт/ссылка больше не подключатся" style="align-self:flex-start">${ic(I.refresh || I.spark)}Отвязать и сбросить код</button>
+            </div>
+          </div>`;
+          const doUnbind = async (rotate) => {
+            if (!await uiConfirm(rotate ? 'Отвязать и сбросить код?' : 'Отвязать Telegram?', rotate ? 'Текущий Telegram отключится, выдадим новый код. Старая ссылка/аккаунт больше не подключатся.' : 'Текущий Telegram отключится. Сможешь подключиться заново — тем же кодом с любого аккаунта.', { ok: 'Отвязать', danger: true })) return;
+            try { await api.post('/tgbridge/unbind', rotate ? { rotate: true } : {}); toast('Отвязано', rotate ? 'Код обновлён — подключись заново' : 'Подключись заново с нужного аккаунта', true); paintTg(); }
+            catch (e) { toast('Не вышло', e.message); }
+          };
+          $('#myTgUnbind', box)?.addEventListener('click', () => doUnbind(false));
+          $('#myTgUnbindRot', box)?.addEventListener('click', () => doUnbind(true));
+          return;
+        }
+        if (!code) { box.innerHTML = 'Код не готов — обнови страницу или обратись к руководителю.'; return; }
+        const link = 'https://t.me/' + bot + '?start=' + encodeURIComponent(code);
+        box.innerHTML = `<div style="display:flex;flex-direction:column;gap:9px">
+          <a class="btn btn-accent btn-sm" href="${link}" target="_blank" style="align-self:flex-start">${ic(I.send)}Открыть бота и подключиться</a>
+          <div style="font-size:12px">Или вручную: открой <b>@${esc(bot)}</b> и отправь команду <code class="pill" style="padding:3px 8px;cursor:pointer" id="myTgCode">/start ${esc(code)}</code></div>
+          <div class="muted" style="font-size:11.5px">Код привязывает приложение именно к тебе. Никому не передавай.</div>
+          <button class="btn btn-sm" id="myTgRecheck" style="align-self:flex-start">${ic(I.refresh || I.check)}Я подключился — проверить</button>
+        </div>`;
+        $('#myTgCode', box)?.addEventListener('click', function () { navigator.clipboard.writeText('/start ' + code); toast('Скопировано', 'Вставь боту в Telegram', true); });
+        $('#myTgRecheck', box)?.addEventListener('click', paintTg);
+      } catch (e) { box.textContent = 'Не удалось загрузить код: ' + e.message; }
+    };
+    paintTg();
+  }
   if (!n) return;
   const upd = () => {
     const nm = ($('#wmName', root) || {}).value || '', ab = ($('#wmAbout', root) || {}).value || '', av = ($('#wmAvatar', root) || {}).value || '';
