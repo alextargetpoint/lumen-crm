@@ -9952,188 +9952,93 @@ PAGES.presentations = async (root) => {
     }, 40);
   });
 };
-PAGES.collections = async (root) => {
-  const [cols0, props, leads, allFolders] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads'), api.get('/folders')]);
-  const cFolders = allFolders.filter(f => f.kind === 'coll');
-  const cFolderF = PAGE_STATE.collFolder || '';
-  const cols = cols0.filter(c => !cFolderF || c.folderId === cFolderF);
-  const active = leads.filter(l => !['lost'].includes(l.stage));
-  const selLead = PAGE_STATE.collLead || '';
-  let suggest = [];
-  if (selLead) { try { suggest = await api.get(`/leads/${selLead}/suggest-properties`); } catch (e) {} }
-  const ordered = selLead && suggest.length ? suggest : props;
-  const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
-  const clViews = cols0.reduce((s2, c) => s2 + (c.views || 0), 0);
-  const clHot = cols0.filter(c => c.analytics && c.analytics.maxDepth >= 75).length;
-  root.innerHTML = `
-    ${heroArt('assets/art/brochures.png', `
-      <div class="ha-title">${ic(I.layers)}Подборки<span class="sub">персональные веб-страницы и PDF · трекинг каждого просмотра</span></div>
-      ${[
-        ['Собрано подборок', cols0.length, 'конструктор — слева'],
-        ['Просмотров клиентами', clViews, 'по всем ссылкам'],
-        ['Горячий интерес', clHot, 'изучили страницу на 75%+'],
-      ].map(([k, v, sub]) => `<div class="ha-row" data-ha>
-        <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
-      </div>`).join('')}
-    `, { v: 'left', hue: '#38A8E8' })}
-    <div class="cl-layout">
-      <div class="glass card cl-config">
-        <div class="card-title">${ic(I.layers)}Конструктор подборки<span class="sub">веб-страница + PDF</span></div>
-        <div class="form-row"><label>Для лида</label><select id="clLead"><option value="">— без лида (общая)</option>${active.map(l => `<option value="${l.id}" ${selLead === l.id ? 'selected' : ''}>${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
-        <div class="form-row"><label>Название</label><input id="clTitle" value="${selLead ? 'Подборка под ваш запрос' : 'Подборка'}"></div>
-        <div class="form-row"><label>Вступление (первая страница)</label><textarea id="clIntro" style="min-height:84px">${selLead ? esc(((active.find(l => l.id === selLead) || {}).name || '').split(' ')[0] + ', добрый день!\nПодготовил для вас подборку самых интересных проектов по выгодным ценам и с рассрочкой.\nЧто заинтересует — я на связи, посчитаю доходность по понравившимся.') : ''}</textarea></div>
-        <div class="ds-fold ${PAGE_STATE.collDsOpen ? 'open' : ''}">
-          <button type="button" class="ds-fold-h" id="clDsToggle">${ic(I.layers)}Дизайн документа<span class="ds-hint">арт-движок · всё Авто</span><span class="ds-caret">${ic(I.chev)}</span></button>
-          <div class="ds-fold-b"><div class="ds-fold-inner">
-            <div class="ds-grid">${dsSelects('clDs', {})}</div>
-            <div class="ds-note">Движок сам решит композицию под данные объектов и запрос лида. Точная настройка — на карточке подборки.</div>
-          </div></div>
-        </div>
-        <label class="cl-premium"><input type="checkbox" id="clPremium" checked><span class="cl-chk"></span><span style="flex:1">${ic(I.spark)}<b>Премиум арт-документ</b> <span class="muted" style="font-size:11px">— авто-дизайн уровня студии (журнальный разворот, не «CRM-PDF»)</span></span></label>
-        <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
-        <div class="cl-props">
-          ${ordered.map(pr => { const us = (pr.units || []).filter(Boolean); const uLbl = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area).replace(/\s*(m²|м²|m2|sqm|кв\.?\s*м)\s*$/i, '')) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`; return `<div class="cl-prow">
-            <label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
-            <span class="cl-chk"></span>
-            <span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area)} · ${esc(pr.type)} · от ${fmt(pr)}</span></span>
-            ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>
-            ${us.length ? `<div class="cl-units" data-ppid="${pr.id}">
-              <button type="button" class="cl-units-tg" data-uall="${us.length}">${ic(I.grid)}юниты: <b class="cl-usum">все ${us.length}</b><span class="cl-ucar">${ic(I.chev)}</span></button><button type="button" class="cl-ub" data-usel="all">Все</button><button type="button" class="cl-ub" data-usel="none">Снять</button>
-              <div class="cl-units-list" hidden>${us.map((u, i) => `<label class="cl-unit ${u.status === 'sold' ? 'sold' : ''}"><input type="checkbox" data-uidx="${i}" ${u.status === 'sold' ? '' : 'checked'}><span>${uLbl(u)}</span></label>`).join('')}</div>
-            </div>` : ''}
-          </div>`; }).join('')}
-        </div>
-        <button class="btn btn-accent" id="clCreate" style="margin-top:14px;width:100%;justify-content:center">${ic(I.plus)}Создать подборку</button>
-      </div>
-      <div>
-        <div class="shelf shelf-sm">
-          <div class="fold ${!cFolderF ? 'active' : ''}" data-cfopen=""><span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span><div class="fold-meta"><b>Все</b><i>${cols0.length}</i></div></div>
-          ${cFolders.map(f => `<div class="fold ${cFolderF === f.id ? 'active' : ''}" data-cfopen="${f.id}" data-cfid="${f.id}">
-            <span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span><div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count}</i></div>
-            <div class="fold-acts"><button class="btn-ghost" data-cfdel2="${f.id}">${ic(I.x)}</button></div>
-          </div>`).join('')}
-          <button class="fold fold-new" id="cfNew">${ic(I.plus)}<span>Папка</span></button>
-        </div>
-        ${cols.map(c => {
-          const thumbs = c.propertyIds.map(id => { const p = props.find(x => x.id === id); return p && (p.images || [])[0]; }).filter(Boolean).slice(0, 4);
-          const geoHue = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
-          const firstGeo = (props.find(x => x.id === c.propertyIds[0]) || {}).geo || 'dubai';
-          return `<div class="glass cl2-card ${selSet('collections').has(c.id) ? 'sel' : ''}" data-cl="${c.id}" data-id="${c.id}" data-cllead="${c.leadId || ''}" data-title="${esc(c.title || '')}" data-dragcoll="${c.id}">
-          <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
-          <div class="cl2-preview">
-            ${thumbs.length ? thumbs.map(u => `<div class="cl2-thumb" style="background-image:url('${esc(u)}')"></div>`).join('') : `<div class="cl2-thumb grad" style="background:${geoHue[firstGeo]}">${lumenMark()}</div>`}
-            ${c.propertyIds.length > thumbs.length && thumbs.length ? `<div class="cl2-thumb more">+${c.propertyIds.length - thumbs.length}</div>` : ''}
-            ${c.views ? `<span class="cl2-views">${ic(I.eye)}${c.views}</span>` : ''}
-          </div>
-          <div class="cl2-body">
-            <div class="nm cl2-name" data-act="ren" title="Переименовать">${esc(c.title)}<span class="nm-pen">${ic(I.edit || I.doc)}</span></div>
-            <div class="cl2-meta">${c.propertyIds.length} ${plural(c.propertyIds.length, 'объект', 'объекта', 'объектов')}${c.leadName ? ' · для ' + esc(c.leadName) : ''} · ${ago(c.createdAt)}</div>
-            ${c.analytics ? `<div class="cl2-analytics ${c.analytics.maxDepth >= 75 ? 'hot' : ''}"><div class="cl2-bar"><i style="width:${c.analytics.maxDepth}%"></i></div><span>изучил ${c.analytics.maxDepth}%${c.analytics.deepSessions ? ' · глубоких ' + c.analytics.deepSessions : ''}</span></div>` : ''}
-            <div class="cl2-acts">
-              <a class="btn btn-sm btn-accent" href="/p/${c.id}?design=1&edit=1&key=${c.editKey}" target="_blank" title="Открыть конструктор подборки — редактируемый арт-документ, из него «Скачать PDF»">${ic(I.edit || I.doc)}Открыть</a>
-              <button class="btn btn-sm" data-act="compose" title="Изменить объекты и юниты подборки">${ic(I.grid)}Состав</button>
-              <button class="btn btn-sm" data-act="share" title="Поделиться">${ic(I.send)}Поделиться</button>
-              <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть классический вид">${ic(I.eye)}</a>
-              <span class="tb-spacer"></span>
-              <button class="btn-ghost" data-act="del" title="Удалить">${ic(I.x)}</button>
-            </div>
-          </div>
-        </div>`; }).join('') || '<div class="glass card empty es-art es-coll"><span class="es-art-img"></span><span class="es-art-tx">Подборок нет — соберите первую слева</span></div>'}
-      </div>
-    </div>`;
-  $$('[data-cfopen]', root).forEach(f => f.addEventListener('click', (e) => {
-    if (e.target.closest('[data-cfdel2]')) return;
-    PAGE_STATE.collFolder = f.dataset.cfopen; render();
-  }));
-  $('#cfNew').addEventListener('click', () => modal({
-    title: 'Новая папка подборок', body: '<div class="form-row"><label>Название</label><input id="cfName" placeholder="Например: Горячие / Инвесторы / Сентябрь"></div>',
-    actions: [{ label: 'Создать', cls: 'btn-accent', onClick: async (bd) => { await api.post('/folders', { name: $('#cfName', bd).value, kind: 'coll' }); render(); } }, { label: 'Отмена' }],
-  }));
-  $$('[data-cfdel2]', root).forEach(b => b.addEventListener('click', async () => { await fetch('/api/folders/' + b.dataset.cfdel2, { method: 'DELETE' }); render(); }));
-  wireShelfDrag(root, '[data-dragcoll]', async (itemId, folderId) => { await api.patch('/collections/' + itemId, { folderId }); render(); });
-  COLL_FOLDERS = cFolders; COLL_KEY = Object.fromEntries(cols0.map(c => [c.id, c.editKey]));
-  wireCollSelect(root);
-  $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
-  const dsT = $('#clDsToggle'); if (dsT) dsT.addEventListener('click', () => { PAGE_STATE.collDsOpen = !PAGE_STATE.collDsOpen; dsT.closest('.ds-fold').classList.toggle('open', PAGE_STATE.collDsOpen); });
-  /* выбор юнитов: раскрытие списка + живой счётчик «N из M» */
-  const updUSum = (box) => { const all = $$('.cl-unit input', box); const n = all.filter(x => x.checked).length; const sum = $('.cl-usum', box); if (sum) sum.textContent = (n === all.length ? 'все ' + all.length : n + ' из ' + all.length); };
-  $$('.cl-units', root).forEach(box => {
-    const tg = $('.cl-units-tg', box), list = $('.cl-units-list', box);
-    tg?.addEventListener('click', () => { list.hidden = !list.hidden; box.classList.toggle('open', !list.hidden); });
-    $$('.cl-ub', box).forEach(b => b.addEventListener('click', () => { const on = b.dataset.usel === 'all'; $$('.cl-unit input', box).forEach(ch => { ch.checked = on && !ch.closest('.cl-unit').classList.contains('sold'); }); updUSum(box); }));
-    $$('.cl-unit input', box).forEach(ch => ch.addEventListener('change', () => updUSum(box)));
-    updUSum(box);
+/* Создание клиентской подборки — модалка выбора объектов + пресета → новый редактор /pres/:id */
+async function openCollectionCreate(preselectIds) {
+  let props = [];
+  try { const p = await api.get('/properties'); props = Array.isArray(p) ? p : (p.items || p.properties || []); } catch (e) {}
+  if (props.length < 2) { toast('Нужно ≥2 объекта', 'Добавьте объекты в «Объектах»'); return; }
+  const sel = new Set(preselectIds || []);
+  let selPreset = 'gallerywhite';
+  const PRESETS_UI = [
+    { id: 'gallerywhite', name: 'Gallery White', sw: ['#FFFFFF', '#3155E7', '#151515'] },
+    { id: 'graphite', name: 'Urban Graphite', sw: ['#FFFFFF', '#24282C', '#59636A'] },
+    { id: 'terracotta', name: 'Terracotta Atelier', sw: ['#FBF7F2', '#A6533D', '#392D28'] },
+  ];
+  const presetBtns = PRESETS_UI.map(p => '<button class="btn coll-preset" data-preset="' + p.id + '" style="flex:1;min-width:140px;justify-content:flex-start;gap:8px' + (p.id === selPreset ? ';background:var(--accent-weak,rgba(120,110,90,.12));border-color:var(--accent,#8a6d3b);font-weight:600' : '') + '"><span style="display:inline-flex;gap:2px">' + p.sw.map(c => '<i style="width:11px;height:14px;border-radius:2px;background:' + c + ';border:1px solid rgba(0,0,0,.12);display:inline-block"></i>').join('') + '</span>' + esc(p.name) + '</button>').join('');
+  modal({
+    title: 'Новая подборка', sub: 'Отметьте 2+ объекта, выберите оформление, задайте клиента', wide: true,
+    body: '<div style="display:flex;flex-direction:column;gap:10px">' +
+      '<input id="collTitle" class="inp" placeholder="Название подборки (напр. «Пхукет у моря»)" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px">' +
+      '<input id="collClient" class="inp" placeholder="Имя клиента (необязательно)" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px">' +
+      '<div class="muted" style="font-size:12px;margin-top:2px">Оформление (пресет):</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' + presetBtns + '</div>' +
+      '<div class="muted" style="font-size:12px;margin-top:2px">Объекты подборки (отметьте):</div>' +
+      '<div id="collPick" style="display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto">' +
+      props.slice(0, 80).map(p => '<button class="btn coll-pick" data-pp="' + esc(p.id) + '" style="justify-content:flex-start' + (sel.has(p.id) ? ';background:var(--accent-weak,rgba(120,110,90,.12));border-color:var(--accent,#8a6d3b);font-weight:600' : '') + '">' + ic(I.building) + esc(p.name || p.id) + '</button>').join('') +
+      '</div><button class="btn btn-accent" id="collCreate" style="margin-top:4px">' + ic(I.plus) + 'Создать и открыть редактор</button></div>',
+    actions: [{ label: 'Отмена' }],
   });
-  const collectUnitSel = (ids) => { const sel = {}; $$('.cl-units', root).forEach(box => { const pid = box.dataset.ppid; if (!ids.includes(pid)) return; const all = $$('.cl-unit input', box); const checked = all.filter(x => x.checked); if (checked.length && checked.length < all.length) sel[pid] = checked.map(x => +x.dataset.uidx); }); return sel; };
-  const uLblC = u => `${esc(u.type || u.plan || 'Юнит')}${u.area ? ' · ' + esc(String(u.area).replace(/\s*(m²|м²|m2|sqm|кв\.?\s*м)\s*$/i, '')) + ' м²' : ''}${u.floor ? ' · эт.' + esc(String(u.floor)) : ''}${u.price ? ' · ' + (u.currency === 'EUR' ? '€' : u.currency === 'THB' ? '฿' : '$') + esc(String(u.price)) : ''}${u.status === 'sold' ? ' · продан' : ''}`;
-  function openComposeModal(col, allProps) {
-    if (!col) return;
-    const selIds = col.propertyIds || []; const uSel = col.unitSel || {};
-    const ordered = [...allProps].sort((a, b) => (selIds.includes(b.id) ? 1 : 0) - (selIds.includes(a.id) ? 1 : 0));
-    const body = `<div class="cl-props" style="max-height:52vh">${ordered.map(pr => { const us = (pr.units || []).filter(Boolean); const psel = uSel[pr.id]; const inCol = selIds.includes(pr.id); return `<div class="cl-prow">
-      <label class="cl-prop"><input type="checkbox" value="${pr.id}" ${inCol ? 'checked' : ''}><span class="cl-chk"></span><span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area || '')} · ${esc(pr.type || '')}</span></span></label>
-      ${us.length ? `<div class="cl-units ${inCol ? 'open' : ''}" data-ppid="${pr.id}"><button type="button" class="cl-units-tg">${ic(I.grid)}юниты: <b class="cl-usum"></b><span class="cl-ucar">${ic(I.chev)}</span></button><button type="button" class="cl-ub" data-usel="all">Все</button><button type="button" class="cl-ub" data-usel="none">Снять</button>
-        <div class="cl-units-list" ${inCol ? '' : 'hidden'}>${us.map((u, i) => `<label class="cl-unit ${u.status === 'sold' ? 'sold' : ''}"><input type="checkbox" data-uidx="${i}" ${(psel ? psel.includes(i) : (u.status !== 'sold')) ? 'checked' : ''}><span>${uLblC(u)}</span></label>`).join('')}</div></div>` : ''}
-    </div>`; }).join('')}</div>`;
-    const md = modal({ title: 'Состав подборки', sub: 'объекты и юниты, которые войдут в документ', wide: true, body, actions: [
-      { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
-        const ids = $$('.cl-prop input:checked', bd).map(x => x.value);
-        if (!ids.length) { toast('Отметьте хотя бы один объект'); return false; }
-        const sel = {}; $$('.cl-units', bd).forEach(box => { const pid = box.dataset.ppid; if (!ids.includes(pid)) return; const all = $$('.cl-unit input', box); const ch = all.filter(x => x.checked); if (ch.length && ch.length < all.length) sel[pid] = ch.map(x => +x.dataset.uidx); });
-        await api.patch('/collections/' + col.id, { propertyIds: ids, unitSel: sel });
-        toast('Состав обновлён', null, true); render();
-      } },
-      { label: 'Отмена' },
-    ] });
-    $$('.cl-units', md).forEach(box => { const tg = $('.cl-units-tg', box), list = $('.cl-units-list', box);
-      const upd = () => { const all = $$('.cl-unit input', box); const n = all.filter(x => x.checked).length; const s = $('.cl-usum', box); if (s) s.textContent = (n === all.length ? 'все ' + all.length : n + ' из ' + all.length); };
-      tg?.addEventListener('click', () => { list.hidden = !list.hidden; box.classList.toggle('open', !list.hidden); });
-      $$('.cl-ub', box).forEach(b => b.addEventListener('click', () => { const on = b.dataset.usel === 'all'; $$('.cl-unit input', box).forEach(ch => { ch.checked = on && !ch.closest('.cl-unit').classList.contains('sold'); }); upd(); }));
-      $$('.cl-unit input', box).forEach(ch => ch.addEventListener('change', upd)); upd();
+  setTimeout(() => {
+    $$('.coll-pick').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.pp;
+      if (sel.has(id)) { sel.delete(id); b.style.background = ''; b.style.borderColor = ''; b.style.fontWeight = ''; }
+      else { sel.add(id); b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600'; }
+    }));
+    $$('.coll-preset').forEach(b => b.addEventListener('click', () => {
+      selPreset = b.dataset.preset;
+      $$('.coll-preset').forEach(x => { x.style.background = ''; x.style.borderColor = ''; x.style.fontWeight = ''; });
+      b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600';
+    }));
+    $('#collCreate')?.addEventListener('click', async () => {
+      const ids = [...sel];
+      if (ids.length < 2) { toast('Отметьте ≥2 объекта'); return; }
+      try {
+        const r = await api.post('/presentations/collection', { projectIds: ids, title: ($('#collTitle') || {}).value || '', clientName: ($('#collClient') || {}).value || '', presetId: selPreset, comparison: true });
+        if (r && r.id) { closeModal(); location.href = '/pres/' + r.id; }
+        else toast('Не вышло', (r && r.error) || '');
+      } catch (e) { toast('Не вышло', e.message); }
     });
-  }
-  $('#clCreate').addEventListener('click', async () => {
-    const ids = $$('.cl-prop input:checked', root).map(x => x.value);
-    if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
-    const premium = !!($('#clPremium', root) && $('#clPremium', root).checked);
-    const design = dsCollect('clDs'); if (premium) design.auto = true;
-    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids, unitSel: collectUnitSel(ids), design });
-    toast('Подборка собрана', premium ? 'премиум арт-документ — откройте «Арт-PDF»' : null, true);
-    render();
-  });
-  $$('[data-cl]', root).forEach(card => card.addEventListener('click', async (e) => {
-    const act = e.target.closest('[data-act]');
-    if (!act) return;
-    const id = card.dataset.cl;
-    if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
-    if (act.dataset.act === 'share') { openShareModal(id, card.dataset.cllead, card.dataset.title); return; }
-    if (act.dataset.act === 'design') { openDesignModal(id, card.dataset.title); return; }
-    if (act.dataset.act === 'compose') { openComposeModal(cols0.find(x => x.id === id), props); return; }
-    if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
-    if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
-    if (act.dataset.act === 'ren' && !act.dataset.editing) {
-      act.dataset.editing = '1';
-      const cur = act.childNodes[0].textContent;
-      act.innerHTML = '<input class="nm-edit">';
-      const inp = act.querySelector('input');
-      inp.value = cur;
-      inp.focus(); inp.select();
-      inp.addEventListener('pointerdown', ev => ev.stopPropagation()); /* не дёргать drag карточки */
-      let done0 = false;
-      const done = async (saveIt) => {
-        if (done0) return; done0 = true;
-        const v = inp.value.trim();
-        if (saveIt && v && v !== cur) await api.patch('/collections/' + id, { title: v });
-        render();
-      };
-      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); });
-      inp.addEventListener('blur', () => done(true));
-    }
+  }, 40);
+}
+
+PAGES.collections = async (root) => {
+  /* Чистый каталог «Подборки клиентов» (ТЗ v3 §2/§8): без баннера и постоянной формы — таблица + «Создать подборку» */
+  const [presD, oldCols, leads] = await Promise.all([
+    api.get('/presentations').catch(() => ({ items: [] })),
+    api.get('/collections').catch(() => []),
+    api.get('/leads').catch(() => []),
+  ]);
+  const leadName = id => (leads.find(l => l.id === id) || {}).name || '';
+  const newColls = (presD.items || []).filter(x => x.kind === 'collection' && x.status !== 'archived');
+  const items = newColls.map(x => ({ id: x.id, kind: 'new', title: x.title || 'Подборка', client: x.clientName || leadName(x.clientId) || '', objects: x.objectCount || (x.projectIds || []).length, status: x.status, updatedAt: x.updatedAt, hasPublic: x.hasPublic }))
+    .concat((oldCols || []).filter(c => c.status !== 'archived').map(c => ({ id: c.id, kind: 'old', title: c.title || 'Подборка', client: leadName(c.leadId), objects: (c.propertyIds || []).length, status: c.status, updatedAt: c.updatedAt, legacy: true })));
+  items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const STLAB = { draft: 'Черновик', ready: 'Готово', published: 'Опубликовано' };
+  const rows = items.map(x => {
+    const acts = x.kind === 'new'
+      ? '<a class="btn btn-sm btn-accent" href="/pres/' + x.id + '">Редактировать</a><button class="btn btn-sm" data-ccpdf="' + x.id + '">PDF</button><button class="btn btn-sm" data-ccpub="' + x.id + '">Поделиться</button>'
+      : '<a class="btn btn-sm" href="/p/' + x.id + '" target="_blank">Открыть</a>';
+    const dt = x.updatedAt ? new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
+    return '<tr><td class="cc-nm"><b>' + esc(x.title) + '</b>' + (x.legacy ? '<span class="cc-leg">старая</span>' : '') + '</td>' +
+      '<td>' + (x.client ? esc(x.client) : '<span class="muted">Общая</span>') + '</td>' +
+      '<td>' + x.objects + ' об.</td>' +
+      '<td><span class="cc-st st-' + (x.status || 'draft') + '">' + (STLAB[x.status] || 'Черновик') + '</span></td>' +
+      '<td class="muted" style="font-size:12px">' + esc(dt) + '</td>' +
+      '<td class="cc-acts">' + acts + '</td></tr>';
+  }).join('');
+  root.innerHTML =
+    '<div class="cc-top"><div><h1 class="plo-h1" style="font-size:27px;font-weight:600;margin:0 0 3px">Подборки клиентов</h1>' +
+    '<div class="muted" style="font-size:13px">Несколько объектов под запрос клиента — один документ, PDF и ссылка. Готовые презентации объектов переиспользуются.</div></div>' +
+    '<button class="btn btn-accent" id="ccNew">' + ic(I.plus) + 'Создать подборку</button></div>' +
+    (items.length
+      ? '<table class="cc-table"><thead><tr><th>Название</th><th>Клиент</th><th>Объекты</th><th>Статус</th><th>Изменено</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+      : '<div class="cc-empty">Пока нет подборок. Нажмите «Создать подборку» или выделите объекты в «Объектах» → «Собрать подборку».</div>');
+  $('#ccNew', root)?.addEventListener('click', () => openCollectionCreate());
+  $$('[data-ccpdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ccpdf + '/print?format=portrait_a4', '_blank')));
+  $$('[data-ccpub]', root).forEach(b => b.addEventListener('click', async () => {
+    try { const r = await api.post('/presentations/' + b.dataset.ccpub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); }
   }));
 };
-
-
-/* ---------------- РЕАНИМАЦИЯ ---------------- */
 PAGES.wake = async (root) => {
   const [preview, campaigns] = await Promise.all([api.get('/wake/preview'), api.get('/campaigns')]);
   PAGE_STATE.wakePreview = preview;
