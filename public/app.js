@@ -4360,7 +4360,16 @@ async function loadSeats() {
     </div>
     ${findings ? `<div class="seat-finds">${findings}</div>` : '<div class="seat-clean">' + ic(I.check) + 'Подозрительной активности не обнаружено. Каждый вход — с ожидаемого места.</div>'}
     ${active ? `<div class="seat-sub-t">Кто в системе сейчас</div><div class="seat-list">${active}</div>` : ''}
+    <div class="seat-dev">
+      <div class="seat-dev-l"><b>${ic(I.shield)}Устройств у администратора</b><span>Сколько своих устройств админ может держать онлайн одновременно (ПК + ноутбук = 2). Входы в пределах не считаются нарушением.</span></div>
+      <div class="seat-dev-ctrl">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="seat-dev-b ${n === (d.ownerMaxDevices || 1) ? 'on' : ''}" data-ownerdev="${n}">${n}</button>`).join('')}</div>
+    </div>
     <div class="seat-note">Сигнал не блокирует вход автоматически — это подсказка владельцу. Массовый вход разных сотрудников с одного IP/устройства обычно означает передачу одного доступа на несколько человек в обход подписки.</div>`;
+  $$('[data-ownerdev]', box).forEach(b => b.addEventListener('click', async (e) => {
+    const n = +e.currentTarget.dataset.ownerdev;
+    try { await api.patch('/settings', { auth: { ownerMaxDevices: n } }); toast('Сохранено', 'Админу разрешено устройств: ' + n, true); loadSeats(); }
+    catch (err) { toast('Не сохранилось', err.message); }
+  }));
 }
 /* ⭐ Мозаичная упаковка виджетов Обзора (masonry): измеряем натуральную высоту каждого виджета
    и задаём grid-row span на мелкой сетке строк → виджеты «заклиниваются» без пустот, сохраняя ширины (spans).
@@ -7577,18 +7586,22 @@ PAGES.waProfile = async (root) => {
       try { const t = await api.get('/tgbridge'); const bot = t.centralBot, code = t.me && t.me.code, bound = t.me && t.me.bound;
         if (!bot) { box.innerHTML = 'Telegram-бот пока не настроен платформой — обратись к руководителю.'; return; }
         if (bound) {
-          /* ПОДКЛЮЧЕНО: даём отвязать (и перепривязать на другой аккаунт) прямо здесь */
+          /* ПОДКЛЮЧЕНО: можно добавить ещё свои аккаунты, отвязать всё, сбросить код */
+          const nAcc = ((t.me && t.me.accounts) || []).length || 1;
+          const addLink = (bot && code) ? ('https://t.me/' + bot + '?start=' + encodeURIComponent(code)) : '';
           box.innerHTML = `<div style="display:flex;flex-direction:column;gap:9px">
-            <div><span class="badge ok">подключено ✓</span> приложение привязано к твоему Telegram.</div>
-            <div class="muted" style="font-size:11.5px">Чтобы перепривязать на <b>другой</b> Telegram-аккаунт — сначала отвяжи здесь, потом открой бота и подключись уже с нужного аккаунта.</div>
+            <div><span class="badge ok">подключено ✓</span> ${nAcc > 1 ? `твой Telegram привязан на <b>${nAcc} аккаунтах</b> — клиенты приходят на все.` : 'приложение привязано к твоему Telegram.'}</div>
+            <div class="muted" style="font-size:11.5px">Можно подключить <b>несколько своих</b> Telegram-аккаунтов (например, рабочий и личный) — сообщения клиентов придут на все, reply с любого уходит клиенту. Чтобы добавить ещё: открой бота <b>с другого аккаунта</b> и отправь <code class="pill" style="padding:2px 7px;cursor:pointer" id="myTgCode2">/start ${esc(code || '')}</code> — отвязывать не нужно.</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-sm" id="myTgUnbind" style="align-self:flex-start">${ic(I.x || I.link)}Отвязать</button>
-              <button class="btn btn-sm" id="myTgUnbindRot" title="Отвязать и выдать НОВЫЙ код — старый аккаунт/ссылка больше не подключатся" style="align-self:flex-start">${ic(I.refresh || I.spark)}Отвязать и сбросить код</button>
+              ${addLink ? `<a class="btn btn-sm btn-accent" href="${addLink}" target="_blank" style="align-self:flex-start">${ic(I.send)}Добавить ещё аккаунт</a>` : ''}
+              <button class="btn btn-sm" id="myTgUnbind" style="align-self:flex-start">${ic(I.x || I.link)}Отвязать всё</button>
+              <button class="btn btn-sm" id="myTgUnbindRot" title="Отвязать все аккаунты и выдать НОВЫЙ код — старые ссылки/аккаунты больше не подключатся" style="align-self:flex-start">${ic(I.refresh || I.spark)}Отвязать и сбросить код</button>
             </div>
           </div>`;
+          $('#myTgCode2', box)?.addEventListener('click', function () { navigator.clipboard.writeText('/start ' + (code || '')); toast('Скопировано', 'Отправь боту с другого своего аккаунта', true); });
           const doUnbind = async (rotate) => {
-            if (!await uiConfirm(rotate ? 'Отвязать и сбросить код?' : 'Отвязать Telegram?', rotate ? 'Текущий Telegram отключится, выдадим новый код. Старая ссылка/аккаунт больше не подключатся.' : 'Текущий Telegram отключится. Сможешь подключиться заново — тем же кодом с любого аккаунта.', { ok: 'Отвязать', danger: true })) return;
-            try { await api.post('/tgbridge/unbind', rotate ? { rotate: true } : {}); toast('Отвязано', rotate ? 'Код обновлён — подключись заново' : 'Подключись заново с нужного аккаунта', true); paintTg(); }
+            if (!await uiConfirm(rotate ? 'Отвязать всё и сбросить код?' : 'Отвязать все Telegram-аккаунты?', rotate ? 'Все твои привязанные аккаунты отключатся, выдадим новый код. Старые ссылки больше не подключатся.' : 'Все твои привязанные аккаунты отключатся. Сможешь подключиться заново — тем же кодом с нужных аккаунтов.', { ok: 'Отвязать', danger: true })) return;
+            try { await api.post('/tgbridge/unbind', rotate ? { rotate: true } : {}); toast('Отвязано', rotate ? 'Код обновлён — подключись заново' : 'Подключись заново с нужных аккаунтов', true); paintTg(); }
             catch (e) { toast('Не вышло', e.message); }
           };
           $('#myTgUnbind', box)?.addEventListener('click', () => doUnbind(false));

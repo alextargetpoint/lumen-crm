@@ -45,6 +45,27 @@ function cfg(db) { return db.settings.tgBridge || {}; }
 function token(db) { return platformToken() || cfg(db).botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken) || ''; }
 function ready(db) { return central() ? true : !!(cfg(db).enabled && token(db)); }
 
+/* ---------- НЕСКОЛЬКО Telegram-аккаунтов у одного брокера ----------
+   broker.tgChatIds — массив chatId (может быть несколько своих аккаунтов/устройств). broker.tgChatId
+   держим как ПЕРВИЧНЫЙ (последний привязанный) для обратной совместимости старых чтений в index.js. */
+function brokerChatIds(b) {
+  if (!b) return [];
+  if (Array.isArray(b.tgChatIds) && b.tgChatIds.length) return b.tgChatIds.map(String);
+  return b.tgChatId ? [String(b.tgChatId)] : [];
+}
+function addBrokerChat(b, chatId) {
+  chatId = String(chatId);
+  const ids = brokerChatIds(b);
+  if (!ids.includes(chatId)) ids.push(chatId);
+  b.tgChatIds = ids;
+  b.tgChatId = chatId;   /* первичный = последний привязанный */
+}
+function removeBrokerChat(b, chatId) {
+  const ids = brokerChatIds(b).filter(x => x !== String(chatId));
+  b.tgChatIds = ids;
+  b.tgChatId = ids[0] || null;
+}
+
 function rt(db) {
   if (!db.tgBridge) db.tgBridge = {};
   if (!db.tgBridge.replyMap) db.tgBridge.replyMap = {};
@@ -133,16 +154,18 @@ function bindBroker(db, chatId, code) {
   if (!c) return { ok: false };
   const broker = db.brokers.find(b => String(b.tgBindCode || '').toLowerCase() === c);
   if (!broker) return { ok: false };
-  db.brokers.forEach(b => { if (b.tgChatId === chatId && b.id !== broker.id) b.tgChatId = null; });
-  broker.tgChatId = chatId;
+  /* этот chatId не может принадлежать двум брокерам — убираем его у других */
+  db.brokers.forEach(b => { if (b.id !== broker.id) removeBrokerChat(b, chatId); });
+  const already = brokerChatIds(broker).includes(String(chatId));
+  addBrokerChat(broker, chatId);   /* ДОБАВляем (не заменяем) — у брокера может быть несколько своих аккаунтов */
   store.save();
-  return { ok: true, broker };
+  return { ok: true, broker, already, count: brokerChatIds(broker).length };
 }
 
 /* какому лиду адресован ответ брокера: reply на пересланное сообщение → точный лид,
    иначе — последний «активный» лид этого брокера */
-function resolveLead(db, broker, msg) {
-  const chatId = broker.tgChatId;
+function resolveLead(db, broker, msg, chatId) {
+  chatId = String(chatId || broker.tgChatId);   /* ответ пришёл с конкретного аккаунта — его chatId */
   const rep = msg.reply_to_message;
   if (rep) {
     const e = rt(db).replyMap[`${chatId}:${rep.message_id}`];
@@ -172,19 +195,21 @@ async function handleUpdate(db, update) {
     await safeApi(db, 'sendMessage', {
       chat_id: chatId,
       text: r.ok
-        ? `✅ Привязано: ${r.broker.name}.\nТеперь отвечайте reply на сообщения клиентов — они уйдут клиенту в WhatsApp от вашего имени.`
+        ? (r.already
+          ? `✅ Этот аккаунт уже привязан: ${r.broker.name}. Всё работает.`
+          : `✅ Привязано: ${r.broker.name}.${r.count > 1 ? `\n(Ваших Telegram-аккаунтов подключено: ${r.count} — сообщения клиентов приходят на все.)` : ''}\nТеперь отвечайте reply на сообщения клиентов — они уйдут клиенту в WhatsApp от вашего имени.`)
         : '❌ Код не найден. Возьмите свой код в CRM → Подключения → Мост Telegram.',
     });
     return { bound: r.ok };
   }
 
-  const broker = db.brokers.find(b => b.tgChatId === chatId);
+  const broker = db.brokers.find(b => brokerChatIds(b).includes(chatId));
   if (!broker) {
     await safeApi(db, 'sendMessage', { chat_id: chatId, text: 'Вы не привязаны к CRM. Отправьте /start <код> (код в CRM → Подключения → Мост Telegram).' });
     return { skip: 'unbound' };
   }
 
-  const lead = resolveLead(db, broker, msg);
+  const lead = resolveLead(db, broker, msg, chatId);
   if (!lead) {
     await safeApi(db, 'sendMessage', { chat_id: chatId, text: '↩️ Ответьте reply на сообщение клиента, чтобы я знал, кому переслать.' });
     return { skip: 'no lead' };
@@ -218,11 +243,12 @@ async function handleUpdate(db, update) {
 function routeChat(db, lead) {
   if (lead && lead.broker) {
     const b = (db.brokers || []).find(x => x.id === lead.broker);
-    if (b && b.tgChatId) return { chatId: b.tgChatId, broker: b, toFounder: false };
-    if (b && !b.tgChatId) return null;   /* брокер назначен, но не привязал TG — его дело подключить; фаундеру не дублируем */
+    const ids = brokerChatIds(b);
+    if (b && ids.length) return { chatIds: ids, broker: b, toFounder: false };
+    if (b && !ids.length) return null;   /* брокер назначен, но не привязал TG — его дело подключить; фаундеру не дублируем */
   }
   const owner = db.settings && db.settings.ownerTgChatId;
-  if (owner) return { chatId: owner, broker: null, toFounder: true };
+  if (owner) return { chatIds: [String(owner)], broker: null, toFounder: true };
   return null;
 }
 
@@ -238,25 +264,27 @@ async function forwardInbound(db, lead, m) {
   if (!ready(db) || !lead) return;
   const route = routeChat(db, lead);
   if (!route) return;                                   /* некому зеркалить (нет TG ни у брокера, ни у фаундера) */
-  const { chatId, broker, toFounder } = route;
+  const { chatIds, broker, toFounder } = route;
   const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const first = (lead.name || '').split(' ')[0] || lead.name || 'Клиент';
   const aiOn = lead.ai && lead.ai.enabled;
   const who = toFounder ? `${esc(first)} · ${esc(lead.phone || '')}${lead.broker ? '' : ' · пул'}` : esc(first);
   const foot = aiOn ? '🤖 отвечает ассистент · reply — перехватить' : 'reply — ответить клиенту';
-  let sent;
-  try {
-    if (m.media && m.media.url) {
-      /* медиа: подпись без HTML (sendMedia не ставит parse_mode) */
-      const capPlain = `💬 ${first}\n${m.text || ''}\n${aiOn ? '🤖 отвечает ассистент · reply — перехватить' : 'reply — ответить'}`.trim();
-      sent = await sendMediaToBroker(db, chatId, m.media, capPlain);
-    } else {
-      const capHtml = `💬 <b>${who}</b>\n${esc(m.text || '')}\n<i>${foot}</i>`.trim();
-      sent = await api(db, 'sendMessage', { chat_id: chatId, text: capHtml, parse_mode: 'HTML' });
-    }
-  } catch (e) { console.error('[tgbridge] forwardInbound', e.message); return; }
-  const mid = sent && sent.result && sent.result.message_id;
-  if (mid) { rt(db).replyMap[`${chatId}:${mid}`] = { leadId: lead.id, at: Date.now() }; pruneMap(db); }
+  for (const chatId of chatIds) {                        /* на ВСЕ привязанные аккаунты брокера */
+    let sent;
+    try {
+      if (m.media && m.media.url) {
+        const capPlain = `💬 ${first}\n${m.text || ''}\n${aiOn ? '🤖 отвечает ассистент · reply — перехватить' : 'reply — ответить'}`.trim();
+        sent = await sendMediaToBroker(db, chatId, m.media, capPlain);
+      } else {
+        const capHtml = `💬 <b>${who}</b>\n${esc(m.text || '')}\n<i>${foot}</i>`.trim();
+        sent = await api(db, 'sendMessage', { chat_id: chatId, text: capHtml, parse_mode: 'HTML' });
+      }
+    } catch (e) { console.error('[tgbridge] forwardInbound', chatId, e.message); continue; }
+    const mid = sent && sent.result && sent.result.message_id;
+    if (mid) { rt(db).replyMap[`${chatId}:${mid}`] = { leadId: lead.id, at: Date.now() }; }
+  }
+  pruneMap(db);
   if (broker) broker.tgActiveLeadId = lead.id;
   store.save();
 }
@@ -266,24 +294,31 @@ async function forwardAiReply(db, lead, m) {
   if (!ready(db) || !lead || !m || !m.text) return;
   const route = routeChat(db, lead);
   if (!route) return;
-  const { chatId, broker } = route;
+  const { chatIds } = route;
   const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const first = (lead.name || '').split(' ')[0] || 'клиенту';
   const txt = `🤖 <b>Ассистент</b> → ${esc(first)}\n${esc(m.text)}`;
-  try {
-    const sent = await api(db, 'sendMessage', { chat_id: chatId, text: txt, parse_mode: 'HTML' });
-    if (sent && sent.result) { rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId: lead.id, at: Date.now() }; pruneMap(db); }
-  } catch (e) { console.error('[tgbridge] forwardAiReply', e.message); }
+  for (const chatId of chatIds) {
+    try {
+      const sent = await api(db, 'sendMessage', { chat_id: chatId, text: txt, parse_mode: 'HTML' });
+      if (sent && sent.result) { rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId: lead.id, at: Date.now() }; }
+    } catch (e) { console.error('[tgbridge] forwardAiReply', chatId, e.message); }
+  }
+  pruneMap(db);
 }
 
 /* передача лида брокеру → короткий бриф в его Telegram */
 async function forwardHandover(db, lead) {
   if (!ready(db) || !lead || !lead.broker) return;
   const broker = db.brokers.find(b => b.id === lead.broker);
-  if (!broker || !broker.tgChatId) return;
+  const ids = brokerChatIds(broker);
+  if (!broker || !ids.length) return;
   const txt = `🤝 Новый лид вам: ${lead.name}\n\n${lead.summary || ''}\n\nОтвечайте reply на сообщения этого клиента — уйдёт клиенту в WhatsApp от вашего имени.`.trim();
-  try { const sent = await api(db, 'sendMessage', { chat_id: broker.tgChatId, text: txt }); if (sent.result) { rt(db).replyMap[`${broker.tgChatId}:${sent.result.message_id}`] = { leadId: lead.id, at: Date.now() }; pruneMap(db); } }
-  catch (e) { console.error('[tgbridge] forwardHandover', e.message); return; }
+  for (const chatId of ids) {
+    try { const sent = await api(db, 'sendMessage', { chat_id: chatId, text: txt }); if (sent.result) { rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId: lead.id, at: Date.now() }; } }
+    catch (e) { console.error('[tgbridge] forwardHandover', chatId, e.message); }
+  }
+  pruneMap(db);
   broker.tgActiveLeadId = lead.id;
   store.save();
 }
@@ -349,4 +384,5 @@ module.exports = {
   ready, cfg, token, handleUpdate, forwardInbound, forwardAiReply, forwardHandover, bindBroker,
   setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl, notify,
   central, platformSecret, setupPlatformWebhook, platformBotUsername, webhookInfo,
+  brokerChatIds, addBrokerChat, removeBrokerChat,
 };

@@ -1220,7 +1220,8 @@ function seatAudit(db) {
     if (!findings.some(f => f.kind === 'ip_multi' && f.ip === ip)) findings.push({ kind: 'dev_shared', severity: 'med', ip, fp, who: [...set].map(brokerName), text: `За неделю с одного устройства (${fp}) заходили ${set.size} аккаунта` });
   }
   const seats = Object.values(byWho).length;
-  return { active, findings, seats, brokersTotal: db.brokers.filter(b => b.active !== false).length, generatedAt: now };
+  const ownerMaxDevices = Math.max(1, +((db.settings.auth && db.settings.auth.ownerMaxDevices) || 1));
+  return { active, findings, seats, brokersTotal: db.brokers.filter(b => b.active !== false).length, ownerMaxDevices, generatedAt: now };
 }
 /* роль сессии: owner (пароль агентства) | broker (личный PIN).
    previewAs: владелец может смотреть кабинет брокера — читаем как брокер, но помним, что реально owner. */
@@ -4348,14 +4349,14 @@ function tgValidateInitData(initData, botToken) {
 function tgAppBroker(req, db) {
   const user = tgValidateInitData(req.headers['x-tg-init-data'] || '', tgbridge.token(db));
   if (!user || !user.id) return null;
-  return db.brokers.find(b => String(b.tgChatId) === String(user.id) && b.active !== false) || null;
+  return db.brokers.find(b => tgbridge.brokerChatIds(b).includes(String(user.id)) && b.active !== false) || null;
 }
 /* роль пользователя мини-аппа: брокер (по tgChatId) ИЛИ основатель (по settings.ownerTgChatId).
    Брокерская резолюция идентична tgAppBroker — существующий путь не меняется. */
 function tgAppUser(req, db) {
   const user = tgValidateInitData(req.headers['x-tg-init-data'] || '', tgbridge.token(db));
   if (!user || !user.id) return null;
-  const broker = db.brokers.find(b => String(b.tgChatId) === String(user.id) && b.active !== false);
+  const broker = db.brokers.find(b => tgbridge.brokerChatIds(b).includes(String(user.id)) && b.active !== false);
   if (broker) return { role: 'broker', broker };
   if (db.settings.ownerTgChatId && String(db.settings.ownerTgChatId) === String(user.id)) return { role: 'owner' };
   return null;
@@ -6115,7 +6116,7 @@ const server = http.createServer(async (req, res) => {
          и коды tgBindCode ЧУЖИХ брокеров (→ угон чужого канала). Полный вид — только владельцу. */
       if (_R.role === 'broker') {
         const me2 = (db.brokers || []).find(b => b.id === _R.brokerId) || {};
-        return json(res, 200, { central: tgbridge.central(), centralBot: _cbot, ready: tgbridge.ready(db), me: { name: me2.name || null, code: me2.tgBindCode || null, bound: !!me2.tgChatId } });
+        return json(res, 200, { central: tgbridge.central(), centralBot: _cbot, ready: tgbridge.ready(db), me: { name: me2.name || null, code: me2.tgBindCode || null, bound: tgbridge.brokerChatIds(me2).length > 0, accounts: tgbridge.brokerChatIds(me2) } });
       }
       return json(res, 200, {
         ownerTgCode: db.settings.ownerTgCode,
@@ -6125,7 +6126,7 @@ const server = http.createServer(async (req, res) => {
         tokenSet: !!(tb.botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken)),
         webhookUrl: base.replace(/\/$/, '') + '/tg/webhook',
         ready: tgbridge.ready(db),
-        brokers: db.brokers.filter(b => b.active !== false).map(b => ({ id: b.id, name: b.name, code: b.tgBindCode, bound: !!b.tgChatId })),
+        brokers: db.brokers.filter(b => b.active !== false).map(b => ({ id: b.id, name: b.name, code: b.tgBindCode, bound: tgbridge.brokerChatIds(b).length > 0, accounts: tgbridge.brokerChatIds(b).length })),
       });
     }
     if (p === '/api/tgbridge' && req.method === 'POST') {
@@ -6204,16 +6205,19 @@ const server = http.createServer(async (req, res) => {
       else if (R.role === 'owner' || R.role === 'master') broker = (db.brokers || []).find(x => x.id === b.brokerId);
       else return json(res, 403, { error: 'недоступно для вашей роли' });
       if (!broker) return json(res, 404, { error: 'брокер не найден' });
-      const oldChat = broker.tgChatId;
-      broker.tgChatId = null;
+      /* b.chatId → отвязать ТОЛЬКО этот аккаунт (у брокера их может быть несколько); иначе — все */
+      const one = b.chatId ? String(b.chatId) : null;
+      const toRemove = one ? [one] : tgbridge.brokerChatIds(broker);
+      if (one) tgbridge.removeBrokerChat(broker, one);
+      else { broker.tgChatIds = []; broker.tgChatId = null; }
       if (b.rotate) broker.tgBindCode = crypto.randomBytes(3).toString('hex');   /* новый код → старые ссылки/аккаунты больше не привяжутся */
       store.save();
-      if (oldChat) {
+      for (const oldChat of toRemove) {
         try { const reg = store.getRegistry(); if (reg.tgChatIndex && reg.tgChatIndex[oldChat]) { delete reg.tgChatIndex[oldChat]; store.saveRegistry(); } } catch (_) {}
         try { await tgbridge.notify(db, oldChat, '🔌 Этот Telegram отвязан от CRM. Чтобы подключиться снова — пришлите /start <код> из CRM → «Мои подключения».'); } catch (_) {}
       }
-      ai.pushEvent(db, { type: 'note', text: `Telegram отвязан у брокера ${broker.name}${b.rotate ? ' (код обновлён)' : ''}` });
-      return json(res, 200, { ok: true, code: broker.tgBindCode, bound: false });
+      ai.pushEvent(db, { type: 'note', text: `Telegram ${one ? 'аккаунт отвязан' : 'отвязан'} у брокера ${broker.name}${b.rotate ? ' (код обновлён)' : ''}` });
+      return json(res, 200, { ok: true, code: broker.tgBindCode, bound: tgbridge.brokerChatIds(broker).length > 0, accounts: tgbridge.brokerChatIds(broker).length });
     }
     if (p === '/api/tgbridge/regen-owner' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
@@ -6226,10 +6230,10 @@ const server = http.createServer(async (req, res) => {
     if ((tgm = p.match(/^\/api\/brokers\/([^/]+)\/tg-unbind$/)) && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const br = db.brokers.find(x => x.id === tgm[1]); if (!br) return json(res, 404, { error: 'not found' });
-      const oldChat = br.tgChatId;
-      br.tgChatId = null; br.tgActiveLeadId = null; store.save();
-      /* чистим индекс чата центрального бота + уведомляем старый Telegram (как в /api/tgbridge/unbind) */
-      if (oldChat) {
+      const oldChats = tgbridge.brokerChatIds(br);
+      br.tgChatIds = []; br.tgChatId = null; br.tgActiveLeadId = null; store.save();
+      /* чистим индекс чата центрального бота + уведомляем ВСЕ старые аккаунты (как в /api/tgbridge/unbind) */
+      for (const oldChat of oldChats) {
         try { const reg = store.getRegistry(); if (reg.tgChatIndex && reg.tgChatIndex[oldChat]) { delete reg.tgChatIndex[oldChat]; store.saveRegistry(); } } catch (_) {}
         try { await tgbridge.notify(db, oldChat, '🔌 Этот Telegram отвязан от CRM руководителем. Чтобы подключиться снова — пришлите /start <код> из CRM → «Мои подключения».'); } catch (_) {}
       }
@@ -9185,6 +9189,8 @@ const server = http.createServer(async (req, res) => {
       }
       const _replyDelayChanged = !!(b.ai && (b.ai.replyDelayMinSec != null || b.ai.replyDelayMaxSec != null));   /* сменили время ответа ИИ → пересчитать сроки висящих ответов */
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) Object.assign(db.settings[k], b[k]);   /* SEC/robustness: только plain-object, иначе Object.assign(obj,"строка") засоряет настройки числовыми ключами */
+      /* безопасность: сколько устройств/IP разрешено АДМИНУ (владельцу) одновременно — ПК+ноутбук=2 (аудит не флагит в пределах). Трогаем ТОЛЬКО это поле auth, не passHash/sessions. */
+      if (b.auth && typeof b.auth === 'object' && b.auth.ownerMaxDevices != null) { db.settings.auth = db.settings.auth || {}; db.settings.auth.ownerMaxDevices = Math.max(1, Math.min(5, Math.round(+b.auth.ownerMaxDevices) || 1)); }
       if (_replyDelayChanged) { try { const n = engine.rescheduleDueReplies(db); if (n) console.log('[reply-delay] пересчитано сроков ответа:', n); } catch (e) { console.error('[reschedule]', e && e.message); } }
       if (b.baseCurrency) db.settings.baseCurrency = String(b.baseCurrency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);   /* базовая валюта кабинета для показа «≈ в моей валюте» */
       /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */
