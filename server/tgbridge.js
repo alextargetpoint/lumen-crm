@@ -292,6 +292,11 @@ async function safeApi(db, method, body) { try { return await api(db, method, bo
 
 /* поставить вебхук у Telegram на наш /tg/webhook с секрет-токеном */
 async function setupWebhook(db, baseUrl) {
+  /* ⚠️ В CENTRAL-режиме у всех агентств ОДИН бот (token(db) === platformToken()). Ставить его вебхук
+     ПЕР-ТЕНАНТНЫМ секретом нельзя — это затрёт platformSecret, и апдейты посыплются в пер-тенантную
+     ветку → «❌ Код не найден» у ВСЕХ. Поэтому любой «перепривязать» в central-режиме ставит
+     ЦЕНТРАЛЬНЫЙ вебхук (platformSecret). (Был реальный баг на Trust Phuket.) */
+  if (central()) return setupPlatformWebhook(baseUrl);
   const url = baseUrl.replace(/\/$/, '') + '/tg/webhook';
   return api(db, 'setWebhook', {
     url,
