@@ -463,3 +463,20 @@ button{font-family:inherit;cursor:pointer}
 .pb-webadd:hover{background:#000}.pb-webadd svg{width:13px;height:13px}
 .pb-webnote{grid-column:1/-1;margin-top:10px;font-size:11.5px;color:var(--pe-mut);line-height:1.4}
 .pb-stub .pe-btn{margin-top:14px}
+
+/* ── Композиция/Стиль — инлайн-контролы (ТЗ §4/§5/§6) ─────────────────────── */
+.pe-typesel{width:100%;height:40px;border:1.5px solid var(--pe-line);border-radius:10px;background:#fff;padding:0 34px 0 12px;font-size:13.5px;font-weight:500;color:inherit;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.pe-covers{grid-template-columns:1fr 1fr}
+.pe-stylecards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pe-stylecard{position:relative;border:1.5px solid var(--pe-line);border-radius:10px;padding:9px 6px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px}
+.pe-stylecard.on{border-color:var(--pe-accent);box-shadow:inset 0 0 0 1px var(--pe-accent)}
+.pe-stylecard-sw{display:flex;gap:2px}
+.pe-stylecard-sw i{width:12px;height:17px;border-radius:2px;border:1px solid rgba(0,0,0,.08)}
+.pe-stylecard-nm{font-size:10.5px;font-weight:600;text-align:center;line-height:1.15}
+.pe-stylecard-ck{position:absolute;top:5px;right:5px;color:var(--pe-accent)}
+.pe-stylecard-ck svg{width:13px;height:13px}
+.pe-paldots{display:flex;gap:9px;flex-wrap:wrap}
+.pe-paldot{width:28px;height:28px;border-radius:50%;border:2px solid #fff;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,.12);padding:0}
+.pe-paldot.on{box-shadow:0 0 0 2px var(--pe-accent)}
+.pe-brandview{border:1px solid var(--pe-line);border-radius:10px;padding:10px 12px;background:var(--pe-hi)}
+.pe-brandname{font-size:14px;font-weight:600;margin-bottom:2px}

@@ -454,25 +454,46 @@
   /* ---------- COMPOSITION TAB ---------- */
   function compositionTab() {
     var s = curSection(); if (!s) return '';
-    var compatible = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits'];
-    var h = '<div class="pe-sec-label">Макет страницы</div><p class="hint" style="margin-bottom:12px">Переключение сохраняет содержание. Несопоставимые блоки остаются в черновике.</p>';
-    h += '<div class="pe-variants">' + compatible.map(function (f) {
-      return '<div class="pe-var' + (f === s.family ? ' on' : '') + '" data-act="setFamily" data-fam="' + f + '"><div class="pe-var-prev" data-varmini="' + f + '"></div><div class="pe-var-nm">' + esc(FAM_LABEL[f]) + '</div></div>';
-    }).join('') + '</div>';
-    if (s.family === 'editorial' || s.family === 'metrics' || s.family === 'benefits') {
-      h += '<div class="pe-hd">Параметры</div><div class="pe-switchrow"><span style="font-size:13px">Зеркально (фото / текст)</span><button class="pe-toggle' + (s.styleOverrides && s.styleOverrides.mirror ? ' on' : '') + '" data-act="mirror"></button></div>';
+    /* Тип страницы (ЧТО это за страница) — отдельно от макета (КАК разложены элементы) — ТЗ §4/§6 */
+    var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker'];
+    var h = '<div class="pe-sec-label">Тип страницы</div>' +
+      '<select class="pe-typesel" data-act="setType">' + types.map(function (f) {
+        return '<option value="' + f + '"' + (f === s.family ? ' selected' : '') + '>' + esc(FAM_LABEL[f] || f) + '</option>';
+      }).join('') + '</select>';
+    if (s.family === 'hero') {
+      var COVERS = [['bottom', 'Фото снизу'], ['right', 'Фото справа'], ['full', 'На весь лист'], ['text', 'Текстовая']];
+      var cur = s.coverLayout || defaultCover();
+      h += '<div class="pe-sec-label" style="margin-top:18px">Варианты компоновки (обложка)</div>' +
+        '<div class="pe-variants pe-covers">' + COVERS.map(function (v) {
+          return '<div class="pe-var' + (v[0] === cur ? ' on' : '') + '" data-act="setCover" data-cover="' + v[0] + '"><div class="pe-var-prev" data-covermini="' + v[0] + '"></div><div class="pe-var-nm">' + v[1] + '</div></div>';
+        }).join('') + '</div>';
+    } else if (s.family === 'editorial' || s.family === 'metrics' || s.family === 'benefits') {
+      h += '<div class="pe-sec-label" style="margin-top:18px">Варианты компоновки</div>' +
+        '<div class="pe-switchrow"><span style="font-size:13px">Зеркально (фото / текст)</span><button class="pe-toggle' + (s.styleOverrides && s.styleOverrides.mirror ? ' on' : '') + '" data-act="mirror"></button></div>';
+    } else {
+      h += '<p class="hint" style="margin-top:14px">У этого типа страницы один макет.</p>';
     }
     return h;
   }
 
   /* ---------- STYLE TAB ---------- */
+  /* Стиль — ИНЛАЙН в правой панели (ТЗ §5: без отдельного полноэкранного экрана).
+     Пресет / палитра / шрифты применяются к документу сразу; «Применить ко всем» — явное подтверждение. */
   function styleTab() {
-    var pal = TOK.palette(S.pres.theme.paletteId), fp = TOK.fontPair(S.pres.theme.fontPairId);
-    return '<div class="pe-sec-label">Стиль документа</div>' +
-      '<div class="pe-field"><label>Палитра</label><div class="pe-swatch-row"><div class="pe-swatch" style="background:' + pal.c.accent + '"></div><div class="pe-swatch-tx"><b>' + esc(pal.name) + '</b><span>' + pal.c.accent + '</span></div></div></div>' +
-      '<div class="pe-field"><label>Шрифты</label><div style="font-size:13px">' + esc(fp.heading.family) + ' + ' + esc(fp.body.family) + '</div></div>' +
-      '<button class="pe-btn pe-btn-primary" style="width:100%;justify-content:center" data-act="openStyle">' + ic('palette') + 'Открыть «Стиль презентации»</button>' +
-      '<p class="hint" style="margin-top:12px">Стиль применяется ко всем страницам и визитке.</p>';
+    var th = S.pres.theme;
+    var pal = TOK.palette(th.paletteId), fp = TOK.fontPair(th.fontPairId);
+    var brand = brandWithBroker();
+    function presetCard(p) { var c = TOK.palette(p.paletteId).c; return '<button class="pe-stylecard' + (p.id === th.presetId ? ' on' : '') + '" data-act="pickPreset" data-preset="' + p.id + '"><div class="pe-stylecard-sw">' + [c.background, c.surface, c.accent, c.text].map(function (x) { return '<i style="background:' + x + '"></i>'; }).join('') + '</div><div class="pe-stylecard-nm">' + esc(p.name) + '</div>' + (p.id === th.presetId ? '<div class="pe-stylecard-ck">' + ic('check') + '</div>' : '') + '</button>'; }
+    var h = '<div class="pe-sec-label">Стиль документа</div><div class="pe-stylecards">' + TOK.PRESETS.map(presetCard).join('') + '</div>';
+    h += '<div class="pe-sec-label" style="margin-top:18px">Цветовая палитра</div><div class="pe-paldots">' +
+      TOK.PALETTES.map(function (p) { return '<button class="pe-paldot' + (p.id === th.paletteId ? ' on' : '') + '" data-act="pickPalette" data-pal="' + p.id + '" title="' + esc(p.name) + '" style="background:' + p.c.accent + '"></button>'; }).join('') + '</div>';
+    h += '<div class="pe-sec-label" style="margin-top:18px">Шрифты</div><select class="pe-typesel" data-act="pickFont">' +
+      TOK.FONT_PAIRS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === th.fontPairId ? ' selected' : '') + '>' + esc(f.heading.family) + ' + ' + esc(f.body.family) + '</option>'; }).join('') + '</select>';
+    h += '<div class="pe-sec-label" style="margin-top:18px">Бренд</div><div class="pe-brandview"><div class="pe-brandname">' + esc(brand.logoText || brand.name || '—') + '</div><div class="hint">Меняется в настройках агентства</div></div>';
+    var cr = TOK.contrast(pal.c.text, pal.c.background); var ok = cr >= 4.5;
+    h += '<div class="pe-contrast' + (ok ? '' : ' bad') + '" style="margin-top:16px"><div class="ic">' + ic(ok ? 'check' : 'x') + '</div><div><b>' + (ok ? 'Контраст пройден' : 'Низкий контраст') + '</b><p>Текст на фоне ' + cr.toFixed(1) + ':1 — ' + (ok ? 'норма WCAG' : 'ниже 4.5:1') + '</p></div></div>';
+    h += '<button class="pe-btn pe-btn-primary" style="width:100%;justify-content:center;margin-top:14px" data-act="applyAll">' + ic('check') + 'Применить ко всем страницам</button>';
+    return h;
   }
 
   /* ================= WIRING ================= */
@@ -488,6 +509,7 @@
     // inspector tabs
     root.querySelectorAll('[data-tab]').forEach(function (el) { el.addEventListener('click', function () { S.tab = el.getAttribute('data-tab'); root.querySelectorAll('[data-tab]').forEach(function (t) { t.classList.toggle('on', t === el); }); var ib = document.getElementById('peInsp'); ib.innerHTML = inspBody(); wireInsp(); mountVarMinis(); }); });
     if (S.addMode) wireAddPanel(); else wireInsp();
+    mountVarMinis();   /* миниатюры вариантов компоновки красятся на каждый рендер, не только при переключении вкладки */
   }
   function wireAddPanel() {
     var s = document.getElementById('peBlSearch'); if (!s) return;
@@ -665,7 +687,13 @@
       case 'focalHint': toast('Кликните по фото, чтобы задать точку фокуса'); break;
       case 'galtoggle': galToggle(s, el.getAttribute('data-gid')); break;
       case 'setFamily': mutate(function () { s.family = el.getAttribute('data-fam'); }); break;
+      case 'setType': mutate(function () { s.family = el.value; }); break;
+      case 'setCover': mutate(function () { s.coverLayout = el.getAttribute('data-cover'); }); break;
       case 'mirror': mutate(function () { s.styleOverrides = s.styleOverrides || {}; s.styleOverrides.mirror = !s.styleOverrides.mirror; }); break;
+      case 'pickPreset': mutate(function () { var t = TOK.presetTheme(el.getAttribute('data-preset')); if (t) { S.pres.theme.presetId = t.presetId; S.pres.theme.paletteId = t.paletteId; S.pres.theme.fontPairId = t.fontPairId; } }); break;
+      case 'pickPalette': mutate(function () { S.pres.theme.paletteId = el.getAttribute('data-pal'); S.pres.theme.presetId = null; }); break;
+      case 'pickFont': mutate(function () { S.pres.theme.fontPairId = el.value; }); break;
+      case 'applyAll': scheduleSave(); toast('Оформление применено ко всем страницам'); break;
       case 'detach': mutate(function () { setOverride(s, el.getAttribute('data-key'), cval(s, el.getAttribute('data-key'))); }); break;
       case 'toggleBroker': mutate(function () { S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = !S.pres.brokerAppendix.enabled; }); break;
       case 'pickBroker': S.pres.brokerId = el.value; S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = true; scheduleSave(); break;
@@ -745,13 +773,20 @@
       box.innerHTML = '<div class="pe-mini-stage" style="width:' + f.cssW + 'px;height:' + f.cssH + 'px;transform:scale(' + sc + ')">' + html + '</div>';
     });
   }
+  function defaultCover() { var p = S.pres.theme && S.pres.theme.presetId; return p === 'gallerywhite' ? 'bottom' : p === 'terracotta' ? 'right' : 'full'; }
+  function miniHtml(box, tmp) {
+    var f = TOK.format(S.fmt);
+    var html; try { html = T.renderSection(tmp, ctx())[0] || ''; } catch (e) { html = ''; }
+    var w = box.clientWidth || 100; var sc = w / f.cssW;
+    box.innerHTML = '<div style="position:absolute;top:0;left:0;transform-origin:top left;width:' + f.cssW + 'px;height:' + f.cssH + 'px;transform:scale(' + sc + ')">' + html + '</div>';
+  }
   function mountVarMinis() {
+    var s = curSection(); if (!s) return;
     document.querySelectorAll('[data-varmini]').forEach(function (box) {
-      var fam = box.getAttribute('data-varmini'); var s = curSection(); if (!s) return;
-      var tmp = Object.assign({}, s, { family: fam }); var f = TOK.format(S.fmt);
-      var html; try { html = T.renderSection(tmp, ctx())[0] || ''; } catch (e) { html = ''; }
-      var w = box.clientWidth || 100; var sc = w / f.cssW;
-      box.innerHTML = '<div style="position:absolute;top:0;left:0;transform-origin:top left;width:' + f.cssW + 'px;height:' + f.cssH + 'px;transform:scale(' + sc + ')">' + html + '</div>';
+      miniHtml(box, Object.assign({}, s, { family: box.getAttribute('data-varmini') }));
+    });
+    document.querySelectorAll('[data-covermini]').forEach(function (box) {
+      miniHtml(box, Object.assign({}, s, { coverLayout: box.getAttribute('data-covermini') }));
     });
   }
 

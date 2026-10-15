@@ -187,6 +187,33 @@
     const brandMark = brand.logoText ? `<div class="lp-brandmark">${esc(brand.logoText)}</div>` : '';
 
     const presetId = ctx.theme && ctx.theme.presetId;
+    /* Явно выбранный вариант компоновки обложки (ТЗ §4/§6: тип страницы ≠ макет).
+       bottom=фото снизу · right=фото справа · full=фото на весь лист · text=без фото.
+       Переопределяет пресет-дефолт; если не задан — поведение как раньше (ниже по пресету). */
+    const cover = ctx.section.coverLayout;
+    if (cover && fmt.orient === 'portrait') {
+      if (cover === 'bottom') return [`<div class="lp-safe lp-hero-gw">
+        <div class="lp-hero-gw-head">${brandMark}${loc}${title}${sub}</div>
+        <div class="lp-hero-gw-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
+      </div>`];
+      if (cover === 'full') return [`
+        <div class="lp-bleed" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
+        <div class="lp-hero-ug">${brandMark}${loc}${title}${sub}
+          ${metrics.length ? `<div class="lp-hero-ug-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}
+        </div>`];
+      if (cover === 'right') return [`
+        <div class="lp-hero-split">
+          <div class="lp-hero-split-txt">${brandMark}${loc}${title}${sub}
+            ${metrics.length ? `<div class="lp-hero-split-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}${price}
+          </div>
+          <div class="lp-hero-split-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
+        </div>`];
+      if (cover === 'text') return [`<div class="lp-safe lp-hero-gw">
+        <div class="lp-hero-gw-head">${brandMark}${loc}${title}${sub}${price}
+          ${metrics.length ? `<div class="lp-hero-metrics" style="margin-top:auto">${metrics.map(metricCell).join('')}</div>` : ''}
+        </div>
+      </div>`];
+    }
     /* Gallery White — обложка-галерея: логотип+крупное название сверху, фото в прямоугольнике снизу, белые поля (ТЗ §3) */
     if (presetId === 'gallerywhite' && fmt.orient === 'portrait') {
       return [`<div class="lp-safe lp-hero-gw">
