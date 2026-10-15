@@ -613,3 +613,77 @@ input[type=number] { -moz-appearance: textfield; }
 .app.editor-mode.nav-pinned .sidebar .nav-label,
 .app.editor-mode.nav-pinned .sidebar .agency-tx,
 .app.editor-mode.nav-pinned .sidebar .agency-chev{ opacity:1; pointer-events:auto; }
+
+/* ── Каталог «Презентации объектов» (референс-мокап №1) ───────────────────── */
+.po-crumb{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:4px;margin:0 0 10px}
+.po-crumb svg{width:13px;height:13px;opacity:.6}
+.po-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 18px}
+.po-h1{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0 0 4px}
+.po-sub{font-size:13.5px;color:var(--muted)}
+.po-new{border-radius:11px;padding:11px 18px;font-weight:600}
+.po-toolbar{display:flex;align-items:center;gap:10px;margin:0 0 18px;flex-wrap:wrap}
+.po-search{flex:1;min-width:220px;display:flex;align-items:center;gap:9px;background:var(--card,#fff);border:1px solid var(--stroke);border-radius:11px;padding:0 13px;height:42px}
+.po-search svg{width:16px;height:16px;opacity:.5;flex:none}
+.po-search input{flex:1;border:0;background:transparent;outline:0;font-size:14px;color:inherit}
+.po-sel{height:42px;border:1px solid var(--stroke);border-radius:11px;background:var(--card,#fff);padding:0 34px 0 14px;font-size:13.5px;font-weight:500;color:inherit;cursor:pointer;
+  -webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.po-viewtog{display:inline-flex;border:1px solid var(--stroke);border-radius:11px;overflow:hidden;height:42px}
+.po-viewtog button{border:0;background:var(--card,#fff);width:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+.po-viewtog button svg{width:17px;height:17px}
+.po-viewtog button.on{background:var(--ink,#141414);color:#fff}
+.po-viewtog button+button{border-left:1px solid var(--stroke)}
+
+.po-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;margin-bottom:30px}
+.po-card{background:var(--card,#fff);border:1px solid var(--stroke);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .16s,transform .16s}
+.po-card:hover{box-shadow:0 14px 40px -18px rgba(20,20,30,.32)}
+.po-thumb{height:178px;background:#e9e6e0 center/cover no-repeat;flex:none}
+.po-cb{padding:15px 16px 16px;display:flex;flex-direction:column;gap:2px}
+.po-ct{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.po-obj{align-self:flex-start;border:0;background:transparent;padding:3px 0;color:var(--muted);font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+.po-obj svg{width:13px;height:13px;opacity:.7}
+.po-obj:hover{color:var(--accent,#6b4f2a)}
+.po-metaline{font-size:12.5px;color:var(--muted)}
+.po-saved{font-size:12px;color:var(--muted);opacity:.8;margin-bottom:9px}
+.po-pill{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;margin-bottom:13px}
+.po-pill i{width:7px;height:7px;border-radius:50%;flex:none}
+.po-pub{background:rgba(46,125,50,.1);color:#2e7d32}.po-pub i{background:#2e9b43}
+.po-changed{background:rgba(201,138,30,.12);color:#b67a16}.po-changed i{background:#e0a020}
+.po-draft{background:rgba(90,100,110,.1);color:#5a646e}.po-draft i{background:#8a949e}
+.po-acts{display:flex;gap:6px;align-items:center;flex-wrap:nowrap}
+.po-acts>button{border-radius:9px;height:34px!important;min-height:34px!important;box-sizing:border-box;padding:0 11px;font-size:12.5px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.po-acts>button svg{width:13px;height:13px}
+.po-acts .btn-accent{padding:0 13px}
+.po-more{width:34px;padding:0!important;flex:none}
+.po-more svg{width:16px;height:16px;opacity:.65}
+
+.po-list{display:flex;flex-direction:column;gap:9px;margin-bottom:30px}
+.po-lrow{display:flex;align-items:center;gap:14px;background:var(--card,#fff);border:1px solid var(--stroke);border-radius:13px;padding:10px 14px}
+.po-lthumb{width:64px;height:48px;border-radius:9px;background:#e9e6e0 center/cover no-repeat;flex:none}
+.po-lmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.po-lmain b{font-size:14.5px;font-weight:620}
+.po-lmain span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.po-lrow .po-pill{margin:0}
+.po-lsaved{font-size:12.5px;color:var(--muted);white-space:nowrap}
+
+.po-empty{padding:40px 0;text-align:center;border:1px dashed var(--stroke);border-radius:14px;color:var(--muted);font-size:13.5px;margin-bottom:30px}
+
+.po-recent{background:var(--card,#fff);border:1px solid var(--stroke);border-radius:16px;padding:18px 20px 8px;margin-bottom:24px}
+.po-recent-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.po-recent-hd b{font-size:16px;font-weight:650}
+.po-rtable{display:flex;flex-direction:column}
+.po-rhead,.po-rr{display:grid;grid-template-columns:140px 1fr 1fr 180px;gap:14px;align-items:center}
+.po-rhead{padding:0 4px 9px;border-bottom:1px solid var(--stroke)}
+.po-rhead span{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.po-rr{padding:12px 4px;border-bottom:1px solid var(--stroke)}
+.po-rr:last-child{border-bottom:0}
+.po-ric{display:none}
+.po-rdate{font-size:13px;font-weight:600;display:flex;flex-direction:column}
+.po-rdate span{font-size:11.5px;font-weight:400;color:var(--muted)}
+.po-rpres b{font-size:13.5px;font-weight:600;display:block}
+.po-rpres span{font-size:11.5px;color:var(--muted)}
+.po-rchange{font-size:13px}
+.po-ruser{display:flex;align-items:center;gap:9px}
+.po-rava{width:30px;height:30px;border-radius:50%;background:var(--ink,#1a1a1a);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
+.po-ruser b{font-size:13px;font-weight:600;display:block}
+.po-ruser span{font-size:11.5px;color:var(--muted)}
+@media(max-width:720px){.po-rhead,.po-rr{grid-template-columns:1fr 1fr}.po-rdate{grid-column:1}.po-ruser{grid-column:2}.po-rpres,.po-rchange{grid-column:1/-1}}

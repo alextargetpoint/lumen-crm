@@ -17002,12 +17002,18 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
       // catalog
       if (p === '/api/presentations' && req.method === 'GET') {
         const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
-        const items = presList().filter(x => R.role === 'owner' || x.brokerId === R.brokerId).map(x => {
+        const mine = presList().filter(x => R.role === 'owner' || x.brokerId === R.brokerId);
+        const brokerName = (bid) => { const bk = (db.brokers || []).find(k => k.id === bid); return bk ? (bk.name || bk.fullName || '') : ''; };
+        const items = mine.map(x => {
           const firstPid = x.projectId || (x.projectIds || [])[0];
           const pr = (db.properties || []).find(pp => pp.id === firstPid) || {};
-          return { id: x.id, kind: x.kind || 'object', projectId: x.projectId, projectIds: x.projectIds || null, title: x.title || pr.name || 'Презентация', brokerId: x.brokerId, status: x.status || 'draft', defaultFormat: x.defaultFormat, updatedAt: x.updatedAt, thumb: (pr.images || [])[0] || '', objectCount: (x.projectIds && x.projectIds.length) || 1, hasPublic: !!x.publicToken };
+          return { id: x.id, kind: x.kind || 'object', projectId: x.projectId, projectIds: x.projectIds || null, title: x.title || pr.name || 'Презентация', objectName: pr.name || '', brokerId: x.brokerId, brokerName: brokerName(x.brokerId), status: x.status || 'draft', defaultFormat: x.defaultFormat, updatedAt: x.updatedAt, publishedAt: x.publishedAt || null, lang: x.lang || 'RU', variant: x.variantName || 'Основная версия', thumb: (pr.images || [])[0] || '', objectCount: (x.projectIds && x.projectIds.length) || 1, hasPublic: !!x.publicToken };
         }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-        return json(res, 200, { items });
+        /* «Последние изменения»: агрегируем историю всех документов (последние 8) */
+        const recent = [];
+        for (const x of mine) { const rpr = (db.properties || []).find(pp => pp.id === (x.projectId || (x.projectIds || [])[0])) || {}; for (const h of (x.history || [])) recent.push({ at: h.at, presId: x.id, title: x.title || rpr.name || 'Документ', objectName: rpr.name || '', lang: x.lang || 'RU', variant: x.variantName || 'Основная версия', type: h.type, label: h.label || '', by: brokerName(h.by) || '' }); }
+        recent.sort((a, b) => (b.at || 0) - (a.at || 0));
+        return json(res, 200, { items, recent: recent.slice(0, 8) });
       }
       // create from property
       if (p === '/api/presentations' && req.method === 'POST') {
@@ -17090,6 +17096,8 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         if (ch.brokerAppendix && typeof ch.brokerAppendix === 'object') pres.brokerAppendix = Object.assign(pres.brokerAppendix || {}, ch.brokerAppendix);
         if (ch.brokerId !== undefined) { pres.brokerId = ch.brokerId; if (pres.brokerAppendix) { pres.brokerAppendix.enabled = !!ch.brokerId; pres.brokerAppendix.profileId = ch.brokerId; } }
         if (ch.status && ['draft', 'ready', 'archived'].includes(ch.status)) pres.status = ch.status;
+        if (typeof ch.title === 'string' && ch.title.trim()) pres.title = ch.title.trim().slice(0, 120);
+        if (typeof ch.variantName === 'string') pres.variantName = ch.variantName.trim().slice(0, 60);
         pres.draftRevision = (pres.draftRevision || 1) + 1; pres.updatedAt = Date.now(); pres.updatedBy = R.brokerId || 'owner';
         store.save();
         return json(res, 200, { ok: true, revision: pres.draftRevision });
@@ -17204,7 +17212,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         if (snap.broker && snap.broker.channels) { try { snap.broker.qr = await qrDataUrl(`${baseUrl(req)}/pv/${pres.publicToken || ''}`); } catch (e) {} }
         pres.snapshots = (pres.snapshots || []).concat(snap).slice(-10);
         if (!pres.publicToken) pres.publicToken = crypto.randomBytes(8).toString('hex');
-        pres.publishedSnapshotId = snap.id; pres.status = 'ready'; pres.updatedAt = Date.now();
+        pres.publishedSnapshotId = snap.id; pres.status = 'ready'; pres.updatedAt = Date.now(); pres.publishedAt = pres.updatedAt;
         presentation.pushHistory(pres, 'publish', presBy(R), 'Опубликовано · версия ' + (pres.snapshots || []).length);
         // regenerate QR now that token exists
         if (snap.broker && snap.broker.channels) { try { snap.broker.qr = await qrDataUrl(`${baseUrl(req)}/pv/${pres.publicToken}`); } catch (e) {} }

@@ -9964,33 +9964,106 @@ async function openDesignModal(id, title) {
   });
   setTimeout(() => { const rb = $('#dmRecompose'); if (rb) rb.addEventListener('click', async () => { const r = await api.post('/collections/' + id + '/recompose?key=' + key); window.open('/p/' + id + '?design=1&key=' + key, '_blank'); }); }, 60);
 }
+/* ⋯-меню карточки презентации: предпросмотр, переименование варианта, дубль, архив */
+function openPresMore(x) {
+  if (!x) return;
+  modal({
+    title: 'Действия', sub: esc(x.title || 'Презентация'),
+    body: `<div style="display:flex;flex-direction:column;gap:6px">
+      <button class="btn" data-m="preview" style="justify-content:flex-start;gap:8px">${ic(I.eye)}Открыть предпросмотр</button>
+      <button class="btn" data-m="rename" style="justify-content:flex-start;gap:8px">${ic(I.doc)}Переименовать вариант</button>
+      <button class="btn" data-m="dup" style="justify-content:flex-start;gap:8px">${ic(I.copy)}Создать похожую (вариант)</button>
+      <button class="btn" data-m="archive" style="justify-content:flex-start;gap:8px;color:#c0392b">${ic(I.x)}В архив</button>
+    </div>`,
+    actions: [{ label: 'Закрыть' }],
+  });
+  setTimeout(() => {
+    $('[data-m="preview"]')?.addEventListener('click', () => { window.open('/pres/' + x.id + '/print?format=portrait_a4', '_blank'); closeModal(); });
+    $('[data-m="rename"]')?.addEventListener('click', () => {
+      closeModal();
+      modal({
+        title: 'Название варианта', sub: 'Понятное имя, если это не основная версия — например «Краткая» или «Для инвестора»',
+        body: `<input id="poVarName" class="inp" placeholder="Основная версия" value="${esc(x.variant === 'Основная версия' ? '' : (x.variant || ''))}" style="width:100%;padding:10px 12px;border:1px solid var(--stroke);border-radius:10px;font-size:14px">`,
+        actions: [
+          { label: 'Сохранить', cls: 'btn-accent', onClick: async () => { const v = (($('#poVarName') || {}).value || '').trim(); try { await api.patch('/presentations/' + x.id, { changes: { variantName: v } }); closeModal(); toast('Сохранено', null, true); render(); } catch (e) { toast('Не вышло', e.message); } } },
+          { label: 'Отмена' },
+        ],
+      });
+      setTimeout(() => $('#poVarName')?.focus(), 60);
+    });
+    $('[data-m="dup"]')?.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: x.projectId, forceNew: true }); if (r && r.id) { closeModal(); openEditor(r.id); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } });
+    $('[data-m="archive"]')?.addEventListener('click', async () => { try { await api.del('/presentations/' + x.id); closeModal(); toast('Перенесено в архив', null, true); render(); } catch (e) { toast('Не вышло', e.message); } });
+  }, 40);
+}
 PAGES.presentations = async (root) => {
-  const [d, props] = await Promise.all([api.get('/presentations').catch(() => ({ items: [] })), api.get('/properties').catch(() => [])]);
+  const [d, props] = await Promise.all([api.get('/presentations').catch(() => ({ items: [], recent: [] })), api.get('/properties').catch(() => [])]);
   const items = (d.items || []).filter(x => x.status !== 'archived' && x.kind !== 'collection');   /* только презентации объектов — подборки в своей вкладке */
   const propList = Array.isArray(props) ? props : (props.items || props.properties || []);
-  const STLAB = { draft: 'Черновик', ready: 'Готово' };
-  const FLAB = { landscape_16_9: '16:9', portrait_a4: 'A4', landscape_a4: 'A4 гориз.', portrait_9_16: '9:16' };
+  const recent = d.recent || [];
   const absU = u => (u && /^assets\//.test(u)) ? '/' + u : u;
-  const cards = items.map(x => `<div class="pres-card">
-      <div class="pres-thumb" style="${x.thumb ? `background-image:url('${esc(absU(x.thumb))}')` : ''}"></div>
-      <div class="pres-b"><div class="pres-t">${esc(x.title || 'Презентация')}</div>
-        <div class="pres-m"><span class="pres-st st-${x.status || 'draft'}">${STLAB[x.status] || 'Черновик'}</span>${x.kind === 'collection' ? ` · Подборка · ${x.objectCount || ''} об.` : ` · ${FLAB[x.defaultFormat] || ''}`}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''}</div>
-        <div class="pres-acts"><button class="btn btn-sm btn-accent" data-popen="${x.id}" data-pkind="${x.kind || 'object'}">${ic(I.doc)}${x.kind === 'collection' ? 'Предпросмотр' : 'Открыть'}</button><button class="btn btn-sm" data-ppdf="${x.id}" title="Быстрый PDF">${ic(I.doc)}PDF</button><button class="btn btn-sm" data-pstyle="${x.id}" title="Сменить пресет оформления">${ic(I.sparkle || I.doc)}Стиль</button>${x.hasPublic ? `<button class="btn btn-sm" data-ppub="${x.id}">${ic(I.link || I.send)}Ссылка</button>` : ''}</div>
-      </div></div>`).join('');
+  const fmtDate = t => t ? new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const statusOf = x => {
+    if (x.status === 'ready' && x.publishedAt && (x.updatedAt || 0) > x.publishedAt + 2000) return { k: 'changed', label: 'Есть изменения', cls: 'po-changed' };
+    if (x.status === 'ready') return { k: 'published', label: 'Опубликовано', cls: 'po-pub' };
+    return { k: 'draft', label: 'Черновик', cls: 'po-draft' };
+  };
+  const PENCIL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  PAGE_STATE.presFilter = PAGE_STATE.presFilter || { q: '', status: '', broker: '', view: 'grid' };
+  const F = PAGE_STATE.presFilter;
+  const brokers = [...new Map(items.filter(x => x.brokerId).map(x => [x.brokerId, x.brokerName || x.brokerId])).entries()];
+  const filtered = items.filter(x => {
+    if (F.q && (x.objectName || x.title || '').toLowerCase().indexOf(F.q.toLowerCase()) < 0) return false;
+    if (F.status && statusOf(x).k !== F.status) return false;
+    if (F.broker && x.brokerId !== F.broker) return false;
+    return true;
+  });
+  const DOTS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+  const acts = x => `<div class="po-acts">
+      <button class="btn btn-sm btn-accent" data-edit="${x.id}">${PENCIL}Редактировать</button>
+      <button class="btn btn-sm" data-pdf="${x.id}">${ic(I.doc)}PDF</button>
+      <button class="btn btn-sm" data-link="${x.id}">${ic(I.link)}Ссылка</button>
+      <button class="btn btn-sm po-more" data-more="${x.id}" title="Ещё">${DOTS}</button>
+    </div>`;
+  const card = x => { const st = statusOf(x); return `<div class="po-card">
+      <div class="po-thumb" style="${x.thumb ? `background-image:url('${esc(absU(x.thumb))}')` : ''}"></div>
+      <div class="po-cb">
+        <div class="po-ct">${esc(x.title || 'Презентация')}</div>
+        <button class="po-obj" data-objopen="${esc(x.projectId || '')}">Объект: ${esc(x.objectName || '—')}${ic(I.chev)}</button>
+        <div class="po-metaline">${esc(x.lang || 'RU')} · ${esc(x.variant || 'Основная версия')}</div>
+        <div class="po-saved">Сохранено ${fmtDate(x.updatedAt)}</div>
+        <div class="po-pill ${st.cls}"><i></i>${st.label}</div>
+        ${acts(x)}
+      </div></div>`; };
+  const row = x => { const st = statusOf(x); return `<div class="po-lrow">
+      <div class="po-lthumb" style="${x.thumb ? `background-image:url('${esc(absU(x.thumb))}')` : ''}"></div>
+      <div class="po-lmain"><b>${esc(x.title || 'Презентация')}</b><span>Объект: ${esc(x.objectName || '—')} · ${esc(x.lang || 'RU')} · ${esc(x.variant || 'Основная версия')}</span></div>
+      <div class="po-pill ${st.cls}"><i></i>${st.label}</div>
+      <div class="po-lsaved">${fmtDate(x.updatedAt)}</div>
+      ${acts(x)}</div>`; };
+  const statusSel = `<select id="poStatus" class="po-sel"><option value="">Все статусы</option><option value="published"${F.status === 'published' ? ' selected' : ''}>Опубликовано</option><option value="changed"${F.status === 'changed' ? ' selected' : ''}>Есть изменения</option><option value="draft"${F.status === 'draft' ? ' selected' : ''}>Черновик</option></select>`;
+  const brokerSel = `<select id="poBroker" class="po-sel"><option value="">Все брокеры</option>${brokers.map(([id, nm]) => `<option value="${esc(id)}"${F.broker === id ? ' selected' : ''}>${esc(nm)}</option>`).join('')}</select>`;
+  const changeLabel = r => r.label || ({ publish: 'Опубликована презентация', edit: 'Внесены изменения в слайды', save: 'Внесены изменения', create: 'Создана новая версия', restore: 'Восстановлена версия', draft: 'Черновик сохранён', preset: 'Сменён стиль' }[r.type] || 'Изменение');
+  const recentRows = recent.map(r => `<div class="po-rr"><div class="po-ric">${ic(r.type === 'publish' ? I.doc : I.clock)}</div><div class="po-rdate">${fmtDate(r.at)}<span>${new Date(r.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span></div><div class="po-rpres"><b>${esc(r.title || r.objectName || 'Документ')}</b><span>${esc(r.lang || 'RU')} · ${esc(r.variant || 'Основная версия')}</span></div><div class="po-rchange">${esc(changeLabel(r))}</div><div class="po-ruser"><span class="po-rava">${esc((r.by || '—').slice(0, 2).toUpperCase())}</span><div><b>${esc(r.by || '—')}</b><span>Брокер</span></div></div></div>`).join('');
   root.innerHTML = `
-    <h1 class="plo-h1" style="font-size:27px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px">Презентации объектов</h1>
-    <div class="muted" style="font-size:13px;margin-bottom:16px;max-width:760px">Готовое оформление каждого отдельного объекта — настраивается один раз, затем переиспользуется в подборках. 4 формата (A4 · 16:9 · 9:16), PDF и адаптивная веб-ссылка. Создавайте из карточки объекта (кнопка «Презентация объекта») или кнопкой ниже.</div>
-    <div style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-accent" id="presNew">${ic(I.plus)}Новая презентация из объекта</button></div>
-    ${items.length ? `<div class="pres-grid">${cards}</div>` : '<div class="muted" style="padding:34px 0;text-align:center;border:1px dashed var(--stroke);border-radius:14px">Пока нет презентаций. Нажмите «Новая презентация из объекта» или откройте объект в Базе → «Презентация».</div>'}`;
-  $$('[data-popen]', root).forEach(b => b.addEventListener('click', () => { openEditor(b.dataset.popen); }));
-  $$('[data-ppdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.ppdf + '/print?format=portrait_a4', '_blank')));
-  $$('[data-ppub]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.ppub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
-  $$('[data-pstyle]', root).forEach(b => b.addEventListener('click', () => {
-    const id = b.dataset.pstyle;
-    const PR = [['gallerywhite', 'Gallery White', ['#FFFFFF', '#3155E7', '#151515']], ['graphite', 'Urban Graphite', ['#FFFFFF', '#24282C', '#59636A']], ['terracotta', 'Terracotta Atelier', ['#FBF7F2', '#A6533D', '#392D28']]];
-    modal({ title: 'Сменить оформление', sub: 'Пресет применится к этой презентации (контент сохранится)', body: '<div style="display:flex;flex-direction:column;gap:8px">' + PR.map(([pid, nm, sw]) => `<button class="btn pstyle-pick" data-pp="${pid}" style="justify-content:flex-start;gap:8px"><span style="display:inline-flex;gap:2px">${sw.map(c => `<i style="width:11px;height:14px;border-radius:2px;background:${c};border:1px solid rgba(0,0,0,.12);display:inline-block"></i>`).join('')}</span>${esc(nm)}</button>`).join('') + '</div>', actions: [{ label: 'Отмена' }] });
-    setTimeout(() => { $$('.pstyle-pick').forEach(pb => pb.addEventListener('click', async () => { try { await api.patch('/presentations/' + id, { changes: { presetId: pb.dataset.pp } }); closeModal(); toast('Оформление изменено — откройте предпросмотр', null, true); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
-  }));
+    <div class="po-crumb">База ${ic(I.chev)}</div>
+    <div class="po-head"><div><h1 class="plo-h1 po-h1">Презентации объектов</h1><div class="po-sub">Один объект — готовая презентация.</div></div><button class="btn btn-accent po-new" id="presNew">${ic(I.plus)}Из объекта</button></div>
+    <div class="po-toolbar">
+      <div class="po-search">${ic(I.search)}<input id="poSearch" placeholder="Название объекта" value="${esc(F.q)}" autocomplete="off"></div>
+      ${statusSel}${brokerSel}
+      <div class="po-viewtog"><button class="${F.view === 'grid' ? 'on' : ''}" data-view="grid" title="Плитки">${ic(I.grid)}</button><button class="${F.view === 'list' ? 'on' : ''}" data-view="list" title="Список">${ic(I.list)}</button></div>
+    </div>
+    ${filtered.length ? (F.view === 'grid' ? `<div class="po-grid">${filtered.map(card).join('')}</div>` : `<div class="po-list">${filtered.map(row).join('')}</div>`) : `<div class="po-empty">${items.length ? 'Ничего не найдено по заданным фильтрам.' : 'Пока нет презентаций. Нажмите «Из объекта» или откройте объект в Базе → «Презентация объекта».'}</div>`}
+    ${recent.length ? `<div class="po-recent"><div class="po-recent-hd"><b>Последние изменения</b></div><div class="po-rtable"><div class="po-rhead"><span>Дата</span><span>Презентация</span><span>Изменение</span><span>Пользователь</span></div>${recentRows}</div></div>` : ''}
+  `;
+  $('#poSearch', root)?.addEventListener('input', e => { F.q = e.target.value; clearTimeout(F._t); F._t = setTimeout(() => { render(); setTimeout(() => { const s = $('#poSearch'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }, 0); }, 240); });
+  $('#poStatus', root)?.addEventListener('change', e => { F.status = e.target.value; render(); });
+  $('#poBroker', root)?.addEventListener('change', e => { F.broker = e.target.value; render(); });
+  $$('[data-view]', root).forEach(b => b.addEventListener('click', () => { F.view = b.dataset.view; render(); }));
+  $$('[data-edit]', root).forEach(b => b.addEventListener('click', () => openEditor(b.dataset.edit)));
+  $$('[data-objopen]', root).forEach(b => b.addEventListener('click', () => { const pid = b.dataset.objopen; if (pid) { PAGE_STATE.propView = pid; go('properties'); } }));
+  $$('[data-pdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.pdf + '/print?format=portrait_a4', '_blank')));
+  $$('[data-link]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.link + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
+  $$('[data-more]', root).forEach(b => b.addEventListener('click', () => openPresMore(items.find(x => x.id === b.dataset.more))));
   $('#presNew', root)?.addEventListener('click', () => {
     if (!propList.length) { toast('Нет объектов', 'Добавьте объект в Базе'); return; }
     let selPreset = 'gallerywhite';
