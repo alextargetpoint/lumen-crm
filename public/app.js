@@ -5077,7 +5077,12 @@ PAGES.funnel = async (root) => {
       (F.funnelFlag === 'ai' && l.ai && l.ai.enabled)));
   const srcs = [...new Set(all.map(l => l.source))];
   const view = F.funnelView || 'kanban';
-  const srcName = { meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA' };
+  const srcName = { meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA', ig_direct: 'Instagram', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
+  /* ── хелперы расширенной таблицы воронки ── */
+  const tblCh = (l) => { const ch = l.channels || {}; const dot = (v, letter, on) => `<i class="tbl-cdot ${v === 'yes' || on ? 'on' : v === 'no' ? 'off' : 'unk'}" title="${letter === 'W' ? 'WhatsApp' : 'Telegram'}: ${v === 'yes' || on ? 'есть' : v === 'no' ? 'нет' : 'не проверен'}">${letter}</i>`; return `<span class="tbl-ch">${dot(ch.wa, 'W')}${dot(ch.tg, 'T', l.activeChannel === 'tg')}</span>`; };
+  const tblNext = (l) => { const na = l.nextAction, nt = l.nextTouch; if (na && na.text) { const over = na.at && na.at < Date.now(); return `<span class="${over ? 'tbl-next over' : 'tbl-next'}">${esc(na.text.slice(0, 40))}${na.at ? ` <i>· ${over ? 'просрочено' : ago(na.at)}</i>` : ''}</span>`; } if (nt && nt.at) { const w = nt.at <= Date.now() ? 'скоро' : ago(nt.at); return `<span class="tbl-next ai">${ic(I.spark)}${nt.kind === 'reengage' ? 'ИИ дожмёт' : 'ИИ коснётся'} <i>· ${w}</i></span>`; } return '<span class="muted">—</span>'; };
+  const tblAct = (l) => { const t = l.lastMsgAt || l.createdAt; const dir = l.lastDir === 'in' ? '<i class="tbl-dir in" title="клиент писал">↙</i>' : l.lastDir === 'out' ? '<i class="tbl-dir out" title="мы писали">↗</i>' : ''; return `${dir}<span>${ago(t)}</span>`; };
+  const stageCls = (s) => ({ new: 'st-new', touch: 'st-touch', dialog: 'st-dialog', qualified: 'st-qual', handover: 'st-hand', viewing: 'st-view', deal: 'st-deal', sleeping: 'st-sleep', lost: 'st-lost' })[s] || 'st-new';
   /* контрол цепочек касаний: авто-запуск на новые + ручной запуск на отфильтрованные */
   const aiSet = (STATE.settings.ai) || {};
   const autoChains = aiSet.autoChains !== false;
@@ -5144,32 +5149,38 @@ PAGES.funnel = async (root) => {
         </div>`;
       }).join('')}
     </div>` : `
-    <div class="glass card" style="padding:8px 0">
-      <table class="tbl lead-tbl"><thead><tr>
-        <th style="width:34px"><span class="lc-check tbl" id="tblSelAll" title="Выделить всё">${ic(I.check, 2)}</span></th>
-        ${[['name', 'Лид'], ['stage', 'Стадия'], ['geo', 'Гео'], ['budget', 'Бюджет'], ['axes', 'Квал'], ['broker', 'Брокер'], ['last', 'Контакт'], ['next', 'Следующий шаг']].map(([k, n]) => `<th data-sort="${k}" style="cursor:pointer">${n}${F.funnelSort === k ? ' ↓' : ''}</th>`).join('')}
+    <div class="glass card lead-tbl-card">
+      <div class="lead-tbl-wrap"><table class="tbl lead-tbl lead-tbl-x"><thead><tr>
+        <th class="tbl-cb"><span class="lc-check tbl" id="tblSelAll" title="Выделить всё">${ic(I.check, 2)}</span></th>
+        ${[['name', 'Лид'], ['ch', 'Каналы', 1], ['stage', 'Стадия'], ['geo', 'Гео'], ['budget', 'Бюджет'], ['axes', 'Квал'], ['source', 'Источник'], ['broker', 'Брокер'], ['last', 'Активность'], ['next', 'Следующий шаг']].map(([k, n, noSort]) => noSort ? `<th>${n}</th>` : `<th data-sort="${k}" class="tbl-srt ${F.funnelSort === k ? 'act' : ''}">${n}<span class="tbl-arr">${F.funnelSort === k ? (F.funnelSortDir === 'asc' ? '↑' : '↓') : ''}</span></th>`).join('')}
+        <th class="tbl-acth"></th>
       </tr></thead><tbody>
-        ${leads.sort((a, b) => {
-          const k = F.funnelSort;
-          if (k === 'budget') return ((b.quals.budget || {}).num || 0) - ((a.quals.budget || {}).num || 0);
-          if (k === 'axes') return b.axesFilled - a.axesFilled;
-          if (k === 'stage') return STAGES.findIndex(x => x.id === a.stage) - STAGES.findIndex(x => x.id === b.stage);
-          if (k === 'last') return (b.lastMsgAt || 0) - (a.lastMsgAt || 0);
-          if (k === 'broker') return (a.brokerName || 'я').localeCompare(b.brokerName || 'я');
-          if (k === 'geo') return a.geo.localeCompare(b.geo);
-          if (k === 'next') return ((a.nextAction || {}).at || Infinity) - ((b.nextAction || {}).at || Infinity);
-          return a.name.localeCompare(b.name);
-        }).map(l => `<tr data-row="${l.id}" class="${selSet("funnel").has(l.id) ? "sel" : ""}" style="cursor:pointer">
-          <td><div style="display:flex;gap:9px;align-items:center"><span class="lc-check tbl" data-check title="Выделить">${ic(I.check, 2)}</span>${avaHtml(l, 28)}<div><b>${esc(l.name)}</b><div class="muted" style="font-size:10.5px">${esc(l.phone)}</div></div></div></td>
-          <td><span class="badge ${['qualified', 'handover', 'deal'].includes(l.stage) ? 'ok' : l.stage === 'sleeping' ? '' : 'acc'}">${stageName(l.stage)}</span></td>
-          <td>${l.geoName}</td>
-          <td>${(l.quals.budget || {}).value || '—'}</td>
-          <td><div class="axes" style="width:52px;margin:0">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div></td>
-          <td>${l.brokerName ? esc(l.brokerName.split(' ')[0]) : '—'}</td>
-          <td class="muted" style="font-size:11.5px">${ago(l.lastMsgAt || l.createdAt)}</td>
-          <td style="font-size:11.5px;${l.nextAction && l.nextAction.at && l.nextAction.at < Date.now() ? 'color:var(--bad);font-weight:650' : ''}">${l.nextAction ? esc(l.nextAction.text.slice(0, 34)) : '—'}</td>
+        ${(() => { const dir = F.funnelSortDir === 'asc' ? -1 : 1; const key = (l) => { const k = F.funnelSort;
+            if (k === 'budget') return (l.quals.budget || {}).num || 0;
+            if (k === 'axes') return l.axesFilled;
+            if (k === 'stage') return STAGES.findIndex(x => x.id === l.stage);
+            if (k === 'last') return l.lastMsgAt || 0;
+            if (k === 'broker') return (l.brokerName || 'я').toLowerCase();
+            if (k === 'geo') return (l.geo || '').toLowerCase();
+            if (k === 'source') return (l.source || '').toLowerCase();
+            if (k === 'next') return (l.nextAction || {}).at || Infinity;
+            return (l.name || '').toLowerCase(); };
+          return leads.slice().sort((a, b) => { const ka = key(a), kb = key(b); const c = typeof ka === 'number' ? ka - kb : String(ka).localeCompare(String(kb)); return c * dir; }); })()
+        .map(l => `<tr data-row="${l.id}" class="${selSet("funnel").has(l.id) ? "sel" : ""}">
+          <td class="tbl-cb"><span class="lc-check tbl" data-check title="Выделить">${ic(I.check, 2)}</span></td>
+          <td><div class="tbl-lead">${avaHtml(l, 30)}<div class="tbl-lead-b"><b>${esc(l.name)}</b><span class="tbl-lead-ph">${esc(l.phone)}</span></div></div></td>
+          <td>${tblCh(l)}</td>
+          <td><span class="tbl-stage ${stageCls(l.stage)}">${stageName(l.stage)}</span></td>
+          <td class="tbl-geo">${esc(l.geoName || '—')}</td>
+          <td class="tbl-bud">${(l.quals.budget || {}).value ? '<b>' + esc((l.quals.budget || {}).value) + '</b>' : '<span class="muted">—</span>'}</td>
+          <td><div class="tbl-qual"><div class="axes" style="width:48px;margin:0">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div><span class="tbl-qn">${l.axesFilled}/4</span></div></td>
+          <td>${l.source ? `<span class="tbl-src">${esc(srcName[l.source] || l.source)}</span>` : '<span class="muted">—</span>'}</td>
+          <td class="tbl-brk">${l.brokerName ? esc(l.brokerName.split(' ')[0]) : '<span class="muted">—</span>'}</td>
+          <td class="tbl-act">${tblAct(l)}</td>
+          <td class="tbl-nextc">${tblNext(l)}</td>
+          <td class="tbl-acts"><button class="tbl-ab" data-rowopen="${l.id}" title="Открыть карточку">${ic(I.user)}</button>${l.phone ? `<a class="tbl-ab" href="https://wa.me/${esc(l.phone.replace(/\\D/g, ''))}" target="_blank" title="WhatsApp" onclick="event.stopPropagation()">${ic(I.chat)}</a>` : ''}</td>
         </tr>`).join('')}
-      </tbody></table>
+      </tbody></table></div>
     </div>`}`;
 
   const setF = (k, v) => { PAGE_STATE[k] = v; render(); };
@@ -5182,7 +5193,13 @@ PAGES.funnel = async (root) => {
   $('#fBroker').addEventListener('change', (e) => setF('funnelBroker', e.target.value));
   $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', b.dataset.flag)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
-  $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => setF('funnelSort', h.dataset.sort)));
+  $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => {
+    const k = h.dataset.sort;
+    if (PAGE_STATE.funnelSort === k) PAGE_STATE.funnelSortDir = (PAGE_STATE.funnelSortDir === 'asc' ? 'desc' : 'asc');
+    else { PAGE_STATE.funnelSort = k; PAGE_STATE.funnelSortDir = 'desc'; }
+    render();
+  }));
+  $$('[data-rowopen]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openLeadModal(b.dataset.rowopen); }));
   wireLeadSelect(root);
   $('#importBtn').addEventListener('click', () => window.openMigration());
   const db = $('#dupesBtn');
