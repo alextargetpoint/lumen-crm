@@ -4287,11 +4287,22 @@ function fromNumberList(t) {
 /* коды стран (longest-match) — чтобы +33(FR) не путать с +34(ES) */
 const CALL_CODES = ['1', '7', '20', '27', '30', '31', '32', '33', '34', '36', '39', '40', '41', '43', '44', '45', '46', '47', '48', '49', '52', '54', '55', '57', '60', '61', '62', '63', '64', '65', '66', '81', '82', '84', '86', '90', '91', '92', '94', '98', '211', '212', '213', '216', '218', '220', '221', '233', '234', '250', '251', '254', '255', '256', '351', '352', '353', '357', '358', '359', '370', '371', '372', '373', '374', '375', '376', '377', '380', '381', '385', '386', '387', '420', '421', '852', '853', '855', '856', '880', '886', '960', '961', '962', '963', '964', '965', '966', '967', '968', '970', '971', '972', '973', '974', '975', '976', '977', '992', '993', '994', '995', '996', '998'].sort((a, b) => b.length - a.length);
 function countryCode(e) { const d = String(e || '').replace(/\D/g, ''); for (const c of CALL_CODES) if (d.startsWith(c)) return c; return d.slice(0, 2); }
+/* валидный E.164: 8–15 цифр И начинается с известного кода страны. Кривой CallerID (напр.
+   «+6970516036409017» — слипшиеся номера, код «69» не существует) операторы (тайский True) помечают
+   спамом и РЕЖУТ звук → его нельзя ставить как «От». */
+function validE164(p) {
+  const d = String(p || '').replace(/\D/g, '');
+  if (d.length < 8 || d.length > 15) return false;
+  return CALL_CODES.some(c => d.startsWith(c));
+}
 function pickCallerId(t, leadPhone) {
-  const list = fromNumberList(t); if (!list.length) return e164(t.fromNumber || '');
+  const all = fromNumberList(t);
+  const list = all.filter(validE164);                       /* кривые номера НЕ ставим как CallerID */
+  const def = e164(t.fromNumber || '');
+  if (!list.length) return validE164(def) ? def : (all[0] || def);   /* нет валидных — что есть (крайний случай) */
   const lc = countryCode(e164(leadPhone));
-  const m = list.find(fn => countryCode(fn) === lc);   /* тот же код страны → local presence */
-  return m || e164(t.fromNumber || list[0]);
+  const m = list.find(fn => countryCode(fn) === lc);        /* тот же код страны → local presence */
+  return m || (validE164(def) ? def : list[0]);             /* фолбэк — валидный дефолт, иначе первый валидный */
 }
 function callBase(db) { return (process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || '').replace(/\/$/, ''); }
 function twilioAuthHeader(t) { return 'Basic ' + Buffer.from((t.key || '') + ':' + (t.secret || '')).toString('base64'); }
@@ -9189,6 +9200,12 @@ const server = http.createServer(async (req, res) => {
       }
       const _replyDelayChanged = !!(b.ai && (b.ai.replyDelayMinSec != null || b.ai.replyDelayMaxSec != null));   /* сменили время ответа ИИ → пересчитать сроки висящих ответов */
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) Object.assign(db.settings[k], b[k]);   /* SEC/robustness: только plain-object, иначе Object.assign(obj,"строка") засоряет настройки числовыми ключами */
+      /* телефония: номера «От» → E.164 + выкидываем кривые (кривой CallerID типа +6970516036409017 → оператор режет звук). Авто-лечение: кривой дефолт заменяем первым валидным из списка. */
+      if (b.telephony) {
+        const tl = db.settings.telephony;
+        if (Array.isArray(tl.fromNumbers)) tl.fromNumbers = [...new Set(tl.fromNumbers.map(x => e164(typeof x === 'string' ? x : (x && x.number))).filter(validE164))];
+        if (tl.fromNumber) { const f = e164(tl.fromNumber); tl.fromNumber = validE164(f) ? f : ((tl.fromNumbers && tl.fromNumbers[0]) || ''); }
+      }
       /* безопасность: сколько устройств/IP разрешено АДМИНУ (владельцу) одновременно — ПК+ноутбук=2 (аудит не флагит в пределах). Трогаем ТОЛЬКО это поле auth, не passHash/sessions. */
       if (b.auth && typeof b.auth === 'object' && b.auth.ownerMaxDevices != null) { db.settings.auth = db.settings.auth || {}; db.settings.auth.ownerMaxDevices = Math.max(1, Math.min(5, Math.round(+b.auth.ownerMaxDevices) || 1)); }
       if (_replyDelayChanged) { try { const n = engine.rescheduleDueReplies(db); if (n) console.log('[reply-delay] пересчитано сроков ответа:', n); } catch (e) { console.error('[reschedule]', e && e.message); } }
