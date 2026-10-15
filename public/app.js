@@ -6257,10 +6257,10 @@ function channelBadges(l) {
   const waCls = wa === 'yes' ? 'ok' : wa === 'no' ? 'bad' : 'unk';
   const waTitle = wa === 'yes' ? 'У номера есть WhatsApp — сообщения дойдут. Нажмите, чтобы перепроверить.' : wa === 'no' ? 'У номера НЕ найден WhatsApp — сообщения НЕ дойдут. Проверьте номер. Нажмите, чтобы перепроверить.' : 'WhatsApp не проверен — нажмите, чтобы проверить.';
   const tgCls = onTg ? 'ok' : (ch.tg === 'no' ? 'bad' : 'unk');
-  const tgTitle = onTg ? 'Клиент на связи в Telegram' : (ch.tg === 'no' ? 'Telegram не найден' : 'Telegram — активности не было');
+  const tgTitle = onTg ? 'У номера есть Telegram. Нажмите, чтобы перепроверить.' : (ch.tg === 'no' ? 'У номера НЕ найден Telegram. Нажмите, чтобы перепроверить.' : 'Telegram не проверен — нажмите, чтобы проверить.');
   return `<span class="ch-badges">
     <span class="ch-b ${waCls}" id="chbWa" role="button" tabindex="0" title="${waTitle}">${ic(I.chat)}WhatsApp${wa === 'yes' ? ' ✓' : wa === 'no' ? ' ✕' : ' ?'}</span>
-    <span class="ch-b ${tgCls}" title="${tgTitle}">${ic(I.send)}Telegram${onTg ? ' ✓' : ch.tg === 'no' ? ' ✕' : ' ?'}</span>
+    <span class="ch-b ${tgCls}" id="chbTg" role="button" tabindex="0" title="${tgTitle}">${ic(I.send)}Telegram${onTg ? ' ✓' : ch.tg === 'no' ? ' ✕' : ' ?'}</span>
   </span>`;
 }
 /* местное время клиента по его поясу (lead.tz — смещение в часах от UTC) */
@@ -6552,9 +6552,23 @@ async function openLeadModal(id) {
     try { const r = await api.post(`/leads/${id}/wa-check`, {}); if (!silent) toast(r.exists ? '✓ WhatsApp есть' : 'WhatsApp у номера не найден', null, true); openLeadModal(id); }
     catch (e) { if (!silent) toast('Не вышло проверить', e.message); }
   };
+  const recheckTg = async (silent) => {
+    try { const r = await api.post(`/leads/${id}/tg-check`, {}); if (!silent) toast(r.exists ? '✓ Telegram есть' : 'Telegram у номера не найден', null, true); openLeadModal(id); }
+    catch (e) { if (!silent) toast('Не вышло проверить Telegram', e.message); }
+  };
   $('#chbWa', bd)?.addEventListener('click', () => recheckWa(false));
-  /* авто-проверка один раз для не проверенных активных лидов (экономим дневной лимит проверок/анти-бан; повтор — кликом по бейджу) */
-  { const ch = l.channels || {}; if (l.phone && !ch.wa && !['lost', 'deal'].includes(l.stage)) recheckWa(true); }
+  $('#chbTg', bd)?.addEventListener('click', () => recheckTg(false));
+  /* авто-проверка при открытии карточки — дотягиваем сразу WA+TG (один проход, один ре-рендер в конце).
+     Фоновый channelScanTick тоже проставляет по мере появления лидов. Экономим лимит: только если не проверено. */
+  { const ch = l.channels || {}; const act = l.phone && !['lost', 'deal'].includes(l.stage);
+    const needWa = act && (!ch.wa || ch.wa === 'unknown');
+    const needTg = act && (!ch.tg || ch.tg === 'unknown') && l.activeChannel !== 'tg';
+    if (needWa || needTg) (async () => {
+      let changed = false;
+      if (needWa) { try { await api.post(`/leads/${id}/wa-check`, {}); changed = true; } catch (_) {} }
+      if (needTg) { try { await api.post(`/leads/${id}/tg-check`, {}); changed = true; } catch (_) {} }
+      if (changed) { try { openLeadModal(id); } catch (_) {} }
+    })(); }
   $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id); }); }));
   $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
   $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });

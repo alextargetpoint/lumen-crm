@@ -3310,6 +3310,76 @@ function tgWorkerBase(db) { const r = store.getRegistry(); return normWorkerUrl(
 function tgWorkerToken(db) { const r = store.getRegistry(); return process.env.LUMEN_TG_WORKER_TOKEN || (r.platformTgWorker && r.platformTgWorker.token) || (db.settings.tgGray && db.settings.tgGray.token) || ''; }
 function tgWorkerReady(db) { return !!(tgWorkerBase(db) && tgWorkerToken(db)); }
 function tgGraySid(phone) { return 'tg_' + String(phone).replace(/[^0-9]/g, ''); }
+
+/* ── проверка наличия WhatsApp у номера (через серый WA-номер, ротация + дневной лимит на номер) ── */
+async function waPresenceCheck(db, lead) {
+  if (!lead || !lead.phone) return { error: 'нет номера' };
+  const g = db.settings.waGray || {};
+  if (!waWorkerReady(db) || !(g.numbers || []).length) return { soft: true, error: 'нет WA-воркера/номеров' };
+  let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { return { soft: true, error: 'WA-воркер недоступен' }; }
+  const CHECK_CAP = (g.checkCapPerDay || 40), today = new Date().toISOString().slice(0, 10);
+  const connected = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; });
+  if (!connected.length) return { soft: true, error: 'нет WA-номеров на связи' };
+  for (const n of connected) { if (n._checkDay !== today) { n._checkDay = today; n._checksToday = 0; } }
+  connected.sort((a, b) => (a._checksToday || 0) - (b._checksToday || 0));
+  const pick = connected[0];
+  if ((pick._checksToday || 0) >= CHECK_CAP) return { soft: true, capped: true, error: `дневной лимит проверок WA (${CHECK_CAP}/номер)` };
+  try {
+    const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(pick.phone) + '/check', { to: lead.phone });
+    pick._checksToday = (pick._checksToday || 0) + 1;
+    lead.channels = lead.channels || {}; lead.channels.wa = r.exists ? 'yes' : 'no'; lead.channels.waCheckedAt = Date.now(); store.save();
+    return { ok: true, exists: !!r.exists, wa: lead.channels.wa, checkedFrom: pick.phone, checksLeft: Math.max(0, CHECK_CAP - pick._checksToday), tried: r.tried || null };
+  } catch (e) { return { error: e.message }; }
+}
+/* ── проверка наличия Telegram у номера (через серый TG-номер; воркер должен уметь /sessions/:sid/check) ── */
+async function tgPresenceCheck(db, lead) {
+  if (!lead || !lead.phone) return { error: 'нет номера' };
+  const g = db.settings.tgGray || {};
+  if (!tgWorkerReady(db) || !(g.numbers || []).length) return { soft: true, error: 'нет TG-воркера/номеров' };
+  let live = {}; try { live = (await tgGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { return { soft: true, error: 'TG-воркер недоступен' }; }
+  const CHECK_CAP = (g.checkCapPerDay || 40), today = new Date().toISOString().slice(0, 10);
+  const connected = (g.numbers || []).filter(n => { const s = live[tgGraySid(n.phone)]; return s && s.status === 'connected'; });
+  if (!connected.length) return { soft: true, error: 'нет TG-номеров на связи' };
+  for (const n of connected) { if (n._tgCheckDay !== today) { n._tgCheckDay = today; n._tgChecksToday = 0; } }
+  connected.sort((a, b) => (a._tgChecksToday || 0) - (b._tgChecksToday || 0));
+  const pick = connected[0];
+  if ((pick._tgChecksToday || 0) >= CHECK_CAP) return { soft: true, capped: true, error: `дневной лимит проверок TG (${CHECK_CAP}/номер)` };
+  try {
+    const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(pick.phone) + '/check', { to: lead.phone });
+    pick._tgChecksToday = (pick._tgChecksToday || 0) + 1;
+    lead.channels = lead.channels || {}; lead.channels.tg = r.exists ? 'yes' : 'no'; lead.channels.tgCheckedAt = Date.now(); store.save();
+    return { ok: true, exists: !!r.exists, tg: lead.channels.tg, checkedFrom: pick.phone };
+  } catch (e) {
+    const unsupported = /\b404\b|not found|no route|unknown method|cannot post|не поддерж/i.test(String(e.message || ''));
+    return { error: e.message, unsupported, soft: unsupported };   /* воркер без /check — не считаем фейлом номера (статус остаётся unknown) */
+  }
+}
+/* ── АВТО-СКАН каналов: по мере появления лидов сам проверяет WhatsApp/Telegram и ставит есть/нет (без кнопки) ── */
+let _chScanBusy = false;
+async function channelScanTick() {
+  if (_chScanBusy) return; _chScanBusy = true;
+  try {
+    for (const tid of store.listTenants()) {
+      await store.runInTenant(tid, async () => {
+        const db = store.get();
+        if (db.settings.channels && db.settings.channels.autoScan === false) return;   /* выключатель */
+        const waOn = waWorkerReady(db), tgOn = tgWorkerReady(db);
+        if (!waOn && !tgOn) return;
+        let budget = 6; let waStop = !waOn, tgStop = !tgOn;   /* мягкая нагрузка: ~6 проверок за тик на тенанта */
+        for (const l of (db.leads || [])) {
+          if (budget <= 0 || (waStop && tgStop)) break;
+          if (!l.phone || ['lost', 'deal'].includes(l.stage) || l._demo) continue;
+          const ch = l.channels || (l.channels = {});
+          if (!waStop && (!ch.wa || ch.wa === 'unknown')) { const r = await waPresenceCheck(db, l); budget--; if (r.capped || (r.soft && !r.ok)) waStop = true; }
+          if (budget <= 0) break;
+          if (!tgStop && (!ch.tg || ch.tg === 'unknown')) { const r = await tgPresenceCheck(db, l); budget--; if (r.capped || (r.soft && !r.ok)) tgStop = true; }
+        }
+      });
+    }
+  } catch (e) { console.error('[channelScan]', e.message); }
+  finally { _chScanBusy = false; }
+}
+setInterval(() => { channelScanTick().catch(() => {}); }, 3 * 60e3);   /* ~3 мин; cost-safe: без $, с дневным лимитом проверок на номер (анти-бан) */
 async function tgGrayApi(db, method, pathx, body) {
   const base = tgWorkerBase(db); if (!base) throw new Error('TG-воркер не настроен (LUMEN_TG_WORKER_URL / platformTgWorker)');
   const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 20000);   /* таймаут: зависший TG-воркер не должен блокировать очередь отправки */
@@ -8046,28 +8116,25 @@ const server = http.createServer(async (req, res) => {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
       if (!lead.phone) return json(res, 400, { error: 'у лида нет номера' });
-      const g = db.settings.waGray || {};
       if (!waWorkerReady(db)) return json(res, 400, { error: 'WhatsApp-воркер не подключён. Раздел «Номера» → «Подключить по QR».' });
-      if (!(g.numbers || []).length) return json(res, 400, { error: 'Нет ни одного своего номера. Раздел «Номера» → «Подключить по QR» → добавьте и отсканируйте.' });
-      let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return json(res, 400, { error: 'WhatsApp-воркер недоступен (проверьте URL/токен в разделе «Номера»)' }); }
-      /* РОТАЦИЯ + ЛИМИТ: массовая проверка onWhatsApp с ОДНОГО номера триггерит бан. Поэтому берём
-         подключённый номер с НАИМЕНЬШИМ числом проверок за сегодня (равномерная нагрузка на пул) и
-         держим дневной потолок на номер. Счётчик сбрасывается в новый день. */
-      const CHECK_CAP = (g.checkCapPerDay || 40);
-      const today = new Date().toISOString().slice(0, 10);
-      const connected = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; });
-      if (!connected.length) return json(res, 400, { error: 'Проверять НЕЧЕМ: ни один ваш номер сейчас не на связи. Раздел «Номера» → «Подключить по QR» (после редеплоя воркера сессию нужно пере-сканировать).' });
-      for (const n of connected) { if (n._checkDay !== today) { n._checkDay = today; n._checksToday = 0; } }
-      connected.sort((a, b) => (a._checksToday || 0) - (b._checksToday || 0));
-      const pick = connected[0];
-      if ((pick._checksToday || 0) >= CHECK_CAP) return json(res, 429, { error: `Дневной лимит проверок исчерпан на всех номерах (${CHECK_CAP}/номер) — защита от бана. Подключите ещё номер по QR или повторите завтра.` });
-      const sid = waGraySid(pick.phone);
-      try {
-        const r = await waGrayApi(db, 'POST', '/sessions/' + sid + '/check', { to: lead.phone });
-        pick._checksToday = (pick._checksToday || 0) + 1;
-        lead.channels = lead.channels || {}; lead.channels.wa = r.exists ? 'yes' : 'no'; lead.channels.waCheckedAt = Date.now(); store.save();
-        return json(res, 200, { exists: !!r.exists, wa: lead.channels.wa, checkedFrom: pick.phone, checksLeft: Math.max(0, CHECK_CAP - pick._checksToday), tried: r.tried || null });
-      } catch (e) { return json(res, 400, { error: e.message }); }
+      if (!((db.settings.waGray || {}).numbers || []).length) return json(res, 400, { error: 'Нет ни одного своего номера. Раздел «Номера» → «Подключить по QR» → добавьте и отсканируйте.' });
+      const r = await waPresenceCheck(db, lead);
+      if (r.capped) return json(res, 429, { error: `Дневной лимит проверок исчерпан на всех номерах — защита от бана. Подключите ещё номер по QR или повторите завтра.` });
+      if (r.error) return json(res, 400, { error: r.error });
+      return json(res, 200, { exists: !!r.exists, wa: r.wa, checkedFrom: r.checkedFrom, checksLeft: r.checksLeft, tried: r.tried || null });
+    }
+    /* проверка наличия Telegram у номера (по кнопке/бейджу) — через серый TG-номер */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/tg-check$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      if (!lead.phone) return json(res, 400, { error: 'у лида нет номера' });
+      if (!tgWorkerReady(db)) return json(res, 400, { error: 'Telegram-воркер не подключён. Раздел «Номера» → свой Telegram-номер по QR.' });
+      if (!((db.settings.tgGray || {}).numbers || []).length) return json(res, 400, { error: 'Нет ни одного своего Telegram-номера для проверки. Раздел «Номера» → подключите TG-номер по QR.' });
+      const r = await tgPresenceCheck(db, lead);
+      if (r.capped) return json(res, 429, { error: 'Дневной лимит проверок Telegram исчерпан — защита от бана, повторите завтра.' });
+      if (r.unsupported) return json(res, 501, { error: 'Текущий Telegram-воркер не умеет проверять номер (нужно обновление воркера).' });
+      if (r.error) return json(res, 400, { error: r.error });
+      return json(res, 200, { exists: !!r.exists, tg: r.tg, checkedFrom: r.checkedFrom });
     }
 
     /* файлы в карточку лида: презентации, PDF, картинки, документы — полный менеджмент */
