@@ -18621,6 +18621,7 @@ PAGES.settings = async (root) => {
   const tgbCentral = !!(s.tgBridge && s.tgBridge.central);
   const tgbBotHandle = (s.tgBridge && s.tgBridge.centralBot) ? '@' + s.tgBridge.centralBot : 'бота Lumen';
   const tgBridgeForm = tgbCentral ? `
+      <div id="tgbReadyWarn"></div>
       <div class="muted" style="font-size:11.8px;margin:0 0 14px">Брокер не держит CRM открытой. Входящие клиента приходят ему в личный Telegram — он отвечает <b>reply</b>, ответ уходит клиенту в WhatsApp. Вся переписка логируется в CRM.</div>
       <div class="lc-hint info" style="margin-bottom:12px">${ic(I.spark)}<span>Бот уже подключён платформой — <b>заводить своего бота не нужно</b>. Просто привяжитесь по ключу ниже.</span></div>
       <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">
@@ -18748,6 +18749,12 @@ PAGES.settings = async (root) => {
     const box = $('#tgbBrokers'); if (!box) return;
     try {
       const d = await api.get('/tgbridge');
+      /* предупреждение: бот платформы не подключён (нет токена) → /start и привязка не работают,
+         новый ключ не поможет. Диагностировано на проде: tokenSet=false у центрального бота. */
+      const warn = $('#tgbReadyWarn');
+      if (warn) warn.innerHTML = (d.tokenSet === false || !d.ready)
+        ? `<div class="lc-hint warn" style="margin-bottom:12px">${ic(I.shield)}<span><b>Центральный бот${d.centralBot ? ' @' + esc(d.centralBot) : ''} ещё не подключён</b>${d.tokenSet === false ? ' — у бота не задан токен' : ' — вебхук не настроен'}, поэтому команда <code>/start</code> и привязка по ключу пока не сработают (бот не получает сообщения). Генерация нового ключа это не исправит. ${s.isPrimary ? 'Подключите токен центрального бота ниже или задайте <b>LUMEN_TG_BRIDGE_TOKEN</b> на сервисе lumen-crm в Railway.' : 'Нужно действие оператора платформы — подключить токен центрального бота. Ваши ключи при этом сохранятся.'}</span></div>`
+        : '';
       const deepLink = (code) => d.central && d.centralBot ? `https://t.me/${d.centralBot}?start=${code}` : null;
       const rows = (d.brokers || []).map(b => { const dl = deepLink(b.code); return `<div class="set-row" style="padding:7px 0">
           <div class="sp"><div class="sl">${esc(b.name)}</div><div class="sd">${b.bound ? 'привязан к Telegram' : 'ещё не привязан'}</div></div>
