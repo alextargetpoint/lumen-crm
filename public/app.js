@@ -10628,9 +10628,9 @@ PAGES.automations = async (root) => {
             <input class="gi" data-stname value="${esc(st.name)}" style="flex:1">
             <button class="btn-ghost" data-stmv="-1">${ic(I.chev)}</button>
             <button class="btn-ghost" data-stmv="1" style="transform:rotate(90deg)">${ic(I.chev)}</button>
-            ${st.sys ? '<span class="mini-badge" title="Системная: на ней завязаны ИИ и цепочки — можно переименовать и подвинуть, но не удалить">🔒</span>'
-              : `<label class="switch" title="Показывать в канбане"><input type="checkbox" data-sthide ${(s.stagesCfg?.hidden || []).includes(st.id) ? '' : 'checked'}><span class="tr"></span><span class="th"></span></label>
-                 <button class="btn-ghost" data-stdel>${ic(I.x)}</button>`}
+            <label class="switch" title="Показывать в канбане"><input type="checkbox" data-sthide ${(s.stagesCfg?.hidden || []).includes(st.id) ? '' : 'checked'}><span class="tr"></span><span class="th"></span></label>
+            ${st.sys ? '<span class="mini-badge" title="Системная: на ней завязаны ИИ и цепочки — переименовать, подвинуть и скрыть из канбана можно, удалить нельзя">🔒</span>'
+              : `<button class="btn-ghost" data-stdel>${ic(I.x)}</button>`}
           </div>`).join('')}</div>
           <div class="lc-note-row" style="margin-top:9px">
             <input id="stNew" placeholder="Своя стадия (например: Бронь / Договор / Ипотека)">
@@ -10655,6 +10655,7 @@ PAGES.automations = async (root) => {
   // сегментированная суб-навигация: показываем одну группу карточек за раз
   const autoGrid = root.querySelector('#autoGrid');
   const applyAg = (g) => {
+    PAGE_STATE.funnelAg = g;   /* запоминаем активную группу — сохранение воронки не выкидывает в «Первую линию» */
     $$('#autoSeg .seg-b', root).forEach(b => b.classList.toggle('on', b.dataset.ag === g));
     let shown = 0;
     $$('[data-ag]', autoGrid).forEach(c => { const v = c.dataset.ag === g; c.style.display = v ? '' : 'none'; if (v) shown++; });
@@ -10662,7 +10663,7 @@ PAGES.automations = async (root) => {
     closePop();
   };
   $$('#autoSeg .seg-b', root).forEach(b => b.addEventListener('click', () => applyAg(b.dataset.ag)));
-  applyAg('first');
+  applyAg(PAGE_STATE.funnelAg || 'first');
   const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
   const repPatch = () => ({
     daily: root.querySelector('[data-auto="rep_daily"]').checked,
