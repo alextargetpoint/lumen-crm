@@ -7228,6 +7228,17 @@ async function renderChat(id, rebuild) {
     const edDate = `${_ed.getFullYear()}-${_p2(_ed.getMonth() + 1)}-${_p2(_ed.getDate())}`;
     const edTime = `${_p2(_ed.getHours())}:${_p2(_ed.getMinutes())}`;
     const needDraft = nt.canEdit && !nt.fullText;
+    /* #603: карточка «ИИ запланировал сообщение» занимала много места и её «нельзя было убрать».
+       Добавлен сворачивающий тумблер (localStorage) — сворачивается в одну строку, НЕ выключая ИИ. */
+    const _ntCol = (() => { try { return localStorage.getItem('lumen_ntp_collapsed') === '1'; } catch (_) { return false; } })();
+    if (_ntCol) return `<div class="chat-chain ntp2 ntp2-collapsed">
+      <span class="ntp2-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5z"/></svg></span>
+      <div class="ntp2-info"><div class="ntp2-l2" style="margin:0"><b style="color:var(--navy-900);font-size:13px">${isRe ? 'ИИ дожмёт' : 'ИИ коснётся'}</b> · ${esc(when)} · ${esc(chn2)}</div></div>
+      <div class="ntp2-ctrls">
+        <button class="btn btn-accent ntp2-send" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="Отправить сейчас">${ic(I.send || I.bolt)}</button>
+        <button class="ntp2-cbtn" data-ntuncollapse="1" title="Развернуть карточку">${ic(I.chev)}</button>
+      </div>
+    </div>`;
     return `<div class="chat-chain ntp2${isRe ? ' reengage' : ''}" ${needDraft ? 'data-ntdraft="1"' : ''}>
       <div class="ntp2-bar">
         <span class="ntp2-ic">${ic(I.spark || I.bolt)}</span>
@@ -7237,6 +7248,7 @@ async function renderChat(id, rebuild) {
           <div class="ntp2-l3">${caption}</div>
         </div>
         <div class="ntp2-ctrls">
+          <button class="ntp2-cbtn" data-ntcollapse="1" title="Свернуть карточку (ИИ продолжит работать)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
           ${nt.canEdit ? `<button class="ntp2-cbtn" data-ntedit="time" title="Перенести день и время">${ic(I.clock)}</button>` : ''}
           <button class="ntp2-cbtn" data-ntpause="1" title="Поставить ИИ на паузу">${ic(I.pause)}</button>
           <button class="btn btn-accent ntp2-send" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="${isRe ? 'Дожать клиента сейчас, не дожидаясь срока' : 'Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)'}">${ic(I.send || I.bolt)}Отправить сейчас</button>
@@ -7350,6 +7362,9 @@ async function renderChat(id, rebuild) {
     try { await api.post('/leads/' + l.id + '/next-touch', { text: ta.value }); const sv = pane.querySelector('[data-ntautosave]'); if (sv) { sv.textContent = 'сохранено'; sv.hidden = false; } } catch (_) {}
   }, 1100); }); } }
   $$('[data-ntpause]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { await api.patch('/leads/' + l.id, { ai: { enabled: false } }); toast('ИИ на паузе', 'Автосообщения не уйдут. Вернуть — тумблером «Автопилот».', true); setTimeout(() => { try { render(); } catch (_) {} }, 600); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
+  /* #603: свернуть/развернуть карточку «ИИ запланировал сообщение» (визуально, ИИ не выключается) */
+  $$('[data-ntcollapse]', pane).forEach(b => b.addEventListener('click', () => { try { localStorage.setItem('lumen_ntp_collapsed', '1'); } catch (_) {} try { render(); } catch (_) {} }));
+  $$('[data-ntuncollapse]', pane).forEach(b => b.addEventListener('click', () => { try { localStorage.setItem('lumen_ntp_collapsed', '0'); } catch (_) {} try { render(); } catch (_) {} }));
   $$('[data-ntsave]', pane).forEach(b => b.addEventListener('click', async (e) => {
     const btn = e.currentTarget, box = pane.querySelector('.cc-edit'); if (!box) return;
     const text = (box.querySelector('#ntEditText') || {}).value || '';

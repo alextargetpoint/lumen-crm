@@ -687,3 +687,11 @@ input[type=number] { -moz-appearance: textfield; }
 .po-ruser b{font-size:13px;font-weight:600;display:block}
 .po-ruser span{font-size:11.5px;color:var(--muted)}
 @media(max-width:720px){.po-rhead,.po-rr{grid-template-columns:1fr 1fr}.po-rdate{grid-column:1}.po-ruser{grid-column:2}.po-rpres,.po-rchange{grid-column:1/-1}}
+
+/* #603: свёрнутая карточка «ИИ запланировал сообщение» в диалоге — одна строка */
+.chat-chain.ntp2.ntp2-collapsed{display:flex;align-items:center;gap:11px;padding:8px 14px}
+.ntp2-collapsed .ntp2-ic{width:30px;height:30px;border-radius:9px}
+.ntp2-collapsed .ntp2-ic svg{width:16px;height:16px}
+.ntp2-collapsed .ntp2-info{flex:1;min-width:0}
+.ntp2-collapsed .ntp2-ctrls{display:flex;align-items:center;gap:6px;flex:none}
+.ntp2-collapsed .ntp2-send{padding:6px 11px}
