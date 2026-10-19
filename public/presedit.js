@@ -152,7 +152,7 @@
           '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '"><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
       }
       var i0 = g.idx[0];
-      return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + '" data-pg="' + i0 + '">' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b></div>';
+      return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + '" data-pg="' + i0 + '">' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span></div>';
     }).join('');
     var hasBroker = false; groups.forEach(function (g) { if (g.type === 'broker') hasBroker = true; });
     if (S.pres.brokerAppendix && S.pres.brokerAppendix.enabled && !hasBroker) {
@@ -162,9 +162,10 @@
   }
   function navigator_() {
     var items = S.isColl ? navCollection() : sections().map(thumbRow).join('');
-    var hd = '<div class="pe-nav-hd"><span>' + (S.isColl ? 'Состав подборки' : 'Страницы') + '</span>' +
+    var hd = '<div class="pe-nav-hd"><span>' + (S.isColl ? 'Структура презентации' : 'Страницы') + '</span>' +
       '<div style="display:flex;gap:4px"><button class="pe-nav-sel' + (S.multiMode ? ' on' : '') + '" data-act="multiToggle">' + (S.multiMode ? 'Готово' : 'Выбрать') + '</button>' +
       '<button class="pe-nav-add" data-act="' + (S.isColl ? 'addobj' : 'addpage') + '" title="' + (S.isColl ? 'Добавить объекты' : 'Добавить страницу') + '">' + ic('plus') + '</button></div></div>';
+    if (S.isColl) items += '<button class="pe-addobj-btn" data-act="addobj">' + ic('plus') + 'Добавить объект</button>';
     var bulk = '';
     if (S.multiMode) {
       var n = (S.multiSel || []).length;
@@ -299,11 +300,30 @@
   }
 
   /* ---------- CONTENT TAB (per-family field editors) ---------- */
+  function isCollIntro(s) { return S.isColl && s && s.family === 'hero' && !/^o\d+_/.test(s.id || ''); }
   function contentTab() {
     var s = curSection(); if (!s) return '';
+    /* ТЗ §8: вступление ПОДБОРКИ — контекстные поля (клиент/заголовок/приветствие),
+       без обязательного поля цены, которое уместно только для обложки объекта */
+    if (isCollIntro(s)) return collectionIntroPanel(s) + readinessCard();
     var h = '<div class="pe-sec-label">' + esc(FAM_LABEL[s.family] || s.family) + '</div>';
     h += FIELDS[s.family] ? FIELDS[s.family](s) : '<p class="hint">Нет настраиваемых полей.</p>';
     h += readinessCard();
+    return h;
+  }
+  function collectionIntroPanel(s) {
+    var objCount = (S.pres.projectIds || []).length || (S.projects || []).length;
+    var pageCount = (S.chk && S.chk.pageCount) || sections().filter(function (x) { return x.enabled !== false; }).length;
+    var showClient = S.pres.showClientName !== false;
+    var h = '<div class="pe-sec-label">Вступление подборки</div>';
+    h += '<div class="pe-field"><label>Клиент</label><input class="pe-input" id="peClientName" value="' + esc(S.pres.clientName || '') + '" placeholder="Имя клиента"></div>';
+    h += fld('Заголовок', inp('title', cval(s, 'title'), 'Заголовок подборки'), s, 'title');
+    h += fld('Приветствие', txt('subtitle', cval(s, 'subtitle'), 'Короткое обращение к клиенту'), s, 'subtitle');
+    h += '<div class="pe-switchrow"><span style="font-size:13px">Показать имя клиента</span><button class="pe-toggle' + (showClient ? ' on' : '') + '" data-act="toggleClient"></button></div>';
+    h += '<div class="pe-sec-label" style="margin-top:18px">О подборке</div>';
+    h += '<div class="pe-aboutrow">' + ic('doc') + '<span>Объектов в подборке</span><b>' + objCount + '</b></div>';
+    h += '<div class="pe-aboutrow">' + ic('doc') + '<span>Страниц в презентации</span><b>' + pageCount + '</b></div>';
+    h += '<div class="pe-note" style="margin-top:14px">' + ic('circle') + '<div>Изменения действуют только в этой подборке.</div></div>';
     return h;
   }
   function fld(label, inner, srcSec, srcKey) {
@@ -499,6 +519,7 @@
   /* ================= WIRING ================= */
   function wire() {
     root.querySelectorAll('[data-act]').forEach(function (el) {
+      if (el.closest('#peInsp')) return;   /* кнопки инспектора вешает wireInsp/wireAddPanel — иначе двойной клик (тумблеры не срабатывали) */
       var act = el.getAttribute('data-act');
       el.addEventListener(actEvent(act), function (e) { handle(act, el, e); });
     });
@@ -512,6 +533,8 @@
     mountVarMinis();   /* миниатюры вариантов компоновки красятся на каждый рендер, не только при переключении вкладки */
   }
   function wireAddPanel() {
+    var ib = document.getElementById('peInsp');
+    if (ib) ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener('click', function (e) { handle(a, el, e); }); });
     var s = document.getElementById('peBlSearch'); if (!s) return;
     s.addEventListener('input', function () {
       var v = s.value.toLowerCase();
@@ -533,6 +556,7 @@
     ib.querySelectorAll('[data-pay]').forEach(function (el) { el.addEventListener('input', onPayBase); });
     ib.querySelectorAll('[data-cursel]').forEach(function (el) { el.addEventListener('change', onCur); });
     ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener('click', function (e) { handle(a, el, e); }); });
+    var cn = ib.querySelector('#peClientName'); if (cn) cn.addEventListener('input', function () { S.pres.clientName = cn.value; scheduleSave(); });
   }
 
   function onFieldInput(key, val) {
@@ -694,6 +718,7 @@
       case 'pickPalette': mutate(function () { S.pres.theme.paletteId = el.getAttribute('data-pal'); S.pres.theme.presetId = null; }); break;
       case 'pickFont': mutate(function () { S.pres.theme.fontPairId = el.value; }); break;
       case 'applyAll': scheduleSave(); toast('Оформление применено ко всем страницам'); break;
+      case 'toggleClient': mutate(function () { S.pres.showClientName = S.pres.showClientName === false; }); break;
       case 'detach': mutate(function () { setOverride(s, el.getAttribute('data-key'), cval(s, el.getAttribute('data-key'))); }); break;
       case 'toggleBroker': mutate(function () { S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = !S.pres.brokerAppendix.enabled; }); break;
       case 'pickBroker': S.pres.brokerId = el.value; S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = true; scheduleSave(); break;
