@@ -1656,6 +1656,7 @@ function leadView(db, l) {
   return Object.assign({}, l, {
     brokerName: (db.brokers.find(b => b.id === l.broker) || {}).name || null,
     geoName: db.settings.geoNames[l.geo] || l.geo,
+    phoneInvalid: l.phone ? !validE164(l.phone) : false,   /* #578/#585: кривой caller-ID (напр. +69…, слипшиеся номера) — звук режут операторы */
     axesFilled,
     wakeScore: l.stage === 'sleeping' ? engine.wakeScore(db, l) : null,
     lastText,

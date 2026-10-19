@@ -695,3 +695,7 @@ input[type=number] { -moz-appearance: textfield; }
 .ntp2-collapsed .ntp2-info{flex:1;min-width:0}
 .ntp2-collapsed .ntp2-ctrls{display:flex;align-items:center;gap:6px;flex:none}
 .ntp2-collapsed .ntp2-send{padding:6px 11px}
+
+/* #578/#585: бейдж невалидного номера лида */
+.ph-inv{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:#b4461f;background:rgba(201,80,30,.1);border:1px solid rgba(201,80,30,.22);border-radius:6px;padding:1px 6px;margin-left:5px;vertical-align:middle;white-space:nowrap}
+.ph-inv svg{width:11px;height:11px}
