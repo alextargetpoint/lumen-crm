@@ -16830,10 +16830,42 @@ function wireRbac(root) {
     });
   });
   { const sr = $('#rbacSearch', root); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.rbac-row', root).forEach(r => { r.style.display = (!q || (r.dataset.name || '').includes(q)) ? '' : 'none'; }); $$('.rbac-grp', root).forEach(g => { const any = [...g.querySelectorAll('.rbac-row')].some(r => r.style.display !== 'none'); g.style.display = any ? '' : 'none'; }); }); }
-  { const ad = $('#rbacAdd', root); if (ad) ad.addEventListener('click', () => {
-    const bd = modal({ title: 'Новый сотрудник', sub: 'Имя + роль — доступы применятся сразу', body: `<div class="form-row"><label>Имя</label><input id="rbNm" placeholder="Имя Фамилия"></div><div class="form-row"><label>Роль</label><select id="rbRl" class="sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>`, actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async () => { const nm = $('#rbNm', bd).value.trim(); if (!nm) { toast('Впиши имя'); return false; } try { await api.post('/brokers', { name: nm, roleType: $('#rbRl', bd).value }); toast('Сотрудник добавлен', nm, true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] });
-    setTimeout(() => { const i = $('#rbNm', bd); if (i) i.focus(); }, 30);
-  }); }
+  { const ad = $('#rbacAdd', root); if (ad) ad.addEventListener('click', () => openInviteEmployee()); }
+}
+/* Пригласить сотрудника: e-mail-приглашение + роль + ПЕРСОНАЛЬНАЯ настройка разделов сразу (ТЗ: раздача доступов до конца) */
+function openInviteEmployee() {
+  const secGrid = (rt) => { const defHide = roleTplHide(rt); return RBAC_SECTIONS.map(s => `<button type="button" class="rbac-sec ${defHide.includes(s) ? 'off' : 'on'}" data-nsec="${s}">${esc((NAV[s] || {}).name || s)}</button>`).join(''); };
+  const bd = modal({
+    title: 'Пригласить сотрудника', sub: 'E-mail для приглашения + роль. Разделы можно сразу подстроить под человека.', wide: true,
+    body: `
+      <div class="form-row"><label>Имя</label><input id="rbNm" placeholder="Имя Фамилия"></div>
+      <div class="form-row"><label>E-mail <span class="muted" style="font-weight:400">— на него уйдёт ссылка-приглашение</span></label><input id="rbEmail" type="email" placeholder="employee@agency.com" autocomplete="off"></div>
+      <div class="form-row"><label>Телефон <span class="muted" style="font-weight:400">— необязательно</span></label><input id="rbPhone" placeholder="+66…"></div>
+      <div class="form-row"><label>Роль</label><select id="rbRl" class="sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === 'marketer' ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div style="font-size:12px;font-weight:600;margin:6px 0 7px">Разделы, которые увидит сотрудник <span class="muted" style="font-weight:400">· серые скрыты, клик — открыть/скрыть</span></div>
+      <div class="rbac-secs" id="rbSecs">${secGrid('marketer')}</div>`,
+    actions: [
+      { label: 'Отправить приглашение', cls: 'btn-accent', onClick: async () => {
+        const email = ($('#rbEmail', bd).value || '').trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('Нужен корректный e-mail'); return false; }
+        const hidePages = [...bd.querySelectorAll('#rbSecs .rbac-sec.off')].map(x => x.dataset.nsec);
+        try {
+          const r = await api.post('/brokers/invite', { name: ($('#rbNm', bd).value || '').trim(), email, phone: ($('#rbPhone', bd).value || '').trim(), roleType: $('#rbRl', bd).value, hidePages });
+          if (r.mailed) toast('Приглашение отправлено', email, true);
+          else { if (r.link) { try { navigator.clipboard.writeText(r.link); } catch (_) {} } toast('Сотрудник создан', r.mailErr ? ('письмо не ушло (' + r.mailErr + ') — ссылка скопирована, передайте вручную') : 'ссылка-приглашение скопирована', true); }
+          await loadState(); render();
+        } catch (e) { toast('Не вышло', e.message); return false; }
+      } },
+      { label: 'Отмена' },
+    ],
+  });
+  setTimeout(() => {
+    const wireSecs = () => bd.querySelectorAll('#rbSecs .rbac-sec').forEach(c => c.addEventListener('click', () => { c.classList.toggle('off'); c.classList.toggle('on'); }));
+    const rl = $('#rbRl', bd), secs = $('#rbSecs', bd);
+    if (rl && secs) rl.addEventListener('change', () => { secs.innerHTML = secGrid(rl.value); wireSecs(); });
+    wireSecs();
+    const i = $('#rbNm', bd); if (i) i.focus();
+  }, 30);
 }
 /* HR · подбор — бета-скаффолд (раздел в разработке, помечен явно) */
 const HR_STAGES = [['new', 'Отклики'], ['screen', 'Скрининг'], ['interview', 'Интервью'], ['offer', 'Оффер'], ['hired', 'Вышел']];

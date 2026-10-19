@@ -6731,6 +6731,9 @@ const server = http.createServer(async (req, res) => {
       }
       else if (name) br.name = name;
       if (phone) br.phone = phone;   /* телефон задан при приглашении (или обновлён) */
+      /* роль + персональные правки разделов прямо при приглашении (ТЗ: раздача доступов до конца) */
+      if (bb.roleType && ['broker', 'assistant', 'marketer', 'analyst', 'manager'].includes(bb.roleType)) br.roleType = bb.roleType;
+      if (Array.isArray(bb.hidePages)) br.hidePages = bb.hidePages.filter(x => typeof x === 'string').slice(0, 40);
       const token = crypto.randomBytes(16).toString('hex');
       reg.invites[token] = { tid, brokerId: br.id, email, at: Date.now() };
       reg.byEmail[email] = tid;
