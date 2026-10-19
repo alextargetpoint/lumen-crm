@@ -7904,6 +7904,7 @@ const server = http.createServer(async (req, res) => {
           if (nc && nc.name) lead.tags = [...new Set([...(lead.tags || []), nc.name])];
         }
         if (b.custom) { lead.custom = lead.custom || {}; Object.assign(lead.custom, b.custom); }
+        if (Array.isArray(b.tags)) lead.tags = [...new Set(b.tags.map(t => String(t).slice(0, 40)).filter(Boolean))].slice(0, 20);   /* ручные теги (напр. «неверный номер» для #580) */
         /* рекламная разметка лида (кампания/адсет/объявление + ответы лид-формы). Для теста/ручной привязки.
            Матчинг на дерево креативов (сильные стороны) — matchAds при наличии adId. */
         if (b.ads && typeof b.ads === 'object') {

@@ -1740,14 +1740,17 @@ window.openGrayRescan = async function (phone) {
   bd.addEventListener('click', (e) => { if (e.target.closest('.m-actions') || e.target === bd) stop(); });
   let r0; try { r0 = await api.post('/wa/gray/rescan', { phone }); } catch (e) { const box = $('#rescanQr', bd); if (box) box.innerHTML = `<div style="color:var(--bad)">Не вышло: ${esc(e.message)}</div>`; return; }
   if (r0 && r0.ok === false) { const box = $('#rescanQr', bd); if (box) box.innerHTML = `<div style="color:var(--bad)">Не вышло: ${esc(r0.error || 'ошибка воркера')}</div>`; return; }
+  let ticks = 0;   /* #607: если QR так и не появился (≈25с) — номер мог быть заблокирован WhatsApp, не крутим бесконечно */
   timer = setInterval(async () => {
     if (!document.body.contains(bd)) { stop(); return; }
     const box = $('#rescanQr', bd); if (!box) { stop(); return; }
     let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(phone)); } catch (e) { return; }
     const st = r.session && r.session.status;
-    if (st === 'qr' && r.session.qr) box.innerHTML = `<img src="${r.session.qr}" style="width:250px;height:250px;border-radius:12px;background:#fff;padding:8px" alt="QR">`;
+    ticks++;
+    if (st === 'qr' && r.session.qr) { ticks = 0; box.innerHTML = `<img src="${r.session.qr}" style="width:250px;height:250px;border-radius:12px;background:#fff;padding:8px" alt="QR">`; }
     else if (st === 'connected') { box.innerHTML = `<div style="font-size:16px;color:var(--good,#2f9d74);font-weight:650">${ic(I.check)} Номер пере-привязан${r.session.phone ? ' · +' + esc(r.session.phone) : ''}</div>`; stop(); setTimeout(() => { closeModal(); if (typeof render === 'function') render(); }, 1600); }
-    else if (st === 'logged_out') { box.innerHTML = '<div style="color:var(--bad)">Вышел из аккаунта — нажмите «Пересканировать» ещё раз.</div>'; stop(); }
+    else if (st === 'logged_out') { box.innerHTML = `<div style="color:var(--bad);line-height:1.5">${ic(I.shield)} Номер вышел из аккаунта.<br>Если это повторяется — номер <b>мог быть заблокирован WhatsApp</b>. Нажмите «Пересканировать» ещё раз, а если QR не приходит — подключите <b>новый номер</b>.</div>`; stop(); }
+    else if (ticks >= 14) { box.innerHTML = `<div style="color:var(--bad);line-height:1.5">${ic(I.shield)} QR так и не пришёл за ~25 секунд.<br>Воркер не отвечает или номер <b>заблокирован WhatsApp</b> (QR тогда не помогает). Попробуйте ещё раз или подключите <b>новый номер</b>.</div>`; stop(); }
     else box.innerHTML = 'Подключение…';
   }, 1800);
 };
@@ -6384,6 +6387,7 @@ async function openLeadModal(id) {
       <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
       ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
     </div>
+    ${l.phoneInvalid ? `<div class="lc-badphone"><span class="lc-badphone-tx">${ic(I.flag)}Номер <b>${esc(l.phone)}</b> невалиден (не E.164) — операторы режут звук и доставку.</span><button class="btn btn-sm" id="mSpam">В спам / неверный номер</button></div>` : ''}
     <div class="lp-sec">Следующий шаг</div>
     <div class="lc-note-row">
       <input id="lcNaText" placeholder="например: дожать по подборке" value="${esc((l.nextAction || {}).text || '')}">
@@ -6590,6 +6594,11 @@ async function openLeadModal(id) {
     })(); }
   $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id); }); }));
   $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
+  $('#mSpam', bd)?.addEventListener('click', async (e) => {   /* #580: невалидный номер → в спам (закрыт) + тег «неверный номер» */
+    const btn = e.currentTarget; btn.disabled = true;
+    try { await api.patch('/leads/' + l.id, { stage: 'lost', tags: [...(l.tags || []), 'неверный номер'] }); toast('Помечен: неверный номер', 'Лид закрыт и помечен тегом «неверный номер»', true); closeModal(); render(); }
+    catch (er) { btn.disabled = false; toast('Не вышло', er.message); }
+  });
   $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });
   $('#mBroker', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { broker: e.target.value || null }); });
   $('#mVendor', bd)?.addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { vendorId: e.target.value }); toast('Подрядчик назначен', e.target.value ? vendorName(e.target.value) : 'снят', true); if (['funnel', 'overview', 'inbox'].includes(CUR)) render(); });
