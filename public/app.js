@@ -5138,14 +5138,14 @@ PAGES.funnel = async (root) => {
             ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""} ${l.hint && l.hint.kind === 'act' ? 'hot' : ''}" data-id="${l.id}" data-stage="${l.stage}">
               <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
               <div class="top"><div class="nm">${esc(l.name)}${(l.unread || 0) > 0 ? ` <span class="lc-unread" title="${l.unread} новых сообщений" style="background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle">${l.unread > 9 ? '9+' : l.unread}</span>` : ''}</div>${scoreRing(l.score)}</div>
-              <div class="geo">${l.geoName} · ${esc(l.phone)}${phInvBadge(l)}</div>
-              <div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>
+              <div class="geo-row"><span class="geo">${l.geoName} · ${esc(l.phone)}${phInvBadge(l)}</span>${tblCh(l)}</div>
+              <div class="lc-mid"><div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>${(l.quals.budget || {}).value ? `<span class="lc-bud">${esc((l.quals.budget || {}).value)}</span>` : ''}${l.source && srcName[l.source] ? `<span class="lc-src">${esc(srcName[l.source])}</span>` : ''}</div>
+              ${(() => { const na = l.nextAction, nt = l.nextTouch; if (na && na.text) { const over = na.at && na.at < Date.now(); return `<div class="lc-next ${over ? 'over' : ''}">${over ? ic(I.clock) : ''}${esc(na.text.slice(0, 44))}${na.at ? ` · ${over ? 'просрочено' : ago(na.at)}` : ''}</div>`; } if (nt && nt.at) { return `<div class="lc-next ai">${ic(I.spark)}${nt.kind === 'reengage' ? 'ИИ дожмёт' : 'ИИ коснётся'} · ${nt.at <= Date.now() ? 'скоро' : ago(nt.at)}</div>`; } return ''; })()}
               <div class="foot">
                 ${l.ai && l.ai.enabled ? '<span class="mini-badge ai">ИИ</span>' : ''}
                 ${l.vendorId && vendorName(l.vendorId) ? `<span class="mini-badge" title="Рекламный подрядчик">${esc(vendorName(l.vendorId))}</span>` : ''}
                 ${l.brokerName ? `<span class="mini-badge ok">${esc(l.brokerName.split(' ')[0])}</span>` : ''}
                 ${l.wakeScore != null ? `<span class="mini-badge warn">score ${l.wakeScore}</span>` : ''}
-                ${l.nextAction && l.nextAction.at && l.nextAction.at < Date.now() ? '<span class="mini-badge warn">просрочен шаг</span>' : ''}
                 ${(l.tags || []).includes('нужен человек') ? `<span class="mini-badge warn" title="нужен человек">${ic(I.user, 2)}</span>` : ''}
                 <span class="tm">${ago(l.lastMsgAt || l.createdAt)}</span>
               </div>

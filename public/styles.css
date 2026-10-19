@@ -511,7 +511,20 @@ textarea { resize: vertical; min-height: 70px; }
 .lead-card:hover { transform: translateY(-1px); border-color: var(--hover-bd); box-shadow: var(--shadow-lift); }
 .lead-card .top { display: flex; align-items: center; gap: 8px; }
 .lead-card .nm { font-size: 13px; font-weight: 650; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--navy-900); }
-.lead-card .geo { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+.lead-card .geo { font-size: 11px; color: var(--ink-3); }
+/* обогащённая карточка канбана */
+.lead-card .geo-row { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.lead-card .geo-row .geo { margin-top: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lead-card .geo-row .tbl-ch { flex: 0 0 auto; }
+.lead-card .geo-row .tbl-cdot { width: 17px; height: 17px; font-size: 9px; border-radius: 5px; }
+.lc-mid { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+.lc-mid .axes { margin-top: 0; flex: 1; }
+.lc-bud { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; color: var(--navy-900); font-variant-numeric: tabular-nums; }
+.lc-src { flex: 0 0 auto; font-size: 10px; color: var(--ink-3); background: var(--bg-2, rgba(20,19,17,.045)); border-radius: 6px; padding: 1px 6px; }
+.lc-next { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; color: var(--ink-2); line-height: 1.35; }
+.lc-next svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.lc-next.over { color: var(--bad, #C0392B); font-weight: 600; }
+.lc-next.ai { color: #6B5BC0; }
 .score-ring { position: relative; width: 30px; height: 30px; flex: 0 0 30px; }
 .score-ring svg { width: 30px; height: 30px; transform: rotate(-90deg); }
 .score-ring .txt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 8.5px; font-weight: 700; color: var(--ink-2); }
