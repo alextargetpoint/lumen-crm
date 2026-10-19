@@ -4163,6 +4163,18 @@ function tronFetchOpts(ms) { const k = tronApiKey(); return { signal: AbortSigna
 function notify(db, opts) {
   try {
     const o = opts || {};
+    /* анти-спам: одинаковое уведомление (по ключу title+text, либо o.dedupKey) не повторяем в окне cooldown.
+       Так «Клиент не видит сообщения +X» и «номер разлогинился» не долбят владельца каждые пару минут. */
+    const dedupKey = o.dedupKey || ((o.title || '') + '|' + (o.text || '')).slice(0, 180);
+    const cd = o.cooldownMs != null ? o.cooldownMs : 30 * 60e3;
+    if (cd > 0) {
+      db.settings._notifDedup = db.settings._notifDedup || {};
+      const last = db.settings._notifDedup[dedupKey];
+      if (last && (Date.now() - last) < cd) return;   /* слали недавно → тихо пропускаем (не спамим) */
+      db.settings._notifDedup[dedupKey] = Date.now();
+      const keys = Object.keys(db.settings._notifDedup);
+      if (keys.length > 300) { const cut = Date.now() - 6 * 3600e3; for (const k of keys) if (db.settings._notifDedup[k] < cut) delete db.settings._notifDedup[k]; }
+    }
     db.settings.notifications = db.settings.notifications || [];
     const n = { id: 'nt_' + crypto.randomBytes(5).toString('hex'), type: o.type || 'system', level: o.level || 'info', title: o.title || '', text: o.text || '', url: o.url || '', at: Date.now(), read: false };
     db.settings.notifications.unshift(n);
@@ -4184,7 +4196,8 @@ function notify(db, opts) {
           const body = mailer.emailPanel(`<div style="font-size:16px;font-weight:700;margin:0 0 8px">${esc(n.title || 'Уведомление')}</div><div style="font-size:14px;line-height:1.6">${esc(n.text)}</div>`, accent)
             + (o.url ? mailer.emailButton(o.url, o.buttonLabel || 'Открыть в CRM') : '');
           const html = mailer.emailWrap(n.title || 'Уведомление Lumen', body, 'ru', { preheader: n.text.slice(0, 90) });
-          await mailer.sendViaResend(cfg, to, (n.level === 'critical' ? '🔴 ' : '') + (n.title || 'Уведомление Lumen'), html);
+          const _subT = (n.title || 'Уведомление Lumen').replace(/^(?:🔴|🟠|🟡|🟢|🔔|⚠️|🚨|✅|❌|💬|🤖)\s*/, '');
+          await mailer.sendViaResend(cfg, to, (n.level === 'critical' ? '🔴 ' : '') + _subT, html);
         } catch (e) {}
       })();
     }
@@ -4197,7 +4210,9 @@ function notify(db, opts) {
           if (chat && tgbridge.ready(db)) {
             const he = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const emo = n.level === 'critical' ? '🔴 ' : n.level === 'warn' ? '🟠 ' : n.level === 'success' ? '🟢 ' : '🔔 ';
-            await tgbridge.notify(db, chat, `${emo}<b>${he(n.title || 'Уведомление')}</b>\n${he(n.text)}`);
+            /* чистый минималистичный вид: один статус-эмодзи (по уровню) + заголовок, без дублей эмодзи из title */
+            const cleanT = he(n.title || 'Уведомление').replace(/^(?:🔴|🟠|🟡|🟢|🔔|⚠️|🚨|✅|❌|💬|🤖)\s*/, '');
+            await tgbridge.notify(db, chat, `${emo}<b>${cleanT}</b>\n${he(n.text)}`);
           }
         } catch (e) {}
       })();
