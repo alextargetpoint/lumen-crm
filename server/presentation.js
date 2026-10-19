@@ -384,7 +384,7 @@ function defaultPalette(geo) {
 }
 function heroMetrics(pr, areaRange) {
   const out = [];
-  if (pr.beds != null) out.push({ value: bedsLabel(pr.beds), label: 'спальни', icon: 'bed' });
+  if (pr.beds != null) out.push(bedsMetric(pr.beds, 'спальни'));
   if (areaRange) out.push({ value: T.fmtArea(areaRange), label: 'площадь', icon: 'area' });
   if (pr.handover) out.push({ value: String(pr.handover), label: 'сдача', icon: 'calendar' });
   if (pr.developer) out.push({ value: pr.developer, label: 'застройщик', icon: 'shield' });
@@ -394,15 +394,21 @@ function keyMetrics(pr, areaRange, currency) {
   const out = [];
   if (pr.priceFrom) out.push({ value: T.fmtPrice({ kind: 'from', amount: pr.priceFrom, currency }), label: 'стоимость', icon: 'tag' });
   if (areaRange) out.push({ value: T.fmtArea(areaRange), label: 'площадь', icon: 'area' });
-  if (pr.beds != null) out.push({ value: bedsLabel(pr.beds), label: 'варианты планировок', icon: 'bed' });
+  if (pr.beds != null) out.push(bedsMetric(pr.beds, 'варианты планировок'));
   if (pr.handover) out.push({ value: String(pr.handover), label: 'планируемая сдача', icon: 'calendar' });
   return out.slice(0, 4);
 }
+function isStudio(b) { return b === 0 || /студ|studio/i.test(String(b)); }
 function bedsLabel(b) { if (b === 0) return 'студия'; if (typeof b === 'string') return b; return b + (b >= 5 ? '+' : '') + ' спал.'; }
+/* ТЗ §5: студия — это ТИП, а не количество спален. Не писать «студия / спальни». */
+function bedsMetric(beds, label, icon) {
+  if (isStudio(beds)) return { value: 'Студия', label: 'тип', icon: icon || 'bed' };
+  return { value: bedsLabel(beds), label: label, icon: icon || 'bed' };
+}
 function planParams(unit, pr) {
   const p = [];
   if (unit) { if (unit.area) p.push({ label: 'Площадь', value: unit.area + ' м²' }); if (unit.floor) p.push({ label: 'Этаж', value: unit.floor }); if (unit.view) p.push({ label: 'Вид', value: unit.view }); }
-  if (pr.beds != null && !p.find(x => /спал/i.test(x.label))) p.push({ label: 'Спальни', value: bedsLabel(pr.beds) });
+  if (pr.beds != null && !p.find(x => /спал|тип/i.test(x.label))) p.push(isStudio(pr.beds) ? { label: 'Тип', value: 'Студия' } : { label: 'Спальни', value: bedsLabel(pr.beds) });
   return p;
 }
 function benefitItems(pr) {

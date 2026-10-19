@@ -116,7 +116,7 @@
   }
 
   function thumbRow(s, i) {
-    var title = sectionTitle(s);
+    var title = pageNavLabel(s);
     var err = S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; });
     var msel = S.multiMode && (S.multiSel || []).indexOf(i) >= 0;
     return '<div class="pe-thumb' + (i === S.pageIdx && !S.multiMode ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + (S.multiMode ? ' multi' : '') + (msel ? ' msel' : '') + '" data-pg="' + i + '">' +
@@ -146,7 +146,7 @@
         var open = S.openGroups && S.openGroups[g.k];
         var hasSel = g.idx.indexOf(S.pageIdx) >= 0;
         var sub = open ? '<div class="pe-grp-pages">' + g.idx.map(function (i) {
-          return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '"><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(sectionTitle(sections()[i])) + '</span></div>';
+          return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '"><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(pageNavLabel(sections()[i])) + '</span></div>';
         }).join('') + '</div>' : '';
         return '<div class="pe-grp' + (open ? ' open' : '') + (hasSel ? ' act' : '') + '">' +
           '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '"><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
@@ -178,6 +178,15 @@
     return '<div class="pe-nav">' + hd + '<div class="pe-nav-list">' + items + '</div>' + bulk + '</div>';
   }
   function sectionTitle(s) { var t = cval(s, 'title'); if (s.family === 'broker') t = s.pageType === 'broker_contacts' ? 'Контакты брокера' : 'О брокере'; return (typeof t === 'string' && t) ? t.replace(/\n/g, ' ') : FAM_LABEL[s.family] || 'Страница'; }
+  /* ТЗ §9: в списке страниц — НАЗНАЧЕНИЕ страницы («Расположение»), а не её контент
+     (адрес «Thailand, Phuket…» не должен быть названием). Контент остаётся внутри страницы. */
+  function pageNavLabel(s) {
+    if (!s) return 'Страница';
+    if (s.family === 'broker') return s.pageType === 'broker_contacts' ? 'Контакты' : 'О брокере';
+    if (s.family === 'location') return 'Расположение';
+    if (s.family === 'payment') return 'Условия оплаты';
+    return FAM_LABEL[s.family] || 'Страница';
+  }
 
   function canvasCol() {
     return '<div class="pe-canvaswrap">' +
@@ -815,7 +824,7 @@
     });
   }
 
-  function paintNavTitle() { var el = document.querySelector('.pe-thumb[data-pg="' + S.pageIdx + '"] .pe-thumb-t'); if (el) el.textContent = sectionTitle(curSection()); mountNavMinis(); }
+  function paintNavTitle() { var el = document.querySelector('.pe-thumb[data-pg="' + S.pageIdx + '"] .pe-thumb-t'); if (el) el.textContent = pageNavLabel(curSection()); mountNavMinis(); }
   function paintNavErrors() { sections().forEach(function (s, i) { var el = document.querySelector('.pe-thumb[data-pg="' + i + '"]'); if (!el) return; var err = S.chk && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; }); el.classList.toggle('err', !!err); }); }
   function paintReadiness() { var el = document.getElementById('peReady'); if (el && S.tab === 'content') { var tmp = document.createElement('div'); tmp.innerHTML = readinessCard(); if (tmp.firstChild) el.replaceWith(tmp.firstChild); } }
   function plPages(n) { var a = n % 10, b = n % 100; if (a === 1 && b !== 11) return 'страница'; if (a >= 2 && a <= 4 && (b < 10 || b >= 20)) return 'страницы'; return 'страниц'; }
