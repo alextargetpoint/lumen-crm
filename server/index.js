@@ -6765,7 +6765,19 @@ const server = http.createServer(async (req, res) => {
         const ec = (db.settings.channels && db.settings.channels.email) || {};
         const key = ec.key || pcfg.key;   /* если агентство задало свой ключ — уважаем, иначе платформенный */
         if (key) {
-          const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:480px;margin:0 auto"><h2 style="font-weight:700">${esc(agencyNm)}</h2><p>Вас пригласили в CRM <b>${esc(agencyNm)}</b>. Нажмите, чтобы задать пароль и войти в рабочее место:</p><p style="margin:20px 0"><a href="${link}" style="background:#1a1815;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;display:inline-block;font-weight:600">Принять приглашение</a></p><p style="color:#888;font-size:12px">Или скопируйте ссылку: ${link}</p></div>`;
+          /* фирменное письмо через библиотеку оформления (emailWrap/Button/FeatureList), а не голый div */
+          const roleNm = { broker: 'Брокер', assistant: 'Ассистент', marketer: 'Маркетолог', analyst: 'Аналитик', manager: 'Менеджер' }[br.roleType || 'broker'] || '';
+          const first = name ? esc(String(name).split(' ')[0]) : '';
+          const intro = (first ? first + ', в' : 'В') + 'ас пригласили в CRM <b>' + esc(agencyNm) + '</b>' + (roleNm ? ' как <b>' + esc(roleNm) + '</b>' : '') + '. Примите приглашение — задайте пароль и войдите в своё рабочее место, уже настроенное под вашу роль.';
+          const body = `<div style="font-size:15px;line-height:1.65">${intro}</div>`
+            + mailer.emailButton(link, 'Принять приглашение')
+            + mailer.emailFeatureList([
+              { icon: 'chat', title: 'Диалоги и лиды', sub: 'вся переписка и карточки клиентов — в одном окне' },
+              { icon: 'spark', title: 'ИИ в помощь', sub: 'подсказки, авто-касания и квалификация' },
+              { icon: 'shield', title: 'Доступ под вашу роль', sub: 'видите ровно те разделы, что нужны для работы' },
+            ])
+            + `<div style="font-size:12px;color:#8a857c;margin-top:12px;line-height:1.5">Если кнопка не открывается — скопируйте ссылку:<br>${esc(link)}</div>`;
+          const html = mailer.emailWrap('Добро пожаловать в ' + agencyNm, body, 'ru', { eyebrow: 'Приглашение', preheader: (first ? first + ', в' : 'В') + 'ас пригласили в ' + agencyNm + (roleNm ? ' · ' + roleNm : '') });
           const r2 = await mailer.sendViaResend({ key, from }, email, 'Приглашение в ' + agencyNm, html);
           mailed = !!(r2 && (r2.id || r2.ok)); if (!mailed) mailErr = (r2 && r2.error) || '';
         } else { mailErr = 'платформенный e-mail не настроен'; }
