@@ -710,3 +710,7 @@ input[type=number] { -moz-appearance: textfield; }
 .num-otp-warn{display:flex;gap:8px;align-items:flex-start;background:rgba(201,80,30,.07);border:1px solid rgba(201,80,30,.2);border-radius:10px;padding:9px 11px;margin:0 0 8px;font-size:11px;line-height:1.45;color:#8a4420}
 .num-otp-warn svg{width:14px;height:14px;flex:none;margin-top:1px}
 .num-otp-warn b{color:#6d3417}
+
+/* W/T → минималистичные иконки WhatsApp/Telegram в индикаторе каналов */
+.tbl-cdot svg{width:12px;height:12px;display:block}
+.lead-card .geo-row .tbl-cdot svg{width:11px;height:11px}
