@@ -2321,6 +2321,17 @@ function toast(text, sub, ok) {
   requestAnimationFrame(() => t.classList.add('show'));
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3400);
 }
+/* лимит тарифа (402) → не тупиковый тост, а окно с 1-кликом «Перейти к тарифу».
+   Любой catch: `if (handleLimit(e)) return;`. Возвращает true, если ошибка — про лимит. */
+function handleLimit(e) {
+  if (!e || e.status !== 402) return false;
+  modal({
+    title: 'Достигнут лимит тарифа', sub: e.message || '',
+    body: '<div class="muted" style="font-size:13px;line-height:1.55">Чтобы продолжить — повысьте тариф: больше брокеров, номеров и лидов. Займёт минуту, текущие данные сохранятся.</div>',
+    actions: [{ label: 'Перейти к тарифу', cls: 'btn-accent', onClick: () => { closeModal(); go('billing'); } }, { label: 'Позже' }],
+  });
+  return true;
+}
 
 /* ---------- ✦ ИИ-ассистент текстовых полей ----------
    Вешается на длинные текстовые поля (селекторы ниже): кнопка ✦ →
@@ -5070,6 +5081,7 @@ PAGES.funnel = async (root) => {
   const geos = STATE.settings.agency.geos;
   const q = (F.funnelQ || '').toLowerCase();
   const leads = all.filter(l =>
+    (!F.funnelStage || l.stage === F.funnelStage) &&
     (!F.funnelGeo || l.geo === F.funnelGeo) &&
     (!F.funnelSrc || l.source === F.funnelSrc) &&
     (!F.funnelVendor || (F.funnelVendor === '__none' ? !l.vendorId : l.vendorId === F.funnelVendor)) &&
@@ -5128,6 +5140,25 @@ PAGES.funnel = async (root) => {
       <span class="tb-spacer"></span>
       ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : '<span class="cc-hint">Ручной запуск — выдели карточки лидов</span>'}
     </div>
+    ${(() => {
+      const prog = STAGES.filter(s => !['sleeping', 'lost'].includes(s.id));
+      const cnt = (id) => all.filter(l => l.stage === id).length;
+      const maxN = Math.max(1, ...prog.map(s => cnt(s.id)));
+      const deals = cnt('deal'), sleeping = cnt('sleeping'), active = all.filter(l => !['deal', 'lost', 'sleeping'].includes(l.stage)).length;
+      const conv = all.length ? Math.round(deals / all.length * 100) : 0;
+      const hot = all.filter(l => l.hint && l.hint.kind === 'act').length;
+      const over = all.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()).length;
+      return `<div class="fnl-pulse">
+        <div class="fnl-stages">${prog.map((s, i) => { const n = cnt(s.id), on = F.funnelStage === s.id; return `${i ? '<span class="fnl-sep">›</span>' : ''}<button class="fnl-st ${on ? 'on' : ''}" data-fstage="${s.id}" style="--stg:${stageColor(s.id)}" title="${esc(s.name)} — кликните, чтобы отфильтровать"><span class="fnl-st-bar"><i style="height:${Math.max(8, Math.round(n / maxN * 100))}%"></i></span><span class="fnl-st-n">${n}</span><span class="fnl-st-l">${esc(s.name)}</span></button>`; }).join('')}</div>
+        <div class="fnl-kpis">
+          ${hot ? `<button class="fnl-kpi hot ${F.funnelFlag === 'hot' ? 'on' : ''}" data-flag="hot" title="Горячие — требуют действия">${ic(I.flame || I.bolt)}<b>${hot}</b> горячих</button>` : ''}
+          ${over ? `<button class="fnl-kpi over ${F.funnelFlag === 'overdue' ? 'on' : ''}" data-flag="overdue" title="Просрочен следующий шаг">${ic(I.clock)}<b>${over}</b> просрочено</button>` : ''}
+          <span class="fnl-kpi"><b>${active}</b> в работе</span>
+          ${sleeping ? `<span class="fnl-kpi muted" title="Спящие — вне активной воронки">${sleeping} спящих</span>` : ''}
+          <span class="fnl-kpi"><b>${conv}%</b> конверсия${deals ? ` · ${deals} сделок` : ''}</span>
+        </div>
+      </div>`;
+    })()}
     ${view === 'kanban' ? `
     <div class="kanban">
       ${STAGES.map(st => {
@@ -5196,7 +5227,8 @@ PAGES.funnel = async (root) => {
   $('#fSrc').addEventListener('change', (e) => setF('funnelSrc', e.target.value));
   $('#fVendor')?.addEventListener('change', (e) => setF('funnelVendor', e.target.value));
   $('#fBroker').addEventListener('change', (e) => setF('funnelBroker', e.target.value));
-  $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', b.dataset.flag)));
+  $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', (F.funnelFlag === b.dataset.flag && b.dataset.flag) ? '' : b.dataset.flag)));
+  $$('[data-fstage]', root).forEach(b => b.addEventListener('click', () => setF('funnelStage', F.funnelStage === b.dataset.fstage ? '' : b.dataset.fstage)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
   $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => {
     const k = h.dataset.sort;
