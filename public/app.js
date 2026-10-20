@@ -5072,6 +5072,36 @@ function openMerge(cluster) {
       } },
   ] });
 }
+/* ── сохранённые виды воронки (пресеты фильтров+сортировки) ── */
+function currentFunnelFilter() {
+  const F = PAGE_STATE;
+  return { stage: F.funnelStage || '', flag: F.funnelFlag || '', geo: F.funnelGeo || '', src: F.funnelSrc || '', vendor: F.funnelVendor || '', broker: F.funnelBroker || '', sort: F.funnelSort || '', sortDir: F.funnelSortDir || '', view: F.funnelView || '', q: F.funnelQ || '' };
+}
+function applyFunnelView(f) {
+  const F = PAGE_STATE;
+  F.funnelStage = f.stage || ''; F.funnelFlag = f.flag || ''; F.funnelGeo = f.geo || ''; F.funnelSrc = f.src || ''; F.funnelVendor = f.vendor || ''; F.funnelBroker = f.broker || '';
+  if (f.sort) F.funnelSort = f.sort; if (f.sortDir) F.funnelSortDir = f.sortDir; if (f.view) F.funnelView = f.view; F.funnelQ = f.q || '';
+  render();
+}
+async function saveFunnelViews(views) {
+  STATE.settings.funnelViews = views;
+  try { await api.patch('/settings', { funnelViews: views }); } catch (e) { toast('Не сохранилось', e.message); }
+}
+function promptSaveFunnelView() {
+  const bd = modal({ title: 'Сохранить вид воронки', sub: 'Текущие фильтры, сортировка и режим — под именем', body: `<input id="fvName" placeholder="Напр. «Пхукет · горячие · по бюджету»" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--stroke);border-radius:10px;background:var(--card);color:var(--ink-1);font-size:14px;outline:none">`, actions: [{ label: 'Отмена' }, { label: 'Сохранить', cls: 'btn-accent', onClick: async (b) => { const name = (($('#fvName', b) || {}).value || '').trim(); if (!name) { toast('Введите имя вида'); return false; } const views = (STATE.settings.funnelViews || []).slice(); views.push({ id: 'fv_' + Math.random().toString(36).slice(2, 8), name: name.slice(0, 40), f: currentFunnelFilter() }); await saveFunnelViews(views); toast('Вид сохранён', name, true); render(); } }] });
+  setTimeout(() => { const i = $('#fvName', bd); if (i) i.focus(); }, 60);
+}
+function openFunnelViews(ev) {
+  const views = STATE.settings.funnelViews || [];
+  const items = [];
+  if (!views.length) items.push({ label: 'Пока нет сохранённых видов' });
+  views.forEach(v => items.push({ ic: I.funnel, label: v.name, onClick: () => applyFunnelView(v.f) }));
+  items.push({ sep: true });
+  items.push({ ic: I.check, label: 'Сохранить текущий вид…', onClick: () => promptSaveFunnelView() });
+  if (views.length) items.push({ ic: I.x, danger: true, label: 'Удалить вид…', onClick: () => { setTimeout(() => ctxPopup(ev.currentTarget ? ev.currentTarget.getBoundingClientRect().left : 120, 150, (STATE.settings.funnelViews || []).map(v => ({ ic: I.x, danger: true, label: 'Удалить «' + v.name + '»', onClick: async () => { await saveFunnelViews((STATE.settings.funnelViews || []).filter(x => x.id !== v.id)); toast('Вид удалён', null, true); render(); } }))), 0); } });
+  const r = (ev.currentTarget || ev.target).getBoundingClientRect();
+  ctxPopup(r.left, r.bottom + 4, items);
+}
 PAGES.funnel = async (root) => {
   const all = await api.get('/leads');
   const vendors = await ensureVendors();
@@ -5113,6 +5143,7 @@ PAGES.funnel = async (root) => {
     <div class="filters">
       <input id="fQ" placeholder="Имя или номер…" value="${esc(F.funnelQ || '')}" style="width:170px">
       <button class="btn btn-sm f-toggle ${activeN ? 'on' : ''}" id="fToggle" title="Фильтры: направление, источник, подрядчик, брокер">${ic(I.funnel)}Фильтры${activeN ? ` · ${activeN}` : ''}</button>
+      <button class="btn btn-sm" id="fViews" title="Сохранённые виды: пресеты фильтров и сортировки">${ic(I.layers || I.doc)}Виды${(STATE.settings.funnelViews || []).length ? ` · ${(STATE.settings.funnelViews || []).length}` : ''}</button>
       <div class="seg-toggle">
         ${[['', 'Все'], ['hot', 'Горячие'], ['overdue', 'Просрочка'], ['human', 'Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
       </div>
@@ -5223,6 +5254,7 @@ PAGES.funnel = async (root) => {
 
   const setF = (k, v) => { PAGE_STATE[k] = v; render(); };
   $('#fToggle')?.addEventListener('click', () => { const d = $('#fDrawer', root); if (!d) return; const willOpen = d.hasAttribute('hidden'); d.toggleAttribute('hidden'); PAGE_STATE.funnelFiltersOpen = willOpen; $('#fToggle', root)?.classList.toggle('open', willOpen); });
+  $('#fViews')?.addEventListener('click', (e) => openFunnelViews(e));
   $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; render(); });
   $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => setF('funnelQ', e.target.value), 350); });
   $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));

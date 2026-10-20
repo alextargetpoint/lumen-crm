@@ -9307,6 +9307,14 @@ const server = http.createServer(async (req, res) => {
       }
       /* безопасность: сколько устройств/IP разрешено АДМИНУ (владельцу) одновременно — ПК+ноутбук=2 (аудит не флагит в пределах). Трогаем ТОЛЬКО это поле auth, не passHash/sessions. */
       if (b.auth && typeof b.auth === 'object' && b.auth.ownerMaxDevices != null) { db.settings.auth = db.settings.auth || {}; db.settings.auth.ownerMaxDevices = Math.max(1, Math.min(5, Math.round(+b.auth.ownerMaxDevices) || 1)); }
+      /* сохранённые виды воронки (пресеты фильтров+сортировки) */
+      if (Array.isArray(b.funnelViews)) {
+        db.settings.funnelViews = b.funnelViews.slice(0, 40).map(v => {
+          const f = (v && v.f && typeof v.f === 'object') ? v.f : {}; const cf = {};
+          for (const k of ['stage', 'flag', 'geo', 'src', 'vendor', 'broker', 'sort', 'sortDir', 'view', 'q']) if (f[k] != null) cf[k] = String(f[k]).slice(0, 60);
+          return { id: String((v && v.id) || '').slice(0, 40) || ('fv_' + crypto.randomBytes(3).toString('hex')), name: String((v && v.name) || '').slice(0, 40), f: cf };
+        }).filter(v => v.name);
+      }
       if (_replyDelayChanged) { try { const n = engine.rescheduleDueReplies(db); if (n) console.log('[reply-delay] пересчитано сроков ответа:', n); } catch (e) { console.error('[reschedule]', e && e.message); } }
       if (b.baseCurrency) db.settings.baseCurrency = String(b.baseCurrency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);   /* базовая валюта кабинета для показа «≈ в моей валюте» */
       /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */
