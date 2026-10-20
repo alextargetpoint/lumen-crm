@@ -16895,7 +16895,7 @@ function openInviteEmployee() {
           if (r.mailed) toast('Приглашение отправлено', email, true);
           else { if (r.link) { try { navigator.clipboard.writeText(r.link); } catch (_) {} } toast('Сотрудник создан', r.mailErr ? ('письмо не ушло (' + r.mailErr + ') — ссылка скопирована, передайте вручную') : 'ссылка-приглашение скопирована', true); }
           await loadState(); render();
-        } catch (e) { toast('Не вышло', e.message); return false; }
+        } catch (e) { if (handleLimit(e)) return false; toast('Не вышло', e.message); return false; }
       } },
       { label: 'Отмена' },
     ],
