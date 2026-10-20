@@ -705,3 +705,8 @@ input[type=number] { -moz-appearance: textfield; }
 .lc-badphone-tx{flex:1;min-width:150px;font-size:12px;color:#8a4420;display:inline-flex;align-items:center;gap:6px;line-height:1.4}
 .lc-badphone-tx svg{width:14px;height:14px;flex:none}
 .lc-badphone .btn{flex:none;white-space:nowrap}
+
+/* Предупреждение о бэкапе WhatsApp перед OTP-перерегистрацией (номер logged_out) */
+.num-otp-warn{display:flex;gap:8px;align-items:flex-start;background:rgba(201,80,30,.07);border:1px solid rgba(201,80,30,.2);border-radius:10px;padding:9px 11px;margin:0 0 8px;font-size:11px;line-height:1.45;color:#8a4420}
+.num-otp-warn svg{width:14px;height:14px;flex:none;margin-top:1px}
+.num-otp-warn b{color:#6d3417}
