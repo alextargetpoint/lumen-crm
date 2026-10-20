@@ -1220,12 +1220,33 @@
   function openExport() {
     var fmt = S.fmt, quality = 'standard', method = 'pdf', published = null;
     var ov = document.createElement('div'); ov.className = 'pe-overlay'; ov.id = 'peExportOv';
+    /* №8 «Выдача»: статус публикации + версии + ссылки (из S.pres — snapshots/publicToken/publishedAt уже в full-payload) */
+    function pubBlock() {
+      var snaps = S.pres.snapshots || []; var ver = snaps.length; var tok = S.pres.publicToken;
+      var pubAt = S.pres.publishedAt || 0; var updAt = S.pres.updatedAt || 0;
+      var isPub = ver > 0 && !!tok; var hasUnpub = isPub && updAt > pubAt + 2000;
+      var mainUrl = location.origin + '/pv/' + (tok || ''); var verUrl = mainUrl + '?v=' + ver;
+      var row = !isPub
+        ? '<div class="pe-pub-row draft"><i></i><div><b>Черновик</b><span>ещё не опубликовано</span></div></div>'
+        : hasUnpub
+          ? '<div class="pe-pub-row changed"><i></i><div><b>Есть неопубликованные изменения</b><span>опубликована версия ' + ver + '</span></div></div>'
+          : '<div class="pe-pub-row pub"><i></i><div><b>Опубликовано</b><span>версия ' + ver + '</span></div></div>';
+      var h = '<div class="pe-hd">Статус публикации</div>' + row +
+        '<button class="pe-btn pe-btn-primary" style="width:100%;justify-content:center;margin:2px 0 12px" data-pub>' + ic('check') + (isPub ? (hasUnpub ? 'Опубликовать изменения' : 'Переопубликовать') : 'Опубликовать') + '</button>';
+      if (isPub) {
+        h += '<div class="pe-hd">Клиентская ссылка</div>' +
+          '<div class="pe-linkrow"><span class="pe-linkrow-l">Основная</span><input readonly value="' + esc(mainUrl) + '"><button class="pe-mini" data-copyurl="' + esc(mainUrl) + '" title="Копировать">' + ic('copy') + '</button></div>' +
+          '<div class="pe-linkrow"><span class="pe-linkrow-l">Версия ' + ver + '</span><input readonly value="' + esc(verUrl) + '"><button class="pe-mini" data-copyurl="' + esc(verUrl) + '" title="Копировать">' + ic('copy') + '</button></div>';
+      }
+      return h;
+    }
     function body() {
       var chk = S.chk || { issues: [], pageCount: 0, ok: true };
       var checks = buildChecks(chk);
-      return '<div class="pe-ov-top"><button class="pe-iconbtn" data-x>' + ic('x') + '</button><div class="t">Подготовка к экспорту</div><div class="pe-top-sp" style="flex:1"></div></div>' +
+      return '<div class="pe-ov-top"><button class="pe-iconbtn" data-x>' + ic('x') + '</button><div class="t">Выдача документа</div><div class="pe-top-sp" style="flex:1"></div></div>' +
         '<div class="pe-ov-body"><div class="pe-ov-mid"><div class="pe-exprev" id="peExPrev"></div></div>' +
         '<div class="pe-ov-right">' +
+          pubBlock() +
           '<div class="pe-hd">Выбранный формат</div><select class="pe-select" data-exfmt>' + TOK.FORMATS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === fmt ? ' selected' : '') + '>' + esc(f.label) + '</option>'; }).join('') + '</select>' +
           '<div class="pe-hd">Проверка содержимого</div>' + checks +
           '<div class="pe-hd">Способ экспорта</div>' +
@@ -1267,6 +1288,17 @@
       var dl = ov.querySelector('[data-dl]'); if (dl) dl.onclick = function () { window.open('/pres/' + ID + '/print?format=' + fmt + '&q=' + quality, '_blank'); };
       var lk = ov.querySelector('[data-link]'); if (lk) lk.onclick = function () { lk.textContent = 'Публикуем…'; api('POST', '/' + ID + '/publish', { format: fmt }).then(function (r) { if (r.status === 200) { published = r.json.url; refresh(); } else { toast(r.json && r.json.error === 'PREFLIGHT_FAILED' ? 'Исправьте ошибки перед публикацией' : 'Ошибка публикации'); refresh(); } }); };
       var cp = ov.querySelector('[data-copy]'); if (cp) cp.onclick = function () { navigator.clipboard && navigator.clipboard.writeText(published); cp.textContent = 'Скопировано'; };
+      var pb = ov.querySelector('[data-pub]'); if (pb) pb.onclick = function () {
+        pb.disabled = true; var o = pb.innerHTML; pb.textContent = 'Публикуем…';
+        api('POST', '/' + ID + '/publish', { format: fmt }).then(function (r) {
+          if (r.status === 200) {
+            S.pres.publicToken = r.json.token || S.pres.publicToken;
+            S.pres.snapshots = (S.pres.snapshots || []).concat({ id: r.json.snapshotId || 's', at: Date.now() });
+            S.pres.publishedAt = Date.now(); published = r.json.url; toast('Опубликовано — ссылка готова'); refresh();
+          } else { pb.disabled = false; pb.innerHTML = o; toast(r.json && r.json.error === 'PREFLIGHT_FAILED' ? 'Исправьте ошибки перед публикацией' : 'Ошибка публикации'); }
+        });
+      };
+      ov.querySelectorAll('[data-copyurl]').forEach(function (b) { b.onclick = function () { try { navigator.clipboard.writeText(b.getAttribute('data-copyurl')); } catch (_) {} b.classList.add('ok'); toast('Ссылка скопирована'); }; });
     }
     function refresh() { ov.innerHTML = body(); rewire(); paintPrev(); }
     ov.innerHTML = body(); document.body.appendChild(ov); rewire(); paintPrev();
