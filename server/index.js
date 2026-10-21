@@ -6749,6 +6749,9 @@ const server = http.createServer(async (req, res) => {
       /* роль + персональные правки разделов прямо при приглашении (ТЗ: раздача доступов до конца) */
       if (bb.roleType && ['broker', 'assistant', 'marketer', 'analyst', 'manager'].includes(bb.roleType)) br.roleType = bb.roleType;
       if (Array.isArray(bb.hidePages)) br.hidePages = bb.hidePages.filter(x => typeof x === 'string').slice(0, 40);
+      /* подрядчик трафика → участник со scoped-видимостью (только свои лиды по тегу) + связь с подрядчиком */
+      if (bb.leadFilter && typeof bb.leadFilter === 'object') br.leadFilter = { sources: (bb.leadFilter.sources || []).slice(0, 20).map(String), tags: (bb.leadFilter.tags || []).slice(0, 20).map(x => String(x).slice(0, 40)) };
+      if (bb.contractorId) br.contractorId = String(bb.contractorId).slice(0, 40);
       const token = crypto.randomBytes(16).toString('hex');
       reg.invites[token] = { tid, brokerId: br.id, email, at: Date.now() };
       reg.byEmail[email] = tid;
