@@ -3268,6 +3268,48 @@ async function yesimApi(action, params) {
   return j;
 }
 async function serverPublicIp() { try { const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(6000) }); const j = await r.json(); return j.ip || ''; } catch (_) { return ''; } }
+/* купить ОДИН мобильный Yesim-номер для страны (БЕЗ списания — баланс решает вызывающий).
+   Выбирает мобильный area (нужен для приёма кодов мессенджеров), фоллбэк — без area. */
+async function yesimBuyNumber(country, subscriptionOption) {
+  country = String(country || '').toUpperCase().slice(0, 2);
+  subscriptionOption = ['month', 'year'].includes(subscriptionOption) ? subscriptionOption : 'month';
+  let area = null;
+  try { const ca = await yesimApi('get_country_areas', { country }); const list = (ca.data && (ca.data.areas || ca.data)) || ca.areas || ca.data || []; const arr = Array.isArray(list) ? list : (list.areas || []); const names = arr.map(x => (typeof x === 'string' ? x : (x.area || x.name || x.title || ''))).filter(Boolean); area = names.find(n => /mobile|cell|моб/i.test(n)) || null; } catch (_) {}
+  let r;
+  try { r = await yesimApi('purchase_number', area ? { country, subscriptionOption, area } : { country, subscriptionOption }); }
+  catch (e1) { if (area && /invalid area/i.test(e1.message)) r = await yesimApi('purchase_number', { country, subscriptionOption }); else throw e1; }
+  const number = r.number || (r.data && r.data.number) || '';
+  if (!number) throw new Error('Yesim не вернул номер');
+  return { number: String(number), raw: r };
+}
+/* АВТОВЫДАЧА byod-заказа: докупает недостающие номера (qty), кладёт в пул серых WA, двигает статус.
+   Деньги УЖЕ списаны при заказе ($10/номер) → здесь НЕ списываем повторно. Идемпотентно (доливает до qty).
+   Успех всех → status:'ready' («Подключить»); частично/ошибка → остаётся 'pending' + provisionError. */
+async function provisionByodOrder(db, order) {
+  let reg = {}; try { reg = store.getRegistry(); } catch (_) {}
+  const country = String(order.country || (reg.platformYesim && reg.platformYesim.defaultCountry) || 'GB').toUpperCase().slice(0, 2);
+  db.settings.waGray = db.settings.waGray || { numbers: [] };
+  db.settings.waGray.numbers = db.settings.waGray.numbers || [];
+  order.numbers = Array.isArray(order.numbers) ? order.numbers : [];
+  order.country = country;
+  const want = Math.max(1, order.qty || 1);
+  let lastErr = '';
+  for (let i = order.numbers.length; i < want; i++) {
+    try {
+      const { number } = await yesimBuyNumber(country, 'month');
+      const digits = String(number).replace(/[^0-9]/g, '');
+      if (digits && !db.settings.waGray.numbers.some(n => n.phone === digits)) {
+        db.settings.waGray.numbers.push({ phone: digits, label: 'Yesim ' + country, source: 'yesim', orderId: order.id, roles: { send: true, call: false }, priceUsd: order.price || 10, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 });
+      }
+      if (digits) order.numbers.push('+' + digits);
+    } catch (e) { lastErr = (e && e.message) || String(e); break; }
+  }
+  if (order.numbers.length >= want) { order.status = 'ready'; order.provisionedAt = Date.now(); delete order.provisionError; }
+  else { order.status = 'pending'; order.provisionError = lastErr || 'Не удалось купить номер'; }
+  /* зеркалим в сигнал платформы (founder видит статус/ошибку) */
+  try { if (reg.numberOrders) { reg.numberOrders[store.currentTid() + ':' + order.id] = Object.assign({ tid: store.currentTid() }, order); store.saveRegistry(); } } catch (_) {}
+  return order;
+}
 
 /* --- Серый WhatsApp: обращение к облачному воркеру (Baileys) --- */
 /* sessionId воркера тенант-скоупный: <tid>__<phone> — номера разных агентств не пересекаются */
@@ -7161,14 +7203,36 @@ const server = http.createServer(async (req, res) => {
       if (!ch.ok) return json(res, 402, { error: 'insufficient_balance', balance: ch.balance || 0, need: +(cost - (ch.balance || 0)).toFixed(2), cost });
       const bl = db.settings.billing; bl.numberOrders = bl.numberOrders || [];
       const order = { id: 'no_' + crypto.randomBytes(5).toString('hex'), edition, label, qty, price, cost, status: 'pending', at: Date.now() };
+      if (edition === 'byod' && b.country) order.country = String(b.country).toUpperCase().slice(0, 2);
       /* managed («под ключ») → заказ мест в ферме (founder выполнит из готового пула) */
       if (edition === 'managed') { try { const so = farmSvc.createSeatOrder(store.currentTid(), qty, `Оплачено с баланса $${cost}`); order.seatOrderId = so.id; } catch (_) {} }
       bl.numberOrders.unshift(order); if (bl.numberOrders.length > 100) bl.numberOrders.length = 100;
       /* сигнал платформе (для BYOD founder провижнит Yesim-номер и отдаёт агентству на QR) */
       try { const reg = store.getRegistry(); reg.numberOrders = reg.numberOrders || {}; reg.numberOrders[store.currentTid() + ':' + order.id] = Object.assign({ tid: store.currentTid() }, order); store.saveRegistry(); } catch (_) {}
-      notify(db, { type: 'billing', level: 'success', title: 'Заказ номеров принят', text: `${qty}× «${label}» — списано $${cost} с баланса. ${edition === 'managed' ? 'Места выделяются из фермы' : 'Номера покупаем и настраиваем'} — появятся в разделе «Номера».`, email: false });
+      /* ⭐АВТОВЫДАЧА byod: деньги списаны → сразу покупаем номер(а) через Yesim и двигаем в «Подключить».
+         Ошибка Yesim не рушит заказ (деньги уже списаны) — остаётся «Готовим» + provisionError, можно повторить. */
+      if (edition === 'byod') { try { await provisionByodOrder(db, order); } catch (e) { order.provisionError = (e && e.message) || 'provision error'; } }
+      const provisioned = edition === 'byod' && order.status === 'ready';
+      notify(db, { type: 'billing', level: provisioned ? 'success' : (order.provisionError ? 'warn' : 'success'), title: provisioned ? 'Номер выдан' : 'Заказ номеров принят', text: provisioned ? `${qty}× «${label}» — номер(а) ${(order.numbers || []).join(', ')} куплены. Подключите по QR в разделе «Номера».` : `${qty}× «${label}» — списано $${cost} с баланса. ${edition === 'managed' ? 'Места выделяются из фермы' : (order.provisionError ? 'Покупка номера не прошла — повторите в «Мои заказы»' : 'Номера покупаем и настраиваем')} — в разделе «Номера».`, email: false });
       store.save();
       return json(res, 200, { ok: true, balance: ch.balance, order });
+    }
+    /* ВЫДАТЬ/ПОВТОРИТЬ byod-заказ: докупить номер(а) через Yesim сейчас (для застрявших в «Готовим» заказов).
+       Реально тратит деньги с баланса расходников НЕ здесь (оплата была при заказе) — только дёргает Yesim. */
+    if (p === '/api/numbers/order/provision' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'недоступно для брокера' });
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const bl = db.settings.billing || {};
+      const order = (bl.numberOrders || []).find(o => o.id === b.orderId);
+      if (!order) return json(res, 404, { error: 'заказ не найден' });
+      if (order.edition !== 'byod') return json(res, 400, { error: 'выдача номера — только для «на вашем железе»' });
+      if (order.status === 'fulfilled') return json(res, 400, { error: 'заказ уже подключён' });
+      if (b.country) order.country = String(b.country).toUpperCase().slice(0, 2);
+      try { await provisionByodOrder(db, order); } catch (e) { order.provisionError = (e && e.message) || 'provision error'; }
+      store.save();
+      const ok = order.status === 'ready' || order.status === 'fulfilled';
+      return json(res, ok ? 200 : 400, { ok, order, error: order.provisionError || null });
     }
     /* мои заказы номеров (агентство видит статус) */
     if (p === '/api/numbers/orders' && req.method === 'GET') {
@@ -7185,9 +7249,12 @@ const server = http.createServer(async (req, res) => {
           else { const have = Math.min(readyCount, o.qty); if (have >= o.qty) { r.stage = 'allocating'; r.step = 3; r.stageLabel = 'Номера готовы · выделяем вам'; r.detail = `готово ${have}/${o.qty}, назначаем`; } else { r.stage = 'provisioning'; r.step = 2; r.stageLabel = 'Готовим номера'; r.detail = `покупка · регистрация WhatsApp+Telegram · прогрев (готово ${have}/${o.qty})`; } }
         } else {
           r.steps = ['Оплачено', 'Готовим', 'Подключить', 'Готово'];
+          r.numbers = Array.isArray(o.numbers) ? o.numbers : [];
+          r.provisionError = o.provisionError || '';
           if (o.status === 'fulfilled') { r.stage = 'done'; r.step = 4; r.stageLabel = 'Подключён'; r.detail = 'номер работает через CRM'; }
-          else if (o.status === 'ready') { r.stage = 'connect'; r.step = 3; r.stageLabel = 'Номер готов · подключите по QR'; r.detail = 'см. инструкцию — WhatsApp и Telegram на этом номере'; }
-          else { r.stage = 'provisioning'; r.step = 2; r.stageLabel = 'Готовим номер'; r.detail = 'покупаем и настраиваем через Yesim, затем подключение по QR'; }
+          else if (o.status === 'ready') { r.stage = 'connect'; r.step = 3; r.stageLabel = 'Номер готов · подключите по QR'; r.detail = r.numbers.length ? ('номер: ' + r.numbers.join(', ') + ' — WhatsApp и Telegram на этом номере') : 'см. инструкцию — WhatsApp и Telegram на этом номере'; }
+          else if (o.provisionError) { r.stage = 'provisioning'; r.step = 2; r.stageLabel = 'Покупка не прошла'; r.detail = 'Yesim: ' + r.provisionError + ' — нажмите «Выдать номер» ещё раз'; r.canRetry = true; }
+          else { r.stage = 'provisioning'; r.step = 2; r.stageLabel = 'Готовим номер'; r.detail = 'покупаем и настраиваем через Yesim, затем подключение по QR'; r.canRetry = true; }
         }
         return r;
       });

@@ -15926,10 +15926,18 @@ PAGES.numbers = async (root) => {
     const orders = (d.orders || []).filter(o => (o.stage !== 'done') || (Date.now() - (o.at || 0) < 7 * 864e5));
     if (!orders.length) { box.innerHTML = ''; return; }
     const stepper = (o) => { const steps = o.steps || ['Оплачено', 'Готовим', 'Готово']; const cur = o.step || 1; return `<div style="display:flex;gap:5px;align-items:center;margin-top:7px;flex-wrap:wrap">${steps.map((s, i) => { const done = i < cur - 1, now = i === cur - 1; return `<span style="font-size:10px;padding:2px 8px;border-radius:8px;white-space:nowrap;${done ? 'background:var(--accent);color:#fff' : now ? 'background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700' : 'background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink-3,#8a8a8a)'}">${done ? '✓ ' : now ? '● ' : ''}${esc(s)}</span>`; }).join('<span style="color:var(--ink-3,#bbb);font-size:10px">→</span>')}</div>`; };
+    const isOwner = STATE && STATE.me && STATE.me.role === 'owner';
     box.innerHTML = `<div style="margin-top:14px;border-top:1px solid var(--stroke);padding-top:12px">
       <div class="lp-sec" style="margin:0 0 8px">Мои заказы номеров</div>
-      ${orders.map(o => `<div class="set-row" style="align-items:flex-start"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес — <b style="color:var(--accent)">${esc(o.stageLabel || 'в обработке')}</b></div><div class="sd">${esc(o.detail || '')}${o.detail ? ' · ' : ''}${new Date(o.at).toLocaleDateString('ru-RU')}</div>${stepper(o)}</div></div>`).join('')}
+      ${orders.map(o => { const nums = (o.numbers || []); const act = o.stage === 'connect' && nums.length ? `<button class="btn btn-sm btn-accent" data-noconnect="${esc(nums[0])}" style="margin-top:9px">Подключить по QR</button>` : (o.canRetry && isOwner ? `<button class="btn btn-sm btn-ghost" data-noretry="${esc(o.id)}" style="margin-top:9px">${o.provisionError ? 'Повторить выдачу' : 'Выдать номер'}</button>` : ''); return `<div class="set-row" style="align-items:flex-start"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес — <b style="color:var(--accent)">${esc(o.stageLabel || 'в обработке')}</b></div><div class="sd">${esc(o.detail || '')}${o.detail ? ' · ' : ''}${new Date(o.at).toLocaleDateString('ru-RU')}</div>${stepper(o)}${act}</div></div>`; }).join('')}
     </div>`;
+    $$('[data-noconnect]', box).forEach(b => b.addEventListener('click', () => window.openYesimActivate && window.openYesimActivate(b.dataset.noconnect)));
+    $$('[data-noretry]', box).forEach(b => b.addEventListener('click', async () => {
+      b.disabled = true; const t0 = b.textContent; b.textContent = 'Покупаем номер…';
+      try { const r = await api.post('/numbers/order/provision', { orderId: b.dataset.noretry }); if (r.ok) { toast('Номер выдан', ((r.order && r.order.numbers) || []).join(', ') + ' — подключите по QR', true); } else { toast('Не вышло', (r.error || 'ошибка Yesim') + ' — попробуйте ещё раз', false); } }
+      catch (e) { toast('Ошибка', (e && e.message) || 'не удалось', false); }
+      finally { b.disabled = false; b.textContent = t0; loadNumberOrders(); }
+    }));
   }
   loadNumberOrders();
 
@@ -18368,6 +18376,18 @@ window.openNumbersCheckout = async function (edition) {
       <div class="form-row"><label>Формат</label>
         <div class="seg-toggle" id="ncEd" style="width:100%"><button type="button" class="seg-btn ${ed === 'managed' ? 'on' : ''}" data-ed="managed" style="flex:1">Под ключ · $25</button><button type="button" class="seg-btn ${ed === 'byod' ? 'on' : ''}" data-ed="byod" style="flex:1">На вашем железе · $10</button></div>
         <div class="muted" id="ncEdDesc" style="font-size:11.5px;line-height:1.5;margin-top:6px"></div></div>
+      <div class="form-row" id="ncCountryRow" style="${ed === 'byod' ? '' : 'display:none'}"><label>Страна номера</label>
+        <select id="ncCountry" class="inp">
+          <option value="GB">🇬🇧 Великобритания (+44)</option>
+          <option value="US">🇺🇸 США (+1)</option>
+          <option value="NL">🇳🇱 Нидерланды (+31)</option>
+          <option value="SE">🇸🇪 Швеция (+46)</option>
+          <option value="PL">🇵🇱 Польша (+48)</option>
+          <option value="ES">🇪🇸 Испания (+34)</option>
+          <option value="PT">🇵🇹 Португалия (+351)</option>
+          <option value="CA">🇨🇦 Канада (+1)</option>
+        </select>
+        <div class="muted" style="font-size:11px;line-height:1.5;margin-top:5px">Мобильный номер для приёма кодов WhatsApp/Telegram. Берём автоматически при оплате.</div></div>
       <div class="form-row"><label>Сколько номеров</label>
         <div style="display:flex;align-items:center;gap:12px"><button type="button" class="btn btn-sm" id="ncMinus">−</button><b id="ncQty" style="font-size:22px;min-width:44px;text-align:center">1</b><button type="button" class="btn btn-sm" id="ncPlus">+</button></div></div>
       <div style="border:1px solid var(--stroke);border-radius:12px;padding:14px 16px;margin-top:4px">
@@ -18380,8 +18400,9 @@ window.openNumbersCheckout = async function (edition) {
       { label: 'Оплатить с баланса', cls: 'btn-accent', onClick: async (b2) => {
         const cost = priceOf(ed) * qty;
         if (balance + 1e-9 < cost) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); return; }
-        const out = $('#ncOut', b2); if (out) out.textContent = 'Оформляю…';
-        try { await api.post('/numbers/order', { edition: ed, qty }); toast('Заказ принят', `${qty}× «${labelOf(ed)}» — списано ${money(cost)}. Номера появятся после провижна.`, true); closeModal(); render(); }
+        const out = $('#ncOut', b2); if (out) out.textContent = ed === 'byod' ? 'Оформляю заказ и покупаю номер…' : 'Оформляю…';
+        const country = (($('#ncCountry', b2) || {}).value) || 'GB';
+        try { const rr = await api.post('/numbers/order', ed === 'byod' ? { edition: ed, qty, country } : { edition: ed, qty }); const prov = rr && rr.order && rr.order.status === 'ready'; toast(prov ? 'Номер выдан' : 'Заказ принят', prov ? `${(rr.order.numbers || []).join(', ')} — списано ${money(cost)}. Подключите по QR.` : `${qty}× «${labelOf(ed)}» — списано ${money(cost)}. Номера появятся после провижна.`, true); closeModal(); render(); }
         catch (e) { const msg = (e && e.message) || 'ошибка'; if (/insufficient/.test(msg)) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); } else if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(msg) + '</span>'; }
       } },
       { label: 'Пополнить депозит', onClick: () => { openTopupCrypto({ onDone: () => window.openNumbersCheckout(ed) }); } },
@@ -18397,7 +18418,7 @@ window.openNumbersCheckout = async function (edition) {
     if (balance + 1e-9 < cost) { if (short) { short.style.display = ''; short.querySelector('span').innerHTML = `${ic(I.spark)}Не хватает <b>${money(cost - balance)}</b> на балансе. Кнопка пополнит депозит и вернёт сюда.`; } if (pay) pay.textContent = 'Пополнить и оплатить'; }
     else { if (short) short.style.display = 'none'; if (pay) pay.textContent = 'Оплатить с баланса'; }
   };
-  $$('#ncEd .seg-btn', bd).forEach(b => b.addEventListener('click', () => { ed = b.dataset.ed; $$('#ncEd .seg-btn', bd).forEach(x => x.classList.toggle('on', x === b)); recalc(); }));
+  $$('#ncEd .seg-btn', bd).forEach(b => b.addEventListener('click', () => { ed = b.dataset.ed; $$('#ncEd .seg-btn', bd).forEach(x => x.classList.toggle('on', x === b)); const cr = $('#ncCountryRow', bd); if (cr) cr.style.display = ed === 'byod' ? '' : 'none'; recalc(); }));
   $('#ncMinus', bd)?.addEventListener('click', () => { qty = Math.max(1, qty - 1); recalc(); });
   $('#ncPlus', bd)?.addEventListener('click', () => { qty = Math.min(200, qty + 1); recalc(); });
   recalc();
