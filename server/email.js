@@ -843,7 +843,10 @@ function renderTemplate(registry, key, vars, lang) {
   return { subject, html: emailWrap(title, inner, lang, opt), meta: emailMeta(key) };
 }
 
-function platformEmailCfg(registry) { return { key: (registry.email && registry.email.key) || process.env.RESEND_API_KEY || '', from: (registry.email && registry.email.from) || process.env.RESEND_FROM || 'Lumen <onboarding@resend.dev>' }; }
+/* ⚠️ Дефолтный from — ВЕРИФИЦИРОВАННЫЙ домен lumen247.com (НЕ песочница onboarding@resend.dev:
+   та доставляет письма ТОЛЬКО на email владельца Resend-аккаунта, на внешние адреса — 403, молча;
+   из-за неё сбросы/приглашения/уведомления брокерам и клиентам не доходили). */
+function platformEmailCfg(registry) { return { key: (registry.email && registry.email.key) || process.env.RESEND_API_KEY || '', from: (registry.email && registry.email.from) || process.env.RESEND_FROM || 'Lumen <noreply@lumen247.com>' }; }
 async function sendViaResend(cfg, to, subject, html, attachments, opts) {
   if (!cfg.key) return { ok: false, error: 'Resend не настроен (нет API-ключа)' };
   if (!to) return { ok: false, error: 'нет адреса получателя' };

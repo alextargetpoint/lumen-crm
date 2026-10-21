@@ -6876,6 +6876,10 @@ const server = http.createServer(async (req, res) => {
         return true;
       });
       if (!okDone) return json(res, 400, { error: 'брокер не найден' });
+      /* 🔴 защита: регистрируем email брокера → его тенант. Вход по email и сброс пароля (/auth/forgot, /auth/login)
+         резолвят тенанта по reg.byEmail; без этой строки принявший приглашение брокер после истечения куки
+         не мог войти/сбросить пароль (письмо молча не слалось) до следующего рестарта (startup-бэкфилл). */
+      if (inv.email && (!reg.byEmail[inv.email] || reg.byEmail[inv.email] === inv.tid)) reg.byEmail[inv.email] = inv.tid;
       reg.sessions[sid] = { tid: inv.tid, at: Date.now() };
       delete reg.invites[token];
       store.saveRegistry();
