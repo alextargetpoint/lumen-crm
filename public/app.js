@@ -1816,14 +1816,26 @@ window.openYesimActivate = async function (phone) {
         ['Подключите к CRM', 'После регистрации: «Номера» → «Подключить свой (QR)» → введите +' + esc(clean) + ' → отсканируйте QR из этого же WhatsApp (Связанные устройства).'],
       ].map((s, i) => `<div class="tgb-step"><span class="tgb-n">${i + 1}</span><div class="tgb-b"><b>${s[0]}</b><i>${s[1]}</i></div></div>`).join('')}
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><b style="font-size:13px">Входящие SMS / коды</b><span class="warm-pulse"></span><span class="muted" style="font-size:11px">живой приём</span><button class="btn-ghost btn-sm" id="yActRefresh" style="margin-left:auto">${ic(I.refresh)}Обновить</button></div>
-    <div id="yActSms" class="warm-log"><div class="muted" style="font-size:11.5px;padding:8px">Ждём SMS… придёт, как отправите код на этот номер.</div></div>`;
+    <div class="yact-feed-hd"><b>Входящие коды (OTP)</b><span class="yact-live"><i></i>живой приём</span><button class="btn-ghost btn-sm" id="yActRefresh" style="margin-left:auto">${ic(I.refresh)}Обновить</button></div>
+    <div id="yActSms" class="yact-feed"></div>`;
+  const seen = new Set();   /* уже показанные коды — анимируем только НОВЫЕ */
+  const scanHtml = `<div class="yact-scan"><div class="yact-scan-rings"><i></i><i></i><i></i></div><div class="yact-scan-core">${ic(I.phone)}</div><div class="yact-scan-tx">Ловим код WhatsApp<span class="yact-dots"><i></i><i></i><i></i></span></div><div class="yact-scan-sub">Отправьте код на <b>+${esc(clean)}</b> в WhatsApp — поймаем его здесь автоматически</div></div>`;
   const loadSms = async () => {
     const box = $('#yActSms', bd); if (!box || !document.body.contains(bd)) { stop(); return; }
     try {
       const r = await api.get('/gray/yesim/sms?number=' + encodeURIComponent(clean));
       const arr = (r.sms || []).filter(m => (m.text || '').trim());
-      box.innerHTML = arr.length ? arr.slice(0, 12).map(m => `<div class="warm-msg"><b>${esc(m.from || 'SMS')}</b><span class="warm-txt">${esc(m.text)}</span>${m.code ? `<b style="color:var(--accent);font-size:14px;letter-spacing:1px">${esc(m.code)}</b>` : ''}<i>${esc(String(m.at).slice(0, 16))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт, как WhatsApp отправит код на +' + esc(clean) + '.</div>';
+      if (!arr.length) { if (!box.querySelector('.yact-scan')) box.innerHTML = scanHtml; return; }
+      box.innerHTML = arr.slice(0, 12).map(m => {
+        const fresh = m.code && !seen.has((m.code || '') + '|' + (m.at || ''));
+        return `<div class="yact-code-card${fresh ? ' in' : ''}">
+          <div class="yact-code-top"><span class="yact-code-from">${esc(m.from || 'WhatsApp')}</span><span class="yact-code-at">${esc(String(m.at).slice(0, 16))}</span></div>
+          ${m.code ? `<div class="yact-code-row"><div class="yact-code-big">${esc(m.code).split('').map(d => `<span>${esc(d)}</span>`).join('')}</div><button class="yact-copy" data-ycopy="${esc(m.code)}">${ic(I.copy)}<span>Копировать</span></button></div>` : ''}
+          <div class="yact-code-txt">${esc(m.text)}</div>
+        </div>`;
+      }).join('');
+      arr.forEach(m => { if (m.code) seen.add((m.code || '') + '|' + (m.at || '')); });
+      box.querySelectorAll('[data-ycopy]').forEach(b => b.addEventListener('click', () => { try { navigator.clipboard.writeText(b.dataset.ycopy); } catch (_) {} b.classList.add('ok'); const s = b.querySelector('span'); if (s) s.textContent = 'Скопировано'; }));
     } catch (e) {}
   };
   $('#yActRefresh', bd).addEventListener('click', loadSms);

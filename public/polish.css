@@ -714,3 +714,56 @@ input[type=number] { -moz-appearance: textfield; }
 /* W/T → минималистичные иконки WhatsApp/Telegram в индикаторе каналов */
 .tbl-cdot svg{width:12px;height:12px;display:block}
 .lead-card .geo-row .tbl-cdot svg{width:11px;height:11px}
+
+/* ===== Yesim OTP-активация — motion-графика приёма кода ===== */
+.yact-feed-hd{display:flex;align-items:center;gap:8px;margin:16px 0 8px}
+.yact-feed-hd b{font-size:13px}
+.yact-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3)}
+.yact-live i{width:7px;height:7px;border-radius:50%;background:#2fa98c;animation:yactPulse 1.6s infinite}
+@keyframes yactPulse{0%{box-shadow:0 0 0 0 rgba(47,169,140,.55)}70%{box-shadow:0 0 0 7px rgba(47,169,140,0)}100%{box-shadow:0 0 0 0 rgba(47,169,140,0)}}
+.yact-feed{min-height:168px;border:1px solid var(--stroke);border-radius:14px;padding:8px;background:var(--bg-2);display:flex;flex-direction:column;gap:8px}
+/* ждём код — сканер */
+.yact-scan{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 16px;text-align:center;position:relative;min-height:150px}
+.yact-scan-rings{position:absolute;top:34px;width:80px;height:80px;pointer-events:none}
+.yact-scan-rings i{position:absolute;inset:0;margin:auto;width:52px;height:52px;border:2px solid var(--accent);border-radius:16px;opacity:0;animation:yactRing 2.4s ease-out infinite}
+.yact-scan-rings i:nth-child(2){animation-delay:.8s}
+.yact-scan-rings i:nth-child(3){animation-delay:1.6s}
+@keyframes yactRing{0%{transform:scale(.7);opacity:.5}100%{transform:scale(1.9);opacity:0}}
+.yact-scan-core{width:52px;height:52px;border-radius:16px;background:var(--accent);color:#fff;display:grid;place-items:center;position:relative;z-index:1;box-shadow:0 12px 30px -10px var(--accent);animation:yactFloat 3s ease-in-out infinite}
+.yact-scan-core svg{width:24px;height:24px}
+@keyframes yactFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.yact-scan-tx{margin-top:18px;font-size:14px;font-weight:650;color:var(--ink-1);display:inline-flex;align-items:center;gap:1px}
+.yact-dots{display:inline-flex;gap:3px;margin-left:5px}
+.yact-dots i{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.3;animation:yactDot 1.4s infinite}
+.yact-dots i:nth-child(2){animation-delay:.2s}
+.yact-dots i:nth-child(3){animation-delay:.4s}
+@keyframes yactDot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+.yact-scan-sub{margin-top:9px;font-size:11.5px;color:var(--ink-3);max-width:270px;line-height:1.5}
+.yact-scan-sub b{color:var(--ink-2)}
+/* карточка кода */
+.yact-code-card{border:1px solid var(--stroke);border-radius:12px;padding:12px 14px;background:var(--card)}
+.yact-code-card.in{animation:yactCardIn .5s cubic-bezier(.2,.9,.3,1.3) both,yactGlow 1.9s ease-out .3s 1}
+@keyframes yactCardIn{0%{opacity:0;transform:translateY(14px) scale(.96)}100%{opacity:1;transform:none}}
+@keyframes yactGlow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+.yact-code-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink-3);margin-bottom:9px}
+.yact-code-from{font-weight:650;color:var(--ink-2)}
+.yact-code-row{display:flex;align-items:center;gap:12px;margin-bottom:9px}
+.yact-code-big{display:flex;gap:5px;font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:27px;font-weight:800;letter-spacing:1px;color:var(--navy-900)}
+.yact-code-big span{display:inline-block}
+.yact-code-card.in .yact-code-big span{animation:yactDigit .45s cubic-bezier(.2,.9,.3,1.3) both}
+.yact-code-card.in .yact-code-big span:nth-child(1){animation-delay:.26s}
+.yact-code-card.in .yact-code-big span:nth-child(2){animation-delay:.32s}
+.yact-code-card.in .yact-code-big span:nth-child(3){animation-delay:.38s}
+.yact-code-card.in .yact-code-big span:nth-child(4){animation-delay:.44s}
+.yact-code-card.in .yact-code-big span:nth-child(5){animation-delay:.50s}
+.yact-code-card.in .yact-code-big span:nth-child(6){animation-delay:.56s}
+.yact-code-card.in .yact-code-big span:nth-child(7){animation-delay:.62s}
+.yact-code-card.in .yact-code-big span:nth-child(8){animation-delay:.68s}
+@keyframes yactDigit{0%{opacity:0;transform:translateY(-12px) rotateX(-70deg)}100%{opacity:1;transform:none}}
+.yact-copy{margin-left:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--stroke);border-radius:9px;background:var(--bg-1);padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-1);transition:all .15s;white-space:nowrap}
+.yact-copy:hover{border-color:var(--accent);color:var(--accent)}
+.yact-copy.ok{background:#2fa98c;border-color:#2fa98c;color:#fff;animation:yactPop .3s}
+@keyframes yactPop{0%{transform:scale(.9)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.yact-copy svg{width:14px;height:14px}
+.yact-code-txt{font-size:12px;color:var(--ink-3);line-height:1.5}
+@media (prefers-reduced-motion:reduce){.yact-scan-rings i,.yact-scan-core,.yact-dots i,.yact-live i,.yact-code-card.in,.yact-code-card.in .yact-code-big span{animation:none!important}}
