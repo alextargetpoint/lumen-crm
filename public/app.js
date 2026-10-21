@@ -3099,6 +3099,12 @@ function go(page) {
   if (_editorId) leaveEditor();   /* клик по пункту меню из редактора → выходим в раздел CRM */
   /* реорг 9→5: прямой заход на свёрнутую страницу открывает её композит + нужную под-вкладку */
   if (FOLDED[page]) { const [comp, idx] = FOLDED[page]; PAGE_STATE[comp + 'Tab'] = idx; page = comp; }
+  /* роль-гейт ДО рендера (#631): раньше запретный раздел РЕНДЕРИЛСЯ, и только через ~2 сек applyRoleUi
+     выкидывал на «Обзор» — брокер видел «мигнул и скинуло». Теперь ловим здесь и уводим сразу, без мигания. */
+  if (typeof pageHiddenForUser === 'function' && NAV[page] && pageHiddenForUser(page)) {
+    const fb = !pageHiddenForUser('overview') ? 'overview' : (Object.keys(NAV).find(p => NAV[p] && !pageHiddenForUser(p)) || 'overview');
+    if (page !== fb) { try { toast('Раздел недоступен', 'Для вашей роли он скрыт — обратитесь к владельцу', false); } catch (_) {} page = fb; }
+  }
   CUR = page;
   closeModal(true);   /* FIX: навигация закрывает открытую модалку ТИХО (без history.back — иначе гонка откатывала навигацию обратно: «мигнул диалог → вернулся в воронку») */
   document.getElementById('bulkBar')?.remove();   /* FIX: снять панель массовых действий при уходе со страницы (не висеть сиротой поверх других разделов) */
