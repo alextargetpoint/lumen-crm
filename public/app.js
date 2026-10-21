@@ -3183,7 +3183,7 @@ function mountEditor() {
 function leaveEditor() {
   _editorId = null;
   const app = document.querySelector('.app'); if (app) app.classList.remove('editor-mode', 'nav-open', 'nav-pinned');
-  const c = $('#content'); if (c) c.removeAttribute('data-editor');
+  const c = $('#content'); if (c) { c.removeAttribute('data-editor'); c.innerHTML = ''; }   /* убираем iframe сразу — иначе он мелькает в обычной раскладке до перерисовки раздела */
 }
 
 /* count-up крупных цифр в волну входа */
@@ -19325,10 +19325,14 @@ const startPage = () => (NAV[location.hash.slice(1)] ? location.hash.slice(1) : 
 window.addEventListener('hashchange', () => {
   const h = location.hash.slice(1);
   if (h.indexOf('pres/') === 0) { _editorId = h.slice(5); mountEditor(); return; }   /* #pres/<id> → встроенный редактор */
+  const wasEditor = !!_editorId;
   if (_editorId) leaveEditor();
   const p = h;
-  if (NAV[p] && p !== CUR) go(p);
-  else if (!NAV[p]) history.replaceState(null, '', '#' + CUR);
+  /* ⚠️ после выхода из редактора раздел перерисовываем ВСЕГДА (в #content остался iframe редактора):
+     даже если p === CUR (раздел-основа под редактором был 'properties', CUR тоже 'properties') —
+     иначе класс editor-mode снят, а контент так и держит iframe → сломанный экран. */
+  if (NAV[p]) { if (p !== CUR || wasEditor) go(p); }
+  else { history.replaceState(null, '', '#' + CUR); if (wasEditor && NAV[CUR]) go(CUR); }
 });
 
 /* Канбан-воронка: вертикальное колесо над доской скроллит КОЛОНКУ под курсором (не горизонталь всей доски).
