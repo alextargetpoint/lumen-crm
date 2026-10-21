@@ -19288,6 +19288,18 @@ window.addEventListener('hashchange', () => {
   else if (!NAV[p]) history.replaceState(null, '', '#' + CUR);
 });
 
+/* Канбан-воронка: вертикальное колесо над доской скроллит КОЛОНКУ под курсором (не горизонталь всей доски).
+   Раньше над короткими колонками/зазорами вертикальный wheel уходил в overflow-x доски → «воронка ехала вправо». */
+document.addEventListener('wheel', (e) => {
+  const kb = e.target.closest && e.target.closest('.kanban'); if (!kb) return;
+  if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;   /* горизонтальное намерение (shift/трекпад) — отдаём доске */
+  let col = e.target.closest('.kb-col');
+  if (!col) { col = [...kb.querySelectorAll('.kb-col')].find(c => { const r = c.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right; }); }   /* курсор в зазоре → ближайшая колонка по X */
+  const cards = col && col.querySelector('.kb-cards'); if (!cards) return;
+  cards.scrollTop += e.deltaY;   /* вертикаль всегда в колонку (clamp сам: короткая колонка = no-op) */
+  e.preventDefault();            /* и всегда гасим горизонтальный перехват доски вертикальным колесом */
+}, { passive: false });
+
 /* «Назад» (кнопка браузера/мыши) закрывает открытую карточку/модалку/деталь объекта, а не выкидывает из CRM.
    Раньше SPA держала одну запись истории → любой Back уводил с сайта и ронял весь интерфейс. */
 let _lastPropView = null;
