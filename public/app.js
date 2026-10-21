@@ -13515,7 +13515,8 @@ function openContractorEdit(ct, onDone) {
         <button type="button" class="seg-btn ${qm === 'current' ? 'on' : ''}" data-qm="current" style="flex:1">Только текущая стадия</button>
       </div>
       <div class="lc-hint info" style="margin-top:8px;font-size:11px;line-height:1.55"><span>${ic(I.spark)}<b>Рекомендуется «по достигнутой стадии».</b> Квалифицированный лид со временем естественно отваливается — засыпает, перестаёт отвечать. По маркетингу его качество уже подтверждено, поэтому он должен <b>оставаться</b> в квалах подрядчика (иначе метрика качества трафика тает по мере отвала лидов и подрядчик выглядит хуже, чем привёл). Режим <b>«только текущая стадия»</b> считает лишь тех, кто в квале прямо сейчас — снимок воронки, а не итог по трафику.</span></div>
-    </div>`;
+    </div>
+    ${isNew ? '' : `<div class="form-row" style="border-top:1px solid var(--stroke);padding-top:14px;margin-top:6px"><label>Доступ в CRM</label><div id="ceCrmBox"></div></div>`}`;
   const bd = modal({ title: isNew ? 'Новый подрядчик' : 'Подрядчик', body, wide: true, actions: [
     { label: isNew ? 'Создать' : 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
       const name = $('#ceName', bd).value.trim(); if (!name) { toast('Укажите название'); return false; }
@@ -13529,6 +13530,40 @@ function openContractorEdit(ct, onDone) {
     { label: 'Отмена' },
   ] });
   $$('#ceQm .seg-btn', bd).forEach(b => b.addEventListener('click', () => { $$('#ceQm .seg-btn', bd).forEach(x => x.classList.remove('on')); b.classList.add('on'); }));
+  /* ⭐Доступ в CRM: синхронизация «подрядчик из аналитики» → scoped-сотрудник (видит ТОЛЬКО свои лиды по vendorId) */
+  if (!isNew) {
+    const emailRe = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    const renderCrmAccess = () => {
+      const box = $('#ceCrmBox', bd); if (!box) return;
+      const linked = (STATE.brokers || []).find(x => x.contractorId === ct.id);
+      if (linked) {
+        const roleNm = (typeof RBAC_ROLES !== 'undefined' && RBAC_ROLES[linked.roleType]) || linked.roleType || 'Аналитик';
+        const st = linked.invited ? '<span class="ce-crm-st wait">приглашение отправлено</span>' : '<span class="ce-crm-st ok">активен</span>';
+        box.innerHTML = `<div class="ce-crm-linked"><div class="ce-crm-who"><b>${esc(linked.name || linked.email || 'Сотрудник')}</b> ${st}<div class="muted" style="font-size:11px;margin-top:2px">${esc(linked.email || '')} · ${esc(roleNm)} · видит только лиды этого подрядчика</div></div>
+          <div class="ce-crm-acts"><button type="button" class="btn btn-sm" id="ceCrmOpen">В Роли</button><button type="button" class="btn btn-sm btn-danger" id="ceCrmRevoke">Отозвать</button></div></div>`;
+        $('#ceCrmOpen', box).onclick = () => { if (typeof closeModal === 'function') closeModal(); go('settings'); };
+        $('#ceCrmRevoke', box).onclick = async () => {
+          try { await api.patch('/brokers/' + linked.id, { active: false }); toast('Доступ отозван', 'лиды переназначены команде', true); await loadState(); renderCrmAccess(); }
+          catch (e) { toast('Не вышло', (e && e.message) || 'ошибка'); }
+        };
+      } else {
+        const pref = emailRe.test(String(ct.contact || '').trim()) ? ct.contact.trim() : '';
+        box.innerHTML = `<div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:8px">Выдайте подрядчику вход в CRM — он увидит <b>только свои лиды</b> (по привязке к нему) и аналитику своих кампаний. Роль «Аналитик», доступы донастраиваются в «Настройки → Роли».</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="ceCrmEmail" class="lc-inp" style="flex:1;min-width:200px;padding:9px 11px;border:1px solid var(--stroke);border-radius:9px;background:var(--bg-1);color:var(--ink-1)" value="${esc(pref)}" placeholder="email подрядчика для входа"><button type="button" class="btn btn-sm btn-accent" id="ceCrmGrant">${ic(I.plus)}Выдать доступ</button></div>`;
+        $('#ceCrmGrant', box).onclick = async () => {
+          const email = String(($('#ceCrmEmail', box) || {}).value || '').trim().toLowerCase();
+          if (!emailRe.test(email)) { toast('Нужен корректный email'); return; }
+          const btn = $('#ceCrmGrant', box); btn.disabled = true; btn.textContent = 'Отправляю…';
+          try {
+            await api.post('/brokers/invite', { email, name: ct.name, roleType: 'analyst', leadFilter: { contractors: [ct.id] }, contractorId: ct.id });
+            toast('Приглашение отправлено', email + ' — подрядчик задаст пароль и увидит свои лиды', true);
+            await loadState(); renderCrmAccess();
+          } catch (e) { toast('Не вышло', (e && e.message) || 'ошибка'); btn.disabled = false; btn.textContent = 'Выдать доступ'; }
+        };
+      }
+    };
+    renderCrmAccess();
+  }
 }
 
 /* ---------------- КОММЕНТАРИИ под рекламой (comment-to-lead) ---------------- */
@@ -16889,13 +16924,13 @@ function rbacRowHtml(b) {
   const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = roleTplHide(rt);
   const shown = RBAC_SECTIONS.filter(s => !defHide.includes(s) && !ind.includes(s)).length;
   return `<div class="rbac-row" data-rbacid="${b.id}" data-name="${esc((b.name || '').toLowerCase())}">
-    <button class="rbac-main" data-rbactoggle><span class="rbac-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><span class="rbac-nm"><b>${esc(b.name || 'Сотрудник')}</b><i>${RBAC_ROLES[rt]} · ${shown}/${RBAC_SECTIONS.length} разделов</i></span><span class="rbac-chev">${ic(I.chev)}</span></button>
+    <button class="rbac-main" data-rbactoggle><span class="rbac-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><span class="rbac-nm"><b>${esc(b.name || 'Сотрудник')}</b>${b.contractorId ? '<span class="rbac-ctbadge" title="Подрядчик трафика — видит только свои лиды">подрядчик</span>' : ''}<i>${RBAC_ROLES[rt]} · ${shown}/${RBAC_SECTIONS.length} разделов</i></span><span class="rbac-chev">${ic(I.chev)}</span></button>
     <div class="rbac-body" hidden>
       <div class="rbac-role"><span>Роль</span><select class="sh-sel rbac-roleSel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === rt ? 'selected' : ''}>${n}</option>`).join('')}</select><button class="btn-ghost rbac-del" title="Убрать сотрудника">${ic(I.x)}</button></div>
       <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const byInd = ind.includes(s); const hidden = byRole || byInd; return `<button class="rbac-sec ${hidden ? 'off' : 'on'} ${byRole ? 'locked' : ''}" data-sec="${s}"${byRole ? ' disabled title="Закрыто ролью — смени роль, чтобы открыть"' : ''}>${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
       <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — дополнительно скрыть/показать. Серые закрыты ролью.</div>
       ${(() => {
-        const lf = b.leadFilter || {}; const restrict = ((lf.tags || []).length || (lf.sources || []).length) > 0;
+        const lf = b.leadFilter || {}; const restrict = ((lf.tags || []).length || (lf.sources || []).length || (lf.contractors || []).length) > 0;
         const roleHint = rt === 'broker' ? 'видит только свои лиды' : 'видит все лиды агентства';
         return `<div class="rbac-lf">
         <div class="rbac-lf-h">Какие карточки лидов видит сотрудник</div>

@@ -6792,7 +6792,7 @@ const server = http.createServer(async (req, res) => {
       if (bb.roleType && ['broker', 'assistant', 'marketer', 'analyst', 'manager'].includes(bb.roleType)) br.roleType = bb.roleType;
       if (Array.isArray(bb.hidePages)) br.hidePages = bb.hidePages.filter(x => typeof x === 'string').slice(0, 40);
       /* подрядчик трафика → участник со scoped-видимостью (только свои лиды по тегу) + связь с подрядчиком */
-      if (bb.leadFilter && typeof bb.leadFilter === 'object') br.leadFilter = { sources: (bb.leadFilter.sources || []).slice(0, 20).map(String), tags: (bb.leadFilter.tags || []).slice(0, 20).map(x => String(x).slice(0, 40)) };
+      if (bb.leadFilter && typeof bb.leadFilter === 'object') br.leadFilter = { sources: (bb.leadFilter.sources || []).slice(0, 20).map(String), tags: (bb.leadFilter.tags || []).slice(0, 20).map(x => String(x).slice(0, 40)), contractors: (bb.leadFilter.contractors || []).slice(0, 20).map(x => String(x).slice(0, 40)) };
       if (bb.contractorId) br.contractorId = String(bb.contractorId).slice(0, 40);
       const token = crypto.randomBytes(16).toString('hex');
       reg.invites[token] = { tid, brokerId: br.id, email, at: Date.now() };
@@ -7090,8 +7090,8 @@ const server = http.createServer(async (req, res) => {
     const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona' || p === '/api/brokers/my-phone' || p === '/api/wa/gray/gen-about' || p === '/api/wa/gray/avatar-upload';   /* самообслуживание брокера: свой WA-профиль + телефон + ИИ-«о себе» + аватар */
     if (IS_BROKER && p.startsWith('/api/') && !brokerSelfWaOk && !(isControlDelegate && CONTROL_PATH) && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
     /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
-    const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length)) ? MEMBER.leadFilter : null;
-    const matchesLeadFilter = (l) => { if (!LF) return true; const byTag = (LF.tags || []).length && (l.tags || []).some(t => LF.tags.includes(t)); const bySrc = (LF.sources || []).length && LF.sources.includes(l.source); return !!(byTag || bySrc); };
+    const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length || (MEMBER.leadFilter.contractors || []).length)) ? MEMBER.leadFilter : null;
+    const matchesLeadFilter = (l) => { if (!LF) return true; const byTag = (LF.tags || []).length && (l.tags || []).some(t => LF.tags.includes(t)); const bySrc = (LF.sources || []).length && LF.sources.includes(l.source); const byVendor = (LF.contractors || []).length && LF.contractors.includes(l.vendorId); return !!(byTag || bySrc || byVendor); };
     const canSeeLead = (l) => (!IS_BROKER || (CAP && CAP.leads === 'all') || l.broker === ROLE.brokerId) && matchesLeadFilter(l);
     /* код доступа (pinPlain) виден ТОЛЬКО реальному владельцу (не брокеру, не в режиме preview) */
     const RR_STATE = realRole(req);
@@ -8817,7 +8817,7 @@ const server = http.createServer(async (req, res) => {
         br.busyBlocks = b.busyBlocks.filter(x => x && +x.dow >= 1 && +x.dow <= 7 && /^\d{1,2}:\d{2}$/.test(String(x.from || '')) && /^\d{1,2}:\d{2}$/.test(String(x.to || '')))
           .slice(0, 30).map(x => ({ dow: +x.dow, from: String(x.from), to: String(x.to), label: String(x.label || '').slice(0, 40) }));
       }
-      if (b.leadFilter && typeof b.leadFilter === 'object') { br.leadFilter = { tags: (Array.isArray(b.leadFilter.tags) ? b.leadFilter.tags : []).filter(x => typeof x === 'string').slice(0, 30), sources: (Array.isArray(b.leadFilter.sources) ? b.leadFilter.sources : []).filter(x => typeof x === 'string').slice(0, 20) }; }   /* фильтр видимости карточек лидов по тегам/источникам */
+      if (b.leadFilter && typeof b.leadFilter === 'object') { br.leadFilter = { tags: (Array.isArray(b.leadFilter.tags) ? b.leadFilter.tags : []).filter(x => typeof x === 'string').slice(0, 30), sources: (Array.isArray(b.leadFilter.sources) ? b.leadFilter.sources : []).filter(x => typeof x === 'string').slice(0, 20), contractors: (Array.isArray(b.leadFilter.contractors) ? b.leadFilter.contractors : []).filter(x => typeof x === 'string').slice(0, 20) }; }   /* фильтр видимости карточек лидов по тегам/источникам/подрядчику(vendorId) */
       if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту агентства */
       /* поля публичной визитки брокера (/b/:id) */
       if (b.phone != null) br.phone = String(b.phone).slice(0, 40);
