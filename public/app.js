@@ -4734,6 +4734,23 @@ function selTagPrompt(cfg) {
     actions: [{ label: 'Пометить', cls: 'btn-accent', onClick: (bd) => { const v = $('#bbTag', bd).value.trim(); if (v) selBulk(cfg, 'tag', v); } }, { label: 'Отмена' }] });
 }
 
+/* экспорт выбранных лидов в CSV (клиентом — мгновенно, из LEAD_LOOKUP; ; + BOM → Excel ru открывает ровно) */
+function exportLeadsCsv(ids) {
+  const rows = (ids || []).map(id => LEAD_LOOKUP[id]).filter(Boolean);
+  if (!rows.length) { toast('Нечего экспортировать'); return; }
+  const SRC = { meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA', ig_direct: 'Instagram', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
+  const q = (v) => { v = String(v == null ? '' : v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const chY = (v) => v === 'yes' ? 'да' : v === 'no' ? 'нет' : '—';
+  const fmtd = (t) => t ? new Date(t).toLocaleString('ru-RU') : '';
+  const head = ['Имя', 'Телефон', 'Стадия', 'Направление', 'Бюджет', 'Квал', 'Источник', 'Брокер', 'WhatsApp', 'Telegram', 'Создан', 'Последняя активность', 'Следующий шаг'];
+  const lines = rows.map(l => [l.name, l.phone, stageName(l.stage), l.geoName || l.geo, (l.quals.budget || {}).value || '', (l.axesFilled || 0) + '/4', SRC[l.source] || l.source || '', l.brokerName || '', chY((l.channels || {}).wa), chY((l.channels || {}).tg), fmtd(l.createdAt), fmtd(l.lastMsgAt || l.createdAt), (l.nextAction && l.nextAction.text) || ''].map(q).join(';'));
+  const csv = '﻿' + head.map(q).join(';') + '\n' + lines.join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'leads-' + rows.length + '-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Экспортировано', rows.length + ' лид(ов) в CSV', true);
+}
+
 /* ---------- конфиг: ЛИДЫ ---------- */
 let LEAD_LOOKUP = {};
 let LUMEN_VENDORS = [], LUMEN_VENDORS_LOADED = false; /* кэш подрядчиков (для фильтров/назначения на лид) */
@@ -4751,7 +4768,8 @@ const SELCFG_LEADS = {
     { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
     { id: 'chain', label: 'Запустить цепочку', ic: I.chain, run: (cfg, c) => { const seqs = (STATE.sequences || []).filter(s => s.active); const _n = [...selSet(cfg.kind)].length; const _antiban = _n > 3 ? ' Первые касания раскладываются с паузами (анти-бан) — не летят разом.' : ''; ctxPopup(c.x, c.y, [{ ic: I.bolt, label: 'По направлению (авто)', onClick: () => selBulk(cfg, 'chain', '', { title: `Запустить цепочку на ${_n} лид(ов)?`, sub: 'Клиентам уйдут касания по WhatsApp (по гео-цепочке).' + _antiban, ok: 'Запустить' }) }, ...seqs.map(s => ({ ic: I.chain, label: s.name, onClick: () => selBulk(cfg, 'chain', s.id, { title: `Запустить «${s.name}» на ${_n} лид(ов)?`, sub: 'Клиентам уйдут касания этой цепочки по WhatsApp.' + _antiban, ok: 'Запустить' }) }))]); } },
     { id: 'aion', label: 'ИИ вкл', ic: I.spark, run: (cfg) => selBulk(cfg, 'ai', true) },
-    { id: 'aioff', label: 'ИИ выкл', run: (cfg) => selBulk(cfg, 'ai', false) },
+    { id: 'aioff', label: 'ИИ выкл', ic: I.moon, run: (cfg) => selBulk(cfg, 'ai', false) },
+    { id: 'export', label: 'Экспорт CSV', ic: I.doc, run: (cfg) => exportLeadsCsv([...selSet(cfg.kind)]) },
     { id: 'cases', label: 'Разбор кейсов', ic: I.doc, run: (cfg) => { const ids = [...selSet(cfg.kind)]; if (!ids.length) return; window.open('/cases?ids=' + ids.join(','), '_blank'); } },
     { id: 'archive', label: 'В архив', ic: I.moon, run: (cfg) => selBulk(cfg, 'archive', null, { title: `Архивировать ${n} лид(ов)?`, sub: 'В «Потерянные», ИИ выключится. Обратимо.', ok: 'В архив' }) },
     { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} лид(ов) навсегда?`, sub: 'Карточки и переписка — безвозвратно. Обычно лучше «В архив».', ok: 'Удалить навсегда', danger: true }) },
