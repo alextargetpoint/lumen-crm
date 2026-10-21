@@ -7071,7 +7071,7 @@ const INBOX_SEGS = [['all', 'Все'], ['wait', 'Ждут ответа'], ['hot'
 PAGES.inbox = async (root) => {
   PAGE_STATE.inboxSeg = PAGE_STATE.inboxSeg || 'all';
   const brokers = (STATE.brokers || []).filter(b => b.active !== false);
-  root.innerHTML = `<div class="inbox">
+  root.innerHTML = `<div class="inbox" id="inboxWrap">
     <div class="glass conv-list" id="convList">
       <div class="conv-head">
         <div class="conv-search-wrap">${ic(I.search || I.doc)}<input class="conv-search" id="convSearch" placeholder="Имя или телефон" value="${esc(PAGE_STATE.inboxSearch || '')}"></div>
@@ -7111,14 +7111,22 @@ async function refreshInbox(first) {
   const list = $('#convItems');
   if (!list) return;
   if ((!PAGE_STATE.inboxLead || !leads.some(l => l.id === PAGE_STATE.inboxLead)) && leads.length) PAGE_STATE.inboxLead = leads[0].id;
-  list.innerHTML = leads.map(l => `
-    <div class="conv ${l.id === PAGE_STATE.inboxLead ? 'active' : ''}" data-id="${l.id}">
+  list.innerHTML = leads.map(l => {
+    const nh = (l.tags || []).includes('нужен человек');
+    const dir = l.lastDir === 'in' ? '<span class="conv-dir in">↙</span>' : l.lastDir === 'out' ? '<span class="conv-dir out">↗</span>' : '';
+    return `<div class="conv ${l.id === PAGE_STATE.inboxLead ? 'active' : ''} ${nh ? 'nh' : ''}" data-id="${l.id}">
       ${avaHtml(l)}
-      <div class="meta"><div class="nm">${esc(l.name)}</div><div class="prev">${esc(l.lastText || 'нет сообщений')}</div></div>
-      <div class="tm">${l.lastMsgAt ? tmm(l.lastMsgAt) : ''}</div>
-      ${(l.unread || 0) > 0 ? `<div class="unread-badge" style="background:var(--accent);color:#fff;border-radius:10px;min-width:18px;height:18px;display:grid;place-items:center;font-size:10.5px;font-weight:700;padding:0 5px;box-shadow:0 1px 4px rgba(37,99,235,.4)">${l.unread > 9 ? '9+' : l.unread}</div>` : (l.lastDir === 'in' ? '<div class="unread"></div>' : '')}
-    </div>`).join('') || `<div class="empty" style="padding:24px 14px">Ничего не найдено${PAGE_STATE.inboxSeg !== 'all' || PAGE_STATE.inboxBroker || PAGE_STATE.inboxSearch ? ' — снимите фильтры' : ''}</div>`;
-  $$('.conv', list).forEach(c => c.addEventListener('click', () => { PAGE_STATE.inboxLead = c.dataset.id; $$('.conv', list).forEach(x => x.classList.toggle('active', x === c)); renderChat(c.dataset.id, true); }));
+      <div class="meta">
+        <div class="conv-nm-row"><span class="conv-stdot" style="background:${stageColor(l.stage)}" title="${esc(stageName(l.stage))}"></span><span class="nm">${esc(l.name)}</span>${l.ai && l.ai.enabled ? '<span class="conv-ai" title="ИИ ведёт диалог">ИИ</span>' : ''}</div>
+        <div class="prev">${dir}${esc(l.lastText || 'нет сообщений')}</div>
+      </div>
+      <div class="conv-right">
+        <div class="tm">${l.lastMsgAt ? tmm(l.lastMsgAt) : ''}</div>
+        ${nh ? `<div class="conv-nh" title="Нужен человек — клиент просил менеджера">${ic(I.user, 2)}</div>` : (l.unread || 0) > 0 ? `<div class="unread-badge" style="background:var(--accent);color:#fff;border-radius:10px;min-width:18px;height:18px;display:grid;place-items:center;font-size:10.5px;font-weight:700;padding:0 5px;box-shadow:0 1px 4px rgba(37,99,235,.4)">${l.unread > 9 ? '9+' : l.unread}</div>` : (l.lastDir === 'in' ? '<div class="unread"></div>' : '')}
+      </div>
+    </div>`;
+  }).join('') || `<div class="empty" style="padding:24px 14px">Ничего не найдено${PAGE_STATE.inboxSeg !== 'all' || PAGE_STATE.inboxBroker || PAGE_STATE.inboxSearch ? ' — снимите фильтры' : ''}</div>`;
+  $$('.conv', list).forEach(c => c.addEventListener('click', () => { PAGE_STATE.inboxLead = c.dataset.id; $$('.conv', list).forEach(x => x.classList.toggle('active', x === c)); document.getElementById('inboxWrap')?.classList.add('show-chat'); renderChat(c.dataset.id, true); }));
   if (PAGE_STATE.inboxLead && leads.length) await renderChat(PAGE_STATE.inboxLead, first);
   else if (!leads.length) { const cp = $('#chatPane'); if (cp) cp.innerHTML = '<div class="chat-empty"><div>Нет диалогов по фильтру</div></div>'; }
 }
@@ -7369,6 +7377,7 @@ async function renderChat(id, rebuild) {
   })() : '';
   pane.innerHTML = `
     <div class="chat-head">
+      <button class="chat-back" id="chatBack" title="К списку диалогов">${ic(I.chev)}</button>
       ${avaHtml(l)}
       <div class="chat-head-id" id="chatHeadId" title="Открыть карточку лида"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)}${phInvBadge(l)} · ${l.geoName} ${clientTzBadge(l)}</div></div>
       <div class="chat-head-actions">
@@ -7428,6 +7437,7 @@ async function renderChat(id, rebuild) {
   });
   $('#chatOpenLead')?.addEventListener('click', () => openLeadModal(l.id));
   $('#chatHeadId')?.addEventListener('click', () => openLeadModal(l.id));   /* клик по имени/номеру → карточка лида (по инерции) */
+  $('#chatBack')?.addEventListener('click', () => document.getElementById('inboxWrap')?.classList.remove('show-chat'));   /* мобилка: назад к списку диалогов */
   $$('[data-mcopy]', pane).forEach(b => b.addEventListener('click', async (e) => { const url = e.currentTarget.dataset.mcopy; if (!url) return; try { await navigator.clipboard.writeText(url); toast('Ссылка на созвон скопирована', null, true); } catch (_) { toast('Не удалось скопировать', url); } }));
   $$('[data-medit]', pane).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openMeetingPageEditor(e.currentTarget.dataset.medit); }));
   $$('[data-gofix]', pane).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); const dst = e.currentTarget.dataset.gofix; if (typeof go === 'function') go(dst || 'numbers'); }));

@@ -589,10 +589,20 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .ava img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
 .conv .meta { flex: 1; min-width: 0; }
+.conv-nm-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.conv-stdot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
 .conv .nm { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--navy-900); }
+.conv-ai { flex: 0 0 auto; font-size: 8.5px; font-weight: 800; letter-spacing: .03em; color: #6B5BC0; background: rgba(107,91,192,.12); border-radius: 5px; padding: 1px 4px; }
 .conv .prev { font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
-.conv .tm { font-size: 10.5px; color: var(--ink-3); align-self: flex-start; padding-top: 2px; }
+.conv-dir { font-weight: 800; margin-right: 3px; font-style: normal; }
+.conv-dir.in { color: #2FA98C; } .conv-dir.out { color: #7C8FE0; }
+.conv-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: 0 0 auto; }
+.conv .tm { font-size: 10.5px; color: var(--ink-3); padding-top: 0; align-self: auto; }
 .conv .unread { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.conv-nh { width: 19px; height: 19px; border-radius: 6px; display: grid; place-items: center; background: rgba(192,57,43,.12); color: #C0392B; }
+.conv-nh svg { width: 12px; height: 12px; }
+.conv.nh { box-shadow: inset 3px 0 0 #C0392B; }
+.conv.nh.active { box-shadow: inset 3px 0 0 #C0392B, inset 0 0 0 1px var(--accent-soft-bd); }
 
 .chat { display: flex; flex-direction: column; overflow: hidden; position: relative; }
 /* ⭐ ИИ на связи: живая полоса МЕЖДУ перепиской и полем ввода (в потоке, не поверх сообщений).
@@ -620,6 +630,8 @@ textarea { resize: vertical; min-height: 70px; }
 @keyframes aiBreath { 0%, 100% { opacity: .4; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.3); } }
 @media (prefers-reduced-motion: reduce) { .chat-ai-dot, .chat-ai-aura::before { animation: none; } }
 .chat-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--stroke-soft); flex-wrap: nowrap; }
+.chat-back { display: none; width: 34px; height: 34px; flex: 0 0 auto; border-radius: 10px; border: 1px solid var(--stroke); background: var(--card); color: var(--ink-2); place-items: center; cursor: pointer; margin-right: 2px; }
+.chat-back svg { width: 18px; height: 18px; transform: rotate(180deg); }
 .chat-head-id { flex: 0 6 auto; min-width: 0; cursor: pointer; border-radius: 9px; padding: 4px 8px; margin: -4px -8px; transition: background .14s; }
 .chat-head-chips { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 10px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 10px), transparent); }
 .chat-head-id:hover { background: var(--bg); }
@@ -1516,7 +1528,12 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
   .topbar { padding: 14px 14px 10px; flex-wrap: wrap; }
   .topbar .btn-accent { padding: 8px 13px; font-size: 12.5px; }
   .inbox { grid-template-columns: 1fr; }
-  .conv-list { display: none; }
+  .inbox .lead-panel { display: none; }                 /* панель лида — вторична на мобиле (детали — тап по шапке чата) */
+  .inbox:not(.show-chat) .chat { display: none; }       /* по умолчанию — список диалогов */
+  .inbox.show-chat .conv-list { display: none; }        /* выбрали диалог → только переписка */
+  .chat-back { display: grid !important; }              /* кнопка «назад к списку» */
+  .lead-tbl-x { min-width: 760px; }                     /* таблица воронки на мобиле — компактнее */
+  .fnl-stages { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }   /* воронка-стадии — свайп, не перенос */
 }
 
 /* ---------- объекты ---------- */
