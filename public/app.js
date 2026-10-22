@@ -9945,6 +9945,7 @@ PAGES.properties = async (root) => {
           <button class="imp-tab" data-imptab="reelly">${ic(I.building)}Reelly</button>
           <button class="imp-tab" data-imptab="table">${ic(I.doc)}Таблица · CSV/Excel</button>
           <button class="imp-tab" data-imptab="json">${ic(I.doc)}JSON-фид</button>
+          <button class="imp-tab" data-imptab="manual">${ic(I.edit || I.plus)}Вручную</button>
         </div>
         <div data-imppane="url">
           <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px">Вставьте ссылку на объект/проект с ЛЮБОГО сайта (у источников нет API). ИИ сам разберёт страницу и соберёт карточку — цена, локация, спальни, площадь, план оплаты, описание — а фото перезальёт к нам. Работает без настройки источника.</div>
@@ -9983,6 +9984,11 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
           <textarea id="impJson" style="min-height:130px;font-family:Menlo,monospace;font-size:11.5px" placeholder='[{"name":"Peninsula Four","developer":"Select Group","location":"Business Bay","min_price":520000,"handover":"2028","bedrooms":"2","yield":"6.5%"}]'></textarea>
           <button class="btn btn-accent" id="impJsonGo" style="margin-top:8px">Импортировать JSON</button>
         </div>
+        <div data-imppane="manual" style="display:none">
+          <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px">Создайте пустую карточку и заполните поля руками (название, цена, локация, фото, юниты) — редактор откроется сразу. Удобно, если объекта нет по ссылке или в PDF.</div>
+          <div class="form-row"><label>Название объекта</label><input id="impManualName" placeholder="Напр. The Baya Phuket" autocomplete="off"></div>
+          <button class="btn btn-accent" id="impManualGo">${ic(I.plus)}Создать и открыть редактор</button>
+        </div>
         <div class="lp-sec">Куда сложить</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="form-row"><label>Направление (если не в данных)</label><select id="impPGeo">${geoOpts}</select></div>
@@ -10016,6 +10022,15 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
       } catch (err) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(err.message) + '</span>'; btn.disabled = false; }
     });
     $('#impJsonGo', bd).addEventListener('click', async () => { const j = $('#impJson', bd).value.trim(); if (!j) return toast('Вставьте JSON'); done(await api.post('/properties/import', { json: j, defaults: defaults() })); });
+    /* вручную: пустая карточка → сразу редактор */
+    $('#impManualGo', bd)?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button'); const name = ($('#impManualName', bd) ? $('#impManualName', bd).value : '').trim() || 'Новый объект';
+      const d = defaults(); btn.disabled = true;
+      try { const r = await api.post('/properties', { name, geo: d.geo, market: d.market, force: 'new' });
+        if (r && r.id) { closeModal(); PAGE_STATE.propView = r.id; PAGE_STATE.propEditMode = true; render(); }
+        else { toast('Не вышло', (r && r.error) || ''); btn.disabled = false; } }
+      catch (err) { toast('Ошибка', err.message); btn.disabled = false; }
+    });
     /* по ссылке · ИИ */
     $('#impUrlPrev', bd).addEventListener('click', async () => {
       const url = $('#impUrl', bd).value.trim(); if (!url) return toast('Вставьте ссылку');
