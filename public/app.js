@@ -9738,6 +9738,17 @@ PAGES.properties = async (root) => {
   if (PAGE_STATE.propZone) { const Z = PAGE_STATE.propZone; const R = (Z.r || 2000) * 1.5 / 111000; list = list.filter(p => typeof p.lat === 'number' && Math.hypot(p.lat - Z.lat, (p.lng - Z.lng) * Math.cos(Z.lat * Math.PI / 180)) < R); }
   /* «обведи-область» → только объекты внутри нарисованного контура (по координатам) */
   if (PAGE_STATE.propLasso && PAGE_STATE.propLasso.latlngs && PAGE_STATE.propLasso.latlngs.length > 2) { const P = PAGE_STATE.propLasso.latlngs; list = list.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number' && pointInPoly(p.lat, p.lng, P)); }
+  /* сортировка списка объектов (цены нормализуем в базовую валюту для честного сравнения) */
+  { const _ps = PAGE_STATE.propSort || 'new';
+    const _pnum = s => { const m = String(s == null ? '' : s).match(/[\d.]+/); return m ? parseFloat(m[0]) : 0; };
+    const _pbase = pr => { const e = effPrice(pr); return (typeof convTo === 'function' ? convTo(e.price, e.currency, FX.base) : 0) || e.price || 0; };
+    list.sort((a, b) => {
+      if (_ps === 'priceAsc') return (_pbase(a) || Infinity) - (_pbase(b) || Infinity);
+      if (_ps === 'priceDesc') return _pbase(b) - _pbase(a);
+      if (_ps === 'roi') return _pnum(b.roi) - _pnum(a.roi);
+      if (_ps === 'name') return String(a.name || '').localeCompare(String(b.name || ''));
+      return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);   /* new */
+    }); }
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
     ${heroArt('assets/art/tower.png', `
@@ -9754,6 +9765,7 @@ PAGES.properties = async (root) => {
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
       ${((STATE.brokers || []).some(b => b.active !== false) || (STATE.me && STATE.me.role === 'broker') || props.some(p => p.visibility === 'private')) ? `<select id="prOwn" title="Чьи объекты: общий пул агентства или ваши личные"><option value="">Все объекты</option><option value="mine" ${ownF === 'mine' ? 'selected' : ''}>Мои</option><option value="team" ${ownF === 'team' ? 'selected' : ''}>Командные</option><option value="private" ${ownF === 'private' ? 'selected' : ''}>Личные</option></select>` : ''}
+      <select id="prSort" title="Сортировка">${[['new', 'Сначала новые'], ['priceAsc', 'Цена ↑'], ['priceDesc', 'Цена ↓'], ['roi', 'Доходность ↓'], ['name', 'По названию']].map(([v, n]) => `<option value="${v}" ${(PAGE_STATE.propSort || 'new') === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <select id="prBaseCur" title="Базовая валюта — цены показываются «нативная ≈ в этой валюте»">${['USD', 'EUR', 'AED', 'THB', 'RUB', 'GBP'].map(c => `<option ${(FX.base || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <button class="btn btn-sm ${F.propFiltersOpen ? 'on-map' : ''}" id="prFiltBtn" title="Расширенный фильтр">${ic(I.gear || I.doc)}Фильтры${advCount ? ' · ' + advCount : ''}</button>
       ${PAGE_STATE.propZone ? `<button class="btn btn-sm pr-zonechip" id="prZoneReset" title="Снять фильтр района">${ic(I.pin || I.building, 2)}${esc(PAGE_STATE.propZone.name)} <b>×</b></button>` : ''}
@@ -9819,7 +9831,7 @@ PAGES.properties = async (root) => {
             <span class="pc2-price">${(() => { const e = effPrice(pr); return e.price ? priceHtml(e.price, e.currency, 'от ') : '—'; })()}</span>
             ${pr.roi ? `<span class="pc2-roi">${esc(pr.roi)}</span>` : ''}
           </div>
-          ${[pr.type, pr.handover].filter(x => x && x !== '—').length ? `<div class="pc2-meta">${[pr.type, pr.handover].filter(x => x && x !== '—').map(esc).join('&nbsp;·&nbsp;')}</div>` : ''}
+          ${(() => { const bits = [pr.type, (pr.units || []).length ? pr.units.length + ' юнит.' : '', pr.handover].filter(x => x && x !== '—'); return bits.length ? `<div class="pc2-meta">${bits.map(esc).join('&nbsp;·&nbsp;')}</div>` : ''; })()}
         </div>
       </div>`).join('') || '<div class="glass card empty es-art es-props"><span class="es-art-img"></span><span class="es-art-tx">Объектов нет — добавьте первый</span></div>'}
     </div>`;
@@ -9828,6 +9840,7 @@ PAGES.properties = async (root) => {
   $('#prOwn')?.addEventListener('change', (e) => { PAGE_STATE.propOwn = e.target.value; render(); });
   $('#prvList')?.addEventListener('click', () => { if (PAGE_STATE.propMap) { PAGE_STATE.propMap = false; render(); } });
   $('#prvMap')?.addEventListener('click', () => { if (!PAGE_STATE.propMap) { PAGE_STATE.propMap = true; render(); } });
+  $('#prSort')?.addEventListener('change', (e) => { PAGE_STATE.propSort = e.target.value; render(); });
   $('#prBaseCur')?.addEventListener('change', async (e) => { FX.base = e.target.value; api.patch('/settings', { baseCurrency: FX.base }).catch(() => {}); render(); });
   $('#prZoneReset')?.addEventListener('click', () => { PAGE_STATE.propZone = null; render(); });
   $('#prLassoReset')?.addEventListener('click', () => { PAGE_STATE.propLasso = null; render(); });
