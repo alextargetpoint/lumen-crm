@@ -2232,6 +2232,15 @@ button.fnl-kpi:hover { border-color: var(--accent); }
 .adicp-hint { font-size: 12.5px; color: var(--ink-2); padding: 3px 0; }
 .adicp-hint b { color: var(--navy-900); }
 .adicp-hint i { font-style: normal; color: var(--ink-3); font-size: 11px; }
+/* виджет Обзора «Бюджет рекламы» */
+.ovb-kpi { display: flex; gap: 8px; margin: 10px 0; }
+.ovb-kpi > div { flex: 1; min-width: 0; background: var(--bg-2, rgba(20,19,17,.03)); border: 1px solid var(--stroke-soft); border-radius: 10px; padding: 7px 10px; }
+.ovb-kpi b { display: block; font-size: 16px; font-weight: 750; color: var(--navy-900); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.ovb-kpi i { font-size: 10px; color: var(--ink-3); font-style: normal; }
+.ovb-top { display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--stroke); border-left-width: 3px; background: var(--card); }
+.ovb-top-b { min-width: 0; }
+.ovb-top-b b { display: block; font-size: 12.5px; color: var(--navy-900); }
+.ovb-top-b span { font-size: 11px; color: var(--ink-3); margin-top: 1px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 @keyframes softIn { from { opacity: .55; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .content.soft > * { animation: softIn .24s var(--ease-soft); }
 
