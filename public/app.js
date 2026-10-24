@@ -19007,8 +19007,11 @@ PAGES.settings = async (root) => {
       /* предупреждение: бот платформы не подключён (нет токена) → /start и привязка не работают,
          новый ключ не поможет. Диагностировано на проде: tokenSet=false у центрального бота. */
       const warn = $('#tgbReadyWarn');
-      if (warn) warn.innerHTML = (d.tokenSet === false || !d.ready)
-        ? `<div class="lc-hint warn" style="margin-bottom:12px">${ic(I.shield)}<span><b>Центральный бот${d.centralBot ? ' @' + esc(d.centralBot) : ''} ещё не подключён</b>${d.tokenSet === false ? ' — у бота не задан токен' : ' — вебхук не настроен'}, поэтому команда <code>/start</code> и привязка по ключу пока не сработают (бот не получает сообщения). Генерация нового ключа это не исправит. ${s.isPrimary ? 'Подключите токен центрального бота ниже или задайте <b>LUMEN_TG_BRIDGE_TOKEN</b> на сервисе lumen-crm в Railway.' : 'Нужно действие оператора платформы — подключить токен центрального бота. Ваши ключи при этом сохранятся.'}</span></div>`
+      /* показываем ТОЛЬКО если мост реально не готов. В SaaS работает ЦЕНТРАЛЬНЫЙ бот (d.central),
+         пер-тенантный tokenSet тогда всегда false — это норма, НЕ повод для тревоги (ready=true → /start работает). */
+      const bridgeBroken = !d.ready || (!d.central && d.tokenSet === false);
+      if (warn) warn.innerHTML = bridgeBroken
+        ? `<div class="lc-hint warn" style="margin-bottom:12px">${ic(I.shield)}<span><b>Центральный бот${d.centralBot ? ' @' + esc(d.centralBot) : ''} ещё не подключён</b>${(!d.central && d.tokenSet === false) ? ' — у бота не задан токен' : ' — вебхук не настроен'}, поэтому команда <code>/start</code> и привязка по ключу пока не сработают (бот не получает сообщения). Генерация нового ключа это не исправит. ${s.isPrimary ? 'Подключите токен центрального бота ниже или задайте <b>LUMEN_TG_BRIDGE_TOKEN</b> на сервисе lumen-crm в Railway.' : 'Нужно действие оператора платформы — подключить токен центрального бота. Ваши ключи при этом сохранятся.'}</span></div>`
         : '';
       const deepLink = (code) => d.central && d.centralBot ? `https://t.me/${d.centralBot}?start=${code}` : null;
       const rows = (d.brokers || []).map(b => { const dl = deepLink(b.code); return `<div class="set-row" style="padding:7px 0">
