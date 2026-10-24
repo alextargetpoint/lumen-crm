@@ -11994,6 +11994,7 @@ function restructureAdsTabs(root) {
   const cardOf = (sel) => { const e = root.querySelector(sel); return e ? (e.closest('.glass.card') || e.closest('.glass') || e) : null; };
   const kpis = root.querySelector('.ad-kpis');
   const cmpCardNode = (root.querySelector('#adCmpCard') && root.querySelector('#adCmpCard').children.length) ? root.querySelector('#adCmpCard') : null;
+  const recsCardNode = (root.querySelector('#adRecsCard') && root.querySelector('#adRecsCard').children.length) ? root.querySelector('#adRecsCard') : null;
   const rangeBar = cardOf('#adRangeBar');
   const anaExtra = cardOf('#anaExtra');
   const tree = root.querySelector('.ct-wrap');
@@ -12011,7 +12012,7 @@ function restructureAdsTabs(root) {
   KEYS.forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
   /* Аналитика · факт: диапазон дат + KPI + гео/качество/пересмотр/отчёт (то, что тянется из кабинета) */
-  put(rangeBar, 'analytics'); put(kpis, 'analytics'); put(cmpCardNode, 'analytics'); put(anaExtra, 'analytics');
+  put(rangeBar, 'analytics'); put(recsCardNode, 'analytics'); put(kpis, 'analytics'); put(cmpCardNode, 'analytics'); put(anaExtra, 'analytics');
   /* Дерево креативов: дерево + каталог объявлений (сюда подгружаются креативы) */
   put(tree, 'creatives'); put(imp, 'creatives');
   /* Настройки рекламы: приём лидов (Albato) + кабинет Meta (API) + Meta CAPI + журнал приёма */
@@ -12039,6 +12040,19 @@ PAGES.ads = async (root) => {
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
   const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
+  const recs = await api.get('/ads/recommendations' + rq).catch(() => ({ ready: false, reason: 'сеть' }));
+  const _rm = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
+  const _rtag = { cut: 'Срезать', scale: 'Масштабировать', shift: 'Сдвиг', format: 'Формат' };
+  const recsCard = recs.ready ? `<div class="glass card mb adrecs">
+      <div class="card-title">${ic(I.spark)}Рекомендации по бюджету<span class="muted" style="font-weight:400;margin-left:8px">по CPQL — цене квалифицированного лида</span></div>
+      <div class="adrecs-kpi">
+        <div><b>${recs.totals.cpql ? _rm(recs.totals.cpql) : '—'}</b><i>CPQL средний</i></div>
+        <div><b>${recs.totals.cpl ? _rm(recs.totals.cpl) : '—'}</b><i>CPL средний</i></div>
+        <div><b>${recs.totals.quals || 0}</b><i>квалов</i></div>
+        <div><b>${_rm(recs.totals.spend)}</b><i>расход</i></div>
+      </div>
+      ${(recs.recommendations || []).length ? `<div class="adrecs-list">${recs.recommendations.map(r => `<div class="adrec adrec-${r.kind} sev-${r.sev || 'med'}"><span class="adrec-tag">${_rtag[r.kind] || r.kind}</span><div class="adrec-b"><b>${esc(r.title)}</b><span>${esc(r.text)}</span></div></div>`).join('')}</div>` : '<div class="muted" style="font-size:12.5px;padding:8px 2px">Явных перекосов бюджета нет. Рекомендации появятся, когда по объявлениям накопятся квалы.</div>'}
+    </div>` : `<div class="glass card mb adrecs"><div class="card-title">${ic(I.spark)}Рекомендации по бюджету</div><div class="muted" style="font-size:12.5px;padding:6px 2px">${esc(recs.reason || 'Нет данных для рекомендаций.')}</div></div>`;
   const cmp = await api.get('/ads/compare' + rq).catch(() => ({ rows: [], totals: {} }));
   const cmpCard = (cmp.rows && cmp.rows.length) ? (() => {
     const _S = STATE.settings.metaAds || {}; const _src = (cmp.currency && cmp.currency.src) || _S.sourceCurrency || 'AED'; const _disp = (cmp.currency && cmp.currency.disp) || _S.displayCurrency || _src;
@@ -12079,6 +12093,7 @@ PAGES.ads = async (root) => {
           </div>
         </div>
       </div>`; })()}
+    <div id="adRecsCard">${recsCard}</div>
     <div id="adCmpCard">${cmpCard}</div>
     ${(() => {
       const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2;
