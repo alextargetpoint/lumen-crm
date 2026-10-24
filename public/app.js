@@ -12052,6 +12052,9 @@ PAGES.ads = async (root) => {
         <div><b>${_rm(recs.totals.spend)}</b><i>расход</i></div>
       </div>
       ${(recs.recommendations || []).length ? `<div class="adrecs-list">${recs.recommendations.map(r => `<div class="adrec adrec-${r.kind} sev-${r.sev || 'med'}"><span class="adrec-tag">${_rtag[r.kind] || r.kind}</span><div class="adrec-b"><b>${esc(r.title)}</b><span>${esc(r.text)}</span></div></div>`).join('')}</div>` : '<div class="muted" style="font-size:12.5px;padding:8px 2px">Явных перекосов бюджета нет. Рекомендации появятся, когда по объявлениям накопятся квалы.</div>'}
+      ${recs.totals.cpql ? `<div class="adrecs-plan"><div class="adrecs-plan-hd">${ic(I.target || I.bars)}Планировщик бюджета<span class="muted">цель по квалам → бюджет и сплит</span></div>
+        <div class="adrecs-plan-in">Хочу <input type="number" id="adPlanN" min="1" max="999" value="${Math.max(5, (recs.totals.quals || 10))}"> квал(ов)/период</div>
+        <div class="adrecs-plan-out" id="adPlanOut"></div></div>` : ''}
     </div>` : `<div class="glass card mb adrecs"><div class="card-title">${ic(I.spark)}Рекомендации по бюджету</div><div class="muted" style="font-size:12.5px;padding:6px 2px">${esc(recs.reason || 'Нет данных для рекомендаций.')}</div></div>`;
   const cmp = await api.get('/ads/compare' + rq).catch(() => ({ rows: [], totals: {} }));
   const cmpCard = (cmp.rows && cmp.rows.length) ? (() => {
@@ -12424,6 +12427,24 @@ PAGES.ads = async (root) => {
       </div>
     </div>`;
   restructureAdsTabs(root);   /* упаковать хаос страницы в аккуратные вкладки (Аналитика/Креативы/Приём/CAPI) */
+  /* планировщик бюджета от цели по квалам (строится на CPQL из /ads/recommendations) */
+  if (recs && recs.ready && recs.totals.cpql) {
+    const _pm = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
+    const planOut = $('#adPlanOut', root), planN = $('#adPlanN', root);
+    const calcPlan = () => {
+      if (!planOut) return;
+      const n = Math.max(1, Math.min(999, Math.round(+planN.value || 0)));
+      const blended = recs.totals.cpql, budget = Math.round(n * blended);
+      const geos = (recs.byGeo || []), totQ = recs.totals.quals || 1;
+      let split = '';
+      if (geos.length >= 2) {
+        split = '<div class="adrecs-plan-rows">' + geos.map(g => { const gq = Math.round(n * (g.quals / totQ)); if (gq < 1) return ''; return `<div class="adrecs-plan-row"><span>${esc(g.name)}</span><b>~${gq} квал · ${_pm(gq * g.cpql)}</b><i>CPQL ${_pm(g.cpql)}</i></div>`; }).filter(Boolean).join('') + '</div>';
+        const best = geos[0]; if (best) split += `<div class="adrecs-plan-hint">Дешевле всего — <b>${esc(best.name)}</b> (CPQL ${_pm(best.cpql)}): сдвиг бюджета сюда снизит общий расход.</div>`;
+      }
+      planOut.innerHTML = `<div class="adrecs-plan-total">≈ <b>${_pm(budget)}</b> за период при текущем CPQL ${_pm(blended)}</div>${split}`;
+    };
+    if (planN) { planN.addEventListener('input', calcPlan); calcPlan(); }
+  }
   /* дерево креативов: раскрытие редактора + сохранение креатива/тезисов */
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
   /* под-вкладки аналитики + вид клиента + копия отчёта */

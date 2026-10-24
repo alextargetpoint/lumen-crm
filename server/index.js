@@ -971,7 +971,10 @@ function adBudgetRecommendations(db, opts = {}) {
   if (fmtRows.length >= 2) { fmtRows.sort((a, b) => a.cpql - b.cpql); const b0 = fmtRows[0], w = fmtRows[fmtRows.length - 1];
     if (w.cpql > b0.cpql * 1.5) recs.push({ kind: 'format', sev: 'med', title: `${b0.f[0].toUpperCase() + b0.f.slice(1)} эффективнее`, text: `${b0.f} ${b0.hasQ ? 'CPQL' : 'CPL'} ${money(b0.cpql)} vs ${w.f} ${money(w.cpql)} — делать упор на ${b0.f}.` }); }
   rows.sort((a, b) => (a.cpql || Infinity) - (b.cpql || Infinity));
-  return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, cpl: avgCpl, cpql: avgCpql }, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
+  /* разбивки для планировщика «цель→бюджет+сплит» (только где есть квалы → достоверный CPQL) */
+  const byGeo = geoRows.map(x => ({ key: x.g, name: gn(x.g), spend: x.spend, leads: x.leads, quals: x.quals, cpql: x.cpql })).sort((a, b) => a.cpql - b.cpql);
+  const byFmt = Object.entries(roll('fmt')).map(([f, v]) => ({ key: f, name: f, spend: v.spend, leads: v.leads, quals: v.quals, cpql: v.quals ? Math.round(v.spend / v.quals) : null })).filter(x => x.cpql && x.key !== 'другое').sort((a, b) => a.cpql - b.cpql);
+  return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, cpl: avgCpl, cpql: avgCpql }, byGeo, byFmt, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
 }
 
 /* Раздать креатив/тезисы объявления на ВСЕ объявления с тем же именем (по всем адсетам/кампаниям).
