@@ -145,7 +145,7 @@ function send(db, lead, text, via, opts = {}) {
   if (_dupKey && via !== 'human' && !opts.allowDup) {
     const since = Date.now() - 14 * 864e5;
     const keyOf = mm => (mm.media && mm.media.url) ? ('m:' + mm.media.url) : (mm.text ? ('t:' + String(mm.text).trim().slice(0, 300)) : '');
-    if (db.messages.some(mm => mm.leadId === lead.id && mm.dir === 'out' && (mm.channel || 'wa') === channel && mm.at > since && keyOf(mm) === _dupKey)) {
+    if (db.messages.some(mm => mm.leadId === lead.id && mm.dir === 'out' && mm.status !== 'failed' && (mm.channel || 'wa') === channel && mm.at > since && keyOf(mm) === _dupKey)) {
       ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Анти-дубль (${CH_NAMES[channel] || channel}, ${lead.name}): это сообщение уже отправлялось — повторно не шлём` });
       return null;
     }
@@ -511,6 +511,7 @@ function tickChains(db) {
   const defaultSeqId = (db.settings.ai && db.settings.ai.defaultSeq) || null;
   for (const lead of db.leads) {
     if (!lead.ai.enabled) continue;
+    if (lead.ai.softClosed) continue;     /* клиент мягко отказался («не интересно») — проактивных касаний нет */
     if (lead.ai.pendingTouch) continue;   /* касание ждёт одобрения брокера (режим «с одобрением») — не трогаем, пока не решит */
     const _tmode = (db.settings.automations || {}).touchMode || 'auto';
     if (_tmode === 'off' && !lead.ai.forceInstant) continue;   /* режим «выключено»: проактивных касаний нет (кроме «Отправить сейчас») */
@@ -593,6 +594,15 @@ function tickChains(db) {
       continue;
     }
     if (nowT < lead.ai.nextTouchAt) continue;
+    /* ⭐ЗАЩИТА ОТ ВЫГОРАНИЯ: офлайн-номер → пауза (не прожигаем шаги в мёртвый номер; проба ≤1/6ч, само-восстановление) */
+    if (offlinePaused(db, lead, nowT)) { lead.ai.nextTouchAt = nowT + 6 * 3600e3; continue; }
+    /* потолок касаний без ответа → в «Спящие», бомбить перестаём */
+    const _g = guardCfg(db);
+    if (_g.enabled && _g.maxTouchesNoReply > 0 && lead.ai.chainStep >= _g.maxTouchesNoReply) {
+      lead.stage = 'sleeping';
+      ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: ${_g.maxTouchesNoReply} касаний без ответа — прекращаю авто-дожим (→ Спящие)` });
+      continue;
+    }
     /* тихие часы: мгновенное первое касание (шаг 0, свежая заявка <30 мин) разрешено — клиент онлайн; остальное ждёт утра */
     const freshInstant = (lead.ai.chainStep === 0 && nowT - lead.createdAt < 30 * 60e3) || !!lead.ai.forceInstant;
     if (lead.ai.forceInstant) delete lead.ai.forceInstant;   /* «Отправить сейчас» из диалога — одноразовый обход тихих часов */
@@ -687,6 +697,11 @@ function tickChains(db) {
           : (lead.creativeUrl ? { type: /\.(mp4|webm|mov)(\?|$)/i.test(lead.creativeUrl) ? 'video' : 'image', url: lead.creativeUrl } : null);
         if (media) send(db, lead, '', 'chain', { media });
       }
+      /* ⭐МЯГКИЙ ВЫХОД: на N-м касании добавляем клиенту лёгкую возможность остановить рассылку
+         («не актуально — напишите „нет"»). Снижает копящийся негатив → меньше жалоб и банов номера. */
+      if (_g.enabled && _g.softExitOffer && (lead.ai.chainStep + 1) === _g.softExitAtTouch && typeof text === 'string' && text.trim() && sendOpts.channel !== 'email' && !stepCreative) {
+        text = text.trim() + '\n\n' + _g.softExitText;
+      }
       if (stepCreative) send(db, lead, text || '', 'chain', { ...sendOpts, media: stepCreative });   /* медиа+подпись одним сообщением */
       else send(db, lead, text, 'chain', sendOpts);
       if (lead.stage === 'new') lead.stage = 'touch';
@@ -732,9 +747,66 @@ function reengageCfg(db) {
     gapDays: (Array.isArray(c.gapDays) && c.gapDays.length) ? c.gapDays.map(x => Math.max(0.1, +x || 1)) : [1, 2, 4],
   };
 }
+/* ⭐ ЗАЩИТА ЦЕПОЧЕК ОТ ВЫГОРАНИЯ (anti-burnout): настройки + предикаты.
+   Смысл: не бомбить молчунов до бана номера. Клиент копит негатив → жалоба → бан.
+   4 механизма (каждый настраивается): авто-стоп на отказ, мягкий выход в цепочке,
+   потолок касаний, пауза при офлайн-номере. */
+function guardCfg(db) {
+  const g = (db.settings.automations && db.settings.automations.chainGuard) || {};
+  return {
+    enabled: g.enabled !== false,                                   /* вся защита — по умолчанию ВКЛ */
+    autoStopOnDecline: g.autoStopOnDecline !== false,               /* клиент отказался → одно закрытие + стоп */
+    declineWords: (Array.isArray(g.declineWords) && g.declineWords.length) ? g.declineWords.map(x => String(x).toLowerCase())
+      : ['нет', 'не интересно', 'неинтересно', 'не актуально', 'неактуально', 'воздержусь', 'не нужно', 'не надо', 'спасибо, нет', 'больше не пишите', 'не пишите', 'отпишите', 'отписаться', 'перестаньте', 'остановитесь', 'хватит', 'отстаньте', 'стоп'],
+    closingMessage: typeof g.closingMessage === 'string' && g.closingMessage.trim() ? g.closingMessage
+      : 'Понял вас, {name}. Не буду настаивать — остаёмся на связи. Если тема станет актуальной, просто напишите сюда, и мы продолжим с того же места. Хорошего дня! 🙏',
+    softExitOffer: g.softExitOffer !== false,                       /* мягкий выход в цепочке */
+    softExitAtTouch: Math.max(1, Math.min(20, g.softExitAtTouch != null ? +g.softExitAtTouch : 3)),
+    softExitText: typeof g.softExitText === 'string' && g.softExitText.trim() ? g.softExitText
+      : 'Если тема сейчас не актуальна — просто напишите «нет», и я больше не буду беспокоить. А если интересно, с радостью помогу дальше.',
+    maxTouchesNoReply: Math.max(0, Math.min(30, g.maxTouchesNoReply != null ? +g.maxTouchesNoReply : 5)),  /* 0 = без потолка */
+    pauseOnOffline: g.pauseOnOffline !== false,                     /* не слать, пока номер не на связи (прошлое не ушло) */
+  };
+}
+/* последнее исходящее не ушло (номер разлогинен/офлайн)? → проактивные касания ставим на паузу,
+   иначе движок прожигает шаги в мёртвый номер (сообщения не доходят, но негатив копится при переподключении). */
+function lastOutFailed(db, lead) {
+  const msgs = (db.messages || []).filter(m => m.leadId === lead.id);
+  if (!msgs.length) return false;
+  const last = msgs[msgs.length - 1];
+  /* true ТОЛЬКО если самое последнее сообщение — не ушедшее исходящее. Входящее после (клиент ответил →
+     номер явно онлайн) снимает флаг. */
+  return last.dir === 'out' && last.status === 'failed';
+}
+/* проактивное касание на паузе из-за офлайн-номера? Статус номера синхронно недоступен (воркер — async),
+   поэтому: последнее сообщение — не ушедшее исходящее И прошло < 6ч → пауза; ≥6ч → разрешаем ОДНУ пробу
+   (вдруг номер вернулся). Так не бомбим мёртвый номер (≤1 касание/6ч вместо каждого шага) + само-восстановление. */
+function offlinePaused(db, lead, nowT) {
+  if (!guardCfg(db).pauseOnOffline) return false;
+  const msgs = (db.messages || []).filter(m => m.leadId === lead.id);
+  if (!msgs.length) return false;
+  const last = msgs[msgs.length - 1];
+  if (last.dir !== 'out' || last.status !== 'failed') return false;
+  return (nowT - (last.at || 0)) < 6 * 3600e3;
+}
+/* клиент отказался/просит не беспокоить? (мягкий сигнал, НЕ хард-optout) */
+function declineMatch(db, text) {
+  const t = String(text || '').toLowerCase().replace(/ё/g, 'е');
+  if (!t.trim()) return false;
+  for (const w of guardCfg(db).declineWords) {
+    const ww = w.replace(/ё/g, 'е');
+    /* короткие слова («нет», «стоп») — только как ЦЕЛОЕ сообщение (не внутри «нет, расскажите»);
+       длинные фразы — подстрокой */
+    if (ww.length <= 4) { if (t.replace(/[^а-яёa-z]/gi, '') === ww.replace(/[^а-яёa-z]/gi, '')) return true; }
+    else if (t.includes(ww)) return true;
+  }
+  return false;
+}
 /* кандидат на авто-дожим? (общий предикат для тика и для видимости) */
 function reengageEligible(db, lead) {
   if (!lead.ai || !lead.ai.enabled || lead.marketingOptOut) return false;
+  if (lead.ai.softClosed) return false;                            /* клиент мягко отказался — не дожимаем */
+  if (guardCfg(db).pauseOnOffline && lastOutFailed(db, lead)) return false;   /* номер не на связи — пауза */
   if (lead.stage !== 'dialog') return false;                        /* только живой диалог: цепочка — до ответа; sleeping — bulk-wake */
   if (lead.lastDir !== 'out') return false;                         /* ждём, только если МЫ писали последними (клиент молчит) */
   if (!db._demoSandbox && (lead._demo || isSeedDemoPhone(lead.phone))) return false;
@@ -1301,7 +1373,8 @@ function fireReply(db, lead) {
   l2.ai._replying = Date.now();
   const pending = l2.ai.pendingReply || null;
   const prov = (db.settings.ai || {}).provider;
-  const useLlm = llm.available() && (prov === 'llm' || (prov === 'auto' && !l2.ai.replySimulated));
+  /* закрытие на отказ (kind='closing') — шлём ровно заданный текст, БЕЗ перегенерации LLM */
+  const useLlm = llm.available() && (prov === 'llm' || (prov === 'auto' && !l2.ai.replySimulated)) && (!pending || pending.kind !== 'closing');
   (async () => {
     try {
       let out = null;
@@ -1570,4 +1643,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue, guardCfg, declineMatch, lastOutFailed };

@@ -179,6 +179,25 @@ function onInbound(db, lead, text) {
     pushEvent(db, { type: 'optout', leadId: lead.id, text: `${lead.name}: стоп-слово — ИИ отключён, лид закрыт (opt-out)` });
     return { reply: null };
   }
+  /* ⭐ АВТО-СТОП НА ОТКАЗ (защита от выгорания): клиент написал «не интересно / воздержусь / не актуально» →
+     ИИ шлёт ОДНО вежливое закрытие и прекращает все касания. Лид → «Спящие» (не теряем: напишет снова — продолжим). */
+  let guard = { enabled: false }; try { guard = require('./engine').guardCfg(db); } catch (_) {}
+  const isDecline = guard.enabled && guard.autoStopOnDecline && (() => { try { return require('./engine').declineMatch(db, text); } catch (_) { return false; } })();
+  if (isDecline && !lead.ai.softClosed) {
+    lead.ai.softClosed = true;
+    lead.ai.reengage = null;
+    for (const k of ['nextDraft', '_reengageText', '_gReengage', '_ptText', '_ptEmail', 'nextTouchAt', 'pendingTouch']) delete lead.ai[k];
+    lead.stage = 'sleeping';
+    lead.lastMsgAt = Date.now(); lead.lastDir = 'in'; lead.ai.silentSince = null;
+    const closing = String(guard.closingMessage || '').replace(/\{name\}/g, lead.name || '').replace(/\s+([,.!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+    pushEvent(db, { type: 'optout', leadId: lead.id, text: `${lead.name}: «не интересно»/отказ → ИИ отправил вежливое закрытие и прекратил касания (→ Спящие)` });
+    return { reply: { text: closing, kind: 'closing' } };
+  }
+  /* был мягко закрыт, но написал снова и это НЕ отказ → клиент вернулся, снимаем стоп, ИИ снова ведёт */
+  if (lead.ai.softClosed && !isDecline) {
+    lead.ai.softClosed = false;
+    pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: вернулся после «не беспокоить» — ИИ снова ведёт диалог` });
+  }
   lead.lastMsgAt = Date.now();
   lead.lastDir = 'in';
   lead.ai.silentSince = null;

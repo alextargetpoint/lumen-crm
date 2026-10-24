@@ -772,3 +772,8 @@ input[type=number] { -moz-appearance: textfield; }
 .ce-crm-st.ok{background:rgba(47,169,140,.14);color:#2fa98c}
 .ce-crm-st.wait{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
 .ce-crm-acts{display:flex;gap:7px;flex-shrink:0}
+
+/* ===== Защита цепочек от выгорания (automations) ===== */
+.cg-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 0}
+.cg-row>div:first-child{min-width:0}
+.cg-hr{border:0;border-top:1px solid var(--stroke);margin:8px 0}
