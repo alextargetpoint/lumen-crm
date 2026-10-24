@@ -10695,6 +10695,28 @@ PAGES.automations = async (root) => {
           </div>
           <button class="btn btn-sm btn-accent" id="aiDelaySave" style="margin-top:10px">Сохранить задержку</button>
         </div>`; })()}
+        ${(() => { const g = (s.automations || {}).chainGuard || {}; const gv = (k, d) => g[k] !== undefined ? g[k] : d;
+          const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
+          return `<div class="glass card mb" data-ag="dist">
+          <div class="card-title">${ic(I.shield || I.spark)}Защита цепочек от выгорания<span class="sub">не бомбить молчунов — меньше жалоб и банов номеров</span></div>
+          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Если клиент молчит на 4–5-е касание, долбить дальше вредно: копится негатив → жалобы → бан номера. Эти правила дают клиенту мягко выйти и останавливают рассылку по сигналу отказа.</div>
+          <div class="cg-row"><div><b>Включить защиту</b><div class="muted" style="font-size:11px">главный выключатель всех правил ниже</div></div>${cb('cgEnabled', gv('enabled', true) !== false)}</div>
+          <hr class="cg-hr">
+          <div class="cg-row"><div><b>Авто-стоп на отказ</b><div class="muted" style="font-size:11px">клиент пишет «не интересно / воздержусь / нет» → ИИ шлёт одно вежливое закрытие и прекращает касания (лид → Спящие)</div></div>${cb('cgDecline', gv('autoStopOnDecline', true) !== false)}</div>
+          <div class="form-row"><label>Текст закрытия (<code>{name}</code> — имя клиента)</label><textarea id="cgClosing" rows="2" style="min-height:52px;width:100%;box-sizing:border-box">${esc(gv('closingMessage', 'Понял вас, {name}. Не буду настаивать — остаёмся на связи. Если тема станет актуальной, просто напишите сюда, и мы продолжим с того же места. Хорошего дня! 🙏'))}</textarea></div>
+          <hr class="cg-hr">
+          <div class="cg-row"><div><b>Мягкий выход в цепочке</b><div class="muted" style="font-size:11px">на N-м касании добавить клиенту лёгкую возможность остановить рассылку</div></div>${cb('cgSoftExit', gv('softExitOffer', true) !== false)}</div>
+          <div style="display:grid;grid-template-columns:150px 1fr;gap:10px">
+            <div class="form-row"><label>На каком касании</label><input id="cgSoftAt" type="number" min="1" max="20" value="${+gv('softExitAtTouch', 3)}"></div>
+            <div class="form-row"><label>Текст предложения выхода</label><textarea id="cgSoftText" rows="2" style="min-height:52px;width:100%;box-sizing:border-box">${esc(gv('softExitText', 'Если тема сейчас не актуальна — просто напишите «нет», и я больше не буду беспокоить. А если интересно, с радостью помогу дальше.'))}</textarea></div>
+          </div>
+          <hr class="cg-hr">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
+            <div class="form-row" style="margin:0"><label>Потолок касаний без ответа → Спящие (0 = без потолка)</label><input id="cgMaxTouch" type="number" min="0" max="30" value="${+gv('maxTouchesNoReply', 5)}"></div>
+            <div class="cg-row" style="margin:0"><div><b>Пауза при офлайн-номере</b><div class="muted" style="font-size:11px">не слать, пока номер разлогинен (иначе шлём в пустоту)</div></div>${cb('cgPause', gv('pauseOnOffline', true) !== false)}</div>
+          </div>
+          <button class="btn btn-sm btn-accent" id="cgSave" style="margin-top:12px">Сохранить защиту</button>
+        </div>`; })()}
         <div class="glass card mb" data-ag="reports">
           <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
           ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
@@ -10854,6 +10876,20 @@ PAGES.automations = async (root) => {
   $$('#autoSeg .seg-b', root).forEach(b => b.addEventListener('click', () => applyAg(b.dataset.ag)));
   applyAg(PAGE_STATE.funnelAg || 'first');
   const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
+  $('#cgSave') && $('#cgSave').addEventListener('click', async () => {
+    const g = {
+      enabled: $('#cgEnabled', root).checked,
+      autoStopOnDecline: $('#cgDecline', root).checked,
+      closingMessage: ($('#cgClosing', root).value || '').trim(),
+      softExitOffer: $('#cgSoftExit', root).checked,
+      softExitAtTouch: Math.max(1, Math.min(20, +$('#cgSoftAt', root).value || 3)),
+      softExitText: ($('#cgSoftText', root).value || '').trim(),
+      maxTouchesNoReply: Math.max(0, Math.min(30, +$('#cgMaxTouch', root).value || 0)),
+      pauseOnOffline: $('#cgPause', root).checked,
+    };
+    try { await saveAuto({ chainGuard: g }); toast('Защита сохранена', 'Правила применятся к цепочкам и дожиму', true); }
+    catch (e) { toast('Не сохранилось', e.message); }
+  });
   const repPatch = () => ({
     daily: root.querySelector('[data-auto="rep_daily"]').checked,
     weekly: root.querySelector('[data-auto="rep_weekly"]').checked,
@@ -11995,6 +12031,7 @@ function restructureAdsTabs(root) {
   const kpis = root.querySelector('.ad-kpis');
   const cmpCardNode = (root.querySelector('#adCmpCard') && root.querySelector('#adCmpCard').children.length) ? root.querySelector('#adCmpCard') : null;
   const recsCardNode = (root.querySelector('#adRecsCard') && root.querySelector('#adRecsCard').children.length) ? root.querySelector('#adRecsCard') : null;
+  const icpCardNode = (root.querySelector('#adIcpCard') && root.querySelector('#adIcpCard').children.length) ? root.querySelector('#adIcpCard') : null;
   const rangeBar = cardOf('#adRangeBar');
   const anaExtra = cardOf('#anaExtra');
   const tree = root.querySelector('.ct-wrap');
@@ -12012,7 +12049,7 @@ function restructureAdsTabs(root) {
   KEYS.forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
   /* Аналитика · факт: диапазон дат + KPI + гео/качество/пересмотр/отчёт (то, что тянется из кабинета) */
-  put(rangeBar, 'analytics'); put(recsCardNode, 'analytics'); put(kpis, 'analytics'); put(cmpCardNode, 'analytics'); put(anaExtra, 'analytics');
+  put(rangeBar, 'analytics'); put(recsCardNode, 'analytics'); put(kpis, 'analytics'); put(icpCardNode, 'analytics'); put(cmpCardNode, 'analytics'); put(anaExtra, 'analytics');
   /* Дерево креативов: дерево + каталог объявлений (сюда подгружаются креативы) */
   put(tree, 'creatives'); put(imp, 'creatives');
   /* Настройки рекламы: приём лидов (Albato) + кабинет Meta (API) + Meta CAPI + журнал приёма */
@@ -12056,6 +12093,12 @@ PAGES.ads = async (root) => {
         <div class="adrecs-plan-in">Хочу <input type="number" id="adPlanN" min="1" max="999" value="${Math.max(5, (recs.totals.quals || 10))}"> квал(ов)/период</div>
         <div class="adrecs-plan-out" id="adPlanOut"></div></div>` : ''}
     </div>` : `<div class="glass card mb adrecs"><div class="card-title">${ic(I.spark)}Рекомендации по бюджету</div><div class="muted" style="font-size:12.5px;padding:6px 2px">${esc(recs.reason || 'Нет данных для рекомендаций.')}</div></div>`;
+  const icp = await api.get('/leads/icp').catch(() => ({ ready: false, reason: 'сеть' }));
+  const icpCard = icp.ready ? `<div class="glass card mb adicp">
+      <div class="card-title">${ic(I.user || I.target)}Профиль квал-лида<span class="muted" style="font-weight:400;margin-left:8px">кто чаще доходит до квала · ${icp.quals}/${icp.total} лидов (${icp.qualRate}%)</span></div>
+      <div class="adicp-grid">${icp.profile.map(pr2 => `<div class="adicp-cell"><i>${esc(pr2.dim)}</i><b>${esc(pr2.value)}</b><span>${pr2.share}% квалов${pr2.qualRate != null ? ' · ' + pr2.qualRate + '% конв.' : ''}</span></div>`).join('')}</div>
+      ${(icp.hints || []).length ? `<div class="adicp-hints"><div class="adicp-hints-hd">${ic(I.spark)}Куда целиться — конверсия в квал выше средней (${icp.qualRate}%)</div>${icp.hints.map(h => `<div class="adicp-hint"><b>${esc(h.dim)}: ${esc(h.value)}</b> — ${h.rate}% в квал <i>(${h.n} лид.)</i></div>`).join('')}</div>` : ''}
+    </div>` : `<div class="glass card mb adicp"><div class="card-title">${ic(I.user || I.target)}Профиль квал-лида</div><div class="muted" style="font-size:12.5px;padding:6px 2px">${esc(icp.reason || 'Нет данных.')}</div></div>`;
   const cmp = await api.get('/ads/compare' + rq).catch(() => ({ rows: [], totals: {} }));
   const cmpCard = (cmp.rows && cmp.rows.length) ? (() => {
     const _S = STATE.settings.metaAds || {}; const _src = (cmp.currency && cmp.currency.src) || _S.sourceCurrency || 'AED'; const _disp = (cmp.currency && cmp.currency.disp) || _S.displayCurrency || _src;
@@ -12097,6 +12140,7 @@ PAGES.ads = async (root) => {
         </div>
       </div>`; })()}
     <div id="adRecsCard">${recsCard}</div>
+    <div id="adIcpCard">${icpCard}</div>
     <div id="adCmpCard">${cmpCard}</div>
     ${(() => {
       const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2;

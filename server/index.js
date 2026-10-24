@@ -977,6 +977,42 @@ function adBudgetRecommendations(db, opts = {}) {
   return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, cpl: avgCpl, cpql: avgCpql }, byGeo, byFmt, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
 }
 
+/* профиль «идеального лида» (ICP): по каждому измерению — что доминирует среди КВАЛ-лидов +
+   qual-rate сегмента → подсказки по таргету. На high-water-квалах (качество трафика). */
+function leadICP(db) {
+  const leads = (db.leads || []).filter(l => !l._demo);
+  const total = leads.length;
+  if (total < 8) return { ready: false, reason: `Мало данных (${total} лид.) — профиль станет точным от ~15–20 лидов.` };
+  const quals = leads.filter(l => everReachedQual(db, l, 'peak'));
+  const qN = quals.length;
+  if (qN < 3) return { ready: false, reason: `Пока ${qN} квал. лид(ов) — профиль появится от 3–5.` };
+  const gn = g => (db.settings.geoNames && db.settings.geoNames[g]) || g || '—';
+  const srcName = { meta_form: 'Meta лид-форма', ctwa: 'CTWA', wa_inbound: 'Входящий WhatsApp', ig_direct: 'Instagram', site: 'Сайт', manual: 'Вручную', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
+  const band = n => { if (!n) return null; if (n < 100000) return 'до $100k'; if (n < 200000) return '$100–200k'; if (n < 350000) return '$200–350k'; if (n < 600000) return '$350–600k'; return '$600k+'; };
+  const dims = {
+    'Источник': l => srcName[l.source] || l.source || null,
+    'Направление': l => l.geo ? gn(l.geo) : null,
+    'Язык': l => (l.lang || '').toUpperCase() || null,
+    'Канал': l => { const c = l.channels || {}; return (c.tg === 'yes' || l.activeChannel === 'tg') ? 'Telegram' : c.wa === 'yes' ? 'WhatsApp' : null; },
+    'Бюджет': l => band((l.quals && l.quals.budget && l.quals.budget.num) || 0),
+    'Тип объекта': l => (l.quals && l.quals.type && l.quals.type.value) || l.type || null,
+  };
+  const avgRate = Math.round(qN / total * 100);
+  const profile = [], hints = [];
+  for (const [dim, fn] of Object.entries(dims)) {
+    const qC = {}, aC = {};
+    quals.forEach(l => { const v = fn(l); if (v) qC[v] = (qC[v] || 0) + 1; });
+    leads.forEach(l => { const v = fn(l); if (v) aC[v] = (aC[v] || 0) + 1; });
+    const ent = Object.entries(qC).sort((a, b) => b[1] - a[1]);
+    if (!ent.length) continue;
+    const [topV, topQ] = ent[0];
+    profile.push({ dim, value: topV, share: Math.round(topQ / qN * 100), qualRate: aC[topV] ? Math.round(topQ / aC[topV] * 100) : null });
+    Object.entries(qC).forEach(([v, q]) => { const r = aC[v] ? Math.round(q / aC[v] * 100) : 0; if (aC[v] >= 3 && r >= avgRate * 1.4 && r > avgRate + 8) hints.push({ dim, value: v, rate: r, n: aC[v] }); });
+  }
+  hints.sort((a, b) => b.rate - a.rate);
+  return { ready: true, total, quals: qN, qualRate: avgRate, profile, hints: hints.slice(0, 5) };
+}
+
 /* Раздать креатив/тезисы объявления на ВСЕ объявления с тем же именем (по всем адсетам/кампаниям).
    Explicit-save → перезаписываем одноимённые (пользователь задал креатив для этого названия). */
 function propagateAdByName(db, ad) {
@@ -13087,6 +13123,11 @@ ${SCR}
       for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);
       const from = u.searchParams.get('from') || null, to = u.searchParams.get('to') || null;
       return json(res, 200, adBudgetRecommendations(db, { from, to }));
+    }
+    /* профиль идеального лида (ICP) — из квал-лидов + подсказки по таргету */
+    if (p === '/api/leads/icp' && req.method === 'GET') {
+      if (!sessionRole(req)) return json(res, 401, { error: 'auth' });
+      return json(res, 200, leadICP(db));
     }
     if (p === '/api/ads/leadanalytics' && req.method === 'GET') {
       for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
