@@ -945,16 +945,20 @@ function adBudgetRecommendations(db, opts = {}) {
     const m = adRangeMetrics(ad, from, to);
     const crm = idx[ad.adId] || [];
     const quals = crm.filter(l => everReachedQual(db, l, 'peak')).length;
+    const deals = crm.filter(l => l.stage === 'deal' || l.dealAt || l.dealValue).length;
+    const revenue = crm.reduce((s, l) => s + (+l.dealCommission || 0), 0);
     const leads = crm.length || m.leadsMeta || 0;
     if (m.spend <= 0 && leads <= 0) continue;
-    rows.push({ adId: ad.adId, name: ad.name || ad.adId, campaign: ad.campaignName || '—', geo: ad.geo || '', fmt: adFormatOf(ad.name), spend: m.spend, leads, quals,
-      cpl: leads ? Math.round(m.spend / leads) : null, cpql: quals ? Math.round(m.spend / quals) : null });
+    rows.push({ adId: ad.adId, name: ad.name || ad.adId, campaign: ad.campaignName || '—', geo: ad.geo || '', fmt: adFormatOf(ad.name), spend: m.spend, leads, quals, deals, revenue,
+      cpl: leads ? Math.round(m.spend / leads) : null, cpql: quals ? Math.round(m.spend / quals) : null, cac: deals ? Math.round(m.spend / deals) : null });
   }
   if (!rows.length) return { ready: false, reason: 'За период нет расхода/лидов по синкнутым кампаниям.' };
   const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
-  const totSpend = sum('spend'), totLeads = sum('leads'), totQuals = sum('quals');
+  const totSpend = sum('spend'), totLeads = sum('leads'), totQuals = sum('quals'), totDeals = sum('deals'), totRevenue = sum('revenue');
   const avgCpl = totLeads ? Math.round(totSpend / totLeads) : null;
   const avgCpql = totQuals ? Math.round(totSpend / totQuals) : null;
+  const cac = totDeals ? Math.round(totSpend / totDeals) : null;                 /* цена привлечения СДЕЛКИ */
+  const roas = (totRevenue && totSpend) ? +(totRevenue / totSpend).toFixed(1) : null;  /* возврат на рекламу (комиссия/расход) */
   const recs = [];
   const minMeaningful = Math.max(25, Math.round(totSpend * 0.1));
   rows.filter(r => r.spend >= minMeaningful && r.quals === 0).sort((a, b) => b.spend - a.spend).slice(0, 5)
@@ -970,11 +974,15 @@ function adBudgetRecommendations(db, opts = {}) {
   const fmtRows = Object.entries(roll('fmt')).map(([f, v]) => ({ f, ...v, hasQ: v.quals > 0, cpql: v.quals ? Math.round(v.spend / v.quals) : (v.leads ? Math.round(v.spend / v.leads) : null) })).filter(x => x.cpql && x.f !== 'другое');
   if (fmtRows.length >= 2) { fmtRows.sort((a, b) => a.cpql - b.cpql); const b0 = fmtRows[0], w = fmtRows[fmtRows.length - 1];
     if (w.cpql > b0.cpql * 1.5) recs.push({ kind: 'format', sev: 'med', title: `${b0.f[0].toUpperCase() + b0.f.slice(1)} эффективнее`, text: `${b0.f} ${b0.hasQ ? 'CPQL' : 'CPL'} ${money(b0.cpql)} vs ${w.f} ${money(w.cpql)} — делать упор на ${b0.f}.` }); }
+  /* проверено СДЕЛКОЙ — сильнейший сигнал качества: такие объявления масштабировать в приоритете */
+  rows.filter(r => r.deals > 0).sort((a, b) => (a.cac || Infinity) - (b.cac || Infinity)).slice(0, 3)
+    .forEach(r => { const i = recs.findIndex(x => x.adId === r.adId); if (i >= 0) recs.splice(i, 1);   /* «проверено сделкой» перебивает обычную реку этого объявления */
+      recs.unshift({ kind: 'scale', sev: 'high', adId: r.adId, title: `Проверено сделкой: «${r.name}»`, text: `${r.deals} сделк(и)${r.revenue ? `, комиссия ${money(r.revenue)}` : ''}, цена сделки ${r.cac ? money(r.cac) : '—'}. Это уже приносит деньги — масштабировать в первую очередь.` }); });
   rows.sort((a, b) => (a.cpql || Infinity) - (b.cpql || Infinity));
   /* разбивки для планировщика «цель→бюджет+сплит» (только где есть квалы → достоверный CPQL) */
   const byGeo = geoRows.map(x => ({ key: x.g, name: gn(x.g), spend: x.spend, leads: x.leads, quals: x.quals, cpql: x.cpql })).sort((a, b) => a.cpql - b.cpql);
   const byFmt = Object.entries(roll('fmt')).map(([f, v]) => ({ key: f, name: f, spend: v.spend, leads: v.leads, quals: v.quals, cpql: v.quals ? Math.round(v.spend / v.quals) : null })).filter(x => x.cpql && x.key !== 'другое').sort((a, b) => a.cpql - b.cpql);
-  return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, cpl: avgCpl, cpql: avgCpql }, byGeo, byFmt, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
+  return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, deals: totDeals, revenue: totRevenue, cpl: avgCpl, cpql: avgCpql, cac, roas }, byGeo, byFmt, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
 }
 
 /* профиль «идеального лида» (ICP): по каждому измерению — что доминирует среди КВАЛ-лидов +
@@ -8076,7 +8084,9 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PATCH') {
         const b = await readBody(req);
-        if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); }
+        if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); if (b.stage === 'deal' && !lead.dealAt) lead.dealAt = Date.now(); }
+        if (b.dealValue !== undefined) lead.dealValue = Math.max(0, Math.round(+b.dealValue || 0)) || null;           /* сумма сделки (цена объекта) — для ROI/ROAS по рекламе */
+        if (b.dealCommission !== undefined) lead.dealCommission = Math.max(0, Math.round(+b.dealCommission || 0)) || null;  /* наша комиссия с этой сделки */
         if (b.broker !== undefined) { const nb = b.broker || null; if (nb !== lead.broker) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; }
         if (b.geo) lead.geo = b.geo;
         if (b.grayPhone !== undefined) lead.grayPhone = b.grayPhone ? String(b.grayPhone).replace(/\D/g, '') : null;   /* закрепить серый номер отправки за лидом (или сбросить) */

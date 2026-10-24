@@ -1471,6 +1471,10 @@ body > .dtp-pop.dtp-time, .dtp-pop.dtp-time.show { max-height: 300px; overflow-y
 .lc-ai-head b { font-size: 13px; color: var(--navy-900); flex: 1; }
 .lc-ai-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 4px; line-height: 1.45; }
 .lc-3sel { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; margin-top: 12px; }
+.lc-deal { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin: 11px 0 2px; padding: 11px 13px; border-radius: 11px; background: rgba(47,169,140,.06); border: 1px solid rgba(47,169,140,.18); }
+.lc-deal-f { flex: 1 1 130px; }
+.lc-deal-hint { flex: 1 1 100%; font-size: 11px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 4px; }
+.lc-deal-hint svg { width: 12px; height: 12px; color: #2FA98C; }
 .lc-3sel .cs { width: 100%; }
 .lc-lbl { display: block; font-size: 10.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
 .lc-meet-acts { margin-left: 8px; display: inline-flex; gap: 5px; }
@@ -2188,6 +2192,8 @@ button.fnl-kpi:hover { border-color: var(--accent); }
 .adrecs-kpi > div { flex: 1 1 110px; background: var(--bg-2, rgba(20,19,17,.03)); border: 1px solid var(--stroke-soft); border-radius: 11px; padding: 9px 13px; }
 .adrecs-kpi b { display: block; font-size: 18px; font-weight: 750; color: var(--navy-900); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .adrecs-kpi i { font-size: 10.5px; color: var(--ink-3); font-style: normal; }
+.adrecs-kpi-deal { background: rgba(47,169,140,.1) !important; border-color: rgba(47,169,140,.28) !important; }
+.adrecs-kpi-deal b { color: #1E7A64; }
 .adrecs-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .adrec { display: flex; gap: 11px; align-items: flex-start; padding: 10px 13px; border-radius: 12px; border: 1px solid var(--stroke); border-left-width: 3px; background: var(--card); }
 .adrec-tag { flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 3px 9px; border-radius: 999px; white-space: nowrap; margin-top: 1px; }

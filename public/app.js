@@ -6489,6 +6489,11 @@ async function openLeadModal(id) {
       <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
       ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
     </div>
+    ${['handover', 'viewing', 'deal'].includes(l.stage) ? `<div class="lc-deal">
+      <div class="lc-deal-f"><label class="lc-lbl">Сумма сделки · цена объекта</label><input class="gi" id="mDealVal" type="number" min="0" step="1000" value="${l.dealValue || ''}" placeholder="напр. 150000"></div>
+      <div class="lc-deal-f"><label class="lc-lbl">Наша комиссия, $</label><input class="gi" id="mDealCom" type="number" min="0" step="100" value="${l.dealCommission || ''}" placeholder="комиссия"></div>
+      <span class="lc-deal-hint">${l.dealValue ? ic(I.check) + ' учтётся в ROI/ROAS рекламы' : 'Заполните на сделке — посчитаем CAC и ROAS рекламы'}</span>
+    </div>` : ''}
     ${l.phoneInvalid ? `<div class="lc-badphone"><span class="lc-badphone-tx">${ic(I.flag)}Номер <b>${esc(l.phone)}</b> невалиден (не E.164) — операторы режут звук и доставку.</span><button class="btn btn-sm" id="mSpam">В спам / неверный номер</button></div>` : ''}
     <div class="lp-sec">Следующий шаг</div>
     <div class="lc-note-row">
@@ -6695,7 +6700,9 @@ async function openLeadModal(id) {
       if (changed) { try { openLeadModal(id); } catch (_) {} }
     })(); }
   $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id); }); }));
-  $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
+  $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); openLeadModal(l.id); });   /* перерисовать — чтобы блок суммы сделки появился/скрылся по стадии */
+  $('#mDealVal', bd)?.addEventListener('change', async (e) => { try { await api.patch('/leads/' + l.id, { dealValue: +e.target.value || 0 }); l.dealValue = +e.target.value || null; const h = bd.querySelector('.lc-deal-hint'); if (h && l.dealValue) h.innerHTML = ic(I.check) + ' учтётся в ROI/ROAS рекламы'; } catch (_) {} });
+  $('#mDealCom', bd)?.addEventListener('change', async (e) => { try { await api.patch('/leads/' + l.id, { dealCommission: +e.target.value || 0 }); } catch (_) {} });
   $('#mSpam', bd)?.addEventListener('click', async (e) => {   /* #580: невалидный номер → в спам (закрыт) + тег «неверный номер» */
     const btn = e.currentTarget; btn.disabled = true;
     try { await api.patch('/leads/' + l.id, { stage: 'lost', tags: [...(l.tags || []), 'неверный номер'] }); toast('Помечен: неверный номер', 'Лид закрыт и помечен тегом «неверный номер»', true); closeModal(); render(); }
@@ -12087,6 +12094,7 @@ PAGES.ads = async (root) => {
         <div><b>${recs.totals.cpl ? _rm(recs.totals.cpl) : '—'}</b><i>CPL средний</i></div>
         <div><b>${recs.totals.quals || 0}</b><i>квалов</i></div>
         <div><b>${_rm(recs.totals.spend)}</b><i>расход</i></div>
+        ${recs.totals.deals ? `<div class="adrecs-kpi-deal"><b>${recs.totals.cac ? _rm(recs.totals.cac) : '—'}</b><i>CAC · цена сделки (${recs.totals.deals})</i></div>${recs.totals.roas != null ? `<div class="adrecs-kpi-deal"><b>${recs.totals.roas}×</b><i>ROAS · возврат</i></div>` : ''}` : ''}
       </div>
       ${(recs.recommendations || []).length ? `<div class="adrecs-list">${recs.recommendations.map(r => `<div class="adrec adrec-${r.kind} sev-${r.sev || 'med'}"><span class="adrec-tag">${_rtag[r.kind] || r.kind}</span><div class="adrec-b"><b>${esc(r.title)}</b><span>${esc(r.text)}</span></div></div>`).join('')}</div>` : '<div class="muted" style="font-size:12.5px;padding:8px 2px">Явных перекосов бюджета нет. Рекомендации появятся, когда по объявлениям накопятся квалы.</div>'}
       ${recs.totals.cpql ? `<div class="adrecs-plan"><div class="adrecs-plan-hd">${ic(I.target || I.bars)}Планировщик бюджета<span class="muted">цель по квалам → бюджет и сплит</span></div>
@@ -12496,6 +12504,7 @@ PAGES.ads = async (root) => {
     const L = [`📊 Отчёт по рекламе · ${per}`, '',
       `Расход: ${_pm(recs.totals.spend)} · Лидов: ${recs.totals.leads} · Квалов: ${recs.totals.quals}`,
       `CPL: ${recs.totals.cpl ? _pm(recs.totals.cpl) : '—'} · CPQL: ${recs.totals.cpql ? _pm(recs.totals.cpql) : '—'}`];
+    if (recs.totals.deals) L.push(`Сделок: ${recs.totals.deals} · CAC: ${recs.totals.cac ? _pm(recs.totals.cac) : '—'}${recs.totals.roas != null ? ` · ROAS: ${recs.totals.roas}×` : ''}${recs.totals.revenue ? ` · комиссия ${_pm(recs.totals.revenue)}` : ''}`);
     const wq = (recs.rows || []).filter(r => r.cpql);
     if (wq.length) { L.push('', '🏆 Лучшие по CPQL:'); wq.slice(0, 3).forEach((r, i) => L.push(`  ${i + 1}. ${r.name} — CPQL ${_pm(r.cpql)} (${r.quals} квал)`)); }
     if ((recs.recommendations || []).length) { L.push('', '💡 Рекомендации:'); recs.recommendations.slice(0, 6).forEach(r => L.push(`  • ${r.title}: ${r.text}`)); }
