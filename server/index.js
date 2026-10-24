@@ -8404,7 +8404,21 @@ const server = http.createServer(async (req, res) => {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
       const b = await readBody(req).catch(() => ({}));
-      lead.ai = lead.ai || {}; lead.ai.enabled = true;
+      lead.ai = lead.ai || {};
+      /* СНЯТЬ текущий запланированный шаг (неактуален) — БЕЗ отключения ИИ: чистим план+черновик, двигаем шаг
+         цепочки (как «skip»), чтобы движок не переназначил ТОТ ЖЕ шаг. Автопилот остаётся включён. */
+      if (b.dismiss) {
+        lead.ai.nextTouchAt = null;
+        for (const k of ['nextDraft', '_gReengage', '_reengageText', '_editedText', '_ptText', '_ptEmail', 'pendingTouch']) delete lead.ai[k];
+        if (lead.ai.reengage) lead.ai.reengage.nextAt = null;
+        lead.ai.chainStep = (lead.ai.chainStep || 0) + 1;
+        lead.ai.touchDismissedAt = Date.now();
+        try { ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `Следующий шаг снят брокером (неактуален): ${lead.name}` }); } catch (_) {}
+        store.save();
+        let nt = null; try { nt = engine.nextTouchInfo(db, lead); } catch (_) {}
+        return json(res, 200, { ok: true, dismissed: true, nextTouch: nt });
+      }
+      lead.ai.enabled = true;
       const hasText = typeof b.text === 'string';
       const at = (b.at != null && isFinite(+b.at)) ? +b.at : null;
       // единый СОХРАНЁННЫЙ черновик (переживает перезаходы, его же шлёт движок); чистим старые кэши

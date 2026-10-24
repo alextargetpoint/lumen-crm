@@ -7371,6 +7371,7 @@ async function renderChat(id, rebuild) {
         <div class="ntp2-ctrls">
           <button class="ntp2-cbtn" data-ntcollapse="1" title="Свернуть карточку (ИИ продолжит работать)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
           ${nt.canEdit ? `<button class="ntp2-cbtn" data-ntedit="time" title="Перенести день и время">${ic(I.clock)}</button>` : ''}
+          <button class="ntp2-cbtn" data-ntdismiss="1" title="Снять этот шаг (неактуален) — ИИ останется включён, спланирует следующий позже">${ic(I.x)}</button>
           <button class="ntp2-cbtn" data-ntpause="1" title="Поставить ИИ на паузу">${ic(I.pause)}</button>
           <button class="btn btn-accent ntp2-send" ${isRe ? 'data-reengagenow="1"' : 'data-touchnow="1"'} title="${isRe ? 'Дожать клиента сейчас, не дожидаясь срока' : 'Отправить это касание сейчас, не дожидаясь срока (обходит тихие часы)'}">${ic(I.send || I.bolt)}Отправить сейчас</button>
           ${nt.canEdit ? `<button class="ntp2-cbtn ntp2-chev" data-ntedit="toggle" title="Показать и изменить текст">${ic(I.chev)}</button>` : ''}
@@ -7485,6 +7486,13 @@ async function renderChat(id, rebuild) {
     try { await api.post('/leads/' + l.id + '/next-touch', { text: ta.value }); const sv = pane.querySelector('[data-ntautosave]'); if (sv) { sv.textContent = 'сохранено'; sv.hidden = false; } } catch (_) {}
   }, 1100); }); } }
   $$('[data-ntpause]', pane).forEach(b => b.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; try { await api.patch('/leads/' + l.id, { ai: { enabled: false } }); toast('ИИ на паузе', 'Автосообщения не уйдут. Вернуть — тумблером «Автопилот».', true); setTimeout(() => { try { render(); } catch (_) {} }, 600); } catch (err) { btn.disabled = false; toast('Не вышло', err.message); } }));
+  $$('[data-ntdismiss]', pane).forEach(b => b.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    if (!await uiConfirm('Снять следующий шаг?', 'Текущее запланированное касание отменится. Автопилот останется включён — ИИ спланирует следующий шаг позже, когда будет уместно.', { ok: 'Снять' })) return;
+    btn.disabled = true;
+    try { await api.post('/leads/' + l.id + '/next-touch', { dismiss: true }); toast('Шаг снят', 'Касание отменено. Автопилот продолжает работу.', true); setTimeout(() => { try { render(); } catch (_) {} }, 500); }
+    catch (err) { btn.disabled = false; toast('Не вышло', err.message); }
+  }));
   /* #603: свернуть/развернуть карточку «ИИ запланировал сообщение» (визуально, ИИ не выключается) */
   $$('[data-ntcollapse]', pane).forEach(b => b.addEventListener('click', () => { try { localStorage.setItem('lumen_ntp_collapsed', '1'); } catch (_) {} try { render(); } catch (_) {} }));
   $$('[data-ntuncollapse]', pane).forEach(b => b.addEventListener('click', () => { try { localStorage.setItem('lumen_ntp_collapsed', '0'); } catch (_) {} try { render(); } catch (_) {} }));
