@@ -1061,6 +1061,45 @@ engine.onControlAlert = (db, r) => {
   const did = db.settings.control && db.settings.control.delegateBrokerId;
   if (did) { const del = db.brokers.find(b => b.id === did); if (del && del.tgChatId) tgbridge.notify(db, del.tgChatId, r.text).catch(() => {}); }
 };
+/* проактивный бюджет-алерт: объявления, которые жгут деньги без единого квала → владельцу,
+   не дожидаясь, пока он сам зайдёт в Аналитику. Считает по последним 14 дням; дедуп по adId +
+   троттлинг (повтор не чаще alertRepeatH, частота не чаще alertCooldownMin). Тенанты без
+   синканутой рекламы (ready:false) сюда не попадают. Возвращает {fire,text,wasted,count}. */
+engine.budgetAlert = (db) => {
+  try {
+    const now = Date.now();
+    const rec = adBudgetRecommendations(db, { from: now - 14 * 86400e3, to: now });
+    if (!rec || !rec.ready) return null;
+    const wasteful = rec.recommendations.filter(r => r.kind === 'cut' && r.sev === 'high' && r.adId);  /* потрачено, 0 квалов */
+    if (!wasteful.length) return null;
+    const rowsById = {}; (rec.rows || []).forEach(r => { rowsById[r.adId] = r; });
+    const wasted = wasteful.reduce((s, r) => s + ((rowsById[r.adId] || {}).spend || 0), 0);
+    db.settings.control = db.settings.control || {};
+    const C = control.cfg(db);
+    const cooldownMs = (C.alertCooldownMin || 30) * 60e3;
+    const reMs = (C.alertRepeatH || 24) * 3600e3;
+    const st = db.settings.control.budgetAlertState = db.settings.control.budgetAlertState || { seen: {}, lastAt: 0 };
+    const curKeys = new Set(); let newCount = 0;
+    for (const r of wasteful) { const k = 'b:' + r.adId; curKeys.add(k); const s = st.seen[k]; if (!s || now - s > reMs) newCount++; }
+    for (const k of Object.keys(st.seen)) if (!curKeys.has(k)) delete st.seen[k];
+    for (const k of curKeys) st.seen[k] = now;
+    const throttled = now - (st.lastAt || 0) < cooldownMs;
+    const fire = newCount > 0 && !throttled;
+    if (fire) st.lastAt = now;
+    const money = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
+    const names = wasteful.slice(0, 3).map(r => (String(r.title).match(/«(.+?)»/) || [, r.title])[1]).map(n => '«' + n + '»').join(', ');
+    const n = wasteful.length;
+    const text = `💸 Рекламный бюджет: ${n} объявлени${n === 1 ? 'е потратило' : n < 5 ? 'я потратили' : 'й потратили'} ${money(wasted)} без единого квала — ${names}${n > 3 ? ' и др.' : ''}. Срезать или переделать креатив → «Аналитика рекламы».`;
+    return { fire, text, wasted, count: n };
+  } catch (e) { console.error('[budget-alert]', e.message); return null; }
+};
+/* доставка бюджет-алерта: тот же канал, что и риски — вебхук владельца + Telegram делегата контроля */
+engine.onBudgetAlert = (db, b) => {
+  const url = db.settings.hooks && db.settings.hooks.outboundUrl;
+  if (url) fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'budget.alert', at: Date.now(), text: b.text, wasted: b.wasted, count: b.count }) }).catch(e => console.error('[budget-alert]', e.message));
+  const did = db.settings.control && db.settings.control.delegateBrokerId;
+  if (did) { const del = db.brokers.find(x => x.id === did); if (del && del.tgChatId) tgbridge.notify(db, del.tgChatId, b.text).catch(() => {}); }
+};
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
 /* ассистент ответил клиенту → уведомление брокеру в Telegram (видит, что ИИ ведёт диалог, может перехватить reply) */

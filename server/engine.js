@@ -1598,6 +1598,16 @@ function tickControl(db) {
       if (module.exports.onControlAlert) { try { module.exports.onControlAlert(db, r); } catch (_) {} }
     }
   } catch (e) { console.error('[control]', e.message); }
+  /* проактивный бюджет-алерт: жгущие деньги объявления → владельцу (троттлинг внутри budgetAlert) */
+  try {
+    if (module.exports.budgetAlert) {
+      const b = module.exports.budgetAlert(db);
+      if (b && b.fire && b.text) {
+        ai.pushEvent(db, { type: 'ai_off', text: b.text });
+        if (module.exports.onBudgetAlert) { try { module.exports.onBudgetAlert(db, b); } catch (_) {} }
+      }
+    }
+  } catch (e) { console.error('[budget]', e.message); }
 }
 
 /* отложенные действия по пожеланию клиента: сообщение отправляем сами; звонок — уведомляем брокера */
