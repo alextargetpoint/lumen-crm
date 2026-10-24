@@ -12044,7 +12044,7 @@ PAGES.ads = async (root) => {
   const _rm = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
   const _rtag = { cut: 'Срезать', scale: 'Масштабировать', shift: 'Сдвиг', format: 'Формат' };
   const recsCard = recs.ready ? `<div class="glass card mb adrecs">
-      <div class="card-title">${ic(I.spark)}Рекомендации по бюджету<span class="muted" style="font-weight:400;margin-left:8px">по CPQL — цене квалифицированного лида</span></div>
+      <div class="card-title">${ic(I.spark)}Рекомендации по бюджету<span class="muted" style="font-weight:400;margin-left:8px">по CPQL — цене квалифицированного лида</span><span class="tb-spacer"></span><button class="btn btn-sm" id="adRecsReport" title="Скопировать сводный отчёт за период — отправить клиенту/застройщику">${ic(I.copy)}Отчёт</button></div>
       <div class="adrecs-kpi">
         <div><b>${recs.totals.cpql ? _rm(recs.totals.cpql) : '—'}</b><i>CPQL средний</i></div>
         <div><b>${recs.totals.cpl ? _rm(recs.totals.cpl) : '—'}</b><i>CPL средний</i></div>
@@ -12445,6 +12445,19 @@ PAGES.ads = async (root) => {
     };
     if (planN) { planN.addEventListener('input', calcPlan); calcPlan(); }
   }
+  /* «Отчёт за период» одной кнопкой — собрать текст из данных (его же шлют клиенту/застройщику руками) */
+  if (recs && recs.ready) $('#adRecsReport', root)?.addEventListener('click', async () => {
+    const _pm = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
+    const per = (recs.period && (recs.period.from || recs.period.to)) ? `${recs.period.from || '…'} — ${recs.period.to || '…'}` : 'весь период';
+    const L = [`📊 Отчёт по рекламе · ${per}`, '',
+      `Расход: ${_pm(recs.totals.spend)} · Лидов: ${recs.totals.leads} · Квалов: ${recs.totals.quals}`,
+      `CPL: ${recs.totals.cpl ? _pm(recs.totals.cpl) : '—'} · CPQL: ${recs.totals.cpql ? _pm(recs.totals.cpql) : '—'}`];
+    const wq = (recs.rows || []).filter(r => r.cpql);
+    if (wq.length) { L.push('', '🏆 Лучшие по CPQL:'); wq.slice(0, 3).forEach((r, i) => L.push(`  ${i + 1}. ${r.name} — CPQL ${_pm(r.cpql)} (${r.quals} квал)`)); }
+    if ((recs.recommendations || []).length) { L.push('', '💡 Рекомендации:'); recs.recommendations.slice(0, 6).forEach(r => L.push(`  • ${r.title}: ${r.text}`)); }
+    try { await navigator.clipboard.writeText(L.join('\n')); toast('Отчёт скопирован', 'Вставьте клиенту/застройщику', true); }
+    catch (_) { toast('Не скопировалось', 'Браузер не дал доступ к буферу'); }
+  });
   /* дерево креативов: раскрытие редактора + сохранение креатива/тезисов */
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
   /* под-вкладки аналитики + вид клиента + копия отчёта */
