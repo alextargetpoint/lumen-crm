@@ -9317,6 +9317,7 @@ PAGES.properties = async (root) => {
               <button class="btn btn-sm ${(PAGE_STATE.compare || []).includes(pr.id) ? 'btn-accent' : 'pd2-ghost'}" id="pdCompare" title="Добавить в сравнение (до 3 объектов)">${ic(I.grid || I.layers)}${(PAGE_STATE.compare || []).includes(pr.id) ? 'В сравнении ✓' : 'Сравнить'}</button>
               <button class="btn btn-sm btn-accent" id="pdPresV2" title="Готовое оформление этого объекта: редактор, 4 формата, PDF и веб-ссылка">${ic(I.spark)}Презентация объекта</button>
               <button class="btn btn-sm pd2-ghost" id="pdPresPdf" title="Быстрый PDF этого объекта (без редактирования)">${ic(I.doc)}PDF объекта</button>
+              <button class="btn btn-sm pd2-ghost" id="pdCopyFacts" title="Скопировать ключевые факты текстом — вставить клиенту в чат">${ic(I.copy)}Копировать факты</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
             </div>
@@ -9629,6 +9630,20 @@ PAGES.properties = async (root) => {
     });
     /* БЫСТРЫЙ PDF объекта — через тот же конструктор v2 (не отдельный арт-движок): собираем черновик и
        сразу открываем печатный вид (Cmd/Ctrl+P → Сохранить как PDF), без редактора. */
+    $('#pdCopyFacts')?.addEventListener('click', async () => {
+      const L = [trF(pr, 'name') || pr.name || 'Объект'];
+      const loc = [pr.area, (pr.developer && pr.developer !== '—') ? pr.developer : ''].filter(Boolean).join(' · ');
+      if (loc) L.push('📍 ' + loc);
+      const ep = effPrice(pr); if (ep.price) L.push('💰 от ' + money(ep.price, ep.currency));
+      if (pr.type) L.push('🏠 ' + pr.type);
+      if (pr.handover) L.push('🏗 сдача ' + pr.handover);
+      const roi = [pr.roi ? 'доходность ' + pr.roi : '', pr.appreciation ? 'прирост ' + pr.appreciation : ''].filter(Boolean).join(' · ');
+      if (roi) L.push('📈 ' + roi);
+      if ((pr.units || []).length) L.push('🔑 юнитов: ' + pr.units.length);
+      if (pr.publicToken) L.push('🔗 ' + location.origin + '/pv/' + pr.publicToken);
+      try { await navigator.clipboard.writeText(L.join('\n')); toast('Скопировано', 'Факты объекта — вставьте клиенту', true); }
+      catch (_) { toast('Не скопировалось', 'Браузер не дал доступ к буферу'); }
+    });
     $('#pdPresPdf')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget; btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Собираю…';
       try {
