@@ -18881,10 +18881,10 @@ PAGES.settings = async (root) => {
       <div class="lc-hint info" style="margin-bottom:12px">${ic(I.spark)}<span>Бот уже подключён платформой — <b>заводить своего бота не нужно</b>. Просто привяжитесь по ключу ниже.</span></div>
       <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">
         <b>Привяжите себя (основатель)</b>
-        ${s.ownerTgChatId ? '<div class="lc-hint info" style="margin-top:6px">' + ic(I.check) + '<span>Вы уже привязаны к боту.</span></div>' : `<i>Один клик — бот откроется и сам подставит вашу команду:</i>
-        ${(s.tgBridge && s.tgBridge.centralBot && s.ownerTgCode) ? `<a class="btn btn-accent" href="https://t.me/${esc(s.tgBridge.centralBot)}?start=${esc(s.ownerTgCode)}" target="_blank" style="margin-top:8px">${ic(I.send)}Привязать одним кликом в Telegram</a>` : '<div class="muted" style="font-size:11.5px;margin-top:6px">Ключ ещё не готов — нажмите «Сгенерировать новый ключ» ниже.</div>'}
-        <div class="muted" style="font-size:11px;margin-top:7px">Не открывается? Скопируйте команду и отправьте боту вручную:</div>
-        <div class="tgb-key" data-tgbcode="${esc(s.ownerTgCode || '')}" title="Нажмите — скопируется команда"><code>/start ${esc(s.ownerTgCode || '—')}</code><span class="badge" style="margin-left:auto">ещё не привязан</span></div>`}
+        ${s.ownerTgChatId ? '<div class="lc-hint info" style="margin-top:6px">' + ic(I.check) + '<span>Вы уже привязаны к боту. Этим же ключом можно подключить ещё свой аккаунт (рабочий/личный) — или выдать новый ключ ниже.</span></div>' : '<i>Один клик — бот откроется и сам подставит вашу команду:</i>'}
+        ${(s.tgBridge && s.tgBridge.centralBot && s.ownerTgCode) ? `<a class="btn ${s.ownerTgChatId ? 'btn-sm' : 'btn-accent'}" href="https://t.me/${esc(s.tgBridge.centralBot)}?start=${esc(s.ownerTgCode)}" target="_blank" style="margin-top:8px">${ic(I.send)}${s.ownerTgChatId ? 'Добавить ещё аккаунт' : 'Привязать одним кликом в Telegram'}</a>` : '<div class="muted" style="font-size:11.5px;margin-top:6px">Ключ ещё не готов — нажмите «Сгенерировать новый ключ» ниже.</div>'}
+        <div class="muted" style="font-size:11px;margin-top:7px">${s.ownerTgChatId ? 'Ваш текущий ключ (скопируйте, чтобы подключить ещё аккаунт):' : 'Не открывается? Скопируйте команду и отправьте боту вручную:'}</div>
+        <div class="tgb-key" data-tgbcode="${esc(s.ownerTgCode || '')}" title="Нажмите — скопируется команда"><code>/start ${esc(s.ownerTgCode || '—')}</code><span class="badge ${s.ownerTgChatId ? 'ok' : ''}" style="margin-left:auto">${s.ownerTgChatId ? 'привязан ✓' : 'ещё не привязан'}</span></div>
         <button class="btn-ghost btn-sm" id="tgbRegen" style="margin-top:6px;font-size:11px">${ic(I.refresh)}Сгенерировать новый ключ</button>
       </div></div>
       <div class="tgb-step"><span class="tgb-n">2</span><div class="tgb-b">
