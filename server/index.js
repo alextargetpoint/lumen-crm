@@ -922,6 +922,58 @@ function adRangeMetrics(ad, from, to) {
   return { spend: Math.round(ad.spend || 0), leadsMeta: (ad.leadsMeta != null ? ad.leadsMeta : 0), clicks: ad.clicks || 0, impr: ad.impressions || 0 };
 }
 
+/* формат креатива по названию (эвристика; для сравнения видео/статика/карусель по CPQL) */
+function adFormatOf(name) {
+  const s = String(name || '').toLowerCase();
+  if (/reels?|рилс|рилз|видео|\bvideo\b|ролик|tiktok/.test(s)) return 'видео';
+  if (/карусел|carousel|слайд/.test(s)) return 'карусель';
+  if (/статик|баннер|\bstatic\b|banner|\bпост\b|\bpost\b|картинк|\bimage\b/.test(s)) return 'статика';
+  return 'другое';
+}
+/* ── авто-рекомендации по рекламному бюджету (из CPQL/CPL по объявлениям) ──
+   Главная метрика — CPQL (цена КВАЛА), не голый CPL. Потребляет синкнутые кампании (db.ads) +
+   атрибуцию лидов (buildLeadAdIndex) + high-water-квалы (everReachedQual). Ничего не мутирует. */
+function adBudgetRecommendations(db, opts = {}) {
+  const ads = db.ads || [];
+  if (!ads.length) return { ready: false, reason: 'Нет синкнутых кампаний. Подключите Meta в «Приём рекламы» и синкните — тогда посчитаю CPQL и дам рекомендации.' };
+  const from = opts.from || null, to = opts.to || null;
+  const idx = buildLeadAdIndex(db);
+  const gn = g => (db.settings.geoNames && db.settings.geoNames[g]) || g || '—';
+  const money = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
+  const rows = [];
+  for (const ad of ads) {
+    const m = adRangeMetrics(ad, from, to);
+    const crm = idx[ad.adId] || [];
+    const quals = crm.filter(l => everReachedQual(db, l, 'peak')).length;
+    const leads = crm.length || m.leadsMeta || 0;
+    if (m.spend <= 0 && leads <= 0) continue;
+    rows.push({ adId: ad.adId, name: ad.name || ad.adId, campaign: ad.campaignName || '—', geo: ad.geo || '', fmt: adFormatOf(ad.name), spend: m.spend, leads, quals,
+      cpl: leads ? Math.round(m.spend / leads) : null, cpql: quals ? Math.round(m.spend / quals) : null });
+  }
+  if (!rows.length) return { ready: false, reason: 'За период нет расхода/лидов по синкнутым кампаниям.' };
+  const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
+  const totSpend = sum('spend'), totLeads = sum('leads'), totQuals = sum('quals');
+  const avgCpl = totLeads ? Math.round(totSpend / totLeads) : null;
+  const avgCpql = totQuals ? Math.round(totSpend / totQuals) : null;
+  const recs = [];
+  const minMeaningful = Math.max(25, Math.round(totSpend * 0.1));
+  rows.filter(r => r.spend >= minMeaningful && r.quals === 0).sort((a, b) => b.spend - a.spend).slice(0, 5)
+    .forEach(r => recs.push({ kind: 'cut', sev: 'high', adId: r.adId, title: `Срезать «${r.name}»`, text: `${money(r.spend)} потрачено, ${r.leads ? r.leads + ' лид(ов), но ' : ''}0 квалов — деньги не доходят до качества. Паузить или переделать креатив.` }));
+  if (avgCpql) rows.filter(r => r.cpql && r.cpql > avgCpql * 2 && r.quals > 0 && !recs.some(x => x.adId === r.adId)).sort((a, b) => b.cpql - a.cpql).slice(0, 4)
+    .forEach(r => recs.push({ kind: 'cut', sev: 'med', adId: r.adId, title: `Дорогой квал: «${r.name}»`, text: `CPQL ${money(r.cpql)} — в ${(r.cpql / avgCpql).toFixed(1)}× дороже среднего (${money(avgCpql)}). Снизить бюджет здесь.` }));
+  if (avgCpql) rows.filter(r => r.cpql && r.cpql < avgCpql * 0.75 && r.quals >= 2).sort((a, b) => a.cpql - b.cpql).slice(0, 4)
+    .forEach(r => recs.push({ kind: 'scale', sev: 'high', adId: r.adId, title: `Масштабировать «${r.name}»`, text: `CPQL ${money(r.cpql)} — в ${(avgCpql / r.cpql).toFixed(1)}× дешевле среднего, ${r.quals} квал(ов). Поднять бюджет — лучший источник качества.` }));
+  const roll = (key) => { const o = {}; rows.forEach(r => { const k = r[key] || '—'; (o[k] = o[k] || { spend: 0, quals: 0, leads: 0 }); o[k].spend += r.spend; o[k].quals += r.quals; o[k].leads += r.leads; }); return o; };
+  const geoRows = Object.entries(roll('geo')).map(([g, v]) => ({ g, ...v, cpql: v.quals ? Math.round(v.spend / v.quals) : null })).filter(x => x.cpql);
+  if (geoRows.length >= 2) { geoRows.sort((a, b) => a.cpql - b.cpql); const b0 = geoRows[0], w = geoRows[geoRows.length - 1];
+    if (w.cpql > b0.cpql * 1.4) recs.push({ kind: 'shift', sev: 'med', title: `Сдвинуть сплит: ${gn(b0.g)} эффективнее`, text: `CPQL ${gn(b0.g)} ${money(b0.cpql)} vs ${gn(w.g)} ${money(w.cpql)} — переложить часть бюджета на ${gn(b0.g)}.` }); }
+  const fmtRows = Object.entries(roll('fmt')).map(([f, v]) => ({ f, ...v, hasQ: v.quals > 0, cpql: v.quals ? Math.round(v.spend / v.quals) : (v.leads ? Math.round(v.spend / v.leads) : null) })).filter(x => x.cpql && x.f !== 'другое');
+  if (fmtRows.length >= 2) { fmtRows.sort((a, b) => a.cpql - b.cpql); const b0 = fmtRows[0], w = fmtRows[fmtRows.length - 1];
+    if (w.cpql > b0.cpql * 1.5) recs.push({ kind: 'format', sev: 'med', title: `${b0.f[0].toUpperCase() + b0.f.slice(1)} эффективнее`, text: `${b0.f} ${b0.hasQ ? 'CPQL' : 'CPL'} ${money(b0.cpql)} vs ${w.f} ${money(w.cpql)} — делать упор на ${b0.f}.` }); }
+  rows.sort((a, b) => (a.cpql || Infinity) - (b.cpql || Infinity));
+  return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, cpl: avgCpl, cpql: avgCpql }, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
+}
+
 /* Раздать креатив/тезисы объявления на ВСЕ объявления с тем же именем (по всем адсетам/кампаниям).
    Explicit-save → перезаписываем одноимённые (пользователь задал креатив для этого названия). */
 function propagateAdByName(db, ad) {
@@ -13025,6 +13077,13 @@ ${SCR}
       const breakdown = {}; for (const l of leads) breakdown[l.stage] = (breakdown[l.stage] || 0) + 1;
       const quals = leads.filter(l => everReachedQual(db, l, scopeQualMode(db, u.searchParams.get("contractorId")))).length;
       return json(res, 200, { leads, total: leads.length, quals, breakdown, stageNames: namesCfg, qualStages: QUAL });
+    }
+    /* авто-рекомендации по рекламному бюджету (CPQL + срезать/масштабировать/сдвиг/формат) */
+    if (p === '/api/ads/recommendations' && req.method === 'GET') {
+      if (!sessionRole(req)) return json(res, 401, { error: 'auth' });
+      for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);
+      const from = u.searchParams.get('from') || null, to = u.searchParams.get('to') || null;
+      return json(res, 200, adBudgetRecommendations(db, { from, to }));
     }
     if (p === '/api/ads/leadanalytics' && req.method === 'GET') {
       for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
