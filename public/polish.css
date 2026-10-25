@@ -798,3 +798,27 @@ input[type=number] { -moz-appearance: textfield; }
 .cg-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 0}
 .cg-row>div:first-child{min-width:0}
 .cg-hr{border:0;border-top:1px solid var(--stroke);margin:8px 0}
+
+/* ── Чистая карточка лида на доске (редизайн 2026): имя крупно, минимум шума, действие — только когда нужно ── */
+.lead-card{padding:11px 13px}
+.lead-card .lc-name-row{display:flex;align-items:center;gap:6px}
+.lead-card .lc-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:700;letter-spacing:-.01em;color:var(--navy-900)}
+.lead-card .lc-flag{flex:0 0 auto;display:inline-flex;color:var(--warn)}
+.lead-card .lc-flag svg{width:13px;height:13px}
+.lead-card .lc-unread{flex:0 0 auto;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:700;line-height:1.5}
+.lead-card .lc-ctx{margin-top:3px;font-size:11.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lead-card .lc-act{display:flex;align-items:center;gap:4px;margin-top:7px;font-size:11px;line-height:1.3;color:var(--ink-2)}
+.lead-card .lc-act svg{width:12px;height:12px;flex:0 0 auto}
+.lead-card .lc-act.over{color:var(--bad,#C0392B);font-weight:600}
+.lead-card .lc-foot2{display:flex;align-items:center;gap:6px;margin-top:8px}
+.lead-card .lc-resp{display:flex;align-items:center;gap:5px;min-width:0;flex:1}
+.lead-card .lc-ava{flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:var(--bg-2);color:var(--ink-2);font-size:9.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.lead-card .lc-rnm{font-size:11px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lead-card .lc-rnm.muted{color:var(--ink-3)}
+.lead-card .lc-ai{display:inline-flex;color:var(--accent);opacity:.72}
+.lead-card .lc-ai svg{width:13px;height:13px}
+.lead-card .lc-tm{flex:0 0 auto;margin-left:auto;font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.lead-card .lc-reveal{display:flex;align-items:center;gap:8px;max-height:0;opacity:0;overflow:hidden;margin-top:0;font-size:11px;color:var(--ink-3);transition:max-height .2s ease,opacity .2s ease,margin-top .2s ease}
+.lead-card .lc-reveal .tbl-cdot{width:16px;height:16px;font-size:9px;border-radius:5px}
+.lead-card:hover .lc-reveal{max-height:28px;opacity:1;margin-top:7px}
+@media (hover:none){.lead-card:hover .lc-reveal{max-height:0;opacity:0;margin-top:0}}

@@ -5292,21 +5292,29 @@ PAGES.funnel = async (root) => {
         return `<div class="kb-col" data-stage="${st.id}" style="--stg:${stageColor(st.id)}">
           <div class="kb-head"><span class="kb-dot"></span><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct" data-selcol title="Выделить все в стадии">${items.length}</span></div>
           <div class="kb-cards">
-            ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""} ${l.hint && l.hint.kind === 'act' ? 'hot' : ''}" data-id="${l.id}" data-stage="${l.stage}">
-              <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
-              <div class="top"><div class="nm">${esc(l.name)}${(l.unread || 0) > 0 ? ` <span class="lc-unread" title="${l.unread} новых сообщений" style="background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle">${l.unread > 9 ? '9+' : l.unread}</span>` : ''}${icpBadge(l)}</div>${scoreRing(l.score)}</div>
-              <div class="geo-row"><span class="geo">${l.geoName} · ${esc(l.phone)}${phInvBadge(l)}</span>${tblCh(l)}</div>
-              <div class="lc-mid"><div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>${(l.quals.budget || {}).value ? `<span class="lc-bud">${esc((l.quals.budget || {}).value)}</span>` : ''}${l.source && srcName[l.source] ? `<span class="lc-src">${esc(srcName[l.source])}</span>` : ''}</div>
-              ${(() => { const na = l.nextAction, nt = l.nextTouch; if (na && na.text) { const over = na.at && na.at < Date.now(); return `<div class="lc-next ${over ? 'over' : ''}">${over ? ic(I.clock) : ''}${esc(na.text.slice(0, 44))}${na.at ? ` · ${over ? 'просрочено' : ago(na.at)}` : ''}</div>`; } if (nt && nt.at) { return `<div class="lc-next ai">${ic(I.spark)}${nt.kind === 'reengage' ? 'ИИ дожмёт' : 'ИИ коснётся'} · ${nt.at <= Date.now() ? 'скоро' : ago(nt.at)}</div>`; } return ''; })()}
-              <div class="foot">
-                ${l.ai && l.ai.enabled ? '<span class="mini-badge ai">ИИ</span>' : ''}
-                ${l.vendorId && vendorName(l.vendorId) ? `<span class="mini-badge" title="Рекламный подрядчик">${esc(vendorName(l.vendorId))}</span>` : ''}
-                ${l.brokerName ? `<span class="mini-badge ok">${esc(l.brokerName.split(' ')[0])}</span>` : ''}
-                ${l.wakeScore != null ? `<span class="mini-badge warn">score ${l.wakeScore}</span>` : ''}
-                ${(l.tags || []).includes('нужен человек') ? `<span class="mini-badge warn" title="нужен человек">${ic(I.user, 2)}</span>` : ''}
-                <span class="tm">${ago(l.lastMsgAt || l.createdAt)}</span>
-              </div>
-            </div>`).join('') || '<div class="empty" style="padding:14px;font-size:11.5px">пусто</div>'}
+            ${items.map(l => {
+              const sel = selSet("funnel").has(l.id) ? "sel" : "";
+              const hot = l.hint && l.hint.kind === 'act' ? 'hot' : '';
+              const bud = (l.quals.budget || {}).value, prop = (l.quals.type || {}).value;
+              const ctx = [l.geoName, bud || prop || ''].filter(Boolean).join(' · ');
+              const aiOn = l.ai && l.ai.enabled, needHuman = (l.tags || []).includes('нужен человек');
+              /* строка ДЕЙСТВИЯ — только когда реально нужно действовать (задача брокера / нужен человек). «ИИ коснётся» сюда НЕ выносим — это фон */
+              let act = '';
+              if (needHuman) act = `<div class="lc-act over">${ic(I.user, 2)}<span>Нужен человек</span></div>`;
+              else { const na = l.nextAction; if (na && na.text) { const over = na.at && na.at < Date.now(); const t = esc(na.text.replace(/^Передан вам\s*[—–-]\s*/i, '').slice(0, 40)); const when = na.at ? (over ? ' · просрочено ' + ago(na.at).replace(' назад', '') : ' · ' + ago(na.at).replace(' назад', '')) : ''; act = `<div class="lc-act ${over ? 'over' : ''}">${over ? ic(I.clock) : ''}<span>${t}${when}</span></div>`; } }
+              /* ОДИН ответственный (аватар+имя), ИИ — ненавязчивым значком, не второй плашкой */
+              const first = l.brokerName ? l.brokerName.split(' ')[0] : '';
+              const aiDot = aiOn ? `<span class="lc-ai" title="ИИ ведёт диалог сам">${ic(I.spark)}</span>` : '';
+              const resp = first ? `<span class="lc-ava">${esc((first[0] || '?').toUpperCase())}</span><span class="lc-rnm">${esc(first)}</span>${aiDot}` : (aiOn ? `<span class="lc-ai">${ic(I.spark)}</span><span class="lc-rnm muted">ИИ ведёт</span>` : `<span class="lc-rnm muted">не назначен</span>`);
+              const flag = l.phoneInvalid ? `<span class="lc-flag" title="Невалидный номер">${ic(I.flag)}</span>` : '';
+              return `<div class="lead-card glass ${sel} ${hot}" data-id="${l.id}" data-stage="${l.stage}">
+                <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
+                <div class="lc-name-row"><span class="lc-name">${esc(l.name)}</span>${flag}${(l.unread || 0) > 0 ? `<span class="lc-unread" title="${l.unread} новых сообщений">${l.unread > 9 ? '9+' : l.unread}</span>` : ''}</div>
+                ${ctx ? `<div class="lc-ctx">${esc(ctx)}</div>` : ''}
+                ${act}
+                <div class="lc-foot2"><span class="lc-resp">${resp}</span><span class="lc-tm">${ago(l.lastMsgAt || l.createdAt)}</span></div>
+                <div class="lc-reveal">${esc(l.phone)}${tblCh(l)}</div>
+              </div>`; }).join('') || '<div class="empty" style="padding:14px;font-size:11.5px">пусто</div>'}
           </div>
         </div>`;
       }).join('')}
