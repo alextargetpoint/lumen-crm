@@ -1733,6 +1733,25 @@ window.openGrayManager = async function (jumpPhone) {
   if (jumpPhone) { const clean = String(jumpPhone).replace(/[^0-9]/g, ''); if (clean) connectNumber(clean, ''); }
 };
 /* ПЕРЕ-СКАНИРОВАНИЕ номера прямо из карточки: подтверждение → сброс сессии + новый QR (настройки номера сохраняются). */
+/* Замена заблокированного/мёртвого номера: старый выводим, новый покупаем ЗА СЧЁТ КЛИЕНТА ($10 с баланса).
+   Политика — замены за наш счёт не делаем (выжег рассылками/бан = докупает сам). Нехватка баланса → пополнение. */
+window.replaceGrayNumber = async function (phone) {
+  if (!phone) return;
+  const disp = '+' + String(phone).replace(/[^0-9]/g, '');
+  if (!await uiConfirm('Заменить номер?', `${disp} будет помечен как заблокированный и выведен из работы (переписка с лидами в CRM сохраняется). Новый номер покупается за <b>$10 с вашего баланса</b> — замены за наш счёт не делаются. Купить новый?`, { ok: 'Купить новый за $10', cancel: 'Отмена' })) return;
+  try {
+    const r = await api.post('/numbers/replace', { phone });
+    toast('Замена заказана', 'Старый выведен, новый покупаем — подключите по QR в «Мои заказы»', true);
+    await loadState(); if (PAGES.numbers) PAGES.numbers(root);
+  } catch (e) {
+    if (e && (e.status === 402 || e.code === 'insufficient_balance' || /insufficient|баланс/i.test(e.message || ''))) {
+      const need = (e.body && e.body.need) || 10;
+      openTopupCrypto({ purpose: 'consumables', presetAmount: +need, onDone: () => window.replaceGrayNumber(phone) });
+      return;
+    }
+    toast('Не вышло', (e && e.message) || 'ошибка', false);
+  }
+};
 window.openGrayRescan = async function (phone) {
   if (!phone) return;
   const disp = '+' + String(phone).replace(/[^0-9]/g, '');
@@ -15819,7 +15838,7 @@ PAGES.numbers = async (root) => {
           <div><div class="ph">${esc(n.realPhone ? '+' + n.realPhone : n.phone)}</div><div class="lb">${esc(n.label || 'личный номер')}${n.realPhone && n.realPhone !== n.phone ? ' · подключён' : ''} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
           ${ring(risk)}
         </div>
-        <div style="margin:10px 0 6px">${grayStatusBadge(n.live)}${conn ? ` <span class="badge ${w.ready ? 'ok' : 'warn'}" style="font-size:10px" title="Созревание прогревом: возраст + объём переписки + дни активности. Растёт по мере прогрева.">${w.ready ? `прогрет ${w.score}% · готов` : `прогрев ${w.score}% · ${w.activeDays || 0} дн · ${w.warmCount || 0} сообщ.`}</span>` : ''}</div>
+        <div style="margin:10px 0 6px">${n.banned ? '<span class="badge bad" title="Номер помечен как заблокированный — выведен из работы. Переписка в CRM сохранена. Купите замену.">заблокирован</span>' : grayStatusBadge(n.live)}${n.suspectBanned && !n.banned ? ' <span class="badge warn" title="Долго не возвращается после разлогина — возможно, номер забанен WhatsApp. Если так — замените.">возможно забанен</span>' : ''}${conn ? ` <span class="badge ${w.ready ? 'ok' : 'warn'}" style="font-size:10px" title="Созревание прогревом: возраст + объём переписки + дни активности. Растёт по мере прогрева.">${w.ready ? `прогрет ${w.score}% · готов` : `прогрев ${w.score}% · ${w.activeDays || 0} дн · ${w.warmCount || 0} сообщ.`}</span>` : ''}</div>
         ${n.live && !['connected', 'qr', 'connecting'].includes(n.live.status) ? `<div class="num-otp-warn">${ic(I.shield)}<div><b>Перед перерегистрацией номера по OTP сделайте бэкап WhatsApp</b> (Google Drive / iCloud) и выберите «Восстановить» на шаге кода — иначе нативные чаты на телефоне не вернутся (WhatsApp не хранит историю на сервере). <b>Переписка с лидами в Lumen сохраняется в любом случае.</b> ⚠️ WhatsApp нельзя держать с облачного телефона — только реальный телефон + QR.</div></div>` : ''}
         ${n.live && n.live.status === 'connected' ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых лидов сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5}${(n.newToday || 0) >= (n.newCap || 5) ? ' ⚠️' : ''} · <span title="Массовые рассылки с личных номеров запрещены (риск бана) — только Cloud API">рассылки запрещены ⛔</span></div>` : ''}
         <div class="form-row" style="margin:2px 0 8px"><label style="font-size:11px">Закреп за брокером</label>
@@ -15828,6 +15847,7 @@ PAGES.numbers = async (root) => {
           ${n.source === 'yesim' ? `<button class="btn btn-sm" data-yact="${esc(n.phone)}" title="Гид активации + приём SMS/OTP">${ic(I.spark)}Активация / коды</button>` : ''}
           <button class="btn btn-sm" data-waprofile="${esc(n.phone)}" title="Аватар/имя/описание → синк в WhatsApp">${ic(I.gear)}Профиль</button>
           ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<button class="btn btn-sm" data-graycheck="${esc(n.phone)}" title="Проверить связь: тест отправки + реальный тест приёма (кросс-пинг с другого номера). Покажет честно, читает ли номер входящие.">${ic(I.shield)}Проверить связь</button><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
+          <button class="btn btn-sm${n.banned || n.suspectBanned ? ' btn-accent' : ''}" data-grayreplace="${esc(n.phone)}" title="Номер заблокирован / не работает → вывести из работы и купить новый за $10 с вашего баланса (замены за наш счёт не делаются)">${ic(I.refresh)}${n.banned ? 'Купить замену' : 'Заменить'}</button>
           <button class="btn-ghost num-rm" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
         </div>
       </div>`; }).join('')}
@@ -16392,6 +16412,7 @@ PAGES.numbers = async (root) => {
   /* серые карточки: QR-переподключение, закреп за брокером, удаление — прямо со страницы */
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
   $$('[data-grayrescan]', root).forEach(b => b.addEventListener('click', () => openGrayRescan(b.dataset.grayrescan)));
+  $$('[data-grayreplace]', root).forEach(b => b.addEventListener('click', () => replaceGrayNumber(b.dataset.grayreplace)));
   $$('[data-graycheck]', root).forEach(b => b.addEventListener('click', async () => {
     const phone = b.dataset.graycheck; const old = b.innerHTML;
     b.disabled = true; b.innerHTML = ic(I.spark) + 'Проверяю связь…';

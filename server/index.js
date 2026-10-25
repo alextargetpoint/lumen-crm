@@ -4071,6 +4071,7 @@ async function waDropWatch() {
           const cur = s.status || 'none';
           const prev = (n.live && n.live.status) || 'none';
           const who = n.label || (n.realPhone ? '+' + n.realPhone : n.phone);
+          if (n.banned) continue;   /* номер помечен заблокированным (выведен) — не алертим, замена заказана отдельно */
           /* ⭐ОДНА СИСТЕМА, БЕЗ СПАМА: все проблемы ОДНОГО номера (отвал / не читает / клиенты не получают) склеиваем
              в ОДИН алерт по стабильному ключу wa-health:<номер> (без меняющегося счётчика в тексте) с кулдауном 3ч.
              Восстановление сбрасывает ключ — следующая реальная проблема снова оповестит сразу. */
@@ -4092,6 +4093,16 @@ async function waDropWatch() {
           const retryIn = +s.retryIn || 0;
           const retryBad = cur === 'connected' && retryIn >= 5 && s.lastRetryAt && (Date.now() - s.lastRetryAt < 20 * 60e3);
           if (retryBad) notify(db, { type: 'wa', level: 'critical', title: 'Клиенты не получают сообщения', text: `С «${who}» устройства клиентов не расшифровывают сообщения («Waiting for this message»). Воркер пересобирает сессию сам; если не восстановится за несколько минут — пересканируйте номер по QR.`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
+          /* ⭐АВТО-ПОДОЗРЕНИЕ НА БАН: номер не возвращается >24ч → вероятно заблокирован WhatsApp. Ставим флаг
+             (бейдж в UI + кнопка «Заменить») и ОДИН мягкий алерт. НЕ списываем деньги сами — замену клиент
+             подтверждает кнопкой (покупка нового за свой баланс). Восстановление/бан-замена сбрасывают флаг. */
+          if (cur === 'connected' || n.banned) { n._downSince = null; if (n.suspectBanned) n.suspectBanned = false; }
+          else { if (!n._downSince) n._downSince = Date.now();
+            if (!n.suspectBanned && Date.now() - n._downSince > 24 * 3600e3) {
+              n.suspectBanned = true;
+              notify(db, { type: 'wa', level: 'warn', title: 'Номер не возвращается — возможно, забанен', text: `«${who}» не на связи больше суток. Если номер окончательно заблокирован WhatsApp — замените его: «Номера» → «Заменить» (новый покупается за $10 с вашего баланса).`, dedupKey: 'wa-suspect:' + _nk, cooldownMs: 24 * 3600e3 });
+            }
+          }
           n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad, retryIn, retryBad });
           changed = true;
         }
@@ -7621,6 +7632,35 @@ const server = http.createServer(async (req, res) => {
       if (edition === 'byod') { try { await provisionByodOrder(db, order); } catch (e) { order.provisionError = (e && e.message) || 'provision error'; } }
       const provisioned = edition === 'byod' && order.status === 'ready';
       notify(db, { type: 'billing', level: provisioned ? 'success' : (order.provisionError ? 'warn' : 'success'), title: provisioned ? 'Номер выдан' : 'Заказ номеров принят', text: provisioned ? `${qty}× «${label}» — номер(а) ${(order.numbers || []).join(', ')} куплены. Подключите по QR в разделе «Номера».` : `${qty}× «${label}» — списано $${cost} с баланса. ${edition === 'managed' ? 'Места выделяются из фермы' : (order.provisionError ? 'Покупка номера не прошла — повторите в «Мои заказы»' : 'Номера покупаем и настраиваем')} — в разделе «Номера».`, email: false });
+      store.save();
+      return json(res, 200, { ok: true, balance: ch.balance, order });
+    }
+    /* ⛔→🆕 ЗАМЕНА заблокированного номера: клиент помечает номер как мёртвый/забаненный → старый выводим из
+       работы (переписка в CRM сохраняется), НОВЫЙ покупаем ЗА СЧЁТ КЛИЕНТА (списание с баланса, $10 byod).
+       Политика: замены за наш счёт НЕ делаем — выжег номер рассылками/баном = сам докупает. */
+    if (p === '/api/numbers/replace' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'недоступно для брокера' });
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!db.settings.billing) db.settings.billing = billing.defBilling();
+      const b = await readBody(req);
+      const phone = String(b.phone || '').replace(/\D/g, '');
+      const g = db.settings.waGray || {};
+      const old = (g.numbers || []).find(n => String(n.phone).replace(/\D/g, '') === phone || (n.realPhone && String(n.realPhone).replace(/\D/g, '') === phone));
+      const price = 10, qty = 1, cost = price;
+      const ch = billing.chargeBalance(db, cost, `Замена заблокированного номера${old ? ' ' + (old.label || old.phone) : ''}`);
+      if (!ch.ok) return json(res, 402, { error: 'insufficient_balance', code: 'insufficient_balance', balance: ch.balance || 0, need: +(cost - (ch.balance || 0)).toFixed(2), cost });
+      /* старый номер → заблокирован: выводим из ротации (pickGrayNumber берёт только connected), но не удаляем —
+         переписка/история и привязка брокера остаются; лиды привязаны к карточкам, не к номеру. */
+      if (old) { old.banned = { at: Date.now() }; old.live = Object.assign({}, old.live || {}, { status: 'banned' }); }
+      const bl = db.settings.billing; bl.numberOrders = bl.numberOrders || [];
+      const country = b.country ? String(b.country).toUpperCase().slice(0, 2) : ((old && old.country) || '');
+      const order = { id: 'no_' + crypto.randomBytes(5).toString('hex'), edition: 'byod', label: 'На вашем железе', qty, price, cost, status: 'pending', at: Date.now(), replaces: old ? (old.realPhone || old.phone) : phone };
+      if (country) order.country = country;
+      bl.numberOrders.unshift(order); if (bl.numberOrders.length > 100) bl.numberOrders.length = 100;
+      try { const reg = store.getRegistry(); reg.numberOrders = reg.numberOrders || {}; reg.numberOrders[store.currentTid() + ':' + order.id] = Object.assign({ tid: store.currentTid() }, order); store.saveRegistry(); } catch (_) {}
+      try { await provisionByodOrder(db, order); } catch (e) { order.provisionError = (e && e.message) || 'provision error'; }
+      const provisioned = order.status === 'ready';
+      notify(db, { type: 'billing', level: 'success', title: 'Заказана замена номера', text: `Старый номер выведен (заблокирован). Новый куплен за $${cost} с баланса${provisioned && order.numbers ? ` — ${order.numbers.join(', ')}, подключите по QR` : ' — покупаем и настраиваем'}.`, email: false });
       store.save();
       return json(res, 200, { ok: true, balance: ch.balance, order });
     }
