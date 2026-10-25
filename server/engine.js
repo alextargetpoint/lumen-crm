@@ -594,6 +594,17 @@ function tickChains(db) {
       continue;
     }
     if (nowT < lead.ai.nextTouchAt) continue;
+    /* #578: невалидный номер (кривой E.164 — неверная длина/код) → НЕ шлём: доставка/звук режутся, касание сгорит
+       в пустоту. Помечаем один раз тегом «неверный номер» (в UI бейдж + кнопка «В спам»), перепроверяем через сутки
+       (вдруг номер поправят у источника). validE164 инъектится из index.js (engine.phoneValid). */
+    if (module.exports.phoneValid && lead.phone && !module.exports.phoneValid(lead.phone)) {
+      if (!(lead.tags || []).includes('неверный номер')) {
+        lead.tags = [...(lead.tags || []), 'неверный номер'];
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: номер ${lead.phone} невалиден (E.164) — авто-касания остановлены, проверьте номер или пометьте «В спам»` });
+      }
+      lead.ai.nextTouchAt = nowT + 24 * 3600e3;
+      continue;
+    }
     /* ⭐ЗАЩИТА ОТ ВЫГОРАНИЯ: офлайн-номер → пауза (не прожигаем шаги в мёртвый номер; проба ≤1/6ч, само-восстановление) */
     if (offlinePaused(db, lead, nowT)) { lead.ai.nextTouchAt = nowT + 6 * 3600e3; continue; }
     /* потолок касаний без ответа → в «Спящие», бомбить перестаём */

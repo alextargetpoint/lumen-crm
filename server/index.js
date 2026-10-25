@@ -1219,6 +1219,8 @@ engine.sendOwnerTg = async (db, text) => {
   for (const cid of ids) { try { await tgbridge.notify(db, cid, text); } catch (_) {} }
   return true;
 };
+/* #578: валидатор номера для движка (чтобы не слать авто-касания в кривой E.164). validE164 — hoisted-функция ниже. */
+engine.phoneValid = (phone) => validE164(phone);
 /* ассистент ответил клиенту → уведомление брокеру в Telegram (видит, что ИИ ведёт диалог, может перехватить reply) */
 engine.onAiReply = (db, lead, m) => { try { tgbridge.forwardAiReply(db, lead, m).catch(() => {}); } catch (_) {} };
 /* from-адрес для email: домен агентства (если верифицирован) → «Агентство <noreply@домен>»; иначе null (платформенный дефолт) */
