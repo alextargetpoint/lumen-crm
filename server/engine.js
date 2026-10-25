@@ -1546,7 +1546,7 @@ function buildReport(db, period) {
     extras ? `` : null,
     spendTotal ? `За всё время: лиды ${atLeads} | расход ${M(spendTotal)} | CPL ${M(atCpl)}` : `За всё время: лиды ${atLeads}`,
     ``,
-    `Открыть CRM: ${tunnelBase() || 'http://localhost:' + (process.env.PORT || 5077)}`,
+    `Открыть CRM: ${global.LUMEN_BASE || tunnelBase() || 'http://localhost:' + (process.env.PORT || 5077)}`,
   ].filter(x => x !== null);
   return lines.join('\n');
 }
