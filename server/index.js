@@ -1177,8 +1177,48 @@ engine.onBudgetAlert = (db, b) => {
   const did = db.settings.control && db.settings.control.delegateBrokerId;
   if (did) { const del = db.brokers.find(x => x.id === did); if (del && del.tgChatId) tgbridge.notify(db, del.tgChatId, b.text).catch(() => {}); }
 };
+/* блок «Что улучшить» для отчётов (daily/weekly/monthly): бюджет-рекомендации + ROAS + ICP-таргетинг.
+   Логика (adBudgetRecommendations/leadICP) живёт здесь, buildReport в engine.js дёргает через этот хук. */
+engine.reportExtras = (db, period) => {
+  try {
+    const now = Date.now();
+    const span = period === 'monthly' ? 30 : period === 'weekly' ? 7 : 1;
+    const money = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
+    const out = [];
+    const rec = adBudgetRecommendations(db, { from: now - span * 86400e3, to: now });
+    if (rec && rec.ready) {
+      if (rec.totals.roas) out.push(`• 💰 ROAS рекламы: ${rec.totals.roas}× (комиссия ${money(rec.totals.revenue)} на расход ${money(rec.totals.spend)})`);
+      else if (rec.totals.cpql) out.push(`• 💰 CPQL (цена квала): ${money(rec.totals.cpql)}`);
+      const cut = rec.recommendations.filter(r => r.kind === 'cut' && r.sev === 'high' && r.adId);
+      if (cut.length) {
+        const rowsById = {}; (rec.rows || []).forEach(r => { rowsById[r.adId] = r; });
+        const wasted = cut.reduce((s, r) => s + ((rowsById[r.adId] || {}).spend || 0), 0);
+        const names = cut.slice(0, 2).map(r => (String(r.title).match(/«(.+?)»/) || [, ''])[1]).filter(Boolean).map(n => '«' + n + '»').join(', ');
+        if (names) out.push(`• 💸 Срезать: ${names}${cut.length > 2 ? ' и др.' : ''} — ${money(wasted)} без квалов`);
+      }
+      const scale = rec.recommendations.find(r => r.kind === 'scale' && r.sev === 'high' && r.adId);
+      if (scale) { const nm = (String(scale.title).match(/«(.+?)»/) || [, ''])[1]; if (nm) out.push(`• 📈 Масштабировать: «${nm}» — лучший источник квалов`); }
+    }
+    const icp = leadICP(db);
+    if (icp && icp.ready && icp.hints && icp.hints.length && icp.qualRate) {
+      const h = icp.hints[0];
+      out.push(`• 🎯 Целиться: ${h.dim} «${h.value}» — конверсия в квал ${(h.rate / icp.qualRate).toFixed(1)}× среднего`);
+    }
+    return out.length ? '💡 Что улучшить:\n' + out.join('\n') : '';
+  } catch (e) { console.error('[report-extras]', e.message); return ''; }
+};
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
+/* Отчёты/мгновенные уведомления ОСНОВАТЕЛЮ через центральный бот-мост. engine.sendReport умеет только
+   легаси пер-тенантный бот отчётов (channels.tg.botToken) — в SaaS его нет, основатель привязан к общему
+   боту по ownerTgChatId. Шлём туда (+ доп. аккаунты владельца). true = есть куда слать и мост готов. */
+engine.sendOwnerTg = async (db, text) => {
+  const s = db.settings || {};
+  const ids = [...new Set([s.ownerTgChatId, ...(Array.isArray(s.ownerTgChatIds) ? s.ownerTgChatIds : [])].filter(Boolean).map(String))];
+  if (!ids.length || !tgbridge.ready(db)) return false;
+  for (const cid of ids) { try { await tgbridge.notify(db, cid, text); } catch (_) {} }
+  return true;
+};
 /* ассистент ответил клиенту → уведомление брокеру в Telegram (видит, что ИИ ведёт диалог, может перехватить reply) */
 engine.onAiReply = (db, lead, m) => { try { tgbridge.forwardAiReply(db, lead, m).catch(() => {}); } catch (_) {} };
 /* from-адрес для email: домен агентства (если верифицирован) → «Агентство <noreply@домен>»; иначе null (платформенный дефолт) */

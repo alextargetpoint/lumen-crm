@@ -1514,6 +1514,8 @@ function buildReport(db, period) {
   const topB = Object.entries(bundles).filter(([, v]) => v.leads > 0).sort((a, b) => b[1].leads - a[1].leads).slice(0, 5);
   const atLeads = L.length, atCpl = atLeads ? Math.round(spendTotal / atLeads) : 0;
   const pName = { daily: 'ежедневная сводка', weekly: 'еженедельный отчёт', monthly: 'месячный отчёт' }[period];
+  /* блок «что улучшить» — бюджет-рекомендации + ROAS + ICP-таргетинг (логика в index.js через хук) */
+  const extras = (() => { try { return module.exports.reportExtras ? module.exports.reportExtras(db, period) : ''; } catch (_) { return ''; } })();
   const lines = [
     `📊 ${db.settings.agency.name} — ${pName} по лидогенерации`, ``,
     `Лидов всего: ${nl.length}`,
@@ -1529,6 +1531,8 @@ function buildReport(db, period) {
     `• Лиды: ${pl.length} → ${nl.length} (${dyn(nl.length, pl.length)})`,
     `• Целевые: ${pq.length} → ${nq.length} (${dyn(nq.length, pq.length)})`,
     ``,
+    extras || null,
+    extras ? `` : null,
     spendTotal ? `За всё время: лиды ${atLeads} | расход ${M(spendTotal)} | CPL ${M(atCpl)}` : `За всё время: лиды ${atLeads}`,
     ``,
     `Открыть CRM: ${tunnelBase() || 'http://localhost:' + (process.env.PORT || 5077)}`,
@@ -1556,7 +1560,12 @@ async function sendReport(db, text) {
       return r.ok ? 'tg' : 'tg_error';
     } catch { return 'tg_error'; }
   }
-  ai.pushEvent(db, { type: 'msg_in', text: 'Сводка готова (подключите Telegram-бот и chat_id в «Автоматизациях», чтобы получать её в мессенджер)' });
+  /* Центральный/платформенный бот-мост: основатель привязан по ownerTgChatId (SaaS — без своего бота отчётов).
+     Инъектится из index.js (engine.sendOwnerTg), чтобы не тянуть tgbridge циклическим require. */
+  if (module.exports.sendOwnerTg) {
+    try { if (await module.exports.sendOwnerTg(db, text)) return 'tg'; } catch (_) {}
+  }
+  ai.pushEvent(db, { type: 'msg_in', text: 'Сводка готова (привяжите Telegram в «Подключения → Мост Telegram», чтобы получать её в мессенджер)' });
   return 'event_only';
 }
 
