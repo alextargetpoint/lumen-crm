@@ -2241,6 +2241,8 @@ button.fnl-kpi:hover { border-color: var(--accent); }
 .ovb-top-b { min-width: 0; }
 .ovb-top-b b { display: block; font-size: 12.5px; color: var(--navy-900); }
 .ovb-top-b span { font-size: 11px; color: var(--ink-3); margin-top: 1px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ovs-note { font-size: 12px; color: var(--ink-3); padding: 2px 2px 4px; line-height: 1.4; }
+.ovs-note b { color: var(--navy-900); font-weight: 650; }
 @keyframes softIn { from { opacity: .55; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .content.soft > * { animation: softIn .24s var(--ease-soft); }
 

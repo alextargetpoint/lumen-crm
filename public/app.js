@@ -3364,7 +3364,7 @@ async function ideaSwipe(kind, ctx, repaint) {
 /* гео → смещение UTC (для мировых часов и намёков по времени клиента) */
 const GEO_TZ = { dubai: 4, bali: 8, phuket: 7, spain: 1, france: 1, moscow: 3, msk: 3, istanbul: 3, turkey: 3, cyprus: 2, georgia: 4, tbilisi: 4, montenegro: 1, thailand: 7, indonesia: 8, uae: 4, spain_bcn: 1, latam: -3, portugal: 0, greece: 2, egypt: 2, bangkok: 7 };
 /* ⭐ богатый дефолт-обзор: 13 виджетов (было 8) — пользователь видит всю систему сразу, остальные (нишевые) в «Настроить» */
-const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbundles', 'adbudget', 'leadsources', 'hotleads', 'profileleads', 'goal', 'aivs', 'contenthub', 'activity', 'meetings', 'demos', 'brokers', 'numbers', 'chains', 'leaders'];
+const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbundles', 'adbudget', 'leadsources', 'hotleads', 'profileleads', 'speedlead', 'goal', 'aivs', 'contenthub', 'activity', 'meetings', 'demos', 'brokers', 'numbers', 'chains', 'leaders'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
@@ -3379,15 +3379,15 @@ const OV_VARIANT = {
   funnel: 'cv-analytics', geo: 'cv-analytics', spark: 'cv-analytics',
   tasks: 'cv-standard', meetings: 'cv-standard', activity: 'cv-standard', recent: 'cv-standard', brokers: 'cv-standard', casebase: 'cv-standard',
   hotleads: 'cv-urgent', profileleads: 'cv-urgent', goal: 'cv-goal', leaders: 'cv-editorial',
-  numbers: 'cv-system', aivs: 'cv-ai', ideas: 'cv-ai', chains: 'cv-tinted',
+  numbers: 'cv-system', aivs: 'cv-ai', ideas: 'cv-ai', chains: 'cv-tinted', speedlead: 'cv-system',
   onboarding: 'cv-setup', worldclock: 'cv-inset',
 };
 /* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
-const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, profileleads: 6, goal: 5, meetings: 6, demos: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5, teamperf: 6, trafficperf: 6, adbudget: 6, execsignals: 12 };
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, profileleads: 6, goal: 5, meetings: 6, demos: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5, teamperf: 6, trafficperf: 6, adbudget: 6, speedlead: 6, execsignals: 12 };
 /* категории для библиотеки виджетов */
 const OV_CAT = [
   ['Руководителю · штаб', ['execsignals', 'teamperf', 'trafficperf']],
-  ['Конверсия и качество', ['conversionrail', 'winrate', 'stagemap', 'qualaxes', 'scoredist', 'ainow', 'freshtoday', 'silent']],
+  ['Конверсия и качество', ['conversionrail', 'winrate', 'stagemap', 'qualaxes', 'scoredist', 'ainow', 'freshtoday', 'silent', 'speedlead']],
   ['Продажи и лиды', ['kpi', 'funnel', 'hotleads', 'profileleads', 'recent', 'leadsources', 'chains', 'reengage', 'dealsmonth']],
   ['Аналитика и реклама', ['clientreport', 'adbundles', 'aivs', 'numbers']],
   ['Задачи и день', ['tasks', 'attention', 'goal', 'meetings']],
@@ -3829,6 +3829,7 @@ const OV_W = {
     return hd + `<table class="ov-tp"><thead><tr><th>Сотрудник</th><th>Лиды</th><th>Квал</th><th>Сделки</th><th>Конв</th><th></th></tr></thead><tbody>${rows.map(r => { const v = verdict(r); return `<tr><td class="ov-tp-nm">${esc(r.b.name.split(' ')[0])}${r.hotWait ? `<i class="ov-tp-hot" title="${r.hotWait} горячих без ответа >2ч">${r.hotWait}🔥</i>` : ''}</td><td>${r.n}</td><td>${r.q}</td><td><b>${r.deals}</b></td><td>${r.conv}%</td><td><span class="ov-tp-v ${v.c}">${v.t}</span></td></tr>`; }).join('')}</tbody></table>`;
   } },
   adbudget: { name: 'Бюджет рекламы', icon: () => I.bars, full: false, render: () => `<div class="ov2-card-hd">${ic(I.spark)}Бюджет рекламы<span>CPQL · совет · ROAS</span><button class="btn btn-sm" data-ovgo="ads">Аналитика</button></div><div id="ovBudgetBody" class="ov-budget-body"><div class="muted" style="font-size:12px;padding:10px 2px">Считаю…</div></div>` },
+  speedlead: { name: 'Скорость реакции', icon: () => I.bolt, full: false, render: () => `<div class="ov2-card-hd">${ic(I.bolt)}Скорость реакции<span>время до 1-го ответа</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div><div id="ovSpeedBody"><div class="muted" style="font-size:12px;padding:10px 2px">Считаю…</div></div>` },
   trafficperf: { name: 'Трафик и маркетинг', icon: () => I.target, full: false, render: (c) => {
     const L = c.leads || [], QUAL = ['qualified', 'handover', 'viewing', 'deal'];
     const srcName = (l) => l.source === 'ad_comment' ? 'Комментарии рекламы' : (l.ads && l.ads.campaignName) ? l.ads.campaignName : (l.ads && l.ads.adId) ? 'Реклама · лид-формы' : l.source === 'import' ? 'Импорт' : l.source === 'broker_card' ? 'От брокера' : 'Прямые / другое';
@@ -4400,6 +4401,16 @@ async function loadOvBudget() {
   const top = (r.recommendations || [])[0];
   box.innerHTML = `<div class="ovb-kpi"><div><b>${r.totals.cpql ? _rm(r.totals.cpql) : '—'}</b><i>CPQL</i></div><div><b>${_rm(r.totals.spend)}</b><i>расход</i></div>${r.totals.roas != null ? `<div><b>${r.totals.roas}×</b><i>ROAS</i></div>` : `<div><b>${r.totals.quals || 0}</b><i>квалов</i></div>`}</div>${top ? `<div class="ovb-top adrec-${top.kind}"><span class="adrec-tag">${_tg[top.kind] || ''}</span><div class="ovb-top-b"><b>${esc(top.title)}</b><span>${esc(top.text)}</span></div></div>` : '<div class="muted" style="font-size:12px;padding:6px 2px">Явных перекосов бюджета нет</div>'}`;
 }
+/* виджет Обзора «Скорость реакции»: async-дозагрузка медиана/5мин/30мин + самый медленный брокер */
+async function loadOvSpeed() {
+  const box = document.getElementById('ovSpeedBody'); if (!box) return;
+  let r; try { r = await api.get('/analytics/speed'); } catch (e) { box.innerHTML = '<div class="muted" style="font-size:12px;padding:8px 2px">—</div>'; return; }
+  if (!r.ready) { box.innerHTML = `<div class="muted" style="font-size:12px;padding:10px 2px;line-height:1.5">${esc(r.reason || 'Нет данных')}</div>`; return; }
+  const fm = m => m < 60 ? m + ' мин' : (m / 60).toFixed(1) + ' ч';
+  const slow = (r.byBroker || []).length > 1 ? r.byBroker[r.byBroker.length - 1] : null;
+  const note = slow ? `Медленнее всех: <b>${esc(slow.name)}</b> — медиана ${fm(slow.median)}` : (r.unanswered ? `<b>${r.unanswered}</b> лид(ов) пока без ответа` : `${r.answered} из ${r.total} отвечены`);
+  box.innerHTML = `<div class="ovb-kpi"><div><b>${fm(r.median)}</b><i>медиана</i></div><div><b>${r.within5}%</b><i>за 5 мин</i></div><div><b>${r.within30}%</b><i>за 30 мин</i></div></div><div class="ovs-note">${note}</div>`;
+}
 async function loadSeats() {
   const box = document.getElementById('seatBody'); if (!box) return;
   box.innerHTML = 'Анализирую активность…'; box.className = 'muted';
@@ -4518,6 +4529,7 @@ PAGES.overview = async (root) => {
     /* переходы/действия */
     $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
     loadOvBudget();   /* async-дозагрузка виджета «Бюджет рекламы» (no-op если карточки нет) */
+    loadOvSpeed();    /* async-дозагрузка виджета «Скорость реакции» */
     $$('[data-consdismiss]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const at = Number(b.dataset.consdismiss); const row = b.closest('[data-consrow]'); if (row) row.classList.add('tk-cleared'); try { await api.post('/consults/dismiss', { at }); } catch (_) {} toast('Заявка убрана', null, true); }));
     $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b.dataset.ovlead); }));
     $$('[data-ovcase]', root).forEach(b => b.addEventListener('click', () => openCaseModal((ctx.cases || []).find(k => k.id === b.dataset.ovcase))));

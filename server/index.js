@@ -1204,6 +1204,11 @@ engine.reportExtras = (db, period) => {
       const h = icp.hints[0];
       out.push(`• 🎯 Целиться: ${h.dim} «${h.value}» — конверсия в квал ${(h.rate / icp.qualRate).toFixed(1)}× среднего`);
     }
+    const sp = speedToLead(db, { from: now - span * 86400e3, to: now });
+    if (sp && sp.ready) {
+      const fm = m => m < 60 ? m + ' мин' : (m / 60).toFixed(1) + ' ч';
+      out.push(`• ⚡ Скорость реакции: медиана ${fm(sp.median)} · ${sp.within5}% за 5 мин${sp.median > 30 ? ' — медленно, ускорьте первый контакт' : ''}`);
+    }
     return out.length ? '💡 Что улучшить:\n' + out.join('\n') : '';
   } catch (e) { console.error('[report-extras]', e.message); return ''; }
 };
@@ -1897,6 +1902,41 @@ function creativeForAd(db, ads) {
   const nm = ads.adName || ads.name;
   if (nm) { const a = (db.ads || []).find(x => x.name === nm && x.media && x.media.url); if (a) return a.media; }
   return null;
+}
+/* speed-to-lead: время от создания лида до ПЕРВОГО исходящего (ИИ или брокер). Главный предиктор
+   конверсии в недвижимости (ответ <5 мин конвертит кратно лучше). Медиана/среднее + % за 5/30/60 мин
+   + разрез по брокеру/источнику. ИИ-автоответ тоже считается первым контактом — это и есть фишка CRM. */
+function speedToLead(db, opts = {}) {
+  const to = opts.to || Date.now();
+  const from = opts.from != null ? opts.from : (to - 30 * 86400e3);
+  const leads = (db.leads || []).filter(l => !l._demo && l.createdAt && l.createdAt >= from && l.createdAt < to);
+  if (leads.length < 3) return { ready: false, reason: `Мало лидов за период (${leads.length}) — метрика появится от ~5.` };
+  const firstOut = {};
+  for (const m of (db.messages || [])) {
+    if (m.dir !== 'out' || !m.at || m.leadId == null) continue;
+    if (firstOut[m.leadId] == null || m.at < firstOut[m.leadId]) firstOut[m.leadId] = m.at;
+  }
+  const bn = id => (db.brokers.find(b => b.id === id) || {}).name || '—';
+  const srcName = { meta_form: 'Meta', ctwa: 'CTWA', wa_inbound: 'WhatsApp вх.', ig_direct: 'Instagram', site: 'Сайт', manual: 'Вручную', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
+  const delays = []; let answered = 0, unanswered = 0; const pB = {}, pS = {};
+  for (const l of leads) {
+    const fo = firstOut[l.id];
+    if (fo && fo >= l.createdAt) {
+      const d = (fo - l.createdAt) / 60000; delays.push(d); answered++;
+      const bk = bn(l.broker); (pB[bk] = pB[bk] || []).push(d);
+      const sk = srcName[l.source] || l.source || '—'; (pS[sk] = pS[sk] || []).push(d);
+    } else unanswered++;
+  }
+  if (!delays.length) return { ready: false, reason: 'Нет отвеченных лидов за период.' };
+  const med = a => { const s = a.slice().sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const pct = (a, t) => Math.round(a.filter(d => d <= t).length / a.length * 100);
+  const rows = o => Object.entries(o).filter(([, v]) => v.length >= 2).map(([name, v]) => ({ name, median: Math.round(med(v)), n: v.length })).sort((a, b) => a.median - b.median);
+  return {
+    ready: true, total: leads.length, answered, unanswered,
+    median: Math.round(med(delays)), avg: Math.round(delays.reduce((a, b) => a + b, 0) / delays.length),
+    within5: pct(delays, 5), within30: pct(delays, 30), within60: pct(delays, 60),
+    byBroker: rows(pB), bySource: rows(pS),
+  };
 }
 function leadView(db, l) {
   if (l.ads) healAdNames(l.ads);   /* лечим имена из полей *_id прямо на лиде (Albato) — идемпотентно */
@@ -3669,6 +3709,44 @@ async function handleOwnerWaQr(db, chatId, text) {
 }
 try { tgbridge.setWaQr(handleOwnerWaQr); } catch (_) {}
 
+/* ── АВТО-QR при отвале номера: клиент просил не бегать к ПК — когда номер РАЗЛОГИНился (logged_out),
+   сами пересобираем сессию и шлём свежий QR картинкой владельцу + брокеру-владельцу номера в Telegram.
+   ⚠️Только на logged_out, НЕ на reconnecting/connecting (там воркер восстанавливается сам — форс-logout
+   прервал бы авто-восстановление). Рейт-лимит 30 мин/номер (анти-флап). Настройка automations.autoQrOnDrop
+   (деф. вкл; стоимость — только TG-сообщение через центр-бот, $0). */
+async function autoQrOnDrop(db, n, who) {
+  try {
+    if ((db.settings.automations || {}).autoQrOnDrop === false) return;
+    if (!waWorkerReady(db) || !tgbridge.ready(db)) return;
+    const nowT = Date.now();
+    if (n._autoQrAt && nowT - n._autoQrAt < 30 * 60e3) return;   /* не чаще раза в 30 мин */
+    const targets = new Set();
+    if (db.settings.ownerTgChatId) targets.add(String(db.settings.ownerTgChatId));
+    const br = n.brokerId ? (db.brokers || []).find(b => b.id === n.brokerId) : null;
+    if (br) { try { for (const c of tgbridge.brokerChatIds(br)) targets.add(String(c)); } catch (_) {} }
+    if (!targets.size) return;
+    n._autoQrAt = nowT; store.save();
+    await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/logout').catch(() => {});
+    await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/start');
+    let qr = '', connected = false;
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      let s; try { s = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(n.phone)); } catch (_) { continue; }
+      const ss = (s && s.session) || {};
+      if (ss.status === 'connected') { connected = true; break; }
+      if (ss.status === 'qr' && ss.qr) { qr = ss.qr; break; }
+    }
+    const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    for (const cid of targets) {
+      try {
+        if (connected) await tgbridge.notify(db, cid, `🟢 «${esc(who)}» переподключился сам — QR не нужен.`);
+        else if (qr) await tgbridge.sendDataUrlPhoto(db, cid, qr, `📷 Номер «${who}» отвалился — вот новый QR. WhatsApp → Связанные устройства → Привязать устройство. (прислан автоматически)`);
+        else await tgbridge.notify(db, cid, `⚠️ «${esc(who)}» отвалился, QR пока не готов. Отправьте в бот <code>/qr ${esc(who)}</code> или откройте CRM → «Номера».`);
+      } catch (_) {}
+    }
+  } catch (_) {}
+}
+
 /* ── Серый TELEGRAM (MTProto user-accounts) — воркер lumen-tg-worker, аналог WA-воркера ── */
 function tgWorkerBase(db) { const r = store.getRegistry(); return normWorkerUrl(process.env.LUMEN_TG_WORKER_URL || (r.platformTgWorker && r.platformTgWorker.url) || (db.settings.tgGray && db.settings.tgGray.url) || ''); }
 function tgWorkerToken(db) { const r = store.getRegistry(); return process.env.LUMEN_TG_WORKER_TOKEN || (r.platformTgWorker && r.platformTgWorker.token) || (db.settings.tgGray && db.settings.tgGray.token) || ''; }
@@ -3995,6 +4073,8 @@ async function waDropWatch() {
           const who = n.label || (n.realPhone ? '+' + n.realPhone : n.phone);
           if (prev === 'connected' && cur !== 'connected') {
             notify(db, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер отвалился', text: `Номер «${who}» больше не на связи. Срочно переподключите по QR в разделе «Номера» → «Пересканировать». Диалоги этого номера ждут его возврата — на другие номера переписка автоматически НЕ переносится (перевод диалога — только вручную).` });
+            /* АВТО-QR: только если РЕАЛЬНО разлогинен (не reconnecting — там воркер сам восстановится) */
+            if (cur === 'logged_out') autoQrOnDrop(db, n, who).catch(() => {});
           } else if (prev !== 'connected' && prev !== 'none' && cur === 'connected') {
             notify(db, { type: 'wa', level: 'success', title: 'WhatsApp-номер снова на связи', text: `Номер «${who}» переподключён — вернул в прогрев и касания.` });
           }
@@ -11327,6 +11407,7 @@ const server = http.createServer(async (req, res) => {
           if (_rec) _rec.live = Object.assign({}, _rec.live || {}, { status: 'logged_out' });
           notify(tdb, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер разлогинился', text: `Номер «${_who}» вышел из WhatsApp — СРОЧНО переподключите по QR («Номера» → «Пересканировать»). Диалоги этого номера приостановлены до его возврата; автоматически на другие номера переписка НЕ переносится (перевод — вручную).` });
           store.save();
+          if (_rec) autoQrOnDrop(tdb, _rec, _who).catch(() => {});   /* клиент просил авто-QR на отвал — шлём свежий QR в TG сразу */
           return;
         }
         /* ⚠️ ЭСКАЛАЦИЯ САМОЛЕЧЕНИЯ: воркер сообщает, что контакту сообщения НЕ расшифровываются даже после
@@ -13380,6 +13461,12 @@ ${SCR}
     if (p === '/api/leads/icp' && req.method === 'GET') {
       if (!sessionRole(req)) return json(res, 401, { error: 'auth' });
       return json(res, 200, leadICP(db));
+    }
+    /* скорость реакции на лид (время до 1-го исходящего) — медиана/среднее + % за 5/30/60 мин */
+    if (p === '/api/analytics/speed' && req.method === 'GET') {
+      if (!sessionRole(req)) return json(res, 401, { error: 'auth' });
+      const days = Math.min(365, Math.max(1, +u.searchParams.get('days') || 30));
+      return json(res, 200, speedToLead(db, { from: Date.now() - days * 86400e3 }));
     }
     if (p === '/api/ads/leadanalytics' && req.method === 'GET') {
       for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
