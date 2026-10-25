@@ -4071,32 +4071,27 @@ async function waDropWatch() {
           const cur = s.status || 'none';
           const prev = (n.live && n.live.status) || 'none';
           const who = n.label || (n.realPhone ? '+' + n.realPhone : n.phone);
+          /* ⭐ОДНА СИСТЕМА, БЕЗ СПАМА: все проблемы ОДНОГО номера (отвал / не читает / клиенты не получают) склеиваем
+             в ОДИН алерт по стабильному ключу wa-health:<номер> (без меняющегося счётчика в тексте) с кулдауном 3ч.
+             Восстановление сбрасывает ключ — следующая реальная проблема снова оповестит сразу. */
+          const _nk = String(n.phone).replace(/\D/g, '') || who;
+          const _hkey = 'wa-health:' + _nk;
           if (prev === 'connected' && cur !== 'connected') {
-            notify(db, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер отвалился', text: `Номер «${who}» больше не на связи. Срочно переподключите по QR в разделе «Номера» → «Пересканировать». Диалоги этого номера ждут его возврата — на другие номера переписка автоматически НЕ переносится (перевод диалога — только вручную).` });
+            notify(db, { type: 'wa', level: 'critical', title: 'Номер отключился', text: `«${who}» больше не на связи. Переподключите по QR: «Номера» → «Пересканировать». Диалоги номера ждут его возврата; на другие номера переписка не переносится.`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
             /* АВТО-QR: только если РЕАЛЬНО разлогинен (не reconnecting — там воркер сам восстановится) */
             if (cur === 'logged_out') autoQrOnDrop(db, n, who).catch(() => {});
           } else if (prev !== 'connected' && prev !== 'none' && cur === 'connected') {
-            notify(db, { type: 'wa', level: 'success', title: 'WhatsApp-номер снова на связи', text: `Номер «${who}» переподключён — вернул в прогрев и касания.` });
+            if (db.settings._notifDedup) delete db.settings._notifDedup[_hkey];   /* проблема закрыта → не глушим следующую */
+            notify(db, { type: 'wa', level: 'success', title: 'Номер снова на связи', text: `«${who}» переподключён — вернулся в работу.`, dedupKey: 'wa-ok:' + _nk, cooldownMs: 10 * 60e3 });
           }
-          /* ⚠️ ЧЕСТНЫЙ СТАТУС: номер «connected», но НЕ расшифровывает входящие (Bad MAC/no session) — клиенты
-             пишут, а сообщения не приходят в CRM. Статус-бейдж это не ловит → отдельный алерт + флаг для UI. */
+          /* номер «connected», но НЕ расшифровывает входящие (Bad MAC) — клиенты пишут, а сообщения не доходят */
           const decFails = +s.decFails || 0;
           const decBad = cur === 'connected' && decFails >= 3 && s.lastDecFailAt && (Date.now() - s.lastDecFailAt < 20 * 60e3);
-          if (decBad && (!n._decAlertAt || Date.now() - n._decAlertAt > 6 * 3600e3)) {
-            n._decAlertAt = Date.now();
-            notify(db, { type: 'wa', level: 'critical', title: '🔴 Номер не читает входящие', text: `Номер «${who}» на связи, но НЕ расшифровывает входящие (${decFails} ошибок) — клиенты пишут, а сообщения не доходят в CRM. Сделайте «Пересканировать» этого номера в «Номера».` });
-          }
-          if (!decBad) n._decAlertAt = null;
-          /* ⚠️ ИСХОДЯЩИЙ «waiting»: получатели НЕ расшифровывают наши сообщения (retry-receipt у воркера). Клиент
-             видит «Waiting for this message». Воркер считает retryIn и САМ форс-рефрешит сессию контакта (авто-heal
-             ВНУТРИ того же номера). Диалоги с номера НЕ переносятся на другие номера — только алерт «пересканируйте». */
+          if (decBad) notify(db, { type: 'wa', level: 'critical', title: 'Номер не читает входящие', text: `«${who}» на связи, но не расшифровывает входящие — клиенты пишут, а сообщения не доходят в CRM. Пересканируйте номер в «Номера».`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
+          /* исходящий «waiting»: получатели не расшифровывают наши сообщения (retry-receipt). Воркер сам пересобирает сессию */
           const retryIn = +s.retryIn || 0;
           const retryBad = cur === 'connected' && retryIn >= 5 && s.lastRetryAt && (Date.now() - s.lastRetryAt < 20 * 60e3);
-          if (retryBad && (!n._retryAlertAt || Date.now() - n._retryAlertAt > 6 * 3600e3)) {
-            n._retryAlertAt = Date.now();
-            notify(db, { type: 'wa', level: 'critical', title: '🔴 Клиенты не получают сообщения с номера', text: `С номера «${who}» ${retryIn} раз устройства клиентов не смогли расшифровать сообщение («Waiting for this message»). Воркер сам пере-собирает сессию на ЭТОМ номере — переписка с него НЕ переносится на другие номера. Если не восстановится за несколько минут — сделайте «Пересканировать» этого номера по QR.` });
-          }
-          if (!retryBad) n._retryAlertAt = null;
+          if (retryBad) notify(db, { type: 'wa', level: 'critical', title: 'Клиенты не получают сообщения', text: `С «${who}» устройства клиентов не расшифровывают сообщения («Waiting for this message»). Воркер пересобирает сессию сам; если не восстановится за несколько минут — пересканируйте номер по QR.`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
           n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad, retryIn, retryBad });
           changed = true;
         }
@@ -4652,10 +4647,13 @@ function notify(db, opts) {
           const chat = db.settings.ownerTgChatId;
           if (chat && tgbridge.ready(db)) {
             const he = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const emo = n.level === 'critical' ? '🔴 ' : n.level === 'warn' ? '🟠 ' : n.level === 'success' ? '🟢 ' : '🔔 ';
-            /* чистый минималистичный вид: один статус-эмодзи (по уровню) + заголовок, без дублей эмодзи из title */
-            const cleanT = he(n.title || 'Уведомление').replace(/^(?:🔴|🟠|🟡|🟢|🔔|⚠️|🚨|✅|❌|💬|🤖)\s*/, '');
-            await tgbridge.notify(db, chat, `${emo}<b>${cleanT}</b>\n${he(n.text)}`);
+            /* ЭСТЕТИЧНЫЙ минимал: без ярких кружков 🔴🟢. Тонкая надстрочная рубрика (категория · статус) курсивом +
+               жирный заголовок + текст. Уровень передаём словом, не цветом (в TG цвета нет, кружки = визуальный шум). */
+            const CAT = { wa: 'Номера', billing: 'Биллинг', lead: 'Лиды', meeting: 'Встречи', system: 'Система', security: 'Безопасность', report: 'Сводка' };
+            const lvlWord = n.level === 'critical' ? 'требует внимания' : n.level === 'warn' ? 'внимание' : n.level === 'success' ? 'восстановлено' : '';
+            const eyebrow = `${he(CAT[n.type] || 'Lumen')}${lvlWord ? ' · ' + lvlWord : ''}`;
+            const cleanT = he(n.title || 'Уведомление').replace(/^(?:🔴|🟠|🟡|🟢|🔔|⚠️|🚨|✅|❌|💬|🤖|📷|📥|⌛️)\s*/, '');
+            await tgbridge.notify(db, chat, `<i>${eyebrow}</i>\n<b>${cleanT}</b>\n${he(n.text)}`);
           }
         } catch (e) {}
       })();
@@ -11405,7 +11403,7 @@ const server = http.createServer(async (req, res) => {
           const _rec = (g.numbers || []).find(n => String(n.phone).replace(/\D/g, '') === _ph || (n.live && String(n.live.phone || '').replace(/\D/g, '') === _ph));
           const _who = (_rec && (_rec.label || (_rec.realPhone ? '+' + _rec.realPhone : _rec.phone))) || ('+' + _ph);
           if (_rec) _rec.live = Object.assign({}, _rec.live || {}, { status: 'logged_out' });
-          notify(tdb, { type: 'wa', level: 'critical', title: '🔴 WhatsApp-номер разлогинился', text: `Номер «${_who}» вышел из WhatsApp — СРОЧНО переподключите по QR («Номера» → «Пересканировать»). Диалоги этого номера приостановлены до его возврата; автоматически на другие номера переписка НЕ переносится (перевод — вручную).` });
+          notify(tdb, { type: 'wa', level: 'critical', title: 'Номер вышел из WhatsApp', text: `«${_who}» разлогинился — переподключите по QR («Номера» → «Пересканировать»). Диалоги номера приостановлены до возврата; на другие номера переписка не переносится.`, dedupKey: 'wa-health:' + _ph, cooldownMs: 3 * 3600e3 });
           store.save();
           if (_rec) autoQrOnDrop(tdb, _rec, _who).catch(() => {});   /* клиент просил авто-QR на отвал — шлём свежий QR в TG сразу */
           return;
@@ -11419,7 +11417,7 @@ const server = http.createServer(async (req, res) => {
           const _lead = (tdb.leads || []).filter(l => (l.phone || '').replace(/\D/g, '') === _ph).sort((a, c) => ((c.lastMsgAt || c.createdAt || 0) - (a.lastMsgAt || a.createdAt || 0)))[0];
           const _nm = _lead ? _lead.name : ('+' + _ph);
           if (_lead) _lead.deliveryWarn = { at: Date.now(), reason: 'wa_undecryptable' };
-          notify(tdb, { type: 'wa', level: 'critical', title: '⚠️ Клиент не видит наши сообщения', text: `${_nm}: устройство клиента не расшифровывает наши сообщения даже после авто-лечения сессии — он их НЕ получает. Отправьте текст ещё раз или позвоните; если не поможет — переподключите номер по QR.` });
+          notify(tdb, { type: 'wa', level: 'warn', title: 'Клиент не видит сообщения', text: `${_nm}: устройство клиента не расшифровывает наши сообщения даже после авто-лечения — он их не получает. Напишите ещё раз или позвоните; если не помогает — переподключите номер по QR.`, dedupKey: 'wa-undeliv:' + _ph, cooldownMs: 6 * 3600e3 });
           if (_lead) ai.pushEvent(tdb, { type: 'wa_undelivered', leadId: _lead.id, text: `⚠️ ${_nm}: сообщения не расшифровываются у клиента (возможна потеря лида) — нужно вмешаться.` });
           store.save();
           return;
