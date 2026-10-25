@@ -184,7 +184,7 @@ function dedupeByName(db) {
    Дедуп по meta.leadId. Жёсткие потолки на число объявлений/лидов (cost + rate-safe). */
 async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50, acct } = {}) {
   const c = cfg(db); const token = c.token; const id = acct ? acctId(acct) : (accountsOf(db)[0] || {}).id;
-  const res = { created: 0, repeat: 0, scannedAds: 0, capped: false, error: null };
+  const res = { created: 0, repeat: 0, scannedAds: 0, capped: false, error: null, leadsSeen: 0, noPhone: 0, adErrors: 0, emptyAds: 0, firstError: null };
   if (!id) return res;
   const norm = (ph) => String(ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
   const seen = new Set((db.leads || []).map(l => (l.meta && l.meta.leadId) ? String(l.meta.leadId) : null).filter(Boolean));
@@ -200,13 +200,23 @@ async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50, acct } = {
     res.scannedAds++;
     let leads;
     try { leads = await graphGet(`${ad.id}/leads`, token, { fields: 'id,created_time,field_data,form_id,campaign_id,adset_id', limit: String(maxLeadsPerAd) }); }
-    catch (e) { continue; }   /* нет прав leadgen на это объявление / нет формы — пропускаем */
+    catch (e) {
+      /* НЕ глотаем молча: ошибку прав/формы поднимаем наверх, чтобы владелец видел ПРИЧИНУ «0 лидов».
+         Код Meta 100/подкод 33 = у объявления нет лид-форм (CTWA/мессенджер/трафик — это норма, не ошибка прав). */
+      const code = (e.meta && e.meta.code), sub = (e.meta && e.meta.error_subcode);
+      const noForm = code === 100 || /nonexisting field|does not exist|Unsupported get request/i.test(e.message || '');
+      if (noForm) { res.emptyAds++; }
+      else { res.adErrors++; if (!res.firstError) res.firstError = (code ? ('код ' + code + (sub ? '/' + sub : '') + ': ') : '') + (e.message || 'ошибка'); }
+      continue;
+    }
+    if (!(leads.data || []).length) res.emptyAds++;
     for (const L of (leads.data || [])) {
+      res.leadsSeen++;
       if (seen.has(String(L.id))) continue;
       seen.add(String(L.id));
       const f = {}; for (const kv of (L.field_data || [])) f[(kv.name || '').toLowerCase()] = (kv.values || [])[0];
       const phone = f.phone_number || f.phone || f['телефон'];
-      if (!phone) continue;
+      if (!phone) { res.noPhone++; continue; }
       const name = f.full_name || [f.first_name, f.last_name].filter(Boolean).join(' ') || f.name || 'Без имени';
       const email = f.email || f['e-mail'];
       const existing = (db.leads || []).find(l => norm(l.phone) === norm(phone));
@@ -232,6 +242,8 @@ async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50, acct } = {
         ads: { adId: String(ad.id), adsetId: L.adset_id, campaignId: L.campaign_id, formName: L.form_id ? ('form ' + L.form_id) : null },
       };
       deps.matchAd(db, lead);
+      /* МАРШРУТИЗАЦИЯ входящих на брокера (настройка владельца) — иначе scoped-брокер не увидит лид */
+      try { const rb = deps.routeBroker && deps.routeBroker(db, lead); if (rb) { lead.broker = rb; const bo = (db.brokers || []).find(x => x.id === rb); if (bo) bo.load = (bo.load || 0) + 1; } } catch (_) {}
       db.leads.push(lead);
       res.created++;
       try { deps.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Лид из кабинета Meta (API): ${lead.name} · ${db.settings.geoNames[lead.geo] || lead.geo}` }); } catch (_) {}
@@ -240,6 +252,18 @@ async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50, acct } = {
     }
   }
   if (db.intakeLog && db.intakeLog.length > 200) db.intakeLog.length = 200;
+  /* ПРИЧИНА «0 новых лидов» — в приоритете: ошибка прав > есть лиды без телефона > нет лид-форм.
+     Так владелец в логе синка видит, что чинить, вместо немого нуля. */
+  if (!res.created) {
+    if (res.adErrors && res.firstError) {
+      res.error = 'Meta отклонил запрос лидов (' + res.adErrors + ' из ' + res.scannedAds + ' объявл.): ' + res.firstError +
+        '. Нужны права токена: ads_management, leads_retrieval, pages_show_list, pages_read_engagement; выпустивший токен — с задачей ADVERTISE на Странице, Страница назначена System User.';
+    } else if (res.leadsSeen && res.noPhone >= res.leadsSeen) {
+      res.error = 'Лиды в формах есть (' + res.leadsSeen + '), но без телефона — в лид-форме Meta нет поля «Phone number». Добавьте его в форму.';
+    } else if (res.scannedAds && res.emptyAds >= res.scannedAds && !res.leadsSeen) {
+      res.error = 'У просканированных объявлений (' + res.scannedAds + ') нет лид-форм или новых лидов. Если это кампании «Переписки/CTWA» (клик → WhatsApp), лиды приходят не формой, а сообщением в WhatsApp — проверьте, что номер WA подключён (не разлогинен).';
+    }
+  }
   return res;
 }
 
@@ -265,9 +289,10 @@ async function sync(db, deps, opts = {}) {
   c.lastSyncAt = started;
   c.log = c.log || [];
   c.log.unshift({
-    at: started, ok: out.ok, error: out.error || null,
+    at: started, ok: out.ok, error: out.error || (out.leads && out.leads.error) || null,
     ins: out.insights ? (out.insights.updated + out.insights.added) : 0,
     newLeads: out.leads ? out.leads.created : 0,
+    scannedAds: out.leads ? out.leads.scannedAds : 0,
     capped: !!((out.insights && out.insights.capped) || (out.leads && out.leads.capped)),
   });
   if (c.log.length > 40) c.log.length = 40;

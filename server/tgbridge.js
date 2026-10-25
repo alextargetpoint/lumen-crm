@@ -223,6 +223,13 @@ async function handleUpdate(db, update) {
     return { skip: 'unbound' };
   }
 
+  /* брокер тоже может запросить новый QR номера прямо с телефона (/qr) — номер часто отваливается,
+     ждать владельца не нужно. handleOwnerWaQr сам пускает привязанных брокеров. */
+  if (waQr && /^\/(qr|rescan|пересканировать)\b/i.test(text)) {
+    try { if (await waQr(db, chatId, text)) return { brokerCmd: true }; }
+    catch (e) { console.error('[tgbridge] waQr broker', e.message); }
+  }
+
   const lead = resolveLead(db, broker, msg, chatId);
   if (!lead) {
     await safeApi(db, 'sendMessage', { chat_id: chatId, text: '↩️ Ответьте reply на сообщение клиента, чтобы я знал, кому переслать.' });

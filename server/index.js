@@ -838,6 +838,47 @@ function matchAd(db, lead) {
   } else lead.ads.matched = false;
 }
 
+/* ── Маршрутизация ВХОДЯЩИХ лидов на брокера ──
+   settings.automations.leadRouting = { default: brokerId|'', bySource: { <source>: brokerId } }
+   Приоритет: правило по источнику лида > дефолтный брокер > null (тогда брокера позже даст движок по загрузке/гео).
+   Назначает брокера СРАЗУ на приёме (/hooks/lead, Meta-пул) — иначе scoped-брокер не видит лид (canSeeLead: только свои).
+   Возвращает brokerId или null. Присваивание/load/recordOwner делает вызывающий. */
+function routeIntakeBroker(db, lead) {
+  const r = ((db.settings || {}).automations || {}).leadRouting || {};
+  const want = (r.bySource && lead && lead.source && r.bySource[lead.source]) || r.default || '';
+  if (!want) return null;
+  const b = (db.brokers || []).find(x => x.id === want && x.active !== false);
+  return b ? b.id : null;
+}
+
+/* Уведомить брокера-ПОЛУЧАТЕЛЯ о переданных ему лидах (удалён/отключён другой брокер, оффбординг, ручная
+   передача, маршрутизация входящих). Делает ДВЕ вещи, чтобы лиды не потерялись:
+   1) помечает каждый лид как требующий обработки — старт SLA-таймера (handoverAt), флаг reassigned, +1 непрочитанное;
+      → в кабинете брокера они всплывают в «нужно обработать», даже если TG не привязан;
+   2) шлёт одно сводное TG-сообщение со списком (если брокер привязал Telegram).
+   leads — массив лид-объектов (уже с l.broker === brokerId). reason — человекочитаемая причина. */
+function ruLeads(n) { const a = n % 10, b = n % 100; return n + ' ' + (a === 1 && b !== 11 ? 'лид' : (a >= 2 && a <= 4 && (b < 10 || b >= 20) ? 'лида' : 'лидов')); }
+async function notifyBrokerAssigned(db, brokerId, leads, reason) {
+  const list = (leads || []).filter(Boolean);
+  if (!brokerId || !list.length) return;
+  const b = (db.brokers || []).find(x => x.id === brokerId);
+  if (!b) return;
+  const now = Date.now();
+  for (const l of list) {
+    if (!l.handoverAt) l.handoverAt = now;      /* старт SLA «коснись за N минут» */
+    l.slaFlag = 'reassigned';
+    l.unread = (l.unread || 0) + 1;
+    if (!l.nextAction) l.nextAction = { text: 'Передан вам — связаться', at: now + 30 * 60e3 };
+  }
+  const chatIds = (() => { try { return tgbridge.brokerChatIds(b); } catch (_) { return (b.tgChatId ? [String(b.tgChatId)] : []); } })();
+  if (!chatIds.length) return;                   /* не привязан к TG — лиды уже видны и помечены в CRM */
+  const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const names = list.slice(0, 15).map(l => `• ${esc(l.name || 'Лид')}${l.phone ? ' — ' + esc(l.phone) : ''}`).join('\n');
+  const more = list.length > 15 ? `\n…и ещё ${list.length - 15}` : '';
+  const txt = `📥 <b>Вам передано ${ruLeads(list.length)}</b>${reason ? `\n${esc(reason)}` : ''}\n${names}${more}\n\nОткройте CRM — их нужно обработать.`;
+  for (const cid of chatIds) { try { await tgbridge.notify(db, cid, txt); } catch (_) {} }
+}
+
 /* Атрибуция лида к объявлению для аналитики: сначала по числовому adId, затем ФОЛБЭК ПО ИМЕНАМ
    (объявление → адсет+кампания → кампания). Интеграторы/Meta-формы (Albato и пр.) часто шлют ИМЕНА,
    а не числовой id → adId=null и лид ни к чему не привязывался (Факт лиды/квалы = 0). Единичное
@@ -3494,7 +3535,11 @@ async function waGrayApi(db, method, pathx, body) {
      /qr <...>!        — форс даже если номер «на связи».
    Регистрируется в tgbridge как инъекция, чтобы мост не тянул waGrayApi (без циклического require). */
 async function handleOwnerWaQr(db, chatId, text) {
-  if (!db.settings || String(db.settings.ownerTgChatId || '') !== String(chatId)) return false;   /* только привязанный владелец */
+  /* доступ: владелец (ownerTgChatId) ИЛИ привязанный активный брокер — номер часто отваливается, и брокер
+     должен сам пересканировать его с телефона, не дожидаясь владельца (частый запрос из чата поддержки). */
+  const _isOwner = db.settings && String(db.settings.ownerTgChatId || '') === String(chatId);
+  const _isBroker = (db.brokers || []).some(b => b.active !== false && tgbridge.brokerChatIds(b).includes(String(chatId)));
+  if (!_isOwner && !_isBroker) return false;
   const parts = String(text || '').trim().split(/\s+/);
   const cmd = (parts[0] || '').toLowerCase();
   if (cmd !== '/qr' && cmd !== '/rescan' && cmd !== '/пересканировать') return false;
@@ -3961,7 +4006,7 @@ async function metaAdsTick() {
         const c = db.settings.metaAds;
         const everyMs = Math.max(1, (c.syncEveryHours || 6)) * 3600e3;
         if (c.lastSyncAt && (Date.now() - c.lastSyncAt) < everyMs) return;
-        try { await metaads.sync(db, { matchAd, nextId: store.nextId, pushEvent: ai.pushEvent, save: () => store.save() }); } catch (e) {}
+        try { await metaads.sync(db, { matchAd, nextId: store.nextId, pushEvent: ai.pushEvent, save: () => store.save(), routeBroker: routeIntakeBroker }); } catch (e) {}
       });
     }
   } finally { metaAdsBusy = false; }
@@ -6158,6 +6203,10 @@ const server = http.createServer(async (req, res) => {
           ads: adsFromBody(),
         };
         matchAd(db, lead);
+        /* МАРШРУТИЗАЦИЯ: если владелец задал «входящие → брокеру» — сразу назначаем, иначе брокера даст движок.
+           Иначе лид с broker=null не виден scoped-брокеру (canSeeLead: только свои) — и «лиды не подгружаются». */
+        const routed = routeIntakeBroker(db, lead);
+        if (routed) { lead.broker = routed; const rb = db.brokers.find(x => x.id === routed); if (rb) rb.load = (rb.load || 0) + 1; control.recordOwner(db, lead, routed, 'auto', 'маршрутизация входящих'); }
         db.leads.push(lead);
         entry.result = 'created';
         entry.leadId = lead.id;
@@ -8124,10 +8173,11 @@ const server = http.createServer(async (req, res) => {
       const chainGap = () => chainBulk <= 3
         ? (30e3 + Math.random() * 60e3)                          /* ≤3 лида: 0.5–1.5 мин */
         : Math.max(180e3, Math.round(86400e3 / _dayCap) * (0.8 + Math.random() * 0.4));   /* пачка: равномерно по дневной ёмкости, ≥3 мин */
+      const _bulkAsg = {}; const _actingBroker = (sessionRole(req) && sessionRole(req).brokerId) || null;
       for (const l of targets) {
         if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); markPeakQual(db, l); capi.onStageChange(db, l, l.stage); } done++; }
         else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
-        else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } if (l.broker !== br.id) recordOwner(db, l, br.id, 'owner', 'массовое назначение'); l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') { l.stage = 'handover'; capi.onStageChange(db, l, 'handover'); } if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
+        else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { const changed = l.broker !== br.id; if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } if (changed) recordOwner(db, l, br.id, 'owner', 'массовое назначение'); l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') { l.stage = 'handover'; capi.onStageChange(db, l, 'handover'); } if (!l.handoverAt) l.handoverAt = Date.now(); if (changed && br.id !== _actingBroker) (_bulkAsg[br.id] = _bulkAsg[br.id] || []).push(l); done++; } }
         else if (action === 'vendor') { /* массовое назначение подрядчика (b.value = contractorId или пусто = снять) */
           const nv = b.value ? String(b.value) : null; const prev = (db.mpContractors || []).find(c => c.id === l.vendorId);
           if (prev && prev.name) l.tags = (l.tags || []).filter(t => t !== prev.name);
@@ -8151,6 +8201,7 @@ const server = http.createServer(async (req, res) => {
         }
         else if (action === 'delete') { db.messages = db.messages.filter(mm2 => mm2.leadId !== l.id); db.meetings = (db.meetings || []).filter(mt => mt.leadId !== l.id); db.leads = db.leads.filter(x => x.id !== l.id); done++; }   /* + чистим встречи, чтобы не копились сироты (ломали матч нотетейкера по переиспользуемому коду) */
       }
+      for (const [bid, ls] of Object.entries(_bulkAsg)) notifyBrokerAssigned(db, bid, ls, 'Переданы вам (назначение руководителем).').catch(() => {});
       if (IS_BROKER) audit(db, req, `массовое действие «${action}» над ${done} лид(ами)`);
       const labels = { stage: 'перемещено', archive: 'в архив', broker: 'передано', tag: 'помечено', untag: 'снят тег', ai: b.value ? 'ИИ включён' : 'ИИ выключен', chain: 'запущена цепочка', delete: 'удалено' };
       ai.pushEvent(db, { type: 'stage', text: `Массовое действие: ${labels[action] || action} — ${done} лид(ов)` });
@@ -8185,7 +8236,7 @@ const server = http.createServer(async (req, res) => {
         if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); if (b.stage === 'deal' && !lead.dealAt) lead.dealAt = Date.now(); }
         if (b.dealValue !== undefined) lead.dealValue = Math.max(0, Math.round(+b.dealValue || 0)) || null;           /* сумма сделки (цена объекта) — для ROI/ROAS по рекламе */
         if (b.dealCommission !== undefined) lead.dealCommission = Math.max(0, Math.round(+b.dealCommission || 0)) || null;  /* наша комиссия с этой сделки */
-        if (b.broker !== undefined) { const nb = b.broker || null; if (nb !== lead.broker) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; }
+        if (b.broker !== undefined) { const nb = b.broker || null; const _changed = nb !== lead.broker; const _actB = sessionRole(req) && sessionRole(req).brokerId; if (_changed) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; if (_changed && nb && nb !== _actB) notifyBrokerAssigned(db, nb, [lead], 'Передан вам (назначение руководителем).').catch(() => {}); }
         if (b.geo) lead.geo = b.geo;
         if (b.grayPhone !== undefined) lead.grayPhone = b.grayPhone ? String(b.grayPhone).replace(/\D/g, '') : null;   /* закрепить серый номер отправки за лидом (или сбросить) */
         if (b.ai) {
@@ -8985,7 +9036,18 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/brokers\/([^/]+)$/)) && req.method === 'DELETE') {
       if (db.brokers.length <= 1) return json(res, 400, { error: 'нельзя удалить последнего брокера' });
       const gone = db.brokers.find(x => x.id === m[1]);
-      for (const l of db.leads) if (l.broker === m[1]) { recordOwner(db, l, null, 'system', 'брокер удалён'); l.broker = null; }
+      /* лиды удалённого брокера НЕ бросаем в broker=null (scoped-брокер их не увидит — «лиды не подгружаются»),
+         а передаём наименее загруженному из оставшихся (активных, иначе любому) — как при kill-switch отключении. */
+      const pool = db.brokers.filter(x => x.id !== m[1] && x.active !== false);
+      const reasgPool = pool.length ? pool : db.brokers.filter(x => x.id !== m[1]);
+      const _reasg = {};
+      for (const l of db.leads) if (l.broker === m[1]) {
+        const nb = reasgPool.sort((a2, b2) => (a2.load || 0) - (b2.load || 0))[0];
+        recordOwner(db, l, nb ? nb.id : null, 'system', `брокер ${gone ? gone.name : ''} удалён`);
+        l.broker = nb ? nb.id : null;
+        if (nb && !['deal', 'lost'].includes(l.stage)) { nb.load = (nb.load || 0) + 1; (_reasg[nb.id] = _reasg[nb.id] || []).push(l); }
+      }
+      for (const [bid, ls] of Object.entries(_reasg)) notifyBrokerAssigned(db, bid, ls, `Переданы при удалении брокера${gone ? ` «${gone.name}»` : ''}.`).catch(() => {});
       for (const mt of db.meetings || []) if (mt.brokerId === m[1]) mt.brokerId = db.brokers.find(x => x.id !== m[1]).id;
       db.brokers = db.brokers.filter(x => x.id !== m[1]);
       /* SaaS: чистим реестр и сессии удалённого брокера (e-mail-маппинг, инвайты, активные входы) */
@@ -9051,7 +9113,9 @@ const server = http.createServer(async (req, res) => {
         for (const [sid2, s2] of Object.entries(db.settings.auth.sessions)) if (s2.brokerId === br.id) delete db.settings.auth.sessions[sid2];
         const mine = db.leads.filter(l => l.broker === br.id && !['deal', 'lost'].includes(l.stage));
         const pool = db.brokers.filter(x => x.id !== br.id && x.active !== false);
-        mine.forEach(l => { const nb = pool.sort((a2, b2) => a2.load - b2.load)[0]; recordOwner(db, l, nb ? nb.id : null, 'auto', `передача при отключении ${br.name}`); l.broker = nb ? nb.id : null; if (nb) nb.load += 1; });
+        const _reasg = {};
+        mine.forEach(l => { const nb = pool.sort((a2, b2) => a2.load - b2.load)[0]; recordOwner(db, l, nb ? nb.id : null, 'auto', `передача при отключении ${br.name}`); l.broker = nb ? nb.id : null; if (nb) { nb.load += 1; (_reasg[nb.id] = _reasg[nb.id] || []).push(l); } });
+        for (const [bid, ls] of Object.entries(_reasg)) notifyBrokerAssigned(db, bid, ls, `Переданы при отключении брокера «${br.name}».`).catch(() => {});
         br.load = 0;
         audit(db, req, `доступ отключён, ${mine.length} лидов переназначено`, { broker: br.name });
         ai.pushEvent(db, { type: 'ai_off', text: `Брокер ${br.name} отключён — ${mine.length} лидов переданы команде` });
@@ -9079,13 +9143,13 @@ const server = http.createServer(async (req, res) => {
         if (!prev) return json(res, 404, { error: 'not found' });
         if (prev.poolEmpty) return json(res, 400, { error: 'нет активных брокеров для передачи' });
         /* исполняем план */
-        let moved = 0;
+        let moved = 0; const _off = {};
         for (const item of prev.plan) {
           const lead = db.leads.find(l => l.id === item.leadId); if (!lead) continue;
           const old = db.brokers.find(x => x.id === lead.broker); if (old) old.load = Math.max(0, (old.load || 0) - 1);
           recordOwner(db, lead, item.toId || null, 'owner', `передача дел от ${br.name}`);
           lead.broker = item.toId || null;
-          if (item.toId) { const nb = db.brokers.find(x => x.id === item.toId); if (nb) nb.load = (nb.load || 0) + 1; }
+          if (item.toId) { const nb = db.brokers.find(x => x.id === item.toId); if (nb) nb.load = (nb.load || 0) + 1; (_off[item.toId] = _off[item.toId] || []).push(lead); }
           if (b.notifyClients && item.toId) {
             const nbName = (db.brokers.find(x => x.id === item.toId) || {}).name || 'наш эксперт';
             const nbFirst = String(nbName).split(' ')[0];
@@ -9097,6 +9161,7 @@ const server = http.createServer(async (req, res) => {
           }
           moved++;
         }
+        for (const [bid, ls] of Object.entries(_off)) notifyBrokerAssigned(db, bid, ls, `Переданы вам в рамках передачи дел от «${br.name}».`).catch(() => {});
         /* встречи → преемнику по гео/пулу */
         const fallback = db.brokers.filter(x => x.id !== br.id && x.active !== false).sort((a2, b2) => (a2.load || 0) - (b2.load || 0))[0];
         for (const mt of db.meetings || []) if (mt.brokerId === br.id && (!mt.status || !['done', 'cancelled', 'no_show'].includes(mt.status))) { const tgt = (successorId !== 'auto' && db.brokers.find(x => x.id === successorId && x.active !== false)) || fallback; if (tgt) mt.brokerId = tgt.id; }
@@ -10052,7 +10117,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ---- Прямое подключение рекламного кабинета Meta (Marketing API) ---- */
-    const metaDeps = () => ({ matchAd, nextId: store.nextId, pushEvent: ai.pushEvent, save: () => store.save() });
+    const metaDeps = () => ({ matchAd, nextId: store.nextId, pushEvent: ai.pushEvent, save: () => store.save(), routeBroker: routeIntakeBroker });
     /* проверка токена + доступа к кабинету (использует переданный токен, иначе сохранённый) */
     if (p === '/api/metaads/verify' && req.method === 'POST') {
       const b = await readBody(req);

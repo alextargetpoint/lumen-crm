@@ -10736,6 +10736,23 @@ PAGES.automations = async (root) => {
           </div>
           <button class="btn btn-sm btn-accent" id="cgSave" style="margin-top:12px">Сохранить защиту</button>
         </div>`; })()}
+        ${(() => { const r = (s.automations || {}).leadRouting || {};
+          const brs = (STATE.brokers || []).filter(b => b.active !== false);
+          const optD = (sel) => `<option value="">— Авто (по загрузке и гео)</option>` + brs.map(b => `<option value="${esc(b.id)}" ${sel === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+          const optS = (sel) => `<option value="">— как по умолчанию</option>` + brs.map(b => `<option value="${esc(b.id)}" ${sel === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+          const SRC = [['meta_api', 'Meta — кабинет (напрямую)'], ['meta_form', 'Meta / интегратор (Albato)'], ['site', 'Сайт / лендинг']];
+          const bs = r.bySource || {};
+          return `<div class="glass card mb" data-ag="dist">
+          <div class="card-title">${ic(I.users || I.spark)}Маршрутизация входящих лидов<span class="sub">кому падают новые заявки</span></div>
+          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Новый лид из рекламы сразу закрепляется за выбранным брокером. Иначе он попадает «в общий пул» с <b>broker = не назначен</b> и не виден в кабинете брокера — каждый брокер видит только <b>своих</b> лидов (конфиденциальность). Это и есть причина «лиды из Меты не подгружаются».</div>
+          <div class="form-row"><label>Все новые лиды назначать</label><select id="lrDefault">${optD(r.default || '')}</select></div>
+          <hr class="cg-hr">
+          <div class="muted" style="font-size:11px;margin-bottom:8px">Переопределить по источнику (необязательно):</div>
+          <div style="display:grid;gap:8px">
+            ${SRC.map(([k, label]) => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center"><div style="font-size:12.5px">${esc(label)}</div><select data-lrsrc="${k}">${optS(bs[k] || '')}</select></div>`).join('')}
+          </div>
+          <button class="btn btn-sm btn-accent" id="lrSave" style="margin-top:12px">Сохранить маршрутизацию</button>
+        </div>`; })()}
         <div class="glass card mb" data-ag="reports">
           <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
           ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
@@ -10907,6 +10924,13 @@ PAGES.automations = async (root) => {
       pauseOnOffline: $('#cgPause', root).checked,
     };
     try { await saveAuto({ chainGuard: g }); toast('Защита сохранена', 'Правила применятся к цепочкам и дожиму', true); }
+    catch (e) { toast('Не сохранилось', e.message); }
+  });
+  $('#lrSave') && $('#lrSave').addEventListener('click', async () => {
+    const bySource = {};
+    $$('[data-lrsrc]', root).forEach(sel => { if (sel.value) bySource[sel.dataset.lrsrc] = sel.value; });
+    const lr = { default: ($('#lrDefault', root).value || ''), bySource };
+    try { await saveAuto({ leadRouting: lr }); toast('Маршрутизация сохранена', 'Новые лиды пойдут по заданному правилу', true); }
     catch (e) { toast('Не сохранилось', e.message); }
   });
   const repPatch = () => ({
