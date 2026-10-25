@@ -3486,6 +3486,65 @@ async function waGrayApi(db, method, pathx, body) {
   } finally { clearTimeout(to); }
 }
 
+/* ── Owner-пульт в Telegram-боте: запросить НОВЫЙ QR номера прямо из бота (без входа в CRM) ──
+   Клиенты часто просят пересканировать номер (битые Signal-сессии → «Waiting for this message»).
+   Команда в боте (только владелец, по ownerTgChatId):
+     /qr               — список номеров и их статус + подсказка;
+     /qr <номер|метка> — пересобрать сессию (logout→start) и прислать свежий QR картинкой;
+     /qr <...>!        — форс даже если номер «на связи».
+   Регистрируется в tgbridge как инъекция, чтобы мост не тянул waGrayApi (без циклического require). */
+async function handleOwnerWaQr(db, chatId, text) {
+  if (!db.settings || String(db.settings.ownerTgChatId || '') !== String(chatId)) return false;   /* только привязанный владелец */
+  const parts = String(text || '').trim().split(/\s+/);
+  const cmd = (parts[0] || '').toLowerCase();
+  if (cmd !== '/qr' && cmd !== '/rescan' && cmd !== '/пересканировать') return false;
+  const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const arg = parts.slice(1).join(' ').trim();
+  const nums = ((db.settings.waGray || {}).numbers) || [];
+  if (!waWorkerReady(db)) { await tgbridge.notify(db, chatId, '⚠️ WhatsApp-воркер не подключён — QR запросить нечем. Проверьте настройки воркера в CRM.'); return true; }
+  if (!nums.length) { await tgbridge.notify(db, chatId, 'В CRM нет подключённых WhatsApp-номеров. Добавьте номер в разделе «Номера».'); return true; }
+  let live = {}; try { const lr = await waGrayApi(db, 'GET', '/sessions'); live = lr.sessions || lr || {}; } catch (_) {}
+  const stText = (ph) => { const s = (live[waGraySid(ph)] || {}).status; return s === 'connected' ? '🟢 на связи' : s === 'qr' ? '🟡 ждёт QR' : (s ? '🔴 ' + esc(s) : '⚪️ нет сессии'); };
+  /* без аргумента — список номеров и как запросить QR */
+  if (!arg) {
+    const list = nums.map(n => `• <b>${esc(n.label || n.phone)}</b> (${esc(n.phone)}) — ${stText(n.phone)}`).join('\n');
+    const ex = nums[0].label || nums[0].phone;
+    await tgbridge.notify(db, chatId, `📱 <b>WhatsApp-номера</b>\n${list}\n\nЧтобы получить новый QR, отправьте:\n<code>/qr ${esc(ex)}</code>`);
+    return true;
+  }
+  /* резолв номера: по цифрам (точно → подстрока) или по метке */
+  const bang = /!\s*$/.test(arg);
+  const argClean = arg.replace(/!\s*$/, '').trim();
+  const q = argClean.replace(/[^0-9]/g, '');
+  const rec = (q && nums.find(n => n.phone === q)) || (q.length >= 4 && nums.find(n => n.phone.includes(q))) || nums.find(n => (n.label || '').toLowerCase().includes(argClean.toLowerCase()));
+  if (!rec) { await tgbridge.notify(db, chatId, `❌ Номер «${esc(argClean)}» не найден. Отправьте /qr — покажу список.`); return true; }
+  const name = rec.label || rec.phone;
+  if ((live[waGraySid(rec.phone)] || {}).status === 'connected' && !bang) {
+    await tgbridge.notify(db, chatId, `🟢 «${esc(name)}» уже на связи — QR не нужен. Чтобы пересобрать сессию принудительно: <code>/qr ${esc(name)} !</code>`);
+    return true;
+  }
+  await tgbridge.notify(db, chatId, `♻️ Пересобираю сессию «${esc(name)}»… свежий QR пришлю сюда (10–30 сек).`);
+  try {
+    await waGrayApi(db, 'POST', '/sessions/' + waGraySid(rec.phone) + '/logout').catch(() => {});   /* сброс старой (возможно битой) сессии */
+    await waGrayApi(db, 'POST', '/sessions/' + waGraySid(rec.phone) + '/start');                     /* свежая сессия → новый QR */
+  } catch (e) { await tgbridge.notify(db, chatId, `❌ Не удалось пересобрать сессию: ${esc(e.message)}`); return true; }
+  /* ждём QR от воркера (как CRM: опрос раз в ~1.5с, до ~30с) */
+  let qr = '', connected = false;
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    let s; try { s = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(rec.phone)); } catch (_) { continue; }
+    const ss = (s && s.session) || {};
+    if (ss.status === 'connected') { connected = true; break; }
+    if (ss.status === 'qr' && ss.qr) { qr = ss.qr; break; }
+  }
+  if (connected) { await tgbridge.notify(db, chatId, `🟢 «${esc(name)}» подключился без QR — всё уже работает.`); return true; }
+  if (!qr) { await tgbridge.notify(db, chatId, `⌛️ QR пока не пришёл. Попробуйте ещё раз: <code>/qr ${esc(name)}</code> — или откройте CRM → «Номера».`); return true; }
+  try { await tgbridge.sendDataUrlPhoto(db, chatId, qr, `📷 «${name}»: отсканируйте в WhatsApp → Настройки → Связанные устройства → Привязать устройство.`); }
+  catch (e) { await tgbridge.notify(db, chatId, `QR готов, но не смог отправить картинкой (${esc(e.message)}). Откройте CRM → «Номера» → «Пересканировать».`); }
+  return true;
+}
+try { tgbridge.setWaQr(handleOwnerWaQr); } catch (_) {}
+
 /* ── Серый TELEGRAM (MTProto user-accounts) — воркер lumen-tg-worker, аналог WA-воркера ── */
 function tgWorkerBase(db) { const r = store.getRegistry(); return normWorkerUrl(process.env.LUMEN_TG_WORKER_URL || (r.platformTgWorker && r.platformTgWorker.url) || (db.settings.tgGray && db.settings.tgGray.url) || ''); }
 function tgWorkerToken(db) { const r = store.getRegistry(); return process.env.LUMEN_TG_WORKER_TOKEN || (r.platformTgWorker && r.platformTgWorker.token) || (db.settings.tgGray && db.settings.tgGray.token) || ''; }

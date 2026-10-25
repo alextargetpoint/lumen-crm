@@ -66,6 +66,12 @@ function removeBrokerChat(b, chatId) {
   b.tgChatId = ids[0] || null;
 }
 
+/* ---------- owner-пульт в боте (инъекция из index.js) ----------
+   index.js регистрирует обработчик owner-команд (напр. /qr — новый QR номера),
+   чтобы tgbridge не тянул waGrayApi/воркер (избежать циклического require). */
+let waQr = null;
+function setWaQr(fn) { waQr = fn; }
+
 function rt(db) {
   if (!db.tgBridge) db.tgBridge = {};
   if (!db.tgBridge.replyMap) db.tgBridge.replyMap = {};
@@ -203,6 +209,14 @@ async function handleUpdate(db, update) {
     return { bound: r.ok };
   }
 
+  /* owner-пульт: команды управления номерами с телефона (напр. /qr — новый QR).
+     Владелец привязан по ownerTgChatId (НЕ в db.brokers), поэтому перехватываем ДО проверки брокера,
+     иначе владельцу на любую команду отвечало бы «Вы не привязаны к CRM». */
+  if (waQr && text.startsWith('/') && String((db.settings || {}).ownerTgChatId || '') === chatId) {
+    try { if (await waQr(db, chatId, text)) return { ownerCmd: true }; }
+    catch (e) { console.error('[tgbridge] waQr', e.message); }
+  }
+
   const broker = db.brokers.find(b => brokerChatIds(b).includes(chatId));
   if (!broker) {
     await safeApi(db, 'sendMessage', { chat_id: chatId, text: 'Вы не привязаны к CRM. Отправьте /start <код> (код в CRM → Подключения → Мост Telegram).' });
@@ -325,6 +339,19 @@ async function forwardHandover(db, lead) {
 
 async function safeApi(db, method, body) { try { return await api(db, method, body); } catch (e) { console.error('[tgbridge]', method, e.message); return null; } }
 
+/* отправить картинку из data:URL (напр. QR-код) в чат: декодируем base64 → сохраняем в media → sendPhoto по URL.
+   Telegram сам скачает картинку по публичному /assets/... (как и исходящие медиа брокеру). */
+async function sendDataUrlPhoto(db, chatId, dataUrl, caption) {
+  const m = /^data:(image\/[a-z0-9.+-]+)?;base64,(.+)$/i.exec(String(dataUrl || ''));
+  if (!m) throw new Error('не data:URL');
+  const buf = Buffer.from(m[2], 'base64');
+  const ext = ((m[1] || 'image/png').split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+  const saved = saveMedia(buf, ext);
+  const body = { chat_id: chatId, photo: absUrl(saved.url) };
+  if (caption) body.caption = String(caption).slice(0, 1024);
+  return api(db, 'sendPhoto', body);
+}
+
 /* поставить вебхук у Telegram на наш /tg/webhook с секрет-токеном */
 async function setupWebhook(db, baseUrl) {
   /* ⚠️ В CENTRAL-режиме у всех агентств ОДИН бот (token(db) === platformToken()). Ставить его вебхук
@@ -385,4 +412,5 @@ module.exports = {
   setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl, notify,
   central, platformSecret, setupPlatformWebhook, platformBotUsername, webhookInfo,
   brokerChatIds, addBrokerChat, removeBrokerChat,
+  setWaQr, sendDataUrlPhoto,
 };
