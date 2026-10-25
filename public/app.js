@@ -5301,7 +5301,7 @@ PAGES.funnel = async (root) => {
               /* строка ДЕЙСТВИЯ — только когда реально нужно действовать (задача брокера / нужен человек). «ИИ коснётся» сюда НЕ выносим — это фон */
               let act = '';
               if (needHuman) act = `<div class="lc-act over">${ic(I.user, 2)}<span>Нужен человек</span></div>`;
-              else { const na = l.nextAction; if (na && na.text) { const over = na.at && na.at < Date.now(); const t = esc(na.text.replace(/^Передан вам\s*[—–-]\s*/i, '').slice(0, 40)); const when = na.at ? (over ? ' · просрочено ' + ago(na.at).replace(' назад', '') : ' · ' + ago(na.at).replace(' назад', '')) : ''; act = `<div class="lc-act ${over ? 'over' : ''}">${over ? ic(I.clock) : ''}<span>${t}${when}</span></div>`; } }
+              else { const na = l.nextAction; if (na && na.text) { const over = na.at && na.at < Date.now(); let t0 = na.text.replace(/^Передан вам\s*[—–-]\s*/i, '').trim(); t0 = t0.charAt(0).toUpperCase() + t0.slice(1); const t = esc(t0.slice(0, 40)); const when = na.at ? (over ? ' · просрочено ' + ago(na.at).replace(' назад', '') : ' · ' + ago(na.at).replace(' назад', '')) : ''; act = `<div class="lc-act ${over ? 'over' : ''}">${over ? ic(I.clock) : ''}<span>${t}${when}</span></div>`; } }
               /* ОДИН ответственный (аватар+имя), ИИ — ненавязчивым значком, не второй плашкой */
               const first = l.brokerName ? l.brokerName.split(' ')[0] : '';
               const aiDot = aiOn ? `<span class="lc-ai" title="ИИ ведёт диалог сам">${ic(I.spark)}</span>` : '';
