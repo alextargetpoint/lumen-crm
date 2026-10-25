@@ -10787,6 +10787,7 @@ PAGES.automations = async (root) => {
           ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
           ${swRow('Еженедельная (пн) и ежемесячная (1-е)', 'Расширенные сводки по периодам', sw('rep_weekly', (s.reports || {}).weekly) + sw('rep_monthly', (s.reports || {}).monthly))}
           ${swRow('Мгновенные уведомления', 'Смотрит подборку · квалифицирован · нужен человек · сделка', sw('rep_instant', Object.values((s.reports || {}).instant || {}).some(Boolean)))}
+          ${swRow('Авто-QR при отвале номера', 'Номер WhatsApp разлогинился → сами пересобираем сессию и присылаем свежий QR картинкой в Telegram (вам и брокеру-владельцу номера). Не нужно бежать к ПК — сканируете с телефона', sw('autoQrOnDrop', (s.automations || {}).autoQrOnDrop !== false))}
           <div style="display:flex;gap:10px;align-items:flex-end;margin-top:8px">
             <div class="form-row" style="flex:1;margin:0"><label>Telegram chat_id владельца (бот: токен в каскаде ниже; chat_id — напишите боту и возьмите из @userinfobot)</label>
               <input id="repChat" value="${esc((s.reports || {}).tgChatId || '')}" placeholder="например 123456789"></div>
