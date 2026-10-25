@@ -5304,8 +5304,8 @@ PAGES.funnel = async (root) => {
               else { const na = l.nextAction; if (na && na.text) { const over = na.at && na.at < Date.now(); let t0 = na.text.replace(/^Передан вам\s*[—–-]\s*/i, '').trim(); t0 = t0.charAt(0).toUpperCase() + t0.slice(1); const t = esc(t0.slice(0, 40)); const when = na.at ? (over ? ' · просрочено ' + ago(na.at).replace(' назад', '') : ' · ' + ago(na.at).replace(' назад', '')) : ''; act = `<div class="lc-act ${over ? 'over' : ''}">${over ? ic(I.clock) : ''}<span>${t}${when}</span></div>`; } }
               /* ОДИН ответственный (аватар+имя), ИИ — ненавязчивым значком, не второй плашкой */
               const first = l.brokerName ? l.brokerName.split(' ')[0] : '';
-              const aiDot = aiOn ? `<span class="lc-ai" title="ИИ ведёт диалог сам">${ic(I.spark)}</span>` : '';
-              const resp = first ? `<span class="lc-ava">${esc((first[0] || '?').toUpperCase())}</span><span class="lc-rnm">${esc(first)}</span>${aiDot}` : (aiOn ? `<span class="lc-ai">${ic(I.spark)}</span><span class="lc-rnm muted">ИИ ведёт</span>` : `<span class="lc-rnm muted">не назначен</span>`);
+              const aiDot = aiOn ? `<span class="lc-aidot" title="ИИ ведёт диалог сам">${ic(I.spark)}</span>` : '';
+              const resp = first ? `<span class="lc-ava">${esc((first[0] || '?').toUpperCase())}</span><span class="lc-rnm">${esc(first)}</span>${aiDot}` : (aiOn ? `<span class="lc-aidot">${ic(I.spark)}</span><span class="lc-rnm muted">ИИ ведёт</span>` : `<span class="lc-rnm muted">не назначен</span>`);
               const flag = l.phoneInvalid ? `<span class="lc-flag" title="Невалидный номер">${ic(I.flag)}</span>` : '';
               return `<div class="lead-card glass ${sel} ${hot}" data-id="${l.id}" data-stage="${l.stage}">
                 <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
