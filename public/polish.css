@@ -819,7 +819,7 @@ input[type=number] { -moz-appearance: textfield; }
 .lead-card .lc-aidot svg{width:13px;height:13px}
 /* чекбокс выделения не должен налезать на имя — освобождаем место при наведении/выделении (класс .top переименован в .lc-name-row) */
 .lead-card .lc-name-row{transition:padding-left .22s var(--ease-spring,ease)}
-.lead-card:hover .lc-name-row,.lead-card.sel .lc-name-row{padding-left:24px}
+.lead-card:hover .lc-name-row,.lead-card.sel .lc-name-row{padding-left:24px !important}
 .lead-card .lc-tm{flex:0 0 auto;margin-left:auto;font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .lead-card .lc-reveal{display:flex;align-items:center;gap:8px;max-height:0;opacity:0;overflow:hidden;margin-top:0;font-size:11px;color:var(--ink-3);transition:max-height .2s ease,opacity .2s ease,margin-top .2s ease}
 .lead-card .lc-reveal .tbl-cdot{width:16px;height:16px;font-size:9px;border-radius:5px}
