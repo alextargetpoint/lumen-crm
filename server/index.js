@@ -1028,17 +1028,13 @@ function adBudgetRecommendations(db, opts = {}) {
 
 /* профиль «идеального лида» (ICP): по каждому измерению — что доминирует среди КВАЛ-лидов +
    qual-rate сегмента → подсказки по таргету. На high-water-квалах (качество трафика). */
-function leadICP(db) {
-  const leads = (db.leads || []).filter(l => !l._demo);
-  const total = leads.length;
-  if (total < 8) return { ready: false, reason: `Мало данных (${total} лид.) — профиль станет точным от ~15–20 лидов.` };
-  const quals = leads.filter(l => everReachedQual(db, l, 'peak'));
-  const qN = quals.length;
-  if (qN < 3) return { ready: false, reason: `Пока ${qN} квал. лид(ов) — профиль появится от 3–5.` };
+/* измерения профиля лида — общие для leadICP (построение профиля) и icpScore (скоринг нового лида).
+   Каждое возвращает нормализованное значение или null (неизвестно по этому лиду). */
+function icpDims(db) {
   const gn = g => (db.settings.geoNames && db.settings.geoNames[g]) || g || '—';
   const srcName = { meta_form: 'Meta лид-форма', ctwa: 'CTWA', wa_inbound: 'Входящий WhatsApp', ig_direct: 'Instagram', site: 'Сайт', manual: 'Вручную', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
   const band = n => { if (!n) return null; if (n < 100000) return 'до $100k'; if (n < 200000) return '$100–200k'; if (n < 350000) return '$200–350k'; if (n < 600000) return '$350–600k'; return '$600k+'; };
-  const dims = {
+  return {
     'Источник': l => srcName[l.source] || l.source || null,
     'Направление': l => l.geo ? gn(l.geo) : null,
     'Язык': l => (l.lang || '').toUpperCase() || null,
@@ -1046,6 +1042,15 @@ function leadICP(db) {
     'Бюджет': l => band((l.quals && l.quals.budget && l.quals.budget.num) || 0),
     'Тип объекта': l => (l.quals && l.quals.type && l.quals.type.value) || l.type || null,
   };
+}
+function leadICP(db) {
+  const leads = (db.leads || []).filter(l => !l._demo);
+  const total = leads.length;
+  if (total < 8) return { ready: false, reason: `Мало данных (${total} лид.) — профиль станет точным от ~15–20 лидов.` };
+  const quals = leads.filter(l => everReachedQual(db, l, 'peak'));
+  const qN = quals.length;
+  if (qN < 3) return { ready: false, reason: `Пока ${qN} квал. лид(ов) — профиль появится от 3–5.` };
+  const dims = icpDims(db);
   const avgRate = Math.round(qN / total * 100);
   const profile = [], hints = [];
   for (const [dim, fn] of Object.entries(dims)) {
@@ -1060,6 +1065,37 @@ function leadICP(db) {
   }
   hints.sort((a, b) => b.rate - a.rate);
   return { ready: true, total, quals: qN, qualRate: avgRate, profile, hints: hints.slice(0, 5) };
+}
+/* кэш модели ICP на уровне db (per-tenant объект) — чтобы не пересчитывать профиль на каждый лид
+   при сборке списка. Инвалидируется по числу лидов + раз в 60с. */
+const _icpModelCache = new WeakMap();
+function leadICPModel(db) {
+  const sig = (db.leads || []).length;
+  const c = _icpModelCache.get(db);
+  if (c && c.sig === sig && (Date.now() - c.at) < 60000) return c.model;
+  const icp = leadICP(db);
+  const model = icp.ready ? { ready: true, profile: icp.profile, qualRate: icp.qualRate } : { ready: false };
+  _icpModelCache.set(db, { sig, at: Date.now(), model });
+  return model;
+}
+/* насколько лид похож на профиль квал/закрытых лидов (0–100). Считаем ТОЛЬКО по измерениям,
+   известным у лида (источник/гео/язык часто известны уже на интейке); вес измерения = его qualRate
+   (где совпадение с идеалом сильнее предсказывает квал). Нужно ≥2 известных измерения, иначе null. */
+function icpScore(db, lead, model) {
+  model = model || leadICPModel(db);
+  if (!model || !model.ready || !lead) return null;
+  const dims = icpDims(db);
+  let got = 0, tot = 0, known = 0; const matched = [];
+  for (const p of model.profile) {
+    const fn = dims[p.dim]; if (!fn) continue;
+    const v = fn(lead); if (v == null || v === '') continue;   /* неизвестно у лида — не штрафуем */
+    known++;
+    const w = (p.qualRate != null ? p.qualRate : p.share) || 1;
+    tot += w;
+    if (String(v) === String(p.value)) { got += w; matched.push(p.dim); }
+  }
+  if (known < 2 || !tot) return null;
+  return { score: Math.round(got / tot * 100), matched, known };
 }
 
 /* Раздать креатив/тезисы объявления на ВСЕ объявления с тем же именем (по всем адсетам/кампаниям).
@@ -1836,6 +1872,7 @@ function leadView(db, l) {
     brokerName: (db.brokers.find(b => b.id === l.broker) || {}).name || null,
     geoName: db.settings.geoNames[l.geo] || l.geo,
     phoneInvalid: l.phone ? !validE164(l.phone) : false,   /* #578/#585: кривой caller-ID (напр. +69…, слипшиеся номера) — звук режут операторы */
+    icpMatch: (() => { try { return icpScore(db, l); } catch (_) { return null; } })(),   /* похож на профиль лучших клиентов → приоритет на звонок */
     axesFilled,
     wakeScore: l.stage === 'sleeping' ? engine.wakeScore(db, l) : null,
     lastText,

@@ -608,6 +608,8 @@ function rebuildStages() {
 const stageName = (id) => ((STAGES._all || STAGES).find(s => s.id === id) || {}).name || id;
 /* #578/#585: бейдж невалидного номера (кривой caller-ID, напр. +69…) — операторы режут звук/доставку */
 function phInvBadge(l) { return (l && l.phoneInvalid) ? ` <span class="ph-inv" title="Номер невалиден по E.164 (неверная длина или несуществующий код страны). Операторы могут резать звук при звонке и доставку сообщений. Проверьте источник лида или пометьте как «Спам / неверный номер».">${ic(I.flag)}невалидный №</span>` : ''; }
+/* бейдж «профильный лид»: совпадение с профилем квал/закрытых клиентов (ICP). Не показываем на закрытых. */
+function icpBadge(l) { const m = l && l.icpMatch; return (m && m.score >= 60 && !['deal', 'lost'].includes(l.stage)) ? ` <span class="icp-b" title="Совпадение с профилем ваших квалифицированных и закрытых лидов${m.matched && m.matched.length ? ': ' + m.matched.join(', ') : ''}. Такие лиды чаще доходят до квала — звоните в первую очередь.">${ic(I.star)}профиль ${m.score}%</span>` : ''; }
 
 /* ---------- api ---------- */
 async function apiReq(method, p, b) {
@@ -5249,7 +5251,7 @@ PAGES.funnel = async (root) => {
           <div class="kb-cards">
             ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""} ${l.hint && l.hint.kind === 'act' ? 'hot' : ''}" data-id="${l.id}" data-stage="${l.stage}">
               <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
-              <div class="top"><div class="nm">${esc(l.name)}${(l.unread || 0) > 0 ? ` <span class="lc-unread" title="${l.unread} новых сообщений" style="background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle">${l.unread > 9 ? '9+' : l.unread}</span>` : ''}</div>${scoreRing(l.score)}</div>
+              <div class="top"><div class="nm">${esc(l.name)}${(l.unread || 0) > 0 ? ` <span class="lc-unread" title="${l.unread} новых сообщений" style="background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle">${l.unread > 9 ? '9+' : l.unread}</span>` : ''}${icpBadge(l)}</div>${scoreRing(l.score)}</div>
               <div class="geo-row"><span class="geo">${l.geoName} · ${esc(l.phone)}${phInvBadge(l)}</span>${tblCh(l)}</div>
               <div class="lc-mid"><div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>${(l.quals.budget || {}).value ? `<span class="lc-bud">${esc((l.quals.budget || {}).value)}</span>` : ''}${l.source && srcName[l.source] ? `<span class="lc-src">${esc(srcName[l.source])}</span>` : ''}</div>
               ${(() => { const na = l.nextAction, nt = l.nextTouch; if (na && na.text) { const over = na.at && na.at < Date.now(); return `<div class="lc-next ${over ? 'over' : ''}">${over ? ic(I.clock) : ''}${esc(na.text.slice(0, 44))}${na.at ? ` · ${over ? 'просрочено' : ago(na.at)}` : ''}</div>`; } if (nt && nt.at) { return `<div class="lc-next ai">${ic(I.spark)}${nt.kind === 'reengage' ? 'ИИ дожмёт' : 'ИИ коснётся'} · ${nt.at <= Date.now() ? 'скоро' : ago(nt.at)}</div>`; } return ''; })()}
@@ -5285,7 +5287,7 @@ PAGES.funnel = async (root) => {
           return leads.slice().sort((a, b) => { const ka = key(a), kb = key(b); const c = typeof ka === 'number' ? ka - kb : String(ka).localeCompare(String(kb)); return c * dir; }); })()
         .map(l => `<tr data-row="${l.id}" class="${selSet("funnel").has(l.id) ? "sel" : ""}">
           <td class="tbl-cb"><span class="lc-check tbl" data-check title="Выделить">${ic(I.check, 2)}</span></td>
-          <td><div class="tbl-lead">${avaHtml(l, 30)}<div class="tbl-lead-b"><b>${esc(l.name)}</b><span class="tbl-lead-ph">${esc(l.phone)}${phInvBadge(l)}</span></div></div></td>
+          <td><div class="tbl-lead">${avaHtml(l, 30)}<div class="tbl-lead-b"><b>${esc(l.name)}${icpBadge(l)}</b><span class="tbl-lead-ph">${esc(l.phone)}${phInvBadge(l)}</span></div></div></td>
           <td>${tblCh(l)}</td>
           <td><span class="tbl-stage ${stageCls(l.stage)}">${stageName(l.stage)}</span></td>
           <td class="tbl-geo">${esc(l.geoName || '—')}</td>
@@ -6507,6 +6509,7 @@ async function openLeadModal(id) {
       <span class="lc-deal-hint">${l.dealValue ? ic(I.check) + ' учтётся в ROI/ROAS рекламы' : 'Заполните на сделке — посчитаем CAC и ROAS рекламы'}</span>
     </div>` : ''}
     ${l.phoneInvalid ? `<div class="lc-badphone"><span class="lc-badphone-tx">${ic(I.flag)}Номер <b>${esc(l.phone)}</b> невалиден (не E.164) — операторы режут звук и доставку.</span><button class="btn btn-sm" id="mSpam">В спам / неверный номер</button></div>` : ''}
+    ${l.icpMatch && l.icpMatch.score >= 60 && !['deal', 'lost'].includes(l.stage) ? `<div class="lc-icp"><span class="lc-icp-tx">${ic(I.star)}<b>Профильный лид · ${l.icpMatch.score}%</b> совпадения с вашими квал/закрытыми клиентами${l.icpMatch.matched && l.icpMatch.matched.length ? ` (${l.icpMatch.matched.join(', ')})` : ''}. Такие чаще доходят до сделки — приоритет на звонок.</span></div>` : ''}
     <div class="lp-sec">Следующий шаг</div>
     <div class="lc-note-row">
       <input id="lcNaText" placeholder="например: дожать по подборке" value="${esc((l.nextAction || {}).text || '')}">
@@ -7411,7 +7414,7 @@ async function renderChat(id, rebuild) {
     <div class="chat-head">
       <button class="chat-back" id="chatBack" title="К списку диалогов">${ic(I.chev)}</button>
       ${avaHtml(l)}
-      <div class="chat-head-id" id="chatHeadId" title="Открыть карточку лида"><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)}${phInvBadge(l)} · ${l.geoName} ${clientTzBadge(l)}</div></div>
+      <div class="chat-head-id" id="chatHeadId" title="Открыть карточку лида"><div class="nm">${esc(l.name)}${icpBadge(l)}</div><div class="ph">${esc(l.phone)}${phInvBadge(l)} · ${l.geoName} ${clientTzBadge(l)}</div></div>
       <div class="chat-head-actions">
         <div class="chat-head-chips">
           <span class="chn-chip" style="--chn:${chnMeta[1]}"><i></i>${chnMeta[0]}</span>
