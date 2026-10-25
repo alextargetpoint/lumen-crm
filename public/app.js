@@ -3364,7 +3364,7 @@ async function ideaSwipe(kind, ctx, repaint) {
 /* гео → смещение UTC (для мировых часов и намёков по времени клиента) */
 const GEO_TZ = { dubai: 4, bali: 8, phuket: 7, spain: 1, france: 1, moscow: 3, msk: 3, istanbul: 3, turkey: 3, cyprus: 2, georgia: 4, tbilisi: 4, montenegro: 1, thailand: 7, indonesia: 8, uae: 4, spain_bcn: 1, latam: -3, portugal: 0, greece: 2, egypt: 2, bangkok: 7 };
 /* ⭐ богатый дефолт-обзор: 13 виджетов (было 8) — пользователь видит всю систему сразу, остальные (нишевые) в «Настроить» */
-const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbundles', 'adbudget', 'leadsources', 'hotleads', 'goal', 'aivs', 'contenthub', 'activity', 'meetings', 'demos', 'brokers', 'numbers', 'chains', 'leaders'];
+const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbundles', 'adbudget', 'leadsources', 'hotleads', 'profileleads', 'goal', 'aivs', 'contenthub', 'activity', 'meetings', 'demos', 'brokers', 'numbers', 'chains', 'leaders'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
@@ -3378,17 +3378,17 @@ const OV_VARIANT = {
   kpi: 'cv-borderless', attention: 'cv-borderless',
   funnel: 'cv-analytics', geo: 'cv-analytics', spark: 'cv-analytics',
   tasks: 'cv-standard', meetings: 'cv-standard', activity: 'cv-standard', recent: 'cv-standard', brokers: 'cv-standard', casebase: 'cv-standard',
-  hotleads: 'cv-urgent', goal: 'cv-goal', leaders: 'cv-editorial',
+  hotleads: 'cv-urgent', profileleads: 'cv-urgent', goal: 'cv-goal', leaders: 'cv-editorial',
   numbers: 'cv-system', aivs: 'cv-ai', ideas: 'cv-ai', chains: 'cv-tinted',
   onboarding: 'cv-setup', worldclock: 'cv-inset',
 };
 /* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
-const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, demos: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5, teamperf: 6, trafficperf: 6, adbudget: 6, execsignals: 12 };
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, profileleads: 6, goal: 5, meetings: 6, demos: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5, teamperf: 6, trafficperf: 6, adbudget: 6, execsignals: 12 };
 /* категории для библиотеки виджетов */
 const OV_CAT = [
   ['Руководителю · штаб', ['execsignals', 'teamperf', 'trafficperf']],
   ['Конверсия и качество', ['conversionrail', 'winrate', 'stagemap', 'qualaxes', 'scoredist', 'ainow', 'freshtoday', 'silent']],
-  ['Продажи и лиды', ['kpi', 'funnel', 'hotleads', 'recent', 'leadsources', 'chains', 'reengage', 'dealsmonth']],
+  ['Продажи и лиды', ['kpi', 'funnel', 'hotleads', 'profileleads', 'recent', 'leadsources', 'chains', 'reengage', 'dealsmonth']],
   ['Аналитика и реклама', ['clientreport', 'adbundles', 'aivs', 'numbers']],
   ['Задачи и день', ['tasks', 'attention', 'goal', 'meetings']],
   ['Команда', ['brokers', 'leaders']],
@@ -3955,6 +3955,18 @@ const OV_W = {
       </div>
       ${projected != null ? `<div class="ov-goal2-note ${projected >= target ? 'ok' : 'warn'}">${ic(projected >= target ? I.check : I.clock, 2)}<span>При текущем темпе: ~${projected}/${target}${projected >= target ? ' — идём в план' : ' — темп ниже цели'}</span></div>` : ''}
     </div>`;
+  } },
+  profileleads: { name: 'Профильные лиды', icon: () => I.star, full: false, render: (c) => {
+    const prof = c.leads.filter(l => !['lost', 'deal'].includes(l.stage) && l.icpMatch && l.icpMatch.score >= 60)
+      .sort((a, b) => (b.icpMatch.score || 0) - (a.icpMatch.score || 0)).slice(0, 5);
+    const ini = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const hd = `<div class="ov2-card-hd">${ic(I.star)}Профильные лиды<span>похожи на ваших лучших</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>`;
+    if (!prof.length) return hd + ovEmpty(I.star, 'Пока нет профильных лидов', 'Лиды, похожие на ваших квал/закрытых клиентов, поднимутся сюда — звоните им первыми');
+    return hd + `<div class="ov-prof">${prof.map(l => { const m = l.icpMatch; return `<div class="ov-prof-c" data-ovlead="${l.id}">
+      <span class="ov-prof-ava">${esc(ini(l.name))}</span>
+      <div class="ov-prof-id"><span class="ov-prof-nm">${esc((l.name || '—').split(' ')[0])}</span><span class="ov-prof-meta">${esc(l.geoName || '—')} · ${esc(ovStageName(l.stage))}${m.matched && m.matched.length ? ' · ' + esc(m.matched.slice(0, 2).join(', ')) : ''}</span></div>
+      <span class="ov-prof-score">${m.score}%</span>
+    </div>`; }).join('')}</div>`;
   } },
   hotleads: { name: 'Горячие лиды', icon: () => I.flame, full: false, render: (c) => {
     const hot = c.leads.filter(l => !['lost', 'deal'].includes(l.stage)).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 4);
@@ -5271,12 +5283,13 @@ PAGES.funnel = async (root) => {
     <div class="glass card lead-tbl-card">
       <div class="lead-tbl-wrap"><table class="tbl lead-tbl lead-tbl-x"><thead><tr>
         <th class="tbl-cb"><span class="lc-check tbl" id="tblSelAll" title="Выделить всё">${ic(I.check, 2)}</span></th>
-        ${[['name', 'Лид'], ['ch', 'Каналы', 1], ['stage', 'Стадия'], ['geo', 'Гео'], ['budget', 'Бюджет'], ['axes', 'Квал'], ['source', 'Источник'], ['broker', 'Брокер'], ['last', 'Активность'], ['next', 'Следующий шаг']].map(([k, n, noSort]) => noSort ? `<th>${n}</th>` : `<th data-sort="${k}" class="tbl-srt ${F.funnelSort === k ? 'act' : ''}">${n}<span class="tbl-arr">${F.funnelSort === k ? (F.funnelSortDir === 'asc' ? '↑' : '↓') : ''}</span></th>`).join('')}
+        ${[['name', 'Лид'], ['ch', 'Каналы', 1], ['stage', 'Стадия'], ['geo', 'Гео'], ['budget', 'Бюджет'], ['axes', 'Квал'], ['icp', 'Профиль'], ['source', 'Источник'], ['broker', 'Брокер'], ['last', 'Активность'], ['next', 'Следующий шаг']].map(([k, n, noSort]) => noSort ? `<th>${n}</th>` : `<th data-sort="${k}" class="tbl-srt ${F.funnelSort === k ? 'act' : ''}">${n}<span class="tbl-arr">${F.funnelSort === k ? (F.funnelSortDir === 'asc' ? '↑' : '↓') : ''}</span></th>`).join('')}
         <th class="tbl-acth"></th>
       </tr></thead><tbody>
         ${(() => { const dir = F.funnelSortDir === 'asc' ? -1 : 1; const key = (l) => { const k = F.funnelSort;
             if (k === 'budget') return (l.quals.budget || {}).num || 0;
             if (k === 'axes') return l.axesFilled;
+            if (k === 'icp') return (l.icpMatch && l.icpMatch.score != null) ? l.icpMatch.score : -1;
             if (k === 'stage') return STAGES.findIndex(x => x.id === l.stage);
             if (k === 'last') return l.lastMsgAt || 0;
             if (k === 'broker') return (l.brokerName || 'я').toLowerCase();
@@ -5293,6 +5306,7 @@ PAGES.funnel = async (root) => {
           <td class="tbl-geo">${esc(l.geoName || '—')}</td>
           <td class="tbl-bud">${(l.quals.budget || {}).value ? '<b>' + esc((l.quals.budget || {}).value) + '</b>' : '<span class="muted">—</span>'}</td>
           <td><div class="tbl-qual"><div class="axes" style="width:48px;margin:0">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div><span class="tbl-qn">${l.axesFilled}/4</span></div></td>
+          <td class="tbl-icp">${(l.icpMatch && l.icpMatch.score != null && !['deal', 'lost'].includes(l.stage)) ? `<span class="tbl-icpv ${l.icpMatch.score >= 60 ? 'hi' : l.icpMatch.score >= 40 ? 'mid' : ''}" title="Совпадение с профилем квал/закрытых${l.icpMatch.matched && l.icpMatch.matched.length ? ': ' + l.icpMatch.matched.join(', ') : ''}">${l.icpMatch.score}%</span>` : '<span class="muted">—</span>'}</td>
           <td>${l.source ? `<span class="tbl-src">${esc(srcName[l.source] || l.source)}</span>` : '<span class="muted">—</span>'}</td>
           <td class="tbl-brk">${l.brokerName ? esc(l.brokerName.split(' ')[0]) : '<span class="muted">—</span>'}</td>
           <td class="tbl-act">${tblAct(l)}</td>
