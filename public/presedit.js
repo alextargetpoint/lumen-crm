@@ -768,10 +768,90 @@
     // actually wrapPage returns full .lp-page; set stage sizing on outer
     stage.innerHTML = pages.map(function (html) { return html; }).join('');
     fitCanvas();
+    wireCanvasEditingOnce(); markCanvasEditable();
   }
   function wrapPage(html, f) { return html; }
   function withMirror(s) { if (s.styleOverrides && s.styleOverrides.mirror) { /* mirror handled via class later; pass through */ } return s; }
   function liveCanvas() { mountCanvas(); }
+
+  /* ===== on-canvas редактирование (ТЗ: «редактируешь то, на что смотришь») =====
+     Слой НАД рендером шаблона (общий рендерер НЕ трогаем): клик по тексту на холсте → выбор
+     + фокус поля в правой панели; двойной клик → inline-правка (contenteditable) → запись через
+     setOverride (общий undo/autosave). Ключ поля определяем по классу; inline разрешаем ТОЛЬКО
+     если в инспекторе есть такое же поле data-f=key → write-back эквивалентен правке в панели. */
+  function ceKeyFor(el) {
+    if (!el || !el.matches) return null;
+    return el.matches('.lp-h1, .lp-h2') ? 'title'
+      : el.matches('.lp-hero-sub, .lp-sub') ? 'subtitle'
+      : el.matches('.lp-body') ? 'body'
+      : el.matches('.lp-eyebrow') ? 'eyebrow' : null;
+  }
+  function ceEditable(el, key) {
+    if (!key || key === 'eyebrow') return false;                                  // eyebrow — массив, только выбор
+    if (!document.querySelector('.pe-insp [data-f="' + key + '"]')) return false; // нет такого поля в панели → не наш кейс
+    if (el.querySelector('span, img, svg, b, em')) return false;                  // составной узел (счётчик стр. и т.п.) инлайн не правим
+    return true;
+  }
+  function markCanvasEditable() {
+    var stage = document.getElementById('peStage'); if (!stage) return;
+    stage.querySelectorAll('.lp-h1, .lp-h2, .lp-hero-sub, .lp-sub, .lp-body, .lp-eyebrow').forEach(function (el) {
+      var key = ceKeyFor(el); if (!key) return;
+      el.classList.add('pe-ced'); el.setAttribute('data-pe-key', key);
+      if (ceEditable(el, key)) el.classList.add('pe-ced-text');
+    });
+    if (S._ceSelKey) { var sel = stage.querySelector('.pe-ced[data-pe-key="' + S._ceSelKey + '"]'); if (sel) sel.classList.add('pe-sel'); }
+  }
+  function ceOpenContentTab() {
+    if (S.tab === 'content') return;
+    S.tab = 'content';
+    document.querySelectorAll('.pe-insp-tabs [data-tab]').forEach(function (t) { t.classList.toggle('on', t.getAttribute('data-tab') === 'content'); });
+    var ib = document.getElementById('peInsp'); if (ib) { ib.innerHTML = inspBody(); wireInsp(); mountVarMinis(); }
+  }
+  function ceFocusField(key) {
+    ceOpenContentTab();
+    var f = document.querySelector('.pe-insp [data-f="' + key + '"]');
+    if (f) { try { f.focus({ preventScroll: true }); } catch (_) { f.focus(); } if (f.scrollIntoView) f.scrollIntoView({ block: 'center', behavior: 'smooth' }); f.classList.add('pe-f-flash'); setTimeout(function () { f.classList.remove('pe-f-flash'); }, 1000); }
+  }
+  function ceSelect(el) {
+    var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
+    el.classList.add('pe-sel'); S._ceSelKey = el.getAttribute('data-pe-key');
+    ceFocusField(S._ceSelKey);
+  }
+  function ceBeginEdit(el, key) {
+    if (el.getAttribute('contenteditable') === 'true') return;
+    var before = (el.innerText || '').trim();
+    el.setAttribute('contenteditable', 'true'); el.classList.add('pe-editing'); el.spellcheck = false;
+    el.focus();
+    try { var rg = document.createRange(); rg.selectNodeContents(el); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } catch (_) {}
+    function finish(commit) {
+      el.removeEventListener('blur', onBlur); el.removeEventListener('keydown', onKd);
+      el.removeAttribute('contenteditable'); el.classList.remove('pe-editing');
+      var after = (el.innerText || '').replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n').trim();
+      if (commit && after !== before) { mutate(function () { setOverride(curSection(), key, after); }); }
+      else { mountCanvas(); }   /* откат визуала к данным */
+    }
+    function onBlur() { finish(true); }
+    function onKd(e) {
+      e.stopPropagation();   /* не отдаём Cmd+Z и т.п. глобальному onKey, пока печатаем */
+      if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      else if (e.key === 'Enter' && !e.shiftKey && key !== 'body') { e.preventDefault(); finish(true); }  // заголовки — одна строка; body — многострочный (Enter = перенос)
+    }
+    el.addEventListener('blur', onBlur); el.addEventListener('keydown', onKd);
+  }
+  function wireCanvasEditingOnce() {
+    var stage = document.getElementById('peStage'); if (!stage || stage._ceWired) return; stage._ceWired = true;
+    stage.addEventListener('click', function (e) {
+      var el = e.target.closest('.pe-ced'); if (!el || el.getAttribute('contenteditable') === 'true') return;
+      e.stopPropagation(); ceSelect(el);
+    });
+    stage.addEventListener('dblclick', function (e) {
+      var el = e.target.closest('.pe-ced-text'); if (!el) return;
+      e.preventDefault(); e.stopPropagation();
+      var stg = document.getElementById('peStage'); if (stg) stg.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
+      el.classList.add('pe-sel'); S._ceSelKey = el.getAttribute('data-pe-key');
+      ceBeginEdit(el, el.getAttribute('data-pe-key'));   /* правим ПРЯМО на узле — без ререндера, чтобы узел не протух */
+    });
+  }
 
   function curZoom() { var f = TOK.format(S.fmt); var stage = document.getElementById('peStage'); if (!stage) return 1; var m = stage.style.transform.match(/scale\(([\d.]+)\)/); return m ? +m[1] : 1; }
   /* синхронизируем МАКЕТНУЮ коробку листа со scale (transform сам по себе её не сжимает),

@@ -505,3 +505,13 @@ button{font-family:inherit;cursor:pointer}
 .pe-mini:hover{background:var(--pe-hi)}
 .pe-mini.ok{color:#2e9b43;border-color:#2e9b43}
 .pe-mini svg{width:15px;height:15px}
+
+/* ===== on-canvas редактирование: правь то, на что смотришь ===== */
+.pe-ced{cursor:pointer;transition:outline-color .12s,background .12s;outline:1.5px solid transparent;outline-offset:2px;border-radius:3px}
+.pe-ced:hover{outline-color:color-mix(in srgb,var(--pe-sel) 45%,transparent)}
+.pe-ced-text{cursor:text}
+.pe-ced.pe-sel{outline:1.5px solid var(--pe-sel);outline-offset:2px;background:color-mix(in srgb,var(--pe-sel) 7%,transparent)}
+.pe-ced.pe-editing{outline:2px solid var(--pe-sel);outline-offset:2px;background:color-mix(in srgb,var(--pe-sel) 9%,transparent);cursor:text}
+.pe-ced.pe-editing:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--pe-sel) 18%,transparent)}
+/* кратко подсветить поле в панели, на которое навёл клик с холста */
+.pe-f-flash{box-shadow:0 0 0 2px var(--pe-sel),0 0 0 5px color-mix(in srgb,var(--pe-sel) 22%,transparent)!important;border-color:var(--pe-sel)!important;transition:box-shadow .2s}
