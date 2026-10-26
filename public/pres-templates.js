@@ -154,7 +154,19 @@
     const style = `width:${fmt.cssW}px;height:${fmt.cssH}px;${TOK.themeStyleStr(theme)}`;
     const footer = opts.footer === false ? '' :
       `<div class="lp-foot">${opts.footerHtml || ''}</div>`;
-    return `<section class="${cls}" style="${style}" data-fmt="${fmt.id}">${inner}${footer}</section>`;
+    return `<section class="${cls}" style="${style}" data-fmt="${fmt.id}"${opts.sid ? ` data-sid="${opts.sid}"` : ''}>${inner}${footer}</section>`;
+  }
+  /* смещения текст-блоков (свободное перетаскивание): section.elMove{key:{dx,dy}} → scoped CSS transform.
+     Применяется ОДИНАКОВО на холсте редактора и в PDF/веб-выводе (общий renderSection). No-op без elMove. */
+  const EL_MOVE_SEL = { title: '.lp-h1,.lp-h2', subtitle: '.lp-hero-sub,.lp-sub', body: '.lp-body', eyebrow: '.lp-eyebrow' };
+  function moveStyleFor(sid, elMove) {
+    if (!elMove || !sid) return '';
+    const rules = Object.keys(elMove).map(k => {
+      const mv = elMove[k], sel = EL_MOVE_SEL[k];
+      if (!sel || !mv || (!mv.dx && !mv.dy)) return '';
+      return sel.split(',').map(s => `[data-sid="${sid}"] ${s.trim()}{transform:translate(${Math.round(mv.dx || 0)}px,${Math.round(mv.dy || 0)}px)}`).join('');
+    }).join('');
+    return rules ? `<style>${rules}</style>` : '';
   }
   const eyebrow = (parts) => {
     const arr = (Array.isArray(parts) ? parts : [parts]).filter(Boolean);
@@ -546,10 +558,12 @@
     let inners;
     try { inners = fn(ctx); } catch (e) { inners = [`<div class="lp-safe lp-empty">Ошибка макета: ${esc(e.message)}</div>`]; }
     const footHtml = ctx.brand.footer || (ctx.brand.logoText ? `<span>${esc(ctx.brand.logoText)}</span>` : '');
-    return inners.map((inner, i) => pageShell(fmt, theme, inner, {
+    const mstyle = moveStyleFor(section.id, section.elMove);
+    return inners.map((inner, i) => pageShell(fmt, theme, mstyle + inner, {
       cls: `lp-fam-${section.family}` + (ctx0.altTint ? ' lp-alt-tint' : '') + (i>0?' lp-continuation':''),
       footer: section.family==='hero' ? false : (ctx.brand.footer!==undefined||ctx.brand.logoText?true:false),
       footerHtml: footHtml,
+      sid: section.id,
     }));
   }
 

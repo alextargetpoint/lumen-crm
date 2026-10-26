@@ -1176,6 +1176,33 @@
       }
       document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
     });
+    /* перетаскивание ТЕКСТ-блока по странице → смещение s.elMove[key]{dx,dy}; renderSection пишет
+       scoped CSS transform → видно И на холсте, И в PDF/веб (общий рендерер). Дельту делим на zoom. */
+    stage.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      if (e.target.closest('.pe-ced-photo')) return;                 /* фото — другой слушатель */
+      var el = e.target.closest('.pe-ced[data-pe-key]'); if (!el) return;
+      if (el.getAttribute('contenteditable') === 'true') return;      /* идёт inline-правка — не двигаем */
+      var key = el.getAttribute('data-pe-key'); if (['title', 'subtitle', 'body', 'eyebrow'].indexOf(key) < 0) return;
+      var s = curSection(); if (!s) return;
+      var m0 = (s.elMove && s.elMove[key]) || { dx: 0, dy: 0 };
+      var z = (typeof curZoom === 'function' && curZoom()) || 1; if (!z) z = 1;
+      var sx = e.clientX, sy = e.clientY, moved = false, cur = { dx: m0.dx || 0, dy: m0.dy || 0 };
+      e.preventDefault(); ceHideFloatbar();
+      el.classList.add('pe-moving');
+      function onMove(ev) {
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 3) moved = true;
+        cur.dx = (m0.dx || 0) + (ev.clientX - sx) / z;
+        cur.dy = (m0.dy || 0) + (ev.clientY - sy) / z;
+        el.style.transform = 'translate(' + Math.round(cur.dx) + 'px,' + Math.round(cur.dy) + 'px)';
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
+        el.classList.remove('pe-moving');
+        if (moved) { S._justPanned = true; mutate(function () { s.elMove = s.elMove || {}; s.elMove[key] = { dx: Math.round(cur.dx), dy: Math.round(cur.dy) }; }); }
+      }
+      document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
+    });
     if (!S._ceCtxWired) {
       S._ceCtxWired = true;
       document.addEventListener('click', function (e) { if (!(e.target.closest && e.target.closest('#peCtxMenu'))) ceCloseCtx(); });

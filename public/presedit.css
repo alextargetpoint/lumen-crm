@@ -619,3 +619,8 @@ button{font-family:inherit;cursor:pointer}
 .pe-ced-photo{cursor:grab}
 .pe-ced-photo.pe-panning{cursor:grabbing}
 .pe-ced-photo.pe-panning img.lp-cover{pointer-events:none}
+
+/* свободное перетаскивание текст-блоков */
+.pe-ced-text{cursor:move}
+.pe-ced-text.pe-editing{cursor:text}
+.pe-ced.pe-moving{cursor:grabbing;outline:1.5px solid var(--pe-sel);outline-offset:2px}
