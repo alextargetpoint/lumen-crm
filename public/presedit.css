@@ -515,3 +515,6 @@ button{font-family:inherit;cursor:pointer}
 .pe-ced.pe-editing:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--pe-sel) 18%,transparent)}
 /* кратко подсветить поле в панели, на которое навёл клик с холста */
 .pe-f-flash{box-shadow:0 0 0 2px var(--pe-sel),0 0 0 5px color-mix(in srgb,var(--pe-sel) 22%,transparent)!important;border-color:var(--pe-sel)!important;transition:box-shadow .2s}
+/* подсказка жеста на выбранном редактируемом тексте (как в референсе) */
+.pe-ced.pe-sel.pe-ced-text{position:relative}
+.pe-ced.pe-sel.pe-ced-text:not(.pe-editing)::after{content:'Двойной клик — изменить текст';position:absolute;left:0;top:100%;margin-top:8px;background:var(--pe-sel);color:#fff;font:500 12px/1.1 'Manrope',system-ui,sans-serif;letter-spacing:0;padding:5px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 3px 10px rgba(20,16,12,.22)}
