@@ -19,7 +19,7 @@
   var esc = T.esc;
   var FAM_LABEL = { hero: 'Обложка', editorial: 'О проекте', metrics: 'Показатели', gallery: 'Галерея',
     location: 'Локация', floorplan: 'Планировка', payment: 'План оплаты', comparison: 'Сравнение',
-    benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная' };
+    benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная', contents: 'Содержание' };
   /* библиотека блоков (макет «Добавить блок») — key уникален, f = family движка */
   var BLOCK_TYPES = [
     { key: 'editorial', f: 'editorial', label: 'Текст', ic: 'text' },
@@ -464,6 +464,15 @@
         (S.brokers.length ? '<div class="pe-field"><label>Брокер</label><select class="pe-select" data-act="pickBroker">' + S.brokers.map(function (b) { return '<option value="' + b.id + '"' + (b.id === S.pres.brokerId ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select></div>' : '');
     },
     comparison: function (s) { return '<p class="hint">Сравнение настраивается на уровне подборки.</p>'; },
+    contents: function (s) {
+      var items = cval(s, 'items') || [];
+      var h = '<p class="hint">Карта объектов подборки — «соединяющая» страница между вступлением и объектами. Список формируется автоматически: добавьте или замените объект, и он обновится.</p>';
+      h += fld('Заголовок', inp('title', cval(s, 'title')), s, 'title');
+      h += fld('Подводка', txt('subtitle', cval(s, 'subtitle'), 'Короткий текст над списком'), s, 'subtitle');
+      h += '<div class="pe-sec-label" style="margin-top:14px">Объекты · ' + items.length + '</div>';
+      items.forEach(function (it, i) { h += '<div class="pe-field" style="margin:0 0 6px"><label style="margin:0">' + (i + 1) + '. ' + esc(it.name || 'Объект') + '</label>' + (it.place ? '<div class="hint">' + esc(it.place) + '</div>' : '') + '</div>'; });
+      return h;
+    },
     custom: function (s) { return fld('Заголовок', inp('title', cval(s, 'title'))); },
   };
 

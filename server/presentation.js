@@ -199,6 +199,25 @@ function buildComparison(db, props) {
    собираются в collectionAssets (одна мердж-карта). Структура §10: Вступление → Объект₁..ₙ →
    [Сравнение/Рекомендация — позже] → ОДНА пара страниц брокера в конце (brokerAppendix).
    Рендер/снимок/проекция/валидация работают без изменений через assetsFor(). */
+function ruPlural(n, one, few, many) { const a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return many; if (b > 1 && b < 5) return few; if (b === 1) return one; return many; }
+/* «Соединяющие» подборки: делают переход от презентации ОДНОГО объекта к клиентской
+   подборке логичным — клиент сперва видит карту всех объектов (оглавление), а на обложке
+   каждого объекта стоит пометка его позиции «k из N». */
+function collContentsItem(pr, k) {
+  const gi = geoInfo(pr.geo); const cur = pr.currency || gi.currency;
+  return {
+    name: pr.name || ('Объект ' + (k + 1)),
+    place: [gi.region, gi.country].filter(Boolean).join(' · '),
+    price: (pr.priceFrom != null && pr.priceFrom !== '') ? { kind: 'from', amount: pr.priceFrom, currency: cur } : null,
+  };
+}
+// пометка «Объект k из N» в eyebrow (locationLabel) обложки объекта внутри подборки
+function tagObjectHeroSeq(objSections, pr, k, n) {
+  const hero = (objSections || []).filter(s => s.family === 'hero')[0]; if (!hero) return;
+  const gi = geoInfo(pr.geo);
+  hero.contentBindings = hero.contentBindings || {};
+  hero.contentBindings.locationLabel = ov(['Объект ' + (k + 1) + ' из ' + n].concat([gi.region, gi.country].filter(Boolean)));
+}
 function draftCollection(db, properties, broker, opts) {
   opts = opts || {};
   const props = (properties || []).filter(Boolean);
@@ -216,12 +235,26 @@ function draftCollection(db, properties, broker, opts) {
       title: ov(opts.title || 'Подборка объектов'),
       subtitle: opts.greeting ? ov(opts.greeting) : ov(''),
       locationLabel: ov(opts.clientName ? ['Подготовлено для ' + opts.clientName] : [gi0.region, gi0.country].filter(Boolean)),
-      metrics: ov([{ value: String(props.length), label: props.length === 1 ? 'объект' : 'объектов', icon: 'home' }]),
+      metrics: ov([{ value: String(props.length), label: ruPlural(props.length, 'объект', 'объекта', 'объектов'), icon: 'home' }]),
     },
   });
+  const N = props.length;
+  // Оглавление («соединяющая» страница): карта всех объектов перед подробными страницами (при ≥2)
+  if (N >= 2) {
+    sections.push({
+      id: sid(), family: 'contents', enabled: true,
+      contentBindings: {
+        eyebrow: ov(['Подборка']),
+        title: ov('В этой подборке'),
+        subtitle: ov('Мы подобрали ' + N + ' ' + ruPlural(N, 'объект', 'объекта', 'объектов') + (opts.clientName ? ' под ваш запрос' : '') + '. Ниже — коротко о каждом, далее — подробные страницы' + (opts.comparison !== false ? ' и сравнение' : '') + '.'),
+        items: ov(props.map((pr, k) => collContentsItem(pr, k))),
+      },
+    });
+  }
   // Объекты: секции каждого объекта с неймспейсом ассетов (без его собственного брокер-финала)
   props.forEach((pr, k) => {
     const d = draftFromProperty(db, pr, null);
+    if (N >= 2) tagObjectHeroSeq(d.orderedSections, pr, k, N);
     const amap = assetsForProperty(pr);
     const ns = 'o' + k + '_';
     Object.keys(amap).forEach(key => { assets[ns + key] = amap[key]; });
@@ -279,11 +312,19 @@ function replaceObjectInCollection(db, coll, oldPid, newPid) {
   const amap = assetsForProperty(newPr);
   Object.keys(amap).forEach(key => { coll.collectionAssets[ns + key] = amap[key]; });
   const d = draftFromProperty(db, newPr, null);
+  const N = (coll.projectIds || []).length;
+  if (N >= 2) tagObjectHeroSeq(d.orderedSections, newPr, idx, N);
   const newSecs = (d.orderedSections || []).filter(s => s.family !== 'broker').map(s => Object.assign({}, s, {
     id: ns + s.id, assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })),
   }));
   const at = insertAt < 0 ? coll.orderedSections.length : insertAt;
   coll.orderedSections.splice(at, 0, ...newSecs);
+  // синхронизируем «соединяющее» оглавление: пункт заменённого объекта
+  const toc = coll.orderedSections.filter(s => s.family === 'contents')[0];
+  if (toc && toc.contentBindings && toc.contentBindings.items) {
+    const arr = (toc.contentBindings.items.value || []).slice();
+    if (arr[idx]) { arr[idx] = collContentsItem(newPr, idx); toc.contentBindings.items = ov(arr); }
+  }
   coll.projectIds[idx] = newPid;
   coll.draftRevision = (coll.draftRevision || 1) + 1;
   coll.updatedAt = Date.now();

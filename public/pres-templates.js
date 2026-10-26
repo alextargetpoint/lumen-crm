@@ -421,6 +421,21 @@
     return [`<div class="lp-safe lp-ben-port">${head}${photo}${list}</div>`];
   };
 
+  // ---- CONTENTS (оглавление подборки — «соединяющая» страница между вступлением и объектами) ----
+  F.contents = (ctx) => {
+    const { c } = ctx;
+    const items = Array.isArray(c.items) ? c.items : [];
+    const rows = items.map((it, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const place = it.place ? `<span class="lp-toc-place">${esc(it.place)}</span>` : '';
+      const price = it.price ? `<span class="lp-toc-price">${fmtPrice(it.price)}</span>` : '';
+      return `<li class="lp-toc-row"><span class="lp-toc-n">${num}</span><div class="lp-toc-main"><b class="lp-toc-name">${esc(it.name || 'Объект')}</b>${place}</div>${price}</li>`;
+    }).join('');
+    const head = `${eyebrow(c.eyebrow)}<h2 class="lp-h2">${nl2br(c.title || 'В этой подборке')}</h2>`;
+    const sub = c.subtitle ? `<p class="lp-toc-sub">${nl2br(c.subtitle)}</p>` : '';
+    return [`<div class="lp-safe lp-toc">${head}${sub}<ol class="lp-toc-list">${rows}</ol></div>`];
+  };
+
   // ---- BROKER (intro + contacts) ----
   F.broker = (ctx) => {
     const p = ctx.c.profile || ctx.brand.broker || {};
