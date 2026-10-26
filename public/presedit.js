@@ -72,6 +72,17 @@
   }
   /* вернуть поле к значению из CRM (карточки объекта) — если связь известна */
   function hasSourceLink(sec, key) { var b = (sec.contentBindings || {})[key]; return !!(b && b.mode === 'override' && (b.sourcePath !== undefined || b.cachedValue !== undefined)); }
+  /* значение в карточке объекта изменилось ПОСЛЕ создания презентации? (риск устаревшей цены в sales-доке)
+     Сравниваем live-источник с cachedValue; возвращаем новое значение или null. Только для overridden-полей. */
+  function crmUpdated(sec, key) {
+    var b = (sec.contentBindings || {})[key];
+    if (!b || b.mode !== 'override' || b.sourcePath === undefined || b.cachedValue === undefined) return null;
+    var live = getPath(S.source, b.sourcePath);
+    if (live === undefined || live === null || live === '') return null;
+    var norm = function (v) { return typeof v === 'object' ? JSON.stringify(v) : String(v); };
+    return norm(live) !== norm(b.cachedValue) ? live : null;
+  }
+  function shortVal(v) { var s = typeof v === 'object' ? (Array.isArray(v) ? v.join(' · ') : JSON.stringify(v)) : String(v); return s.length > 40 ? s.slice(0, 38) + '…' : s; }
   function restoreSource(sec, key) {
     var b = (sec.contentBindings || {})[key]; if (!b) return;
     if (b.sourcePath !== undefined) sec.contentBindings[key] = { mode: 'source', sourcePath: b.sourcePath, cachedValue: b.cachedValue };
@@ -355,7 +366,12 @@
     var src = '';
     if (srcSec && srcKey) {
       if (isSource(srcSec, srcKey)) src = '<div class="pe-src"><span class="chip">' + ic('db') + 'Из CRM</span><button class="pe-mini-del" data-act="detach" data-key="' + srcKey + '" title="Отвязать и редактировать">✎</button></div>';
-      else if (hasSourceLink(srcSec, srcKey)) src = '<div class="pe-src"><span class="chip edited">изменено</span><button class="pe-mini-del" data-act="revert" data-key="' + srcKey + '" title="Вернуть значение из карточки объекта">↩</button></div>';
+      else if (hasSourceLink(srcSec, srcKey)) {
+        var upd = crmUpdated(srcSec, srcKey);
+        src = upd != null
+          ? '<div class="pe-src upd"><span class="chip upd">' + ic('db') + 'в CRM обновилось</span><span class="pe-src-new" title="Текущее значение в карточке объекта">«' + esc(shortVal(upd)) + '»</span><button class="pe-mini-del" data-act="revert" data-key="' + srcKey + '" title="Подтянуть актуальное значение из карточки объекта">↻</button></div>'
+          : '<div class="pe-src"><span class="chip edited">изменено</span><button class="pe-mini-del" data-act="revert" data-key="' + srcKey + '" title="Вернуть значение из карточки объекта">↩</button></div>';
+      }
     }
     return '<div class="pe-field"><label>' + esc(label) + '</label>' + inner + src + '</div>';
   }
