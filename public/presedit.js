@@ -799,10 +799,17 @@
       el.classList.add('pe-ced'); el.setAttribute('data-pe-key', key);
       if (ceEditable(el, key)) el.classList.add('pe-ced-text');
     });
-    /* фото: главный снимок секции (assetRefs[0]) — клик → фокус фото-поля в панели (замена/кадрир.).
-       Галерею (несколько фото, свой пикер) пока не метим. Метим только если в панели есть фото-поле. */
+    /* фото: клик → правка в панели. Для одиночного снимка — фото-поле (замена/кадр.);
+       для галереи — грид выбора фотографий (data-act=galtoggle). Метим только при наличии поля. */
     var fam = (curSection() || {}).family;
-    if (fam !== 'gallery' && document.querySelector('.pe-insp .pe-photo-prev[data-idx]')) {
+    if (fam === 'gallery') {
+      if (document.querySelector('.pe-insp [data-act="galtoggle"]')) {
+        var gi = 0;
+        stage.querySelectorAll('img.lp-cover').forEach(function (el) {
+          el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-gallery', '1'); el.setAttribute('data-pe-idx', 'g' + (gi++));
+        });
+      }
+    } else if (document.querySelector('.pe-insp .pe-photo-prev[data-idx]')) {
       stage.querySelectorAll('.lp-bleed, img.lp-cover').forEach(function (el) {
         el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-idx', '0');
       });
@@ -832,6 +839,13 @@
     var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
     el.classList.add('pe-sel'); S._ceSelKey = null; S._ceSelPhoto = el.getAttribute('data-pe-idx') || '0';
     ceOpenContentTab();
+    if (el.getAttribute('data-pe-gallery')) {   /* галерея: фокус грида выбора фотографий */
+      var gtog = document.querySelector('.pe-insp [data-act="galtoggle"]');
+      var gfield = gtog ? gtog.closest('.pe-field') : null;
+      if (gfield) { if (gfield.scrollIntoView) gfield.scrollIntoView({ block: 'center', behavior: 'smooth' }); gfield.classList.add('pe-f-flash'); setTimeout(function () { gfield.classList.remove('pe-f-flash'); }, 1200); }
+      ceShowFloatbarFor(el, 'gallery');
+      return;
+    }
     var prev = document.querySelector('.pe-insp .pe-photo-prev[data-idx="' + S._ceSelPhoto + '"]') || document.querySelector('.pe-insp .pe-photo-prev[data-idx]');
     if (prev) {
       var fieldBox = prev.closest('.pe-field') || prev;
@@ -853,9 +867,11 @@
     if (!bar) { bar = document.createElement('div'); bar.id = 'peFloatbar'; bar.className = 'pe-floatbar'; canvas.appendChild(bar); }
     var actions = kind === 'photo'
       ? '<button class="pe-fb-btn" data-fb="replace">' + ic('image') + 'Заменить</button><button class="pe-fb-btn" data-fb="crop">' + ic('crop') + 'Кадрировать</button>'
-      : kind === 'text'
-        ? '<button class="pe-fb-btn" data-fb="edit">' + ic('text') + 'Изменить текст</button>'
-        : '<button class="pe-fb-btn" data-fb="field">' + ic('text') + 'Править в панели</button>';
+      : kind === 'gallery'
+        ? '<button class="pe-fb-btn" data-fb="galfield">' + ic('image') + 'Выбрать фото</button>'
+        : kind === 'text'
+          ? '<button class="pe-fb-btn" data-fb="edit">' + ic('text') + 'Изменить текст</button>'
+          : '<button class="pe-fb-btn" data-fb="field">' + ic('text') + 'Править в панели</button>';
     bar.innerHTML = actions; bar.style.display = 'flex';
     bar.querySelectorAll('[data-fb]').forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); ceFloatAction(b.getAttribute('data-fb')); }; });
     cePositionFloatbar(el);
@@ -882,6 +898,7 @@
     else if (a === 'field') { ceFocusField(S._ceSelKey); }
     else if (a === 'replace') { var rb = document.querySelector('.pe-insp [data-act="photoBrowser"]'); if (rb) rb.click(); }
     else if (a === 'crop') { var cb = document.querySelector('.pe-insp [data-act="cropFmt"]'); if (cb && !cb.disabled) cb.click(); }
+    else if (a === 'galfield') { var g = document.querySelector('.pe-insp [data-act="galtoggle"]'); var gf = g && g.closest('.pe-field'); if (gf) { if (gf.scrollIntoView) gf.scrollIntoView({ block: 'center', behavior: 'smooth' }); gf.classList.add('pe-f-flash'); setTimeout(function () { gf.classList.remove('pe-f-flash'); }, 1200); } }
   }
   function ceBeginEdit(el, key) {
     if (el.getAttribute('contenteditable') === 'true') return;
@@ -924,7 +941,7 @@
         return;
       }
       var ph = e.target.closest('.pe-ced-photo');
-      if (ph) { e.preventDefault(); e.stopPropagation(); cePhotoSelect(ph); ceFloatAction('replace'); }   /* двойной клик по фото → замена */
+      if (ph) { e.preventDefault(); e.stopPropagation(); cePhotoSelect(ph); if (!ph.getAttribute('data-pe-gallery')) ceFloatAction('replace'); }   /* двойной клик по фото → замена (кроме галереи) */
     });
   }
 
