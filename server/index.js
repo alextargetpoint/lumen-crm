@@ -4689,7 +4689,7 @@ async function emailInvoicePdf(db, inv) {
     const pdf = await invoicepdf.buildInvoicePdf({ inv, company: inv.company || db.settings.billing.company, reg });
     const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const body = mailer.emailPanel(`<div style="font-size:15px;font-weight:700;margin:0 0 6px">Счёт-фактура ${inv.id}</div><div style="font-size:14px;line-height:1.6">Подписка «${inv.planName}» · ${inv.period}. Сумма: <b>${money(inv.amount)}</b>.<br>PDF счёт-фактуры — во вложении. Копия доступна в кабинете → «Подписка и оплата» → «Счета».</div>`, '#c8a86a');
-    const html = mailer.emailWrap('Счёт-фактура ' + inv.id, body, 'ru', { preheader: 'Счёт ' + inv.id + ' на ' + money(inv.amount) });
+    const html = mailer.emailWrap('Счёт-фактура ' + inv.id, body, 'ru', { eyebrow: 'Счёт', hero: { src: mailer.ART + '/doc.gif', h: 190 }, titleSize: 27, preheader: 'Счёт ' + inv.id + ' на ' + money(inv.amount) });
     return await mailer.sendViaResend(cfg, to, 'Счёт-фактура ' + inv.id + ' — Lumen', html, [{ filename: 'invoice-' + inv.id + '.pdf', content: pdf.toString('base64') }]);
   } catch (e) { return { ok: false, error: e.message }; }
 }
@@ -6974,7 +6974,7 @@ const server = http.createServer(async (req, res) => {
           if (!sendCfg) store.runInTenant(acct.tid, () => { const ec = (store.get().settings.channels && store.get().settings.channels.email) || {}; if (ec.key && ec.from) sendCfg = { key: ec.key, from: ec.from }; });
           if (sendCfg) {
             const panel = mailer.emailPanel(`<div style="font-size:15px;font-weight:700;margin:0 0 8px">Код для входа в Lumen</div><div style="font-size:34px;font-weight:800;letter-spacing:.18em;font-family:ui-monospace,monospace;color:#1A1815;margin:8px 0">${code}</div><div style="font-size:13px;color:#6C665C">Код действует 10 минут и подходит один раз. Если вы не запрашивали вход — просто проигнорируйте это письмо.</div>`, '#A98748');
-            const html = mailer.emailWrap('Код входа', panel, 'ru', { preheader: 'Ваш код: ' + code });
+            const html = mailer.emailWrap('Код входа', panel, 'ru', { eyebrow: 'Вход', hero: { src: mailer.ART + '/shield.gif', h: 200 }, titleSize: 29, preheader: 'Ваш код: ' + code });
             await mailer.sendViaResend(sendCfg, email, 'Код входа в Lumen', html);
           }
         } catch (e) {}
@@ -7164,7 +7164,7 @@ const server = http.createServer(async (req, res) => {
         if (sendCfg) {
           const code = issueEmailCode(reg, email);
           const panel = mailer.emailPanel(`<div style="font-size:16px;font-weight:700;margin:0 0 6px">Добро пожаловать в Lumen${agencyName ? ', ' + esc(agencyName) : ''}</div><div style="font-size:13px;color:#6C665C;margin-bottom:10px">Введите этот код, чтобы активировать аккаунт и продолжить настройку:</div><div style="font-size:34px;font-weight:800;letter-spacing:.18em;font-family:ui-monospace,monospace;color:#1A1815;margin:6px 0">${code}</div><div style="font-size:12px;color:#9C958A;margin-top:8px">Код действует 10 минут.</div>`, '#A98748');
-          const html = mailer.emailWrap('Активация аккаунта', panel, 'ru', { preheader: 'Код активации: ' + code });
+          const html = mailer.emailWrap('Активация аккаунта', panel, 'ru', { eyebrow: 'Активация', hero: { src: mailer.ART + '/hero.gif', h: 220 }, titleSize: 30, preheader: 'Код активации: ' + code });
           await mailer.sendViaResend(sendCfg, email, 'Активация аккаунта Lumen', html);
           codeSent = true;
         }
@@ -7241,7 +7241,7 @@ const server = http.createServer(async (req, res) => {
               { icon: 'shield', title: 'Доступ под вашу роль', sub: 'видите ровно те разделы, что нужны для работы' },
             ])
             + `<div style="font-size:12px;color:#8a857c;margin-top:12px;line-height:1.5">Если кнопка не открывается — скопируйте ссылку:<br>${esc(link)}</div>`;
-          const html = mailer.emailWrap('Добро пожаловать в ' + agencyNm, body, 'ru', { eyebrow: 'Приглашение', preheader: (first ? first + ', в' : 'В') + 'ас пригласили в ' + agencyNm + (roleNm ? ' · ' + roleNm : '') });
+          const html = mailer.emailWrap('Добро пожаловать в ' + agencyNm, body, 'ru', { eyebrow: 'Приглашение', hero: { src: mailer.ART + '/nodes.gif', h: 235 }, titleSize: 31, headerNote: roleNm || '', preheader: (first ? first + ', в' : 'В') + 'ас пригласили в ' + agencyNm + (roleNm ? ' · ' + roleNm : '') });
           const r2 = await mailer.sendViaResend({ key, from }, email, 'Приглашение в ' + agencyNm, html);
           mailed = !!(r2 && (r2.id || r2.ok)); if (!mailed) mailErr = (r2 && r2.error) || '';
         } else { mailErr = 'платформенный e-mail не настроен'; }
