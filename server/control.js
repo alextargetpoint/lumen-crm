@@ -16,6 +16,7 @@ function cfg(db) {
     silentHours: c.silentHours || 4,        /* клиент ждёт ответа дольше — брокер «молчит» */
     stalledDays: c.stalledDays || 5,        /* лид без движения дольше — «застрял» */
     overloadPct: c.overloadPct || 1.0,      /* load/capacity выше — «перегружен» */
+    firstContactMin: c.firstContactMin || 20,  /* новый лид без первого ответа дольше — алерт (speed-to-lead) */
   };
 }
 

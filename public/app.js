@@ -5131,6 +5131,7 @@ async function openControlSettings() {
       <label class="cst-f"><span>Крупный бюджет (VIP), $</span><input id="cstVip" type="number" min="10000" step="10000" value="${s.vipBudget}"></label>
       <label class="cst-f"><span>Брокер «молчит» после, ч</span><input id="cstSilent" type="number" min="1" max="72" value="${s.silentHours}"></label>
       <label class="cst-f"><span>Лид «застрял» после, дн.</span><input id="cstStalled" type="number" min="1" max="90" value="${s.stalledDays}"></label>
+      <label class="cst-f"><span>«Без первого ответа» после, мин</span><input id="cstFirst" type="number" min="5" max="240" value="${s.firstContactMin != null ? s.firstContactMin : 20}"></label>
       <label class="cst-f"><span>Перегруз при load/ёмкость ≥</span><input id="cstOver" type="number" min="0.5" max="3" step="0.1" value="${s.overloadPct}"></label>
       <label class="cst-f"><span>Комиссия за сделку</span><select id="cstRule">${ruleOpt('last', 'Последнему брокеру')}${ruleOpt('first', 'Первому касанию')}${ruleOpt('split', 'Поровну между всеми')}</select></label>
       <label class="cst-f"><span>Алерты не чаще раза в, мин</span><input id="cstCool" type="number" min="5" max="1440" value="${s.alertCooldownMin}"></label>
@@ -5143,7 +5144,7 @@ async function openControlSettings() {
     { label: 'Отмена' },
     { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
         const payload = {
-          vipBudget: +$('#cstVip', bd).value, silentHours: +$('#cstSilent', bd).value, stalledDays: +$('#cstStalled', bd).value,
+          vipBudget: +$('#cstVip', bd).value, silentHours: +$('#cstSilent', bd).value, stalledDays: +$('#cstStalled', bd).value, firstContactMin: +$('#cstFirst', bd).value,
           overloadPct: +$('#cstOver', bd).value, commissionRule: $('#cstRule', bd).value,
           alertCooldownMin: +$('#cstCool', bd).value, alertRepeatH: +$('#cstRep', bd).value,
         };

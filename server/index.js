@@ -9412,6 +9412,7 @@ const server = http.createServer(async (req, res) => {
         if (b.vipBudget != null) c.vipBudget = clamp(b.vipBudget, 10000, 100000000, 500000);
         if (b.silentHours != null) c.silentHours = clamp(b.silentHours, 1, 72, 4);
         if (b.stalledDays != null) c.stalledDays = clamp(b.stalledDays, 1, 90, 5);
+        if (b.firstContactMin != null) c.firstContactMin = clamp(b.firstContactMin, 5, 240, 20);
         if (b.overloadPct != null) c.overloadPct = clamp(b.overloadPct, 0.5, 3, 1);
         if (b.commissionRule && ['first', 'last', 'split'].includes(b.commissionRule)) c.commissionRule = b.commissionRule;
         if (b.alertCooldownMin != null) c.alertCooldownMin = clamp(b.alertCooldownMin, 5, 1440, 30);
@@ -9425,7 +9426,7 @@ const server = http.createServer(async (req, res) => {
         store.save();
       }
       const c = control.cfg(db);
-      return json(res, 200, { vipBudget: c.vipBudget, silentHours: c.silentHours, stalledDays: c.stalledDays, overloadPct: c.overloadPct, commissionRule: (db.settings.control.commissionRule || 'last'), alertCooldownMin: c.alertCooldownMin || 30, alertRepeatH: c.alertRepeatH || 24, delegateBrokerId: db.settings.control.delegateBrokerId || null });
+      return json(res, 200, { vipBudget: c.vipBudget, silentHours: c.silentHours, stalledDays: c.stalledDays, firstContactMin: c.firstContactMin || 20, overloadPct: c.overloadPct, commissionRule: (db.settings.control.commissionRule || 'last'), alertCooldownMin: c.alertCooldownMin || 30, alertRepeatH: c.alertRepeatH || 24, delegateBrokerId: db.settings.control.delegateBrokerId || null });
     }
 
     /* ── Слияние дублей лида: перенести переписку/встречи/заметки/владение в один тред ── */
