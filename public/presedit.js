@@ -107,7 +107,7 @@
       else setSave('err');
     }).catch(function () { setSave('err'); });
   }
-  function setSave(st) { S.save = st; var el = document.querySelector('.pe-save'); if (el) { el.className = 'pe-save' + (st === 'saving' ? ' saving' : st === 'err' ? ' err' : ''); el.querySelector('.tx').textContent = st === 'saving' ? 'Сохраняем…' : st === 'err' ? 'Не сохранено' : 'Черновик сохранён'; } }
+  function setSave(st) { S.save = st; var el = document.querySelector('.pe-save'); if (el) { el.className = 'pe-save' + (st === 'saving' ? ' saving' : st === 'err' ? ' err' : ''); el.querySelector('.tx').textContent = st === 'saving' ? 'Сохраняем…' : st === 'err' ? 'Не сохранено' : 'Сохранено'; } }
 
   function revalidate() { clearTimeout(S._chkT); S._chkT = setTimeout(function () {
     api('POST', '/' + ID + '/validate', { format: S.fmt }).then(function (r) { if (r.status === 200) { S.chk = r.json; paintReadiness(); paintNavErrors(); updatePageCount(); } });
@@ -127,18 +127,20 @@
 
   function topbar() {
     var coll = S.isColl;
-    var name = esc(S.pres.title || (S.source && S.source.name) || 'Презентация');
-    var crumb = coll ? 'Подборки клиентов' : 'Презентации объектов';
+    var name = esc(S.pres.title || (S.source && S.source.name) || (coll ? 'Подборка объектов' : 'Презентация'));
+    var crumb = coll ? 'База / Подборки клиентов' : 'База / Презентации объектов';
     return '<div class="pe-top">' +
       '<button class="pe-back" data-act="back" title="Назад в каталог">' + ic('back') + '</button>' +
-      '<div class="pe-crumbs"><span class="c0">База</span><i>/</i><span class="c0">' + crumb + '</span><i>/</i><b>' + name + '</b></div>' +
+      '<div class="pe-titlewrap"><div class="pe-title" title="' + name + '">' + name + '</div><div class="pe-crumbs">' + crumb + '</div></div>' +
       '<div class="pe-top-sp"></div>' +
-      '<button class="pe-iconbtn" data-act="undo" title="Отменить">' + ic('undo') + '</button>' +
-      '<button class="pe-iconbtn" data-act="redo" title="Повторить">' + ic('redo') + '</button>' +
-      '<button class="pe-iconbtn" data-act="history" title="История версий">' + ic('clock') + '</button>' +
-      '<div class="pe-save"><span class="dot"></span><span class="tx">Черновик сохранён</span></div>' +
+      '<div class="pe-toolgroup">' +
+        '<button class="pe-iconbtn" data-act="undo" title="Отменить">' + ic('undo') + '</button>' +
+        '<button class="pe-iconbtn" data-act="redo" title="Повторить">' + ic('redo') + '</button>' +
+        '<button class="pe-iconbtn" data-act="history" title="История версий">' + ic('clock') + '</button>' +
+      '</div>' +
+      '<div class="pe-save"><span class="dot"></span><span class="tx">Сохранено</span></div>' +
       '<button class="pe-btn pe-btn-ghost" data-act="preview">' + ic('eye') + 'Предпросмотр</button>' +
-      '<button class="pe-btn pe-btn-primary" data-act="export">PDF / ссылка ' + ic('chev') + '</button>' +
+      '<button class="pe-btn pe-btn-export" data-act="export">' + ic('download') + 'Экспорт ' + ic('chev') + '</button>' +
     '</div>';
   }
 
