@@ -809,6 +809,7 @@
     }
     if (S._ceSelKey) { var sel = stage.querySelector('.pe-ced[data-pe-key="' + S._ceSelKey + '"]'); if (sel) sel.classList.add('pe-sel'); }
     if (S._ceSelPhoto != null) { var selp = stage.querySelector('.pe-ced-photo[data-pe-idx="' + S._ceSelPhoto + '"]'); if (selp) selp.classList.add('pe-sel'); }
+    if ((S._ceSelKey || S._ceSelPhoto != null) && document.getElementById('peFloatbar')) { var se = ceSelectedEl(); if (se) cePositionFloatbar(se); else ceHideFloatbar(); }
   }
   function ceOpenContentTab() {
     if (S.tab === 'content') return;
@@ -825,6 +826,7 @@
     var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
     el.classList.add('pe-sel'); S._ceSelKey = el.getAttribute('data-pe-key'); S._ceSelPhoto = null;
     ceFocusField(S._ceSelKey);
+    ceShowFloatbarFor(el, el.classList.contains('pe-ced-text') ? 'text' : 'textnoedit');
   }
   function cePhotoSelect(el) {
     var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
@@ -836,9 +838,54 @@
       if (fieldBox.scrollIntoView) fieldBox.scrollIntoView({ block: 'center', behavior: 'smooth' });
       prev.classList.add('pe-f-flash'); setTimeout(function () { prev.classList.remove('pe-f-flash'); }, 1200);
     }
+    ceShowFloatbarFor(el, 'photo');
+  }
+  function ceDeselect() {
+    var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
+    S._ceSelKey = null; S._ceSelPhoto = null; ceHideFloatbar();
+  }
+  /* плавающая мини-панель над выбранным элементом (как в референсе): быстрые действия прямо у объекта.
+     DOM-оверлей внутри #peCanvas (на <img> нельзя ::after); скроллится вместе с холстом (absolute+scrollTop). */
+  function ceHideFloatbar() { var b = document.getElementById('peFloatbar'); if (b) b.style.display = 'none'; }
+  function ceShowFloatbarFor(el, kind) {
+    var canvas = document.getElementById('peCanvas'); if (!canvas || !el) return;
+    var bar = document.getElementById('peFloatbar');
+    if (!bar) { bar = document.createElement('div'); bar.id = 'peFloatbar'; bar.className = 'pe-floatbar'; canvas.appendChild(bar); }
+    var actions = kind === 'photo'
+      ? '<button class="pe-fb-btn" data-fb="replace">' + ic('image') + 'Заменить</button><button class="pe-fb-btn" data-fb="crop">' + ic('crop') + 'Кадрировать</button>'
+      : kind === 'text'
+        ? '<button class="pe-fb-btn" data-fb="edit">' + ic('text') + 'Изменить текст</button>'
+        : '<button class="pe-fb-btn" data-fb="field">' + ic('text') + 'Править в панели</button>';
+    bar.innerHTML = actions; bar.style.display = 'flex';
+    bar.querySelectorAll('[data-fb]').forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); ceFloatAction(b.getAttribute('data-fb')); }; });
+    cePositionFloatbar(el);
+  }
+  function cePositionFloatbar(el) {
+    var canvas = document.getElementById('peCanvas'), bar = document.getElementById('peFloatbar');
+    if (!canvas || !bar || bar.style.display === 'none' || !el) return;
+    var er = el.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+    var bh = bar.offsetHeight || 36;
+    var top = (er.top - cr.top) + canvas.scrollTop - bh - 8;
+    var left = (er.left - cr.left) + canvas.scrollLeft;
+    if (top < canvas.scrollTop + 2) top = (er.bottom - cr.top) + canvas.scrollTop + 8;   /* не влезает сверху → снизу */
+    var maxLeft = canvas.scrollLeft + canvas.clientWidth - bar.offsetWidth - 6;
+    bar.style.top = Math.max(2, top) + 'px'; bar.style.left = Math.min(Math.max(2, left), Math.max(2, maxLeft)) + 'px';
+  }
+  function ceSelectedEl() {
+    var stage = document.getElementById('peStage'); if (!stage) return null;
+    if (S._ceSelPhoto != null) return stage.querySelector('.pe-ced-photo[data-pe-idx="' + S._ceSelPhoto + '"]');
+    if (S._ceSelKey) return stage.querySelector('.pe-ced[data-pe-key="' + S._ceSelKey + '"]');
+    return null;
+  }
+  function ceFloatAction(a) {
+    if (a === 'edit') { var stage = document.getElementById('peStage'); var el = stage && stage.querySelector('.pe-ced-text.pe-sel'); if (el) { ceHideFloatbar(); ceBeginEdit(el, el.getAttribute('data-pe-key')); } }
+    else if (a === 'field') { ceFocusField(S._ceSelKey); }
+    else if (a === 'replace') { var rb = document.querySelector('.pe-insp [data-act="photoBrowser"]'); if (rb) rb.click(); }
+    else if (a === 'crop') { var cb = document.querySelector('.pe-insp [data-act="cropFmt"]'); if (cb && !cb.disabled) cb.click(); }
   }
   function ceBeginEdit(el, key) {
     if (el.getAttribute('contenteditable') === 'true') return;
+    ceHideFloatbar();
     var before = (el.innerText || '').trim();
     el.setAttribute('contenteditable', 'true'); el.classList.add('pe-editing'); el.spellcheck = false;
     el.focus();
@@ -861,16 +908,23 @@
   function wireCanvasEditingOnce() {
     var stage = document.getElementById('peStage'); if (!stage || stage._ceWired) return; stage._ceWired = true;
     stage.addEventListener('click', function (e) {
-      var el = e.target.closest('.pe-ced'); if (!el || el.getAttribute('contenteditable') === 'true') return;
+      var el = e.target.closest('.pe-ced');
+      if (!el) { ceDeselect(); return; }                      /* клик по пустому месту страницы → снять выбор */
+      if (el.getAttribute('contenteditable') === 'true') return;
       e.stopPropagation();
       if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
     });
     stage.addEventListener('dblclick', function (e) {
-      var el = e.target.closest('.pe-ced-text'); if (!el) return;
-      e.preventDefault(); e.stopPropagation();
-      var stg = document.getElementById('peStage'); if (stg) stg.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
-      el.classList.add('pe-sel'); S._ceSelKey = el.getAttribute('data-pe-key');
-      ceBeginEdit(el, el.getAttribute('data-pe-key'));   /* правим ПРЯМО на узле — без ререндера, чтобы узел не протух */
+      var tx = e.target.closest('.pe-ced-text');
+      if (tx) {
+        e.preventDefault(); e.stopPropagation();
+        var stg = document.getElementById('peStage'); if (stg) stg.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
+        tx.classList.add('pe-sel'); S._ceSelKey = tx.getAttribute('data-pe-key'); S._ceSelPhoto = null;
+        ceBeginEdit(tx, tx.getAttribute('data-pe-key'));   /* правим ПРЯМО на узле — без ререндера, чтобы узел не протух */
+        return;
+      }
+      var ph = e.target.closest('.pe-ced-photo');
+      if (ph) { e.preventDefault(); e.stopPropagation(); cePhotoSelect(ph); ceFloatAction('replace'); }   /* двойной клик по фото → замена */
     });
   }
 
@@ -884,7 +938,7 @@
     stage.style.height = (f.cssH * s) + 'px';
     var add = document.querySelector('.pe-canvas-add'); if (add) add.style.width = Math.min(f.cssW * s, 760) + 'px';
   }
-  function setZoom(z) { z = Math.max(0.25, Math.min(2, z)); S.zoom = z; var stage = document.getElementById('peStage'); if (stage) { stage.style.transform = 'scale(' + z + ')'; sizeStage(z); } var zl = document.getElementById('peZoomL'); if (zl) zl.textContent = Math.round(z * 100) + '%'; }
+  function setZoom(z) { z = Math.max(0.25, Math.min(2, z)); S.zoom = z; var stage = document.getElementById('peStage'); if (stage) { stage.style.transform = 'scale(' + z + ')'; sizeStage(z); } var zl = document.getElementById('peZoomL'); if (zl) zl.textContent = Math.round(z * 100) + '%'; var se = ceSelectedEl && ceSelectedEl(); if (se) cePositionFloatbar(se); }
   function fitCanvas() {
     var stage = document.getElementById('peStage'), canvas = document.getElementById('peCanvas'); if (!stage || !canvas) return;
     var f = TOK.format(S.fmt);
