@@ -94,6 +94,20 @@
   function pushUndo() { S.undo.push(snapshotState()); if (S.undo.length > 50) S.undo.shift(); S.redo = []; }
   function restore(str) { var o = JSON.parse(str); S.pres.orderedSections = o.o; S.pres.theme = o.t; S.pres.defaultFormat = o.f; S.pres.brokerAppendix = o.a; }
   function mutate(fn, opts) { pushUndo(); fn(); scheduleSave(); if (!opts || opts.render !== false) render(); revalidate(); }
+  /* переупорядочивание страниц (drag в навигаторе): сдвигаем секцию from→to (до/после), селект следует */
+  function reorderPages(from, to, after) {
+    if (from == null || from === to && !after) return;
+    mutate(function () {
+      var arr = sections();
+      if (from < 0 || from >= arr.length) return;
+      var insertAt = to + (after ? 1 : 0);
+      var moved = arr.splice(from, 1)[0];
+      if (from < insertAt) insertAt--;
+      insertAt = Math.max(0, Math.min(arr.length, insertAt));
+      arr.splice(insertAt, 0, moved);
+      S.pageIdx = Math.max(0, Math.min(arr.length - 1, insertAt));
+    });
+  }
   function doUndo() { if (!S.undo.length) return; S.redo.push(snapshotState()); restore(S.undo.pop()); scheduleSave(); render(); revalidate(); }
   function doRedo() { if (!S.redo.length) return; S.undo.push(snapshotState()); restore(S.redo.pop()); scheduleSave(); render(); revalidate(); }
   function onKey(e) { if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); } else if (e.key === 'Escape') { if (typeof ceCloseCtx === 'function') ceCloseCtx(); } }
@@ -148,11 +162,12 @@
     var title = pageNavLabel(s);
     var err = S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; });
     var msel = S.multiMode && (S.multiSel || []).indexOf(i) >= 0;
-    return '<div class="pe-thumb' + (i === S.pageIdx && !S.multiMode ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + (S.multiMode ? ' multi' : '') + (msel ? ' msel' : '') + '" data-pg="' + i + '">' +
+    return '<div class="pe-thumb' + (i === S.pageIdx && !S.multiMode ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + (S.multiMode ? ' multi' : '') + (msel ? ' msel' : '') + '" data-pg="' + i + '"' + (S.multiMode ? '' : ' draggable="true"') + '>' +
       (S.multiMode ? '<span class="pe-thumb-cb">' + (msel ? ic('check') : '') + '</span>' : '') +
       '<div class="pe-thumb-hd"><span class="pe-thumb-n">' + pad(i + 1) + '</span>' +
         '<span class="pe-thumb-t">' + esc(title) + '</span>' +
-        '<span class="pe-thumb-mini" data-act="pgmenu" data-pg="' + i + '">' + ic('dots') + '</span></div>' +
+        '<span class="pe-thumb-mini" data-act="pgmenu" data-pg="' + i + '">' + ic('dots') + '</span>' +
+        (S.multiMode ? '' : '<span class="pe-thumb-grip" title="Перетащить">' + ic('grip') + '</span>') + '</div>' +
       '<div class="pe-thumb-prev" data-mini="' + i + '"></div>' +
     '</div>';
   }
@@ -191,7 +206,8 @@
   }
   function navigator_() {
     var items = S.isColl ? navCollection() : sections().map(thumbRow).join('');
-    var hd = '<div class="pe-nav-hd"><span>' + (S.isColl ? 'Структура презентации' : 'Страницы') + '</span>' +
+    var pgN = enabledSections().length;
+    var hd = '<div class="pe-nav-hd"><span class="pe-nav-ttl">' + (S.isColl ? 'Структура' : 'Страницы') + '<i class="pe-nav-cnt">' + pgN + '</i></span>' +
       '<div style="display:flex;gap:4px"><button class="pe-nav-sel' + (S.multiMode ? ' on' : '') + '" data-act="multiToggle">' + (S.multiMode ? 'Готово' : 'Выбрать') + '</button>' +
       '<button class="pe-nav-add" data-act="' + (S.isColl ? 'addobj' : 'addpage') + '" title="' + (S.isColl ? 'Добавить объекты' : 'Добавить страницу') + '">' + ic('plus') + '</button></div></div>';
     if (S.isColl) items += '<button class="pe-addobj-btn" data-act="addobj">' + ic('plus') + 'Добавить объект</button>';
@@ -624,6 +640,14 @@
     });
     // page select (плоские миниатюры + строки групп подборки)
     root.querySelectorAll('.pe-nav-list [data-pg]').forEach(function (el) { if (el.getAttribute('data-act')) return; el.addEventListener('click', function (e) { if (e.target.closest('[data-act]')) return; var v = el.getAttribute('data-pg'); if (v === '') return; var i = +v; if (S.multiMode) { S.multiSel = S.multiSel || []; var at = S.multiSel.indexOf(i); if (at >= 0) S.multiSel.splice(at, 1); else S.multiSel.push(i); render(); return; } S.pageIdx = i; render(); }); });
+    /* перетаскивание страниц одиночной презентации → переупорядочивание (HTML5 DnD) */
+    root.querySelectorAll('.pe-thumb[draggable="true"]').forEach(function (el) {
+      el.addEventListener('dragstart', function (e) { S._dragFrom = +el.getAttribute('data-pg'); el.classList.add('pe-dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(S._dragFrom)); } catch (_) {} });
+      el.addEventListener('dragend', function () { el.classList.remove('pe-dragging'); root.querySelectorAll('.pe-drop-before,.pe-drop-after').forEach(function (n) { n.classList.remove('pe-drop-before', 'pe-drop-after'); }); });
+      el.addEventListener('dragover', function (e) { if (S._dragFrom == null) return; e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (_) {} var r = el.getBoundingClientRect(); var after = e.clientY > r.top + r.height / 2; el.classList.toggle('pe-drop-after', after); el.classList.toggle('pe-drop-before', !after); });
+      el.addEventListener('dragleave', function () { el.classList.remove('pe-drop-before', 'pe-drop-after'); });
+      el.addEventListener('drop', function (e) { e.preventDefault(); var to = +el.getAttribute('data-pg'); var after = el.classList.contains('pe-drop-after'); el.classList.remove('pe-drop-before', 'pe-drop-after'); reorderPages(S._dragFrom, to, after); S._dragFrom = null; });
+    });
     // format tabs
     root.querySelectorAll('[data-fmt]').forEach(function (el) { el.addEventListener('click', function () { S.fmt = el.getAttribute('data-fmt'); S.pres.defaultFormat = S.fmt; scheduleSave(); render(); revalidate(); }); });
     // inspector tabs
@@ -1633,7 +1657,7 @@
       warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', link: '<path d="M9 15l6-6M8 11l-2 2a3 3 0 0 0 4 4l2-2M16 13l2-2a3 3 0 0 0-4-4l-2 2"/>',
       phone: '<path d="M5 4h3l2 5-2 1a9 9 0 0 0 4 4l1-2 5 2v3a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
       back: '<path d="M15 6l-6 6 6 6"/>', chev: '<path d="M6 9l6 6 6-6"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
-      gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>', sliders: '<path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h7M15 17h5"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="13" cy="17" r="2"/>',
+      gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>', sliders: '<path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h7M15 17h5"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="13" cy="17" r="2"/>', grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
       text: '<path d="M4 6h16M4 12h16M4 18h10"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
       pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/>', doc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
       clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', swap: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',

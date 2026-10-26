@@ -600,3 +600,17 @@ button{font-family:inherit;cursor:pointer}
 .pe-infobox svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;opacity:.7}
 .pe-page-foot{display:flex;align-items:center;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--pe-line);font-size:12.5px;color:var(--pe-mut)}
 .pe-page-foot svg{width:15px;height:15px;opacity:.7}
+
+/* навигатор: счётчик страниц, grip-ручка и drag-reorder */
+.pe-nav-ttl{display:inline-flex;align-items:center;gap:8px}
+.pe-nav-cnt{font-style:normal;font-size:12px;font-weight:600;color:var(--pe-mut);background:var(--pe-hi);border-radius:20px;padding:1px 9px;min-width:20px;text-align:center}
+.pe-thumb-hd{display:flex;align-items:center;gap:7px}
+.pe-thumb-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe-thumb-grip{flex:0 0 auto;color:var(--pe-mut);opacity:0;cursor:grab;transition:opacity .12s}
+.pe-thumb:hover .pe-thumb-grip{opacity:.55}
+.pe-thumb-grip:hover{opacity:1}
+.pe-thumb-grip:active{cursor:grabbing}
+.pe-thumb-grip svg{width:16px;height:16px}
+.pe-thumb.pe-dragging{opacity:.45}
+.pe-thumb.pe-drop-before{box-shadow:0 -3px 0 -1px var(--pe-accent2)}
+.pe-thumb.pe-drop-after{box-shadow:0 3px 0 -1px var(--pe-accent2)}
