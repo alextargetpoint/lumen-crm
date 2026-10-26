@@ -4982,6 +4982,7 @@ function celebrate(action, n, cfg) {
 
 /* ═══════════ КОНТРОЛЬ — командный центр рисков основателя ═══════════ */
 const CTRL_BUCKETS = {
+  noFirstContact:{ t: 'Без первого ответа',   s: 'crit', ic: I.bolt,     d: 'новый лид давно без единого ответа', lead: true },
   unassigned:   { t: 'Ничьи лиды',            s: 'crit', ic: I.user,     d: 'активный лид без брокера', lead: true },
   slaBreach:    { t: 'Нарушения SLA',         s: 'crit', ic: I.bolt,     d: 'брокер не коснулся вовремя', lead: true },
   leak:         { t: 'Антислив',              s: 'crit', ic: I.flame,    d: 'риск увода на личный канал', lead: true },
@@ -4998,6 +4999,7 @@ function ctrlItemRow(key, it) {
   const open = CTRL_BUCKETS[key].lead && it.id;
   const attr = open ? ` data-ovlead="${esc(it.id)}" style="cursor:pointer"` : '';
   let meta = '';
+  if (key === 'noFirstContact') { const gn = (STATE.settings.geoNames && STATE.settings.geoNames[it.geo]) || it.geo || ''; const hrs = it.ageMin >= 120 ? Math.round(it.ageMin / 60) + ' ч' : it.ageMin + ' мин'; meta = `${hrs} без ответа · ${it.aiOn ? 'ИИ вкл — возможен сбой' : 'ИИ выкл'}${it.broker ? ' · ' + it.broker : gn ? ' · ' + gn : ''}`; }
   if (key === 'unassigned') { const gn = (STATE.settings.geoNames && STATE.settings.geoNames[it.geo]) || it.geo || ''; meta = `${stageName(it.stage)}${it.budget ? ' · $' + (it.budget / 1000 | 0) + 'k' : ''}${gn ? ' · ' + gn : ''}`; }
   if (key === 'slaBreach') meta = `${it.broker || '—'} · ${it.flag === 'reassigned' ? 'возвращён в пул' : 'просрочка'}`;
   if (key === 'leak') meta = `${it.reason}${it.broker ? ' · ' + it.broker : ''}`;
@@ -5076,7 +5078,7 @@ function ctrlAnalyticsHTML(fa) {
 PAGES.control = async (root) => {
   let d, fa = null;
   try { [d, fa] = await Promise.all([api.get('/control-center'), api.get('/control-analytics').catch(() => null)]); } catch (e) { root.innerHTML = `<div class="m-empty">Не удалось загрузить: ${esc(e.message)}</div>`; return; }
-  const order = ['unassigned', 'slaBreach', 'leak', 'dealCheck', 'silentBroker', 'vipStalled', 'awayWaiting', 'duplicates', 'orphanMeetings', 'overloaded', 'geoUncovered'];
+  const order = ['noFirstContact', 'unassigned', 'slaBreach', 'leak', 'dealCheck', 'silentBroker', 'vipStalled', 'awayWaiting', 'duplicates', 'orphanMeetings', 'overloaded', 'geoUncovered'];
   const active = order.filter(k => (d.buckets[k] || []).length);
   window._ctrlDups = d.buckets.duplicates || [];
   const crit = active.filter(k => CTRL_BUCKETS[k].s === 'crit').reduce((s, k) => s + d.buckets[k].length, 0);

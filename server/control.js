@@ -75,10 +75,15 @@ function scanRisks(db) {
     duplicates: [],     /* один человек через разные каналы */
     dealCheck: [],      /* «сделка» без следов работы — сверить факт */
     awayWaiting: [],    /* брокер в отсутствии, а клиент ждёт */
+    noFirstContact: [], /* новый лид без ПЕРВОГО ответа дольше порога (ИИ не ответил/сбой/ручной забыт) */
   };
 
   const geoWithLead = new Set();
   const geoCovered = new Set(activeBrokers.map(b => b.geo).filter(Boolean));
+  /* leadId → был ли хоть один исходящий (ИИ или человек) — чтобы ловить «ни разу не коснулись» */
+  const hasOut = new Set();
+  for (const m of db.messages) if (m.dir === 'out') hasOut.add(m.leadId);
+  const firstContactMs = (C.firstContactMin || 20) * 60e3;   /* порог первого контакта (мин) */
 
   for (const l of db.leads) {
     if (CLOSED_STAGES.includes(l.stage)) continue;
@@ -88,6 +93,12 @@ function scanRisks(db) {
     /* ничьи */
     if (active && !l.broker) {
       buckets.unassigned.push({ id: l.id, name: l.name, geo: l.geo, stage: l.stage, budget: budgetOf(l), at: l.handoverAt || l.createdAt || 0 });
+    }
+    /* новый лид без первого контакта: создан давно, но ни одного исходящего — обещание мгновенного ответа
+       нарушено (ИИ не ответил/сбой, или ручной лид забыт). Speed-to-lead — главный предиктор конверсии. */
+    if (['new', 'touch', 'dialog'].includes(l.stage) && !hasOut.has(l.id)) {
+      const age = now - (l.createdAt || now);
+      if (age > firstContactMs) buckets.noFirstContact.push({ id: l.id, name: l.name, geo: l.geo, broker: brokerName(l.broker), ageMin: Math.round(age / 60e3), aiOn: !!(l.ai && l.ai.enabled) });
     }
     /* SLA */
     if (l.slaFlag) {
@@ -310,6 +321,7 @@ function funnelAnalysis(db) {
    заместителя. Дедуп по ключам + троттлинг: алерт не чаще раза в cooldown, и только
    когда появился НОВЫЙ элемент. Возвращает {fire, text, counts, newCount}. */
 const ALERT_BUCKETS = {
+  noFirstContact: { pfx: 'nf', k: it => it.id, label: 'без первого ответа' },
   unassigned: { pfx: 'u', k: it => it.id, label: 'ничьих лидов' },
   vipStalled: { pfx: 'v', k: it => it.id, label: 'VIP застряло' },
   dealCheck: { pfx: 'd', k: it => it.id, label: 'сделок без следов' },
