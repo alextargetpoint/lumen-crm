@@ -609,6 +609,24 @@ input[type=number] { -moz-appearance: textfield; }
 .app.editor-mode.nav-pinned .sidebar .nav-label,
 .app.editor-mode.nav-pinned .sidebar .agency-tx,
 .app.editor-mode.nav-pinned .sidebar .agency-chev{ opacity:1; pointer-events:auto; }
+/* подпись пункта (nav-item-tx), каретка пространства и бейдж «в доработке» — тоже прячем в свёрнутом,
+   иначе текст обрезается кромкой 48px (баг со скрина). Показываем только при раскрытии. */
+.app.editor-mode .sidebar .nav-item-tx,
+.app.editor-mode .sidebar .nav-caret,
+.app.editor-mode .sidebar .nav-dev{ opacity:0; transition:opacity .12s ease; pointer-events:none; }
+.app.editor-mode .sidebar:hover .nav-item-tx,
+.app.editor-mode .sidebar:focus-within .nav-item-tx,
+.app.editor-mode.nav-open .sidebar .nav-item-tx,
+.app.editor-mode.nav-pinned .sidebar .nav-item-tx,
+.app.editor-mode .sidebar:hover .nav-caret,
+.app.editor-mode .sidebar:focus-within .nav-caret,
+.app.editor-mode.nav-open .sidebar .nav-caret,
+.app.editor-mode.nav-pinned .sidebar .nav-caret,
+.app.editor-mode .sidebar:hover .nav-dev,
+.app.editor-mode.nav-open .sidebar .nav-dev,
+.app.editor-mode.nav-pinned .sidebar .nav-dev{ opacity:1; pointer-events:auto; }
+/* иконки по центру узкой полосы (без текста рядом они не должны липнуть к левому краю) */
+.app.editor-mode .sidebar:not(:hover):not(.nav-open):not(.nav-pinned) .nav-item{ justify-content:center; padding-left:0; padding-right:0; }
 
 /* ── Каталог «Презентации объектов» (референс-мокап №1) ───────────────────── */
 .po-crumb{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:4px;margin:0 0 10px}

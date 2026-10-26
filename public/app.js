@@ -2999,7 +2999,7 @@ function initNav() {
     const ws = btn.dataset.ws ? WORKSPACES[btn.dataset.ws] : null;
     const def = ws ? { icon: ws.icon, name: t(ws.label, ws.labelEn) } : NAV[btn.dataset.page];
     const defName = ws ? def.name : navName(btn.dataset.page);
-    btn.innerHTML = `${ic(def.icon)}${defName}${ws ? '<span class="nav-caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>' : ''}<span class="cnt" data-cnt style="display:none"></span>`;
+    btn.innerHTML = `${ic(def.icon)}<span class="nav-item-tx">${defName}</span>${ws ? '<span class="nav-caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>' : ''}<span class="cnt" data-cnt style="display:none"></span>`;
     if (beta && btn.dataset.page && _isDevPage(btn.dataset.page)) btn.insertAdjacentHTML('beforeend', devBadge);
     btn.addEventListener('click', () => {
       /* пространство: если уже внутри него — не прыгаем на дефолт, остаёмся на текущей вкладке */

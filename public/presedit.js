@@ -566,7 +566,7 @@
     root.querySelectorAll('[data-act]').forEach(function (el) {
       if (el.closest('#peInsp')) return;   /* кнопки инспектора вешает wireInsp/wireAddPanel — иначе двойной клик (тумблеры не срабатывали) */
       var act = el.getAttribute('data-act');
-      el.addEventListener(actEvent(act), function (e) { handle(act, el, e); });
+      el.addEventListener(el.tagName === 'SELECT' ? 'change' : actEvent(act), function (e) { handle(act, el, e); });
     });
     // page select (плоские миниатюры + строки групп подборки)
     root.querySelectorAll('.pe-nav-list [data-pg]').forEach(function (el) { if (el.getAttribute('data-act')) return; el.addEventListener('click', function (e) { if (e.target.closest('[data-act]')) return; var v = el.getAttribute('data-pg'); if (v === '') return; var i = +v; if (S.multiMode) { S.multiSel = S.multiSel || []; var at = S.multiSel.indexOf(i); if (at >= 0) S.multiSel.splice(at, 1); else S.multiSel.push(i); render(); return; } S.pageIdx = i; render(); }); });
@@ -579,7 +579,7 @@
   }
   function wireAddPanel() {
     var ib = document.getElementById('peInsp');
-    if (ib) ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener('click', function (e) { handle(a, el, e); }); });
+    if (ib) ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'click', function (e) { handle(a, el, e); }); });
     var s = document.getElementById('peBlSearch'); if (!s) return;
     s.addEventListener('input', function () {
       var v = s.value.toLowerCase();
@@ -600,7 +600,7 @@
     ib.querySelectorAll('[data-sf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('stages', el); }); });
     ib.querySelectorAll('[data-pay]').forEach(function (el) { el.addEventListener('input', onPayBase); });
     ib.querySelectorAll('[data-cursel]').forEach(function (el) { el.addEventListener('change', onCur); });
-    ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener('click', function (e) { handle(a, el, e); }); });
+    ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'click', function (e) { handle(a, el, e); }); });
     var cn = ib.querySelector('#peClientName'); if (cn) cn.addEventListener('input', function () { S.pres.clientName = cn.value; scheduleSave(); });
   }
 
