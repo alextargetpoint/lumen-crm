@@ -3198,6 +3198,7 @@ function mountEditor() {
     /* «Назад» внутри iframe-редактора → выходим из редактора в предыдущий раздел */
     window.addEventListener('message', e => {
       if (e && e.data === 'lumen:editor-back') history.back();
+      else if (e && e.data === 'lumen:editor-agency') { try { history.back(); } catch (_) {} setTimeout(() => { try { go('agency'); } catch (_) {} }, 60); }
     });
   }
 }

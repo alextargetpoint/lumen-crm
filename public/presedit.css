@@ -546,3 +546,57 @@ button{font-family:inherit;cursor:pointer}
 .pe-ctx-it{display:flex;align-items:center;gap:9px;border:0;background:transparent;color:var(--pe-ink);font:500 13px/1 'Inter',system-ui,sans-serif;padding:9px 11px;border-radius:7px;cursor:pointer;text-align:left;width:100%}
 .pe-ctx-it:hover{background:var(--pe-hi)}
 .pe-ctx-it svg{width:16px;height:16px;flex:none;color:var(--pe-mut)}
+
+/* ===== РЕДИЗАЙН ВКЛАДОК СТИЛЬ / КОМПОЗИЦИЯ (референс клиента) ===== */
+.pe-sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:20px 0 12px}
+.pe-sec-head .pe-sec-label{margin:0}
+.pe-sec-cnt{font-size:12px;color:var(--pe-mut)}
+/* пресет-карточки с живым превью обложки */
+.pe-stylecards .pe-stylecard{padding:0;overflow:hidden;gap:0;border-radius:12px}
+.pe-stylecard.on{border-color:var(--pe-accent2);box-shadow:inset 0 0 0 1px var(--pe-accent2)}
+.pe-stylecard-prev{width:100%;aspect-ratio:3/4;position:relative;overflow:hidden;background:var(--pe-hi);border-bottom:1px solid var(--pe-line)}
+.pe-stylecard-mini{position:absolute;inset:0;overflow:hidden}
+.pe-stylecard-nm{font-size:11px;font-weight:600;padding:8px 4px;width:100%;text-align:center}
+.pe-stylecard-ck{position:absolute;top:6px;right:6px;background:var(--pe-accent2);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;z-index:2}
+.pe-stylecard-ck svg{width:12px;height:12px}
+/* шрифт-карточка (Aa + оверлей-select) */
+.pe-fontcard{position:relative;display:flex;align-items:center;gap:12px;border:1px solid var(--pe-line);border-radius:12px;padding:11px 14px;background:#fff;cursor:pointer}
+.pe-fontcard:hover{border-color:#d9d3c7}
+.pe-fontcard-aa{flex:0 0 auto;width:46px;height:46px;border-radius:11px;background:var(--pe-hi);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--pe-ink)}
+.pe-fontcard-tx{flex:1;min-width:0}
+.pe-fontcard-tx b{display:block;font-size:14px;font-weight:600;color:var(--pe-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pe-fontcard-tx span{display:block;font-size:12px;color:var(--pe-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pe-fontcard-chev{flex:0 0 auto;color:var(--pe-mut)}.pe-fontcard-chev svg{width:18px;height:18px}
+.pe-fontcard-sel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0}
+/* select-карточка (Тип страницы) */
+.pe-selectcard{position:relative;display:flex;align-items:center;border:1px solid var(--pe-line);border-radius:12px;padding:14px;background:#fff;cursor:pointer}
+.pe-selectcard:hover{border-color:#d9d3c7}
+.pe-selectcard-val{flex:1;font-size:14px;font-weight:500;color:var(--pe-ink)}
+.pe-selectcard-chev{color:var(--pe-mut)}.pe-selectcard-chev svg{width:18px;height:18px}
+.pe-selectcard-sel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0}
+/* бренд-карточка */
+.pe-brandcard{display:flex;align-items:center;gap:12px;border:1px solid var(--pe-line);border-radius:12px;padding:12px 13px;background:var(--pe-hi)}
+.pe-brandcard-logo{flex:0 0 auto;min-width:46px;max-width:70px;height:46px;padding:0 8px;border-radius:10px;background:#fff;border:1px solid var(--pe-line);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;letter-spacing:.03em;text-align:center;line-height:1.15;color:var(--pe-ink);overflow:hidden}
+.pe-brandcard-tx{flex:1;min-width:0}
+.pe-brandcard-tx b{display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pe-brandcard-tx span{display:block;font-size:11.5px;color:var(--pe-mut)}
+.pe-brandcard-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--pe-line);background:#fff;border-radius:9px;padding:8px 10px;font-size:12px;font-weight:600;color:var(--pe-ink);cursor:pointer;white-space:nowrap}
+.pe-brandcard-btn:hover{background:#fff;border-color:#d9d3c7}
+.pe-brandcard-btn svg{width:15px;height:15px}
+/* макеты страницы — большие живые превью */
+.pe-layouts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pe-layouts.single{grid-template-columns:1fr}
+.pe-layoutcard{position:relative;border:1.5px solid var(--pe-line);border-radius:12px;padding:0;overflow:hidden;background:#fff;cursor:pointer}
+.pe-layoutcard.on{border-color:var(--pe-accent2);box-shadow:inset 0 0 0 1px var(--pe-accent2)}
+.pe-layoutcard-prev{width:100%;aspect-ratio:3/4;position:relative;overflow:hidden;background:var(--pe-hi)}
+.pe-layouts.single .pe-layoutcard-prev{aspect-ratio:1.414/1}
+.pe-layoutcard-mini{position:absolute;inset:0;overflow:hidden}
+.pe-layoutcard-nm{font-size:11px;font-weight:600;padding:7px 4px;text-align:center}
+.pe-layoutcard-ck{position:absolute;top:7px;right:7px;background:var(--pe-accent2);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;z-index:2}
+.pe-layoutcard-ck svg{width:13px;height:13px}
+.pe-layout-nm{font-size:14px;font-weight:700;margin-top:14px;color:var(--pe-ink)}
+.pe-layout-desc{font-size:12.5px;color:var(--pe-mut);margin-top:2px}
+.pe-infobox{display:flex;align-items:flex-start;gap:9px;background:var(--pe-hi);border:1px solid var(--pe-line);border-radius:10px;padding:11px 13px;margin-top:16px;font-size:12px;color:var(--pe-mut);line-height:1.4}
+.pe-infobox svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;opacity:.7}
+.pe-page-foot{display:flex;align-items:center;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--pe-line);font-size:12.5px;color:var(--pe-mut)}
+.pe-page-foot svg{width:15px;height:15px;opacity:.7}

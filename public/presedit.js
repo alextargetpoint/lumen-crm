@@ -519,28 +519,52 @@
   }
 
   /* ---------- COMPOSITION TAB ---------- */
+  /* Тип страницы (ЧТО) отдельно от макета (КАК) — ТЗ §4/§6. Макет — большие живые превью. */
   function compositionTab() {
     var s = curSection(); if (!s) return '';
-    /* Тип страницы (ЧТО это за страница) — отдельно от макета (КАК разложены элементы) — ТЗ §4/§6 */
     var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker'];
     var h = '<div class="pe-sec-label">Тип страницы</div>' +
-      '<select class="pe-typesel" data-act="setType">' + types.map(function (f) {
-        return '<option value="' + f + '"' + (f === s.family ? ' selected' : '') + '>' + esc(FAM_LABEL[f] || f) + '</option>';
-      }).join('') + '</select>';
-    if (s.family === 'hero') {
-      var COVERS = [['bottom', 'Фото снизу'], ['right', 'Фото справа'], ['full', 'На весь лист'], ['text', 'Текстовая']];
-      var cur = s.coverLayout || defaultCover();
-      h += '<div class="pe-sec-label" style="margin-top:18px">Варианты компоновки (обложка)</div>' +
-        '<div class="pe-variants pe-covers">' + COVERS.map(function (v) {
-          return '<div class="pe-var' + (v[0] === cur ? ' on' : '') + '" data-act="setCover" data-cover="' + v[0] + '"><div class="pe-var-prev" data-covermini="' + v[0] + '"></div><div class="pe-var-nm">' + v[1] + '</div></div>';
-        }).join('') + '</div>';
-    } else if (s.family === 'editorial' || s.family === 'metrics' || s.family === 'benefits') {
-      h += '<div class="pe-sec-label" style="margin-top:18px">Варианты компоновки</div>' +
-        '<div class="pe-switchrow"><span style="font-size:13px">Зеркально (фото / текст)</span><button class="pe-toggle' + (s.styleOverrides && s.styleOverrides.mirror ? ' on' : '') + '" data-act="mirror"></button></div>';
-    } else {
-      h += '<p class="hint" style="margin-top:14px">У этого типа страницы один макет.</p>';
-    }
+      '<div class="pe-selectcard"><span class="pe-selectcard-val">' + esc(FAM_LABEL[s.family] || s.family) + '</span><span class="pe-selectcard-chev">' + ic('chev') + '</span>' +
+      '<select class="pe-selectcard-sel" data-act="setType">' + types.map(function (f) { return '<option value="' + f + '"' + (f === s.family ? ' selected' : '') + '>' + esc(FAM_LABEL[f] || f) + '</option>'; }).join('') + '</select></div>';
+    var layouts = layoutsFor(s);
+    h += '<div class="pe-sec-head"><span class="pe-sec-label" style="margin:0">Макет страницы</span><span class="pe-sec-cnt">' + layouts.length + ' ' + plural(layouts.length, 'макет', 'макета', 'макетов') + '</span></div>';
+    h += '<div class="pe-layouts' + (layouts.length === 1 ? ' single' : '') + '">' + layouts.map(function (l) {
+      return '<button class="pe-layoutcard' + (l.active ? ' on' : '') + '"' + (l.act ? ' data-act="' + l.act + '" ' + (l.data || '') : '') + '><div class="pe-layoutcard-prev"><div class="pe-layoutcard-mini" data-layoutmini="' + l.key + '"></div></div>' + (l.label ? '<div class="pe-layoutcard-nm">' + esc(l.label) + '</div>' : '') + (l.active ? '<div class="pe-layoutcard-ck">' + ic('check') + '</div>' : '') + '</button>';
+    }).join('') + '</div>';
+    h += '<div class="pe-layout-nm">' + esc(layoutTitle(s)) + '</div><div class="pe-layout-desc">Макет для этого типа страницы.</div>';
+    h += '<div class="pe-infobox">' + ic('doc') + '<span>Фотографии и текст меняются во вкладке «Содержание».</span></div>';
+    h += '<div class="pe-page-foot">' + ic('doc') + '<span>Страница ' + (S.pageIdx + 1) + ' · ' + esc(FAM_LABEL[s.family] || s.family) + '</span></div>';
     return h;
+  }
+  function layoutsFor(s) {
+    if (s.family === 'hero') {
+      var COVERS = [['full', 'На весь лист'], ['bottom', 'Фото снизу'], ['right', 'Фото справа'], ['text', 'Текстовая']];
+      var cur = s.coverLayout || defaultCover();
+      return COVERS.map(function (v) { return { key: v[0], label: v[1], active: v[0] === cur, act: 'setCover', data: 'data-cover="' + v[0] + '"' }; });
+    }
+    if (s.family === 'editorial' || s.family === 'metrics' || s.family === 'benefits') {
+      var m = !!(s.styleOverrides && s.styleOverrides.mirror);
+      return [
+        { key: 'normal', label: 'Фото справа', active: !m, act: 'setMirror', data: 'data-mirror="0"' },
+        { key: 'mirror', label: 'Фото слева', active: m, act: 'setMirror', data: 'data-mirror="1"' },
+      ];
+    }
+    return [{ key: 'single', label: '', active: true }];
+  }
+  function layoutTitle(s) {
+    if (s.family === 'hero') { var nm = { full: 'Обложка на весь лист', bottom: 'Обложка с фото снизу', right: 'Обложка с фото справа', text: 'Текстовая обложка' }; return nm[s.coverLayout || defaultCover()] || 'Обложка'; }
+    return FAM_LABEL[s.family] || s.family;
+  }
+  function mountLayoutMinis() {
+    var boxes = document.querySelectorAll('[data-layoutmini]'); if (!boxes.length) return;
+    var s = curSection(); if (!s) return;
+    boxes.forEach(function (box) {
+      var key = box.getAttribute('data-layoutmini');
+      var tmp = Object.assign({}, s);
+      if (key === 'normal' || key === 'mirror') tmp.styleOverrides = Object.assign({}, s.styleOverrides, { mirror: key === 'mirror' });
+      else if (key !== 'single') tmp.coverLayout = key;
+      miniHtml(box, tmp);
+    });
   }
 
   /* ---------- STYLE TAB ---------- */
@@ -550,17 +574,45 @@
     var th = S.pres.theme;
     var pal = TOK.palette(th.paletteId), fp = TOK.fontPair(th.fontPairId);
     var brand = brandWithBroker();
-    function presetCard(p) { var c = TOK.palette(p.paletteId).c; return '<button class="pe-stylecard' + (p.id === th.presetId ? ' on' : '') + '" data-act="pickPreset" data-preset="' + p.id + '"><div class="pe-stylecard-sw">' + [c.background, c.surface, c.accent, c.text].map(function (x) { return '<i style="background:' + x + '"></i>'; }).join('') + '</div><div class="pe-stylecard-nm">' + esc(p.name) + '</div>' + (p.id === th.presetId ? '<div class="pe-stylecard-ck">' + ic('check') + '</div>' : '') + '</button>'; }
+    /* карточка пресета с ЖИВЫМ мини-превью обложки (рендер в data-stylemini после вставки) */
+    function presetCard(p) {
+      return '<button class="pe-stylecard' + (p.id === th.presetId ? ' on' : '') + '" data-act="pickPreset" data-preset="' + p.id + '">' +
+        '<div class="pe-stylecard-prev"><div class="pe-stylecard-mini" data-stylemini="' + p.id + '"></div></div>' +
+        '<div class="pe-stylecard-nm">' + esc(p.name) + '</div>' +
+        (p.id === th.presetId ? '<div class="pe-stylecard-ck">' + ic('check') + '</div>' : '') + '</button>';
+    }
     var h = '<div class="pe-sec-label">Стиль документа</div><div class="pe-stylecards">' + TOK.PRESETS.map(presetCard).join('') + '</div>';
-    h += '<div class="pe-sec-label" style="margin-top:18px">Цветовая палитра</div><div class="pe-paldots">' +
+    h += '<div class="pe-sec-label" style="margin-top:20px">Цветовая палитра</div><div class="pe-paldots">' +
       TOK.PALETTES.map(function (p) { return '<button class="pe-paldot' + (p.id === th.paletteId ? ' on' : '') + '" data-act="pickPalette" data-pal="' + p.id + '" title="' + esc(p.name) + '" style="background:' + p.c.accent + '"></button>'; }).join('') + '</div>';
-    h += '<div class="pe-sec-label" style="margin-top:18px">Шрифты</div><select class="pe-typesel" data-act="pickFont">' +
-      TOK.FONT_PAIRS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === th.fontPairId ? ' selected' : '') + '>' + esc(f.heading.family) + ' + ' + esc(f.body.family) + '</option>'; }).join('') + '</select>';
-    h += '<div class="pe-sec-label" style="margin-top:18px">Бренд</div><div class="pe-brandview"><div class="pe-brandname">' + esc(brand.logoText || brand.name || '—') + '</div><div class="hint">Меняется в настройках агентства</div></div>';
+    /* шрифты — карточка с превью «Aa» + нативный select оверлеем (клик по карточке → список) */
+    h += '<div class="pe-sec-label" style="margin-top:20px">Шрифты</div>' +
+      '<div class="pe-fontcard"><span class="pe-fontcard-aa" style="font-family:\'' + esc(fp.heading.family) + '\',Georgia,serif">Aa</span>' +
+      '<div class="pe-fontcard-tx"><b>' + esc(fp.heading.family) + ' + ' + esc(fp.body.family) + '</b><span>' + esc(fp.character || 'Шрифтовая пара') + '</span></div>' +
+      '<span class="pe-fontcard-chev">' + ic('chev') + '</span>' +
+      '<select class="pe-fontcard-sel" data-act="pickFont">' + TOK.FONT_PAIRS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === th.fontPairId ? ' selected' : '') + '>' + esc(f.heading.family) + ' + ' + esc(f.body.family) + '</option>'; }).join('') + '</select></div>';
+    /* бренд — карточка с логотипом + кнопкой «Настройки агентства» */
+    var logoTx = brand.logoText || brand.name || '—';
+    h += '<div class="pe-sec-label" style="margin-top:20px">Бренд</div>' +
+      '<div class="pe-brandcard"><span class="pe-brandcard-logo">' + esc(logoTx) + '</span>' +
+      '<div class="pe-brandcard-tx"><b>' + esc(brand.name || logoTx) + '</b><span>Меняется в настройках агентства</span></div>' +
+      '<button class="pe-brandcard-btn" data-act="agencySettings" title="Открыть настройки агентства">' + ic('gear') + '<span>Настройки агентства</span></button></div>';
     var cr = TOK.contrast(pal.c.text, pal.c.background); var ok = cr >= 4.5;
     h += '<div class="pe-contrast' + (ok ? '' : ' bad') + '" style="margin-top:16px"><div class="ic">' + ic(ok ? 'check' : 'x') + '</div><div><b>' + (ok ? 'Контраст пройден' : 'Низкий контраст') + '</b><p>Текст на фоне ' + cr.toFixed(1) + ':1 — ' + (ok ? 'норма WCAG' : 'ниже 4.5:1') + '</p></div></div>';
     h += '<button class="pe-btn pe-btn-primary" style="width:100%;justify-content:center;margin-top:14px" data-act="applyAll">' + ic('check') + 'Применить ко всем страницам</button>';
     return h;
+  }
+  /* рендер живых мини-превью пресетов в карточках стиля */
+  function mountStyleMinis() {
+    var boxes = document.querySelectorAll('[data-stylemini]'); if (!boxes.length) return;
+    var s = sections().find(function (x) { return x.family === 'hero'; }) || sections()[0]; if (!s) return;
+    var f = TOK.format('portrait_a4');
+    boxes.forEach(function (box) {
+      var pid = box.getAttribute('data-stylemini');
+      var theme = (TOK.presetTheme && TOK.presetTheme(pid)) || S.pres.theme;
+      var html; try { html = T.renderSection(s, { format: 'portrait_a4', theme: theme, source: S.source, assets: S.assets, brand: brandWithBroker() })[0] || ''; } catch (e) { html = ''; }
+      var w = box.clientWidth || 150; var sc = w / f.cssW;
+      box.innerHTML = '<div style="position:absolute;top:0;left:0;transform-origin:top left;width:' + f.cssW + 'px;height:' + f.cssH + 'px;transform:scale(' + sc + ')">' + html + '</div>';
+    });
   }
 
   /* ================= WIRING ================= */
@@ -717,6 +769,7 @@
       case 'undo': doUndo(); break;
       case 'redo': doRedo(); break;
       case 'preview': window.open('/pres/' + ID + '/print?format=' + S.fmt, '_blank'); break;
+      case 'agencySettings': try { if (window.self !== window.top) window.parent.postMessage('lumen:editor-agency', '*'); else location.href = '/#agency'; } catch (_) {} break;
       case 'export': openExport(); break;
       case 'openStyle': openStyle(); break;
       case 'zoomin': setZoom(curZoom() + 0.1); break;
@@ -765,6 +818,7 @@
       case 'pickPalette': mutate(function () { S.pres.theme.paletteId = el.getAttribute('data-pal'); S.pres.theme.presetId = null; }); break;
       case 'pickFont': mutate(function () { S.pres.theme.fontPairId = el.value; }); break;
       case 'applyAll': scheduleSave(); toast('Оформление применено ко всем страницам'); break;
+      case 'setMirror': mutate(function () { s.styleOverrides = s.styleOverrides || {}; s.styleOverrides.mirror = el.getAttribute('data-mirror') === '1'; }); break;
       case 'toggleClient': mutate(function () { S.pres.showClientName = S.pres.showClientName === false; }); break;
       case 'detach': mutate(function () { setOverride(s, el.getAttribute('data-key'), cval(s, el.getAttribute('data-key'))); }); break;
       case 'revert': mutate(function () { restoreSource(s, el.getAttribute('data-key')); }); break;   /* вернуть из CRM (ТЗ §7) */
@@ -1066,6 +1120,8 @@
     box.innerHTML = '<div style="position:absolute;top:0;left:0;transform-origin:top left;width:' + f.cssW + 'px;height:' + f.cssH + 'px;transform:scale(' + sc + ')">' + html + '</div>';
   }
   function mountVarMinis() {
+    mountStyleMinis();   /* живые превью пресетов (вкладка Стиль) — до guard'а секции */
+    mountLayoutMinis();  /* живое превью макета (вкладка Композиция) */
     var s = curSection(); if (!s) return;
     document.querySelectorAll('[data-varmini]').forEach(function (box) {
       miniHtml(box, Object.assign({}, s, { family: box.getAttribute('data-varmini') }));
@@ -1577,6 +1633,7 @@
       warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', link: '<path d="M9 15l6-6M8 11l-2 2a3 3 0 0 0 4 4l2-2M16 13l2-2a3 3 0 0 0-4-4l-2 2"/>',
       phone: '<path d="M5 4h3l2 5-2 1a9 9 0 0 0 4 4l1-2 5 2v3a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
       back: '<path d="M15 6l-6 6 6 6"/>', chev: '<path d="M6 9l6 6 6-6"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
+      gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>', sliders: '<path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h7M15 17h5"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="13" cy="17" r="2"/>',
       text: '<path d="M4 6h16M4 12h16M4 18h10"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
       pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/>', doc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
       clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', swap: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
