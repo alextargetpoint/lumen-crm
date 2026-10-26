@@ -171,6 +171,7 @@
 .lp-toc-name{ font-weight:600; font-size:1.18em; line-height:1.2; }
 .lp-toc-place{ color:var(--muted); font-size:.9em; }
 .lp-toc-price{ flex:0 0 auto; font-family:var(--font-head); font-weight:var(--head-weight); white-space:nowrap; align-self:center; }
+.lp-cmp-seq{ color:var(--accent); font-family:var(--font-head); font-weight:var(--head-weight); margin-right:8px; letter-spacing:.02em; }
 
 /* ====== BROKER ====== */
 .lp-broker-port{ justify-content:flex-start; align-items:center; text-align:center; }

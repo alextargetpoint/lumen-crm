@@ -174,12 +174,13 @@ function buildComparison(db, props) {
     { key: 'price', label: 'Цена от' }, { key: 'area', label: 'Площадь' },
     { key: 'beds', label: 'Спальни' }, { key: 'handover', label: 'Срок сдачи' },
   ];
-  const objects = (props || []).map(pr => {
+  const objects = (props || []).map((pr, k) => {
     const gi = geoInfo(pr.geo);
     const currency = pr.currency || gi.currency;
     const areas = (pr.units || []).map(u => +u.area).filter(Boolean);
     const areaRange = areas.length ? { from: Math.min(...areas), to: Math.max(...areas), unit: 'm2' } : null;
     return {
+      seq: k + 1,
       name: pr.name || 'Объект',
       values: {
         location: (pr.district && pr.district.name) || gi.region || null,
