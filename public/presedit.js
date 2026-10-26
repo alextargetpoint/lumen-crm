@@ -1028,6 +1028,21 @@
   /* плавающая мини-панель над выбранным элементом (как в референсе): быстрые действия прямо у объекта.
      DOM-оверлей внутри #peCanvas (на <img> нельзя ::after); скроллится вместе с холстом (absolute+scrollTop). */
   function ceHideFloatbar() { var b = document.getElementById('peFloatbar'); if (b) b.style.display = 'none'; }
+  /* направляющие авто-выравнивания (центр страницы) — линии в #peCanvas на время драга */
+  function ceGuideEl(id, cls) {
+    var canvas = document.getElementById('peCanvas'); if (!canvas) return null;
+    var g = document.getElementById(id);
+    if (!g) { g = document.createElement('div'); g.id = id; canvas.appendChild(g); }
+    g.className = 'pe-guide ' + cls; return g;
+  }
+  function ceShowGuides(x, y) {
+    var canvas = document.getElementById('peCanvas'); if (!canvas) return;
+    var cr = canvas.getBoundingClientRect();
+    var gv = ceGuideEl('peGuideV', 'pe-guide-v'), gh = ceGuideEl('peGuideH', 'pe-guide-h');
+    if (gv) { if (x != null) { gv.style.left = (x - cr.left + canvas.scrollLeft) + 'px'; gv.style.display = 'block'; } else gv.style.display = 'none'; }
+    if (gh) { if (y != null) { gh.style.top = (y - cr.top + canvas.scrollTop) + 'px'; gh.style.display = 'block'; } else gh.style.display = 'none'; }
+  }
+  function ceHideGuides() { ['peGuideV', 'peGuideH'].forEach(function (id) { var g = document.getElementById(id); if (g) g.style.display = 'none'; }); }
   function ceShowFloatbarFor(el, kind) {
     var canvas = document.getElementById('peCanvas'); if (!canvas || !el) return;
     var bar = document.getElementById('peFloatbar');
@@ -1073,11 +1088,20 @@
      (улучшить фото, закрепление) — которых нет на плавающей панели. Переиспользует действия инспектора. */
   function ceCloseCtx() { var m = document.getElementById('peCtxMenu'); if (m && m.parentNode) m.parentNode.removeChild(m); }
   function ceCtxItems(el) {
+    var s = curSection();
     if (el.classList.contains('pe-ced-photo')) {
       if (el.getAttribute('data-pe-gallery')) return [['galfield', 'image', 'Выбрать фото в панели']];
-      return [['replace', 'image', 'Заменить фото'], ['crop', 'crop', 'Кадрировать'], ['enhance', 'sparkle', 'Улучшить фото'], ['pin', 'lock', 'Закрепление…']];
+      var pItems = [['replace', 'image', 'Заменить фото'], ['crop', 'crop', 'Кадрировать'], ['enhance', 'sparkle', 'Улучшить фото'], ['pin', 'lock', 'Закрепление…']];
+      var ref = s && (s.assetRefs || [])[+(el.getAttribute('data-pe-idx') || 0)];
+      if (ref && ref.focalPoint && (ref.focalPoint.x !== 0.5 || ref.focalPoint.y !== 0.5)) pItems.push(['resetfocal', 'back', 'Вернуть фото на место']);
+      return pItems;
     }
-    if (el.classList.contains('pe-ced-text')) return [['edit', 'text', 'Изменить текст'], ['field', 'text', 'Править в панели']];
+    if (el.classList.contains('pe-ced-text')) {
+      var tItems = [['edit', 'text', 'Изменить текст'], ['field', 'text', 'Править в панели']];
+      var key = el.getAttribute('data-pe-key'); var mv = s && s.elMove && s.elMove[key];
+      if (mv && (mv.dx || mv.dy)) tItems.push(['resetmove', 'back', 'Вернуть на место']);
+      return tItems;
+    }
     return [['field', 'text', 'Править в панели']];
   }
   function ceShowCtx(el, x, y) {
@@ -1094,6 +1118,8 @@
   function ceCtxAction(a, el) {
     if (a === 'edit') { var t = el && el.classList.contains('pe-ced-text') ? el : (document.getElementById('peStage') || document).querySelector('.pe-ced-text.pe-sel'); if (t) ceBeginEdit(t, t.getAttribute('data-pe-key')); }
     else if (a === 'field') { if (S._ceSelKey) ceFocusField(S._ceSelKey); else if (S._ceSelPhoto != null) { var se = ceSelectedEl(); if (se) cePhotoSelect(se); } }
+    else if (a === 'resetmove') { var k = S._ceSelKey || (el && el.getAttribute('data-pe-key')); if (k) mutate(function () { var s = curSection(); if (s && s.elMove) { delete s.elMove[k]; } }); }
+    else if (a === 'resetfocal') { mutate(function () { var s = curSection(); var ref = s && (s.assetRefs || [])[+(S._ceSelPhoto || 0)]; if (ref) { delete ref.focalPoint; } }); }
     else ceFloatAction(a);   /* replace/crop/enhance/pin/galfield — общие делегаты в инспектор */
   }
   function ceBeginEdit(el, key) {
@@ -1188,17 +1214,31 @@
       var m0 = (s.elMove && s.elMove[key]) || { dx: 0, dy: 0 };
       var z = (typeof curZoom === 'function' && curZoom()) || 1; if (!z) z = 1;
       var sx = e.clientX, sy = e.clientY, moved = false, cur = { dx: m0.dx || 0, dy: m0.dy || 0 };
+      var page = el.closest('.lp-page');
       e.preventDefault(); ceHideFloatbar();
       el.classList.add('pe-moving');
       function onMove(ev) {
         if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 3) moved = true;
         cur.dx = (m0.dx || 0) + (ev.clientX - sx) / z;
         cur.dy = (m0.dy || 0) + (ev.clientY - sy) / z;
+        el.style.transform = 'translate(' + cur.dx + 'px,' + cur.dy + 'px)';
+        /* авто-выравнивание: snap к центру страницы и к исходной оси + направляющие */
+        var snapX = null, snapY = null, SNAP = 7;
+        if (page) {
+          var pr = page.getBoundingClientRect(), er = el.getBoundingClientRect();
+          var pcx = pr.left + pr.width / 2, pcy = pr.top + pr.height / 2;
+          var ecx = er.left + er.width / 2, ecy = er.top + er.height / 2;
+          if (Math.abs(ecx - pcx) < SNAP) { cur.dx += (pcx - ecx) / z; snapX = pcx; }
+          else if (Math.abs(cur.dx) < SNAP / z) { cur.dx = 0; snapX = (er.left - (m0.dx || 0) * z) + er.width / 2; }
+          if (Math.abs(ecy - pcy) < SNAP) { cur.dy += (pcy - ecy) / z; snapY = pcy; }
+          else if (Math.abs(cur.dy) < SNAP / z) { cur.dy = 0; }
+        }
         el.style.transform = 'translate(' + Math.round(cur.dx) + 'px,' + Math.round(cur.dy) + 'px)';
+        ceShowGuides(snapX, snapY);
       }
       function onUp() {
         document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
-        el.classList.remove('pe-moving');
+        el.classList.remove('pe-moving'); ceHideGuides();
         if (moved) { S._justPanned = true; mutate(function () { s.elMove = s.elMove || {}; s.elMove[key] = { dx: Math.round(cur.dx), dy: Math.round(cur.dy) }; }); }
       }
       document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);

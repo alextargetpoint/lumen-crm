@@ -624,3 +624,8 @@ button{font-family:inherit;cursor:pointer}
 .pe-ced-text{cursor:move}
 .pe-ced-text.pe-editing{cursor:text}
 .pe-ced.pe-moving{cursor:grabbing;outline:1.5px solid var(--pe-sel);outline-offset:2px}
+
+/* направляющие авто-выравнивания при драге */
+.pe-guide{position:absolute;z-index:46;pointer-events:none;background:var(--pe-sel);display:none;box-shadow:0 0 0 .5px rgba(45,108,223,.4)}
+.pe-guide-v{top:0;bottom:0;width:1px}
+.pe-guide-h{left:0;right:0;height:1px}
