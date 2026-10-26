@@ -1222,16 +1222,24 @@
         cur.dx = (m0.dx || 0) + (ev.clientX - sx) / z;
         cur.dy = (m0.dy || 0) + (ev.clientY - sy) / z;
         el.style.transform = 'translate(' + cur.dx + 'px,' + cur.dy + 'px)';
-        /* авто-выравнивание: snap к центру страницы и к исходной оси + направляющие */
+        /* авто-выравнивание: snap к центру страницы, к центрам/краям ДРУГИХ блоков, к исходной оси + направляющие */
         var snapX = null, snapY = null, SNAP = 7;
         if (page) {
           var pr = page.getBoundingClientRect(), er = el.getBoundingClientRect();
-          var pcx = pr.left + pr.width / 2, pcy = pr.top + pr.height / 2;
           var ecx = er.left + er.width / 2, ecy = er.top + er.height / 2;
-          if (Math.abs(ecx - pcx) < SNAP) { cur.dx += (pcx - ecx) / z; snapX = pcx; }
-          else if (Math.abs(cur.dx) < SNAP / z) { cur.dx = 0; snapX = (er.left - (m0.dx || 0) * z) + er.width / 2; }
-          if (Math.abs(ecy - pcy) < SNAP) { cur.dy += (pcy - ecy) / z; snapY = pcy; }
-          else if (Math.abs(cur.dy) < SNAP / z) { cur.dy = 0; }
+          /* кандидаты линий: центр страницы + центры/левый/правый (X) и центры/верх/низ (Y) других блоков */
+          var candX = [pr.left + pr.width / 2], candY = [pr.top + pr.height / 2];
+          page.querySelectorAll('.pe-ced[data-pe-key], .pe-ced-photo, .pe-ced-list').forEach(function (o) {
+            if (o === el || el.contains(o) || o.contains(el)) return;
+            var orr = o.getBoundingClientRect(); if (!orr.width) return;
+            candX.push(orr.left + orr.width / 2, orr.left, orr.right);
+            candY.push(orr.top + orr.height / 2, orr.top, orr.bottom);
+          });
+          var nearest = function (val, arr) { var best = null, bd = SNAP; for (var i = 0; i < arr.length; i++) { var dd = Math.abs(val - arr[i]); if (dd < bd) { bd = dd; best = arr[i]; } } return best; };
+          var tx = nearest(ecx, candX);
+          if (tx != null) { cur.dx += (tx - ecx) / z; snapX = tx; } else if (Math.abs(cur.dx) < SNAP / z) { cur.dx = 0; }
+          var ty = nearest(ecy, candY);
+          if (ty != null) { cur.dy += (ty - ecy) / z; snapY = ty; } else if (Math.abs(cur.dy) < SNAP / z) { cur.dy = 0; }
         }
         el.style.transform = 'translate(' + Math.round(cur.dx) + 'px,' + Math.round(cur.dy) + 'px)';
         ceShowGuides(snapX, snapY);

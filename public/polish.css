@@ -559,14 +559,17 @@ input[type=number] { -moz-appearance: textfield; }
    Основное меню → узкая полоса 48px (раскрытие по наведению/клику, overlay без
    сдвига рабочей области); редактор занимает всю область в iframe. */
 .app.editor-mode .sidebar{
-  position:absolute; left:0; top:0; height:100vh; width:48px; z-index:60;
+  position:absolute; left:0; top:0; height:100vh; width:12px; z-index:60;
   overflow:hidden; padding:16px 0 12px;
-  transition:width .18s var(--ease-soft,ease), box-shadow .18s ease;
+  transition:width .2s var(--ease-soft,ease), box-shadow .18s ease;
   will-change:width;
-  /* чистый обрез по 48px: подписи прячутся через opacity (ниже), маска не нужна —
-     она «растворяла» и сами иконки, полоса выглядела кривообрезанной */
+  /* свёрнуто = тонкая кромка-триггер 12px, СОДЕРЖИМОЕ РАСТВОРЕНО (ничего не торчит криво);
+     наведение → широкий раздел 236px. Содержимое прячем целиком (правило ниже). */
 }
-.app.editor-mode .main{ margin-left:48px; transition:margin-left .18s var(--ease-soft,ease); }
+/* растворяем ВСЁ содержимое в свёрнутом виде — остаётся только кромка для наведения */
+.app.editor-mode .sidebar > *{ transition:opacity .16s ease; }
+.app.editor-mode .sidebar:not(:hover):not(.nav-open):not(.nav-pinned) > *{ opacity:0; pointer-events:none; }
+.app.editor-mode .main{ margin-left:12px; transition:margin-left .2s var(--ease-soft,ease); }
 .app.editor-mode .topbar{ display:none; }
 .app.editor-mode .content{ padding:0; overflow:hidden; height:100vh; }
 .app.editor-mode .content .pe-frame{ width:100%; height:100%; border:0; display:block; background:var(--bg,#0b0e14); }
