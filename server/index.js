@@ -187,10 +187,10 @@ function presEditorShell(id, title) {
   В iframe (window.self!==window.top) не срабатывает — так встраивается в CRM. */
 try{if(window.self===window.top){location.replace('/#pres/'+${JSON.stringify(id)});}}catch(_){}</script>
 ${PRES_FAVICON}
-<link rel="stylesheet" href="/pres-styles.css?v=14"><link rel="stylesheet" href="/presedit.css?v=30">
+<link rel="stylesheet" href="/pres-styles.css?v=14"><link rel="stylesheet" href="/presedit.css?v=31">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=16"></script><script src="/presedit.js?v=38"></script>
+<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=16"></script><script src="/presedit.js?v=39"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
@@ -17725,6 +17725,19 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         const r = presentation.replaceObjectInCollection(db, pres, String(b.oldProjectId || ''), String(b.newProjectId || ''));
         if (r.error) return json(res, 400, r);
         presentation.pushHistory(pres, 'replace', presBy(R), 'Заменён объект');
+        store.save();
+        return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
+      }
+      // add objects to a collection — new objects appended before comparison/broker
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/add-objects$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req);
+        const ids = Array.isArray(b.projectIds) ? b.projectIds : (b.projectId ? [b.projectId] : []);
+        const r = presentation.addObjectsToCollection(db, pres, ids);
+        if (r.error) return json(res, 400, r);
+        presentation.pushHistory(pres, 'add', presBy(R), 'Добавлены объекты: ' + r.added);
         store.save();
         return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
       }

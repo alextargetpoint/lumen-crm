@@ -313,23 +313,78 @@ function replaceObjectInCollection(db, coll, oldPid, newPid) {
   const amap = assetsForProperty(newPr);
   Object.keys(amap).forEach(key => { coll.collectionAssets[ns + key] = amap[key]; });
   const d = draftFromProperty(db, newPr, null);
-  const N = (coll.projectIds || []).length;
-  if (N >= 2) tagObjectHeroSeq(d.orderedSections, newPr, idx, N);
   const newSecs = (d.orderedSections || []).filter(s => s.family !== 'broker').map(s => Object.assign({}, s, {
     id: ns + s.id, assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })),
   }));
   const at = insertAt < 0 ? coll.orderedSections.length : insertAt;
   coll.orderedSections.splice(at, 0, ...newSecs);
-  // синхронизируем «соединяющее» оглавление: пункт заменённого объекта
-  const toc = coll.orderedSections.filter(s => s.family === 'contents')[0];
-  if (toc && toc.contentBindings && toc.contentBindings.items) {
-    const arr = (toc.contentBindings.items.value || []).slice();
-    if (arr[idx]) { arr[idx] = collContentsItem(newPr, idx); toc.contentBindings.items = ov(arr); }
-  }
   coll.projectIds[idx] = newPid;
+  // «соединяющие» заново: оглавление, пометки «k из N», колонка сравнения
+  syncCollectionConnectors(db, coll);
   coll.draftRevision = (coll.draftRevision || 1) + 1;
   coll.updatedAt = Date.now();
   return { ok: true, replaced: { from: oldPid, to: newPid, index: idx, pages: newSecs.length } };
+}
+/* Добавление объектов в подборку: новые объекты встают в конец (перед сравнением/
+   рекомендацией/брокером), N растёт → пересобираются ВСЕ «соединяющие» (оглавление,
+   пометки «k из N» на обложках, сравнение). Правки существующих объектов не трогаются. */
+function addObjectsToCollection(db, coll, newPids) {
+  if (!coll || coll.kind !== 'collection') return { error: 'not a collection' };
+  const existing = coll.projectIds || (coll.projectIds = []);
+  const toAdd = (Array.isArray(newPids) ? newPids : []).map(String)
+    .filter((pid, i, arr) => arr.indexOf(pid) === i && existing.indexOf(pid) < 0 && (db.properties || []).some(x => x.id === pid));
+  if (!toAdd.length) return { error: 'нет новых объектов для добавления' };
+  coll.collectionAssets = coll.collectionAssets || {};
+  coll.orderedSections = coll.orderedSections || [];
+  let insertAt = coll.orderedSections.findIndex(s => ['comparison', 'recommendation', 'broker'].indexOf(s.family) >= 0);
+  if (insertAt < 0) insertAt = coll.orderedSections.length;
+  const built = [];
+  toAdd.forEach(pid => {
+    const pr = (db.properties || []).find(x => x.id === pid);
+    const k = existing.length; existing.push(pid);
+    const ns = 'o' + k + '_';
+    const amap = assetsForProperty(pr);
+    Object.keys(amap).forEach(key => { coll.collectionAssets[ns + key] = amap[key]; });
+    const d = draftFromProperty(db, pr, null);
+    (d.orderedSections || []).filter(s => s.family !== 'broker').forEach(s => {
+      built.push(Object.assign({}, s, { id: ns + s.id, assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })) }));
+    });
+  });
+  coll.orderedSections.splice(insertAt, 0, ...built);
+  syncCollectionConnectors(db, coll);
+  coll.draftRevision = (coll.draftRevision || 1) + 1;
+  coll.updatedAt = Date.now();
+  return { ok: true, added: toAdd.length, pages: built.length, projectIds: existing.slice() };
+}
+// props объектов подборки в порядке индексов
+function collObjectProps(db, coll) {
+  return (coll.projectIds || []).map(pid => (db.properties || []).find(x => x.id === pid) || { name: '', geo: '' });
+}
+// гарантируем страницу-оглавление сразу после вступления
+function ensureContentsSection(coll) {
+  let toc = (coll.orderedSections || []).filter(s => s.family === 'contents')[0];
+  if (toc) return toc;
+  toc = { id: 's' + hex(3), family: 'contents', enabled: true, contentBindings: { eyebrow: ov(['Подборка']), title: ov('В этой подборке'), subtitle: ov(''), items: ov([]) } };
+  const introIdx = (coll.orderedSections || []).findIndex(s => s.family === 'hero' && !/^o\d+_/.test(String(s.id || '')));
+  coll.orderedSections.splice(introIdx >= 0 ? introIdx + 1 : 0, 0, toc);
+  return toc;
+}
+/* Единая пересборка «соединяющих» подборки — вызывается после любого изменения состава
+   объектов (добавление/замена). Пересобирает оглавление, пометки «k из N», сравнение.
+   Заголовок/подводку оглавления, набранные вручную, НЕ затирает (только items). */
+function syncCollectionConnectors(db, coll) {
+  const props = collObjectProps(db, coll);
+  const N = props.length;
+  if (N >= 2) {
+    const toc = ensureContentsSection(coll);
+    toc.contentBindings = toc.contentBindings || {};
+    toc.contentBindings.items = ov(props.map((pr, k) => collContentsItem(pr, k)));
+    const sb = toc.contentBindings.subtitle;
+    if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + N + ' ' + ruPlural(N, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
+    props.forEach((pr, k) => tagObjectHeroSeq(objSectionsOf(coll, k), pr, k, N));
+  }
+  const cmp = (coll.orderedSections || []).filter(s => s.family === 'comparison')[0];
+  if (cmp && N >= 2) { const c = buildComparison(db, props); cmp.contentBindings = cmp.contentBindings || {}; cmp.contentBindings.criteria = ov(c.criteria); cmp.contentBindings.objects = ov(c.objects); }
 }
 /* Diff объекта в подборке против живой карточки (ТЗ v3 §14, экран «Обновить данные объекта»).
    «В подборке» = значение в документе (override если правлено, иначе cached из источника);
@@ -649,7 +704,7 @@ function publicProjection(snap) {
 
 module.exports = {
   SCHEMA_VERSION, RENDERER_VERSION, TOK, T,
-  draftFromProperty, draftCollection, replaceObjectInCollection, objectUpdates, applyObjectUpdates, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
+  draftFromProperty, draftCollection, replaceObjectInCollection, addObjectsToCollection, objectUpdates, applyObjectUpdates, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
 };

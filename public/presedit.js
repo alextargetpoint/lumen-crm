@@ -812,7 +812,7 @@
       case 'addclose': S.addMode = false; render(); break;
       case 'grptoggle': S.openGroups = S.openGroups || {}; var gk = +el.getAttribute('data-gk'); S.openGroups[gk] = !S.openGroups[gk]; render(); break;
       case 'objmenu': objMenu(el, +el.getAttribute('data-gk')); break;
-      case 'addobj': toast('Добавить объекты', 'Поиск и выбор объектов — экран в разработке'); break;
+      case 'addobj': openAddObjects(); break;
       case 'multiToggle': S.multiMode = !S.multiMode; S.multiSel = []; render(); break;
       case 'bulkHide': bulkOp('hide'); break;
       case 'bulkDup': bulkOp('dup'); break;
@@ -1608,6 +1608,59 @@
     document.body.appendChild(ov);
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     ov.querySelector('#roSearch').addEventListener('input', function () { q = this.value.toLowerCase(); ov.querySelector('.ro-list').innerHTML = list(); wireBody(); });
+    paint();
+  }
+
+  /* ---------- «Добавить объект(ы)» — мультивыбор, добавляются в конец подборки ---------- */
+  function openAddObjects() {
+    api('GET', '/objects').then(function (r) {
+      if (r.status !== 200) { toast('Не удалось', (r.json && r.json.error) || ''); return; }
+      var all = r.json.items || [];
+      var inColl = S.pres.projectIds || [];
+      var avail = all.filter(function (x) { return inColl.indexOf(x.id) < 0; });
+      addObjectsModal(avail, inColl.length);
+    });
+  }
+  function addObjectsModal(avail, curN) {
+    var sel = {}, q = '';
+    var ov = document.createElement('div'); ov.className = 'pu-overlay';
+    function money(o) { var c = o.currency === 'EUR' ? '€' : o.currency === 'THB' ? '฿' : '$'; return o.priceFrom ? 'от ' + c + ' ' + (o.priceFrom).toLocaleString('ru-RU') : ''; }
+    function selCount() { return Object.keys(sel).filter(function (k) { return sel[k]; }).length; }
+    function list() {
+      var items = avail.filter(function (x) { return !q || (x.name + ' ' + x.geoName).toLowerCase().indexOf(q) >= 0; });
+      if (!items.length) return '<div class="pe-bl-empty">' + (avail.length ? 'Ничего не найдено' : 'Все объекты уже в подборке') + '</div>';
+      return items.map(function (o) {
+        var on = !!sel[o.id];
+        return '<button class="ro-item' + (on ? ' on' : '') + '" data-roid="' + esc(o.id) + '">' +
+          '<span class="ro-cb">' + (on ? ic('check') : '') + '</span>' +
+          '<div class="ro-thumb" style="' + (o.image ? 'background-image:url(\'' + esc(absU(o.image)) + '\')' : '') + '"></div>' +
+          '<div class="ro-b"><b>' + esc(o.name) + '</b><span>' + esc([o.geoName, o.type].filter(Boolean).join(' · ')) + ' · ' + esc(money(o)) + '</span><span class="ro-ph">' + o.photos + ' фото' + '</span></div></button>';
+      }).join('');
+    }
+    function side() {
+      var n = selCount();
+      var info = n ? ('<div class="ro-warn"><div class="ro-sw">Выбрано: <b>' + n + '</b></div><ul><li>Объекты добавятся в конец подборки — станет <b>' + (curN + n) + '</b></li><li>Оглавление и нумерация «Объект k из N» обновятся автоматически</li>' + (curN + n >= 2 ? '<li>Сравнение учтёт новые объекты</li>' : '') + '</ul></div>')
+        : '<div class="ro-warn muted">Отметьте объекты, которые добавить в подборку. Можно выбрать несколько.</div>';
+      return info + '<div class="ro-acts"><button class="pe-btn pe-btn-primary ro-apply"' + (n ? '' : ' disabled') + '>Добавить' + (n ? ' (' + n + ')' : '') + '</button><button class="pe-btn pe-btn-ghost" data-puclose>Отмена</button></div>';
+    }
+    function paint() { ov.querySelector('.ro-list').innerHTML = list(); ov.querySelector('.ro-side').innerHTML = side(); wireBody(); }
+    function wireBody() {
+      ov.querySelectorAll('[data-roid]').forEach(function (b) { b.addEventListener('click', function () { var id = b.getAttribute('data-roid'); sel[id] = !sel[id]; paint(); }); });
+      ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
+      var ap = ov.querySelector('.ro-apply'); if (ap && selCount()) ap.addEventListener('click', function () {
+        var ids = Object.keys(sel).filter(function (k) { return sel[k]; });
+        ap.disabled = true;
+        api('POST', '/' + ID + '/add-objects', { projectIds: ids }).then(function (r) { close(); if (r.status === 200) { toast(ids.length > 1 ? 'Объекты добавлены' : 'Объект добавлен', null, true); reloadPres(); } else toast('Не удалось', (r.json && r.json.error) || ''); });
+      });
+    }
+    function close() { ov.remove(); }
+    ov.innerHTML = '<div class="pu-box ro-box"><div class="pu-hd"><h2>Добавить объект</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
+      '<div class="ro-cur">В подборке сейчас: <b>' + curN + '</b> ' + plural(curN, 'объект', 'объекта', 'объектов') + '</div>' +
+      '<div class="ro-grid"><div class="ro-pick"><div class="pe-add-search">' + ic('search') + '<input id="aoSearch" placeholder="Поиск объекта…"></div><div class="ro-list"></div></div>' +
+      '<div class="ro-side"></div></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelector('#aoSearch').addEventListener('input', function () { q = this.value.toLowerCase(); ov.querySelector('.ro-list').innerHTML = list(); wireBody(); });
     paint();
   }
 

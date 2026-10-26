@@ -192,6 +192,9 @@ button{font-family:inherit;cursor:pointer}
 .ro-item:hover{background:var(--pe-hi)}
 .ro-item.on{border-color:#d8b24a;background:#fdf7e8}
 .ro-thumb{flex:0 0 auto;width:54px;height:44px;border-radius:8px;background:#eee center/cover no-repeat;border:1px solid var(--pe-line)}
+.ro-cb{flex:0 0 auto;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--pe-line);display:flex;align-items:center;justify-content:center;color:#fff}
+.ro-item.on .ro-cb{background:#d8b24a;border-color:#d8b24a}
+.ro-cb svg{width:12px;height:12px}
 .ro-b{flex:1;min-width:0}.ro-b b{display:block;font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ro-b span{display:block;color:var(--pe-mut);font-size:12px}
 .ro-b .ro-ph{font-size:11px}
