@@ -4098,7 +4098,12 @@ async function waDropWatch() {
              подтверждает кнопкой (покупка нового за свой баланс). Восстановление/бан-замена сбрасывают флаг. */
           if (cur === 'connected' || n.banned) { n._downSince = null; if (n.suspectBanned) n.suspectBanned = false; }
           else { if (!n._downSince) n._downSince = Date.now();
-            if (!n.suspectBanned && Date.now() - n._downSince > 24 * 3600e3) {
+            const _downMs = Date.now() - n._downSince;
+            /* ⭐ЗАЛИП: номер застрял не-connected (reconnecting/qr/none) >20 мин — воркер явно не восстановился сам.
+               Авто-QR (как при logged_out), иначе номер висит в reconnecting вечно и брокер пингует владельца вручную.
+               autoQrOnDrop рейт-лимитит (30 мин/номер) и шлёт свежий QR в TG владельцу+брокеру. */
+            if (cur !== 'logged_out' && _downMs > 20 * 60e3) autoQrOnDrop(db, n, who).catch(() => {});
+            if (!n.suspectBanned && _downMs > 24 * 3600e3) {
               n.suspectBanned = true;
               notify(db, { type: 'wa', level: 'warn', title: 'Номер не возвращается — возможно, забанен', text: `«${who}» не на связи больше суток. Если номер окончательно заблокирован WhatsApp — замените его: «Номера» → «Заменить» (новый покупается за $10 с вашего баланса).`, dedupKey: 'wa-suspect:' + _nk, cooldownMs: 24 * 3600e3 });
             }
