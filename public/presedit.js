@@ -1093,6 +1093,7 @@
   function wireCanvasEditingOnce() {
     var stage = document.getElementById('peStage'); if (!stage || stage._ceWired) return; stage._ceWired = true;
     stage.addEventListener('click', function (e) {
+      if (S._justPanned) { S._justPanned = false; return; }   /* это был драг фото, не клик */
       var el = e.target.closest('.pe-ced');
       if (!el) { ceDeselect(); return; }                      /* клик по пустому месту страницы → снять выбор */
       if (el.getAttribute('contenteditable') === 'true') return;
@@ -1116,6 +1117,34 @@
       e.preventDefault();
       if (el.classList.contains('pe-ced-list')) ceListSelect(el); else if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
       ceShowCtx(el, e.clientX, e.clientY);
+    });
+    /* перетаскивание фото на холсте → пан точки фокуса (ref.focalPoint); рендерер применяет его
+       как background-position/object-position → изменение видно и в предпросмотре, и в PDF/веб-выводе.
+       Во время драга двигаем инлайн-стиль (плавно, без ререндера), на отпускании — сохраняем через mutate. */
+    stage.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      var el = e.target.closest('.pe-ced-photo'); if (!el || el.getAttribute('data-pe-gallery')) return;
+      var idx = +(el.getAttribute('data-pe-idx') || 0);
+      var s = curSection(); var ref = (s && s.assetRefs || [])[idx]; if (!ref || !ref.assetId) return;
+      var rect = el.getBoundingClientRect(); if (!rect.width) return;
+      var sx = e.clientX, sy = e.clientY;
+      var f0 = ref.focalPoint ? { x: ref.focalPoint.x, y: ref.focalPoint.y } : { x: 0.5, y: 0.5 };
+      var cur = { x: f0.x, y: f0.y }, moved = false, isImg = el.tagName === 'IMG';
+      e.preventDefault(); ceHideFloatbar();
+      el.classList.add('pe-panning');
+      function onMove(ev) {
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 3) moved = true;
+        cur.x = Math.max(0, Math.min(1, f0.x - (ev.clientX - sx) / rect.width));
+        cur.y = Math.max(0, Math.min(1, f0.y - (ev.clientY - sy) / rect.height));
+        var pos = Math.round(cur.x * 100) + '% ' + Math.round(cur.y * 100) + '%';
+        if (isImg) el.style.objectPosition = pos; else el.style.backgroundPosition = pos;
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
+        el.classList.remove('pe-panning');
+        if (moved) { S._justPanned = true; mutate(function () { ref.focalPoint = { x: +cur.x.toFixed(3), y: +cur.y.toFixed(3) }; }); }
+      }
+      document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
     });
     if (!S._ceCtxWired) {
       S._ceCtxWired = true;

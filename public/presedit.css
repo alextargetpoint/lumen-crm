@@ -614,3 +614,8 @@ button{font-family:inherit;cursor:pointer}
 .pe-thumb.pe-dragging{opacity:.45}
 .pe-thumb.pe-drop-before{box-shadow:0 -3px 0 -1px var(--pe-accent2)}
 .pe-thumb.pe-drop-after{box-shadow:0 3px 0 -1px var(--pe-accent2)}
+
+/* перетаскивание фото (пан фокуса) */
+.pe-ced-photo{cursor:grab}
+.pe-ced-photo.pe-panning{cursor:grabbing}
+.pe-ced-photo.pe-panning img.lp-cover{pointer-events:none}
