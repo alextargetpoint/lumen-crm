@@ -931,6 +931,15 @@
         el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-idx', '0');
       });
     }
+    /* списки (метрики/места/преимущества): клик по пункту → фокус его строки в панели.
+       Пункты идут по порядку = индексу строки инспектора (.pe-metric-row[data-mi=i]). Только если
+       в панели есть list-редактор. Общий рендерер НЕ трогаем — индекс считаем по позиции в DOM. */
+    if (document.querySelector('.pe-insp .pe-metric-row[data-mi]')) {
+      [['.lp-metric', 1], ['.lp-metric-lg', 1], ['.lp-benefits > li', 1], ['.lp-places > li', 1]].forEach(function (p) {
+        var items = stage.querySelectorAll(p[0]); if (!items.length) return;
+        items.forEach(function (el, i) { if (el.classList.contains('pe-ced')) return; el.classList.add('pe-ced', 'pe-ced-list'); el.setAttribute('data-pe-listidx', i); });
+      });
+    }
     if (S._ceSelKey) { var sel = stage.querySelector('.pe-ced[data-pe-key="' + S._ceSelKey + '"]'); if (sel) sel.classList.add('pe-sel'); }
     if (S._ceSelPhoto != null) { var selp = stage.querySelector('.pe-ced-photo[data-pe-idx="' + S._ceSelPhoto + '"]'); if (selp) selp.classList.add('pe-sel'); }
     if ((S._ceSelKey || S._ceSelPhoto != null) && document.getElementById('peFloatbar')) { var se = ceSelectedEl(); if (se) cePositionFloatbar(se); else ceHideFloatbar(); }
@@ -951,6 +960,19 @@
     el.classList.add('pe-sel'); S._ceSelKey = el.getAttribute('data-pe-key'); S._ceSelPhoto = null;
     ceFocusField(S._ceSelKey);
     ceShowFloatbarFor(el, el.classList.contains('pe-ced-text') ? 'text' : 'textnoedit');
+  }
+  /* клик по пункту списка на холсте → выбор + фокус его строки (data-mi) в редакторе списка панели */
+  function ceListSelect(el) {
+    var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
+    el.classList.add('pe-sel'); S._ceSelKey = null; S._ceSelPhoto = null; ceHideFloatbar();
+    ceOpenContentTab();
+    var idx = el.getAttribute('data-pe-listidx');
+    var row = document.querySelector('.pe-insp .pe-metric-row[data-mi="' + idx + '"]');
+    if (row) {
+      if (row.scrollIntoView) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      row.classList.add('pe-f-flash'); setTimeout(function () { row.classList.remove('pe-f-flash'); }, 1200);
+      var inp = row.querySelector('input'); if (inp) { try { inp.focus({ preventScroll: true }); } catch (_) { inp.focus(); } }
+    }
   }
   function cePhotoSelect(el) {
     var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
@@ -1075,7 +1097,7 @@
       if (!el) { ceDeselect(); return; }                      /* клик по пустому месту страницы → снять выбор */
       if (el.getAttribute('contenteditable') === 'true') return;
       e.stopPropagation();
-      if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
+      if (el.classList.contains('pe-ced-list')) ceListSelect(el); else if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
     });
     stage.addEventListener('dblclick', function (e) {
       var tx = e.target.closest('.pe-ced-text');
@@ -1092,7 +1114,7 @@
     stage.addEventListener('contextmenu', function (e) {
       var el = e.target.closest('.pe-ced'); if (!el) return;
       e.preventDefault();
-      if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
+      if (el.classList.contains('pe-ced-list')) ceListSelect(el); else if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
       ceShowCtx(el, e.clientX, e.clientY);
     });
     if (!S._ceCtxWired) {
