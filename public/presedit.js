@@ -961,6 +961,34 @@
     ceFocusField(S._ceSelKey);
     ceShowFloatbarFor(el, el.classList.contains('pe-ced-text') ? 'text' : 'textnoedit');
   }
+  /* основное текстовое значение пункта списка → (список, поле, под-элемент) для inline-правки */
+  function ceListMap(itemEl) {
+    if (itemEl.matches('.lp-metric, .lp-metric-lg')) return { list: 'metrics', field: 'value', sub: itemEl.querySelector('b') };
+    if (itemEl.closest('.lp-benefits')) return { list: 'items', field: 'title', sub: itemEl.querySelector('b') };
+    if (itemEl.closest('.lp-places')) return { list: 'nearbyPlaces', field: 'name', sub: itemEl.querySelector('b') };
+    return null;
+  }
+  /* двойной клик по пункту списка → inline-правка его значения прямо на холсте → запись в список */
+  function ceListBeginEdit(itemEl) {
+    var map = ceListMap(itemEl); if (!map || !map.sub) return;
+    var idx = +itemEl.getAttribute('data-pe-listidx'); var el = map.sub;
+    if (el.getAttribute('contenteditable') === 'true') return;
+    ceHideFloatbar();
+    var before = (el.innerText || '').trim();
+    el.setAttribute('contenteditable', 'true'); el.classList.add('pe-editing'); el.spellcheck = false; el.focus();
+    try { var r = document.createRange(); r.selectNodeContents(el); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r); } catch (_) {}
+    function finish(commit) {
+      el.removeEventListener('blur', onBlur); el.removeEventListener('keydown', onKd);
+      el.removeAttribute('contenteditable'); el.classList.remove('pe-editing');
+      var after = (el.innerText || '').replace(/\s+/g, ' ').trim();
+      if (commit && after !== before) {
+        mutate(function () { var s = curSection(); var arr = (cval(s, map.list) || []).slice(); arr[idx] = Object.assign({}, arr[idx]); arr[idx][map.field] = after; setOverride(s, map.list, arr); });
+      } else { mountCanvas(); }
+    }
+    function onBlur() { finish(true); }
+    function onKd(e) { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); finish(false); } else if (e.key === 'Enter') { e.preventDefault(); finish(true); } }
+    el.addEventListener('blur', onBlur); el.addEventListener('keydown', onKd);
+  }
   /* клик по пункту списка на холсте → выбор + фокус его строки (data-mi) в редакторе списка панели */
   function ceListSelect(el) {
     var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
@@ -1109,6 +1137,8 @@
         ceBeginEdit(tx, tx.getAttribute('data-pe-key'));   /* правим ПРЯМО на узле — без ререндера, чтобы узел не протух */
         return;
       }
+      var li = e.target.closest('.pe-ced-list');
+      if (li) { e.preventDefault(); e.stopPropagation(); li.classList.add('pe-sel'); S._ceSelKey = null; S._ceSelPhoto = null; ceListBeginEdit(li); return; }   /* двойной клик по пункту списка → inline-правка значения */
       var ph = e.target.closest('.pe-ced-photo');
       if (ph) { e.preventDefault(); e.stopPropagation(); cePhotoSelect(ph); if (!ph.getAttribute('data-pe-gallery')) ceFloatAction('replace'); }   /* двойной клик по фото → замена (кроме галереи) */
     });
