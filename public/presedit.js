@@ -60,7 +60,23 @@
   function cval(sec, key) { var b = (sec.contentBindings || {})[key]; if (!b) return undefined; if (b.mode === 'override') return b.value; if (b.sourcePath !== undefined) { var v = getPath(S.source, b.sourcePath); return v !== undefined ? v : b.cachedValue; } return b.value !== undefined ? b.value : b.cachedValue; }
   function isSource(sec, key) { var b = (sec.contentBindings || {})[key]; return b && b.mode === 'source'; }
   function getPath(o, p) { return p.split('.').reduce(function (a, k) { return a == null ? undefined : a[k]; }, o); }
-  function setOverride(sec, key, value) { sec.contentBindings = sec.contentBindings || {}; sec.contentBindings[key] = { mode: 'override', value: value }; }
+  /* правка поля → override, но СОХРАНЯЕМ связь с CRM (sourcePath/cachedValue), чтобы можно было вернуть
+     исходное значение (ТЗ §7: правка в презентации не рвёт связь с карточкой объекта навсегда). */
+  function setOverride(sec, key, value) {
+    sec.contentBindings = sec.contentBindings || {};
+    var prev = sec.contentBindings[key] || {};
+    var nb = { mode: 'override', value: value };
+    if (prev.sourcePath !== undefined) nb.sourcePath = prev.sourcePath;
+    if (prev.cachedValue !== undefined) nb.cachedValue = prev.cachedValue;
+    sec.contentBindings[key] = nb;
+  }
+  /* вернуть поле к значению из CRM (карточки объекта) — если связь известна */
+  function hasSourceLink(sec, key) { var b = (sec.contentBindings || {})[key]; return !!(b && b.mode === 'override' && (b.sourcePath !== undefined || b.cachedValue !== undefined)); }
+  function restoreSource(sec, key) {
+    var b = (sec.contentBindings || {})[key]; if (!b) return;
+    if (b.sourcePath !== undefined) sec.contentBindings[key] = { mode: 'source', sourcePath: b.sourcePath, cachedValue: b.cachedValue };
+    else if (b.cachedValue !== undefined) sec.contentBindings[key] = { mode: 'source', cachedValue: b.cachedValue };
+  }
 
   /* ---------- mutation + autosave + undo ---------- */
   function snapshotState() { return JSON.stringify({ o: S.pres.orderedSections, t: S.pres.theme, f: S.pres.defaultFormat, a: S.pres.brokerAppendix }); }
@@ -336,7 +352,11 @@
     return h;
   }
   function fld(label, inner, srcSec, srcKey) {
-    var src = (srcSec && isSource(srcSec, srcKey)) ? '<div class="pe-src"><span class="chip">' + ic('db') + 'Из CRM</span><button class="pe-mini-del" data-act="detach" data-key="' + srcKey + '" title="Отвязать и редактировать">✎</button></div>' : '';
+    var src = '';
+    if (srcSec && srcKey) {
+      if (isSource(srcSec, srcKey)) src = '<div class="pe-src"><span class="chip">' + ic('db') + 'Из CRM</span><button class="pe-mini-del" data-act="detach" data-key="' + srcKey + '" title="Отвязать и редактировать">✎</button></div>';
+      else if (hasSourceLink(srcSec, srcKey)) src = '<div class="pe-src"><span class="chip edited">изменено</span><button class="pe-mini-del" data-act="revert" data-key="' + srcKey + '" title="Вернуть значение из карточки объекта">↩</button></div>';
+    }
     return '<div class="pe-field"><label>' + esc(label) + '</label>' + inner + src + '</div>';
   }
   function inp(key, val, ph) { return '<input class="pe-input" data-f="' + key + '" value="' + esc(val == null ? '' : val) + '" placeholder="' + esc(ph || '') + '">'; }
@@ -729,6 +749,7 @@
       case 'applyAll': scheduleSave(); toast('Оформление применено ко всем страницам'); break;
       case 'toggleClient': mutate(function () { S.pres.showClientName = S.pres.showClientName === false; }); break;
       case 'detach': mutate(function () { setOverride(s, el.getAttribute('data-key'), cval(s, el.getAttribute('data-key'))); }); break;
+      case 'revert': mutate(function () { restoreSource(s, el.getAttribute('data-key')); }); break;   /* вернуть из CRM (ТЗ §7) */
       case 'toggleBroker': mutate(function () { S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = !S.pres.brokerAppendix.enabled; }); break;
       case 'pickBroker': S.pres.brokerId = el.value; S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = true; scheduleSave(); break;
     }

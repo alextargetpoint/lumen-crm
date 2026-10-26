@@ -357,6 +357,7 @@ button{font-family:inherit;cursor:pointer}
 .pe-row{display:flex;gap:12px}.pe-row>*{flex:1}
 .pe-src{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--pe-mut);margin-top:6px}
 .pe-src .chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--pe-line);border-radius:20px;padding:3px 9px;font-weight:600}
+.pe-src .chip.edited{color:#8a5a12;background:rgba(184,131,9,.1);border-color:rgba(184,131,9,.3)}
 .pe-metriclist,.pe-paylist{display:flex;flex-direction:column;gap:10px}
 .pe-metric-row{display:flex;gap:8px;align-items:center;border:1px solid var(--pe-line);border-radius:9px;padding:8px}
 .pe-metric-row input{border:0;font-size:13px;padding:4px;width:100%;background:transparent}
