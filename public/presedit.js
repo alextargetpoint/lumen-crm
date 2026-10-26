@@ -799,7 +799,16 @@
       el.classList.add('pe-ced'); el.setAttribute('data-pe-key', key);
       if (ceEditable(el, key)) el.classList.add('pe-ced-text');
     });
+    /* фото: главный снимок секции (assetRefs[0]) — клик → фокус фото-поля в панели (замена/кадрир.).
+       Галерею (несколько фото, свой пикер) пока не метим. Метим только если в панели есть фото-поле. */
+    var fam = (curSection() || {}).family;
+    if (fam !== 'gallery' && document.querySelector('.pe-insp .pe-photo-prev[data-idx]')) {
+      stage.querySelectorAll('.lp-bleed, img.lp-cover').forEach(function (el) {
+        el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-idx', '0');
+      });
+    }
     if (S._ceSelKey) { var sel = stage.querySelector('.pe-ced[data-pe-key="' + S._ceSelKey + '"]'); if (sel) sel.classList.add('pe-sel'); }
+    if (S._ceSelPhoto != null) { var selp = stage.querySelector('.pe-ced-photo[data-pe-idx="' + S._ceSelPhoto + '"]'); if (selp) selp.classList.add('pe-sel'); }
   }
   function ceOpenContentTab() {
     if (S.tab === 'content') return;
@@ -814,8 +823,19 @@
   }
   function ceSelect(el) {
     var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
-    el.classList.add('pe-sel'); S._ceSelKey = el.getAttribute('data-pe-key');
+    el.classList.add('pe-sel'); S._ceSelKey = el.getAttribute('data-pe-key'); S._ceSelPhoto = null;
     ceFocusField(S._ceSelKey);
+  }
+  function cePhotoSelect(el) {
+    var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
+    el.classList.add('pe-sel'); S._ceSelKey = null; S._ceSelPhoto = el.getAttribute('data-pe-idx') || '0';
+    ceOpenContentTab();
+    var prev = document.querySelector('.pe-insp .pe-photo-prev[data-idx="' + S._ceSelPhoto + '"]') || document.querySelector('.pe-insp .pe-photo-prev[data-idx]');
+    if (prev) {
+      var fieldBox = prev.closest('.pe-field') || prev;
+      if (fieldBox.scrollIntoView) fieldBox.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      prev.classList.add('pe-f-flash'); setTimeout(function () { prev.classList.remove('pe-f-flash'); }, 1200);
+    }
   }
   function ceBeginEdit(el, key) {
     if (el.getAttribute('contenteditable') === 'true') return;
@@ -842,7 +862,8 @@
     var stage = document.getElementById('peStage'); if (!stage || stage._ceWired) return; stage._ceWired = true;
     stage.addEventListener('click', function (e) {
       var el = e.target.closest('.pe-ced'); if (!el || el.getAttribute('contenteditable') === 'true') return;
-      e.stopPropagation(); ceSelect(el);
+      e.stopPropagation();
+      if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
     });
     stage.addEventListener('dblclick', function (e) {
       var el = e.target.closest('.pe-ced-text'); if (!el) return;
