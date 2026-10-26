@@ -69,7 +69,7 @@
   function mutate(fn, opts) { pushUndo(); fn(); scheduleSave(); if (!opts || opts.render !== false) render(); revalidate(); }
   function doUndo() { if (!S.undo.length) return; S.redo.push(snapshotState()); restore(S.undo.pop()); scheduleSave(); render(); revalidate(); }
   function doRedo() { if (!S.redo.length) return; S.undo.push(snapshotState()); restore(S.redo.pop()); scheduleSave(); render(); revalidate(); }
-  function onKey(e) { if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); } }
+  function onKey(e) { if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); } else if (e.key === 'Escape') { if (typeof ceCloseCtx === 'function') ceCloseCtx(); } }
 
   function scheduleSave() { setSave('saving'); clearTimeout(S._saveT); S._saveT = setTimeout(save, 800); }
   function save() {
@@ -898,7 +898,36 @@
     else if (a === 'field') { ceFocusField(S._ceSelKey); }
     else if (a === 'replace') { var rb = document.querySelector('.pe-insp [data-act="photoBrowser"]'); if (rb) rb.click(); }
     else if (a === 'crop') { var cb = document.querySelector('.pe-insp [data-act="cropFmt"]'); if (cb && !cb.disabled) cb.click(); }
+    else if (a === 'enhance') { var eb = document.querySelector('.pe-insp [data-act="enhance"]'); if (eb && !eb.disabled) eb.click(); }
+    else if (a === 'pin') { var pb = document.querySelector('.pe-insp [data-act="photoPin"]'); if (pb) pb.click(); }
     else if (a === 'galfield') { var g = document.querySelector('.pe-insp [data-act="galtoggle"]'); var gf = g && g.closest('.pe-field'); if (gf) { if (gf.scrollIntoView) gf.scrollIntoView({ block: 'center', behavior: 'smooth' }); gf.classList.add('pe-f-flash'); setTimeout(function () { gf.classList.remove('pe-f-flash'); }, 1200); } }
+  }
+  /* контекстное меню по правому клику (ТЗ §6): действия именно этого элемента, в т.ч. вторичные
+     (улучшить фото, закрепление) — которых нет на плавающей панели. Переиспользует действия инспектора. */
+  function ceCloseCtx() { var m = document.getElementById('peCtxMenu'); if (m && m.parentNode) m.parentNode.removeChild(m); }
+  function ceCtxItems(el) {
+    if (el.classList.contains('pe-ced-photo')) {
+      if (el.getAttribute('data-pe-gallery')) return [['galfield', 'image', 'Выбрать фото в панели']];
+      return [['replace', 'image', 'Заменить фото'], ['crop', 'crop', 'Кадрировать'], ['enhance', 'sparkle', 'Улучшить фото'], ['pin', 'lock', 'Закрепление…']];
+    }
+    if (el.classList.contains('pe-ced-text')) return [['edit', 'text', 'Изменить текст'], ['field', 'text', 'Править в панели']];
+    return [['field', 'text', 'Править в панели']];
+  }
+  function ceShowCtx(el, x, y) {
+    ceCloseCtx(); ceHideFloatbar();
+    var items = ceCtxItems(el);
+    var m = document.createElement('div'); m.id = 'peCtxMenu'; m.className = 'pe-ctxmenu';
+    m.innerHTML = items.map(function (it) { return '<button class="pe-ctx-it" data-cx="' + it[0] + '">' + ic(it[1]) + '<span>' + it[2] + '</span></button>'; }).join('');
+    document.body.appendChild(m);
+    var mw = m.offsetWidth, mh = m.offsetHeight;
+    m.style.left = Math.max(4, Math.min(x, window.innerWidth - mw - 6)) + 'px';
+    m.style.top = Math.max(4, Math.min(y, window.innerHeight - mh - 6)) + 'px';
+    m.querySelectorAll('[data-cx]').forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); var a = b.getAttribute('data-cx'); ceCloseCtx(); ceCtxAction(a, el); }; });
+  }
+  function ceCtxAction(a, el) {
+    if (a === 'edit') { var t = el && el.classList.contains('pe-ced-text') ? el : (document.getElementById('peStage') || document).querySelector('.pe-ced-text.pe-sel'); if (t) ceBeginEdit(t, t.getAttribute('data-pe-key')); }
+    else if (a === 'field') { if (S._ceSelKey) ceFocusField(S._ceSelKey); else if (S._ceSelPhoto != null) { var se = ceSelectedEl(); if (se) cePhotoSelect(se); } }
+    else ceFloatAction(a);   /* replace/crop/enhance/pin/galfield — общие делегаты в инспектор */
   }
   function ceBeginEdit(el, key) {
     if (el.getAttribute('contenteditable') === 'true') return;
@@ -943,6 +972,17 @@
       var ph = e.target.closest('.pe-ced-photo');
       if (ph) { e.preventDefault(); e.stopPropagation(); cePhotoSelect(ph); if (!ph.getAttribute('data-pe-gallery')) ceFloatAction('replace'); }   /* двойной клик по фото → замена (кроме галереи) */
     });
+    stage.addEventListener('contextmenu', function (e) {
+      var el = e.target.closest('.pe-ced'); if (!el) return;
+      e.preventDefault();
+      if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
+      ceShowCtx(el, e.clientX, e.clientY);
+    });
+    if (!S._ceCtxWired) {
+      S._ceCtxWired = true;
+      document.addEventListener('click', function (e) { if (!(e.target.closest && e.target.closest('#peCtxMenu'))) ceCloseCtx(); });
+      document.addEventListener('scroll', ceCloseCtx, true);
+    }
   }
 
   function curZoom() { var f = TOK.format(S.fmt); var stage = document.getElementById('peStage'); if (!stage) return 1; var m = stage.style.transform.match(/scale\(([\d.]+)\)/); return m ? +m[1] : 1; }
