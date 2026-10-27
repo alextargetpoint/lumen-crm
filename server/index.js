@@ -4078,7 +4078,7 @@ async function waDropWatch() {
           const _nk = String(n.phone).replace(/\D/g, '') || who;
           const _hkey = 'wa-health:' + _nk;
           if (prev === 'connected' && cur !== 'connected') {
-            notify(db, { type: 'wa', level: 'critical', title: 'Номер отключился', text: `«${who}» больше не на связи. Переподключите по QR: «Номера» → «Пересканировать». Диалоги номера ждут его возврата; на другие номера переписка не переносится.`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
+            notify(db, { type: 'wa', level: 'critical', title: 'Номер отключился', text: `«${who}» больше не на связи. Переподключите по QR: «Номера» → «Пересканировать», ИЛИ брокер сам отправит /qr в бот — пришлём свежий QR в Telegram. Диалоги номера ждут его возврата; на другие номера переписка не переносится.`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
             /* АВТО-QR: только если РЕАЛЬНО разлогинен (не reconnecting — там воркер сам восстановится) */
             if (cur === 'logged_out') autoQrOnDrop(db, n, who).catch(() => {});
           } else if (prev !== 'connected' && prev !== 'none' && cur === 'connected') {

@@ -232,7 +232,7 @@ async function handleUpdate(db, update) {
 
   const lead = resolveLead(db, broker, msg, chatId);
   if (!lead) {
-    await safeApi(db, 'sendMessage', { chat_id: chatId, text: '↩️ Ответьте reply на сообщение клиента, чтобы я знал, кому переслать.' });
+    await safeApi(db, 'sendMessage', { chat_id: chatId, text: '↩️ Ответьте reply на сообщение клиента, чтобы я знал, кому переслать.\n\n📱 Отвалился номер WhatsApp? Отправьте /qr — пришлю список номеров и свежий QR для пересканирования (без входа в CRM).' });
     return { skip: 'no lead' };
   }
 
