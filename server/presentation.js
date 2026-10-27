@@ -385,9 +385,48 @@ function addObjectsToCollection(db, coll, newPids) {
   coll.updatedAt = Date.now();
   return { ok: true, added: toAdd.length, pages: built.length, projectIds: existing.slice() };
 }
-// props объектов подборки в порядке индексов
+// props объектов подборки по стабильному индексу k (= позиция в projectIds, = префикс o{k}_)
 function collObjectProps(db, coll) {
   return (coll.projectIds || []).map(pid => (db.properties || []).find(x => x.id === pid) || { name: '', geo: '' });
+}
+// порядок ОТОБРАЖЕНИЯ объектов — k по первому появлению блока o{k}_ в orderedSections.
+// Идентичность объекта (k/префикс/projectIds/ассеты/reusedObjectPres) стабильна; порядок — отдельно.
+function collObjectOrder(coll) {
+  const seen = [], set = {};
+  (coll.orderedSections || []).forEach(s => { const m = String(s.id || '').match(/^o(\d+)_/); if (m) { const k = +m[1]; if (!set[k]) { set[k] = 1; seen.push(k); } } });
+  return seen;
+}
+// переставить физические блоки объектов под новый порядок k (вступление/оглавление — спереди, сравнение/брокер — сзади)
+function rebuildOrderedByObjectOrder(coll, order) {
+  const secs = coll.orderedSections || [];
+  const isObj = s => /^o\d+_/.test(String(s.id || ''));
+  const firstObjIdx = secs.findIndex(isObj);
+  if (firstObjIdx < 0) return;
+  let lastObjIdx = -1; for (let i = secs.length - 1; i >= 0; i--) { if (isObj(secs[i])) { lastObjIdx = i; break; } }
+  const leading = secs.slice(0, firstObjIdx);
+  const trailing = secs.slice(lastObjIdx + 1);
+  const blocks = {}; order.forEach(k => { blocks[k] = []; });
+  secs.slice(firstObjIdx, lastObjIdx + 1).forEach(s => {
+    const m = String(s.id || '').match(/^o(\d+)_/);
+    if (m) { (blocks[+m[1]] = blocks[+m[1]] || []).push(s); } else { leading.push(s); } // чужая секция среди объектов → в начало (не теряем)
+  });
+  const mid = order.reduce((a, k) => a.concat(blocks[k] || []), []);
+  coll.orderedSections = leading.concat(mid, trailing);
+}
+/* Переместить объект в подборке вверх/вниз по ПОРЯДКУ ОТОБРАЖЕНИЯ (dir<0 вверх, иначе вниз).
+   Блоки секций переставляются, идентичность k не меняется, «соединяющие» пересобираются. */
+function moveObjectInCollection(db, coll, k, dir) {
+  if (!coll || coll.kind !== 'collection') return { error: 'not a collection' };
+  const order = collObjectOrder(coll);
+  const pos = order.indexOf(k);
+  if (pos < 0) return { error: 'object not in collection' };
+  const to = pos + (dir < 0 ? -1 : 1);
+  if (to < 0 || to >= order.length) return { error: 'крайняя позиция' };
+  const no = order.slice(); const t = no[pos]; no[pos] = no[to]; no[to] = t;
+  rebuildOrderedByObjectOrder(coll, no);
+  syncCollectionConnectors(db, coll);
+  coll.draftRevision = (coll.draftRevision || 1) + 1; coll.updatedAt = Date.now();
+  return { ok: true, order: no, index: k, from: pos, to: to };
 }
 // гарантируем страницу-оглавление сразу после вступления
 function ensureContentsSection(coll) {
@@ -402,18 +441,19 @@ function ensureContentsSection(coll) {
    объектов (добавление/замена). Пересобирает оглавление, пометки «k из N», сравнение.
    Заголовок/подводку оглавления, набранные вручную, НЕ затирает (только items). */
 function syncCollectionConnectors(db, coll) {
-  const props = collObjectProps(db, coll);
-  const N = props.length;
-  if (N >= 2) {
+  const propsByK = collObjectProps(db, coll);  // по стабильному индексу k
+  const order = collObjectOrder(coll);         // k в порядке отображения
+  const M = order.length;
+  if (M >= 2) {
     const toc = ensureContentsSection(coll);
     toc.contentBindings = toc.contentBindings || {};
-    toc.contentBindings.items = ov(props.map((pr, k) => collContentsItem(pr, k)));
+    toc.contentBindings.items = ov(order.map((k, pos) => collContentsItem(propsByK[k] || {}, pos)));
     const sb = toc.contentBindings.subtitle;
-    if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + N + ' ' + ruPlural(N, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
-    props.forEach((pr, k) => tagObjectHeroSeq(objSectionsOf(coll, k), pr, k, N));
+    if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + M + ' ' + ruPlural(M, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
+    order.forEach((k, pos) => tagObjectHeroSeq(objSectionsOf(coll, k), propsByK[k] || {}, pos, M));
   }
   const cmp = (coll.orderedSections || []).filter(s => s.family === 'comparison')[0];
-  if (cmp && N >= 2) { const c = buildComparison(db, props); cmp.contentBindings = cmp.contentBindings || {}; cmp.contentBindings.criteria = ov(c.criteria); cmp.contentBindings.objects = ov(c.objects); }
+  if (cmp && M >= 2) { const c = buildComparison(db, order.map(k => propsByK[k] || {})); cmp.contentBindings = cmp.contentBindings || {}; cmp.contentBindings.criteria = ov(c.criteria); cmp.contentBindings.objects = ov(c.objects); }
 }
 /* Diff объекта в подборке против живой карточки (ТЗ v3 §14, экран «Обновить данные объекта»).
    «В подборке» = значение в документе (override если правлено, иначе cached из источника);
@@ -733,7 +773,7 @@ function publicProjection(snap) {
 
 module.exports = {
   SCHEMA_VERSION, RENDERER_VERSION, TOK, T,
-  draftFromProperty, draftCollection, replaceObjectInCollection, addObjectsToCollection, objectUpdates, applyObjectUpdates, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
+  draftFromProperty, draftCollection, replaceObjectInCollection, addObjectsToCollection, moveObjectInCollection, objectUpdates, applyObjectUpdates, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
 };

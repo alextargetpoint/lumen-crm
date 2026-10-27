@@ -190,7 +190,7 @@ ${PRES_FAVICON}
 <link rel="stylesheet" href="/pres-styles.css?v=14"><link rel="stylesheet" href="/presedit.css?v=32">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=16"></script><script src="/presedit.js?v=40"></script>
+<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=16"></script><script src="/presedit.js?v=41"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
@@ -7532,7 +7532,7 @@ const server = http.createServer(async (req, res) => {
     const canControl = () => !!ROLE && (!IS_BROKER || isControlDelegate);
     const CONTROL_PATH = /^\/api\/(control-center|control-analytics|control-settings)$/.test(p) || /^\/api\/brokers\/[^/]+\/offboard$/.test(p) || p === '/api/leads/merge' || /^\/api\/leads\/[^/]+\/commission$/.test(p);
     /* брокеру РАЗРЕШЕНО редактировать ТОЛЬКО свой закреплённый WhatsApp-профиль (проверка владения — внутри роутов) */
-    const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona' || p === '/api/brokers/my-phone' || p === '/api/wa/gray/gen-about' || p === '/api/wa/gray/avatar-upload';   /* самообслуживание брокера: свой WA-профиль + телефон + ИИ-«о себе» + аватар */
+    const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona' || p === '/api/brokers/my-phone' || p === '/api/brokers/my-autoqr' || p === '/api/wa/gray/gen-about' || p === '/api/wa/gray/avatar-upload';   /* самообслуживание брокера: свой WA-профиль + телефон + ИИ-«о себе» + аватар + авто-QR */
     if (IS_BROKER && p.startsWith('/api/') && !brokerSelfWaOk && !(isControlDelegate && CONTROL_PATH) && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
     /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
     const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length || (MEMBER.leadFilter.contractors || []).length)) ? MEMBER.leadFilter : null;
@@ -8211,7 +8211,7 @@ const server = http.createServer(async (req, res) => {
         sequences: IS_BROKER ? db.sequences.filter(sq => !sq.ownerId || sq.ownerId === ROLE.brokerId || sq.visibility === 'agency' || (sq.sharedWith || []).includes(ROLE.brokerId)) : db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}),
-        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...roleHide(db, MEMBER.roleType), ...(MEMBER.hidePages || [])])].filter(pg => !(MEMBER.showPages || []).includes(pg)).filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
+        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), autoQr: IS_BROKER ? !(MEMBER.autoQrOptOut) : ((db.settings.automations || {}).autoQrOnDrop !== false), hidePages: IS_BROKER ? [...new Set([...roleHide(db, MEMBER.roleType), ...(MEMBER.hidePages || [])])].filter(pg => !(MEMBER.showPages || []).includes(pg)).filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
     }
     /* гейт баланса: клиент (владелец/маркетолог) сообщает основателю об оплате расходников */
@@ -11210,6 +11210,17 @@ const server = http.createServer(async (req, res) => {
       const br = (db.brokers || []).find(b => b.id === bid); if (!br) return json(res, 404, { error: 'broker not found' });
       const b = await readBody(req); br.phone = String(b.phone || '').trim().slice(0, 40); store.save();
       return json(res, 200, { ok: true, phone: br.phone });
+    }
+    /* САМООБСЛУЖИВАНИЕ: получать ли авто-QR при отвале номера в свой Telegram. Брокер → свой autoQrOptOut;
+       владелец → общий тумблер агентства automations.autoQrOnDrop. */
+    if (p === '/api/brokers/my-autoqr' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const bb = await readBody(req); const on = bb.on !== false;
+      if (R.role === 'broker' && R.brokerId) {
+        const br = (db.brokers || []).find(x => x.id === R.brokerId); if (!br) return json(res, 404, { error: 'broker not found' });
+        br.autoQrOptOut = !on; store.save();
+      } else { db.settings.automations = db.settings.automations || {}; db.settings.automations.autoQrOnDrop = on; store.save(); }
+      return json(res, 200, { ok: true, on });
     }
     if (p === '/api/wa/gray/my-persona' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
@@ -17768,6 +17779,18 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         const r = presentation.addObjectsToCollection(db, pres, ids);
         if (r.error) return json(res, 400, r);
         presentation.pushHistory(pres, 'add', presBy(R), 'Добавлены объекты: ' + r.added);
+        store.save();
+        return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
+      }
+      // reorder an object within a collection (move up/down by display order)
+      if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/move-object$/)) && req.method === 'POST') {
+        const R = presAuth(); if (!R) return json(res, 401, { error: 'auth' });
+        const pres = presFind(mm[1]); if (!pres) return json(res, 404, { error: 'not found' });
+        if (!presCanEdit(R, pres)) return json(res, 403, { error: 'forbidden' });
+        const b = await readBody(req);
+        const r = presentation.moveObjectInCollection(db, pres, Math.max(0, parseInt(b.index, 10) || 0), (+b.dir < 0 ? -1 : 1));
+        if (r.error) return json(res, 400, r);
+        presentation.pushHistory(pres, 'move', presBy(R), 'Переставлен объект');
         store.save();
         return json(res, 200, Object.assign({ revision: pres.draftRevision }, r));
       }

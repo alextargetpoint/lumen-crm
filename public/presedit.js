@@ -1340,12 +1340,23 @@
     ]);
   }
   function objMenu(anchor, k) {
-    menu(anchor, [
+    var objGroups = collectionGroups().filter(function (g) { return g.type === 'object'; });
+    var pos = objGroups.map(function (g) { return g.k; }).indexOf(k);
+    var items = [
       { t: 'Проверить обновления', ic: 'db', fn: function () { openObjectUpdates(k); } },
       { t: 'Заменить объект', ic: 'image', fn: function () { openReplaceObject(k); } },
-      { t: 'Настроить страницы', ic: 'dots', fn: function () { S.openGroups = S.openGroups || {}; S.openGroups[k] = true; render(); } },
-      { t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } },
-    ]);
+    ];
+    if (pos > 0) items.push({ t: 'Переместить выше', ic: 'up', fn: function () { moveObject(k, -1); } });
+    if (pos >= 0 && pos < objGroups.length - 1) items.push({ t: 'Переместить ниже', ic: 'down', fn: function () { moveObject(k, 1); } });
+    items.push({ t: 'Настроить страницы', ic: 'dots', fn: function () { S.openGroups = S.openGroups || {}; S.openGroups[k] = true; render(); } });
+    items.push({ t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } });
+    menu(anchor, items);
+  }
+  function moveObject(k, dir) {
+    api('POST', '/' + ID + '/move-object', { index: k, dir: dir }).then(function (r) {
+      if (r.status === 200) { toast('Объект перемещён', null, true); reloadPres(); }
+      else toast('Не удалось', (r.json && r.json.error) || '');
+    });
   }
   /* ---------- Массовые действия (§7/§11) — одна отмена на всю операцию ---------- */
   function bulkOp(op) {
