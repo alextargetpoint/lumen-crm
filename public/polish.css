@@ -846,3 +846,21 @@ input[type=number] { -moz-appearance: textfield; }
 .lead-card .lc-reveal .tbl-cdot{width:16px;height:16px;font-size:9px;border-radius:5px}
 .lead-card:hover .lc-reveal{max-height:28px;opacity:1;margin-top:7px}
 @media (hover:none){.lead-card:hover .lc-reveal{max-height:0;opacity:0;margin-top:0}}
+
+/* ── Кликабельные счётчики квалов + попап «квал-лиды» (ручная правка статуса) ── */
+.ql-clk{cursor:pointer;border-bottom:1px dashed color-mix(in srgb,var(--accent) 55%,transparent)}
+.ql-clk:hover{color:var(--accent)}
+.ql-clk-card{cursor:pointer}
+.ql-clk-card:hover b{color:var(--accent)}
+.ql-sum{font-size:12.5px;color:var(--ink-2);padding:2px 8px 10px;border-bottom:1px solid var(--stroke);margin-bottom:6px}
+.ql-sum b{color:var(--navy-900)}
+.ql-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:9px}
+.ql-row:hover{background:var(--bg-2)}
+.ql-fl{flex:0 0 auto;font-size:14px}
+.ql-nm{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px;font-weight:600;color:var(--navy-900);overflow:hidden}
+.ql-nm i{font-style:normal;font-weight:400;font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ql-rst{flex:0 0 auto;font-size:10.5px;color:var(--ink-3);background:none;border:1px solid var(--stroke);border-radius:7px;padding:3px 8px;cursor:pointer}
+.ql-rst:hover{color:var(--navy-900);border-color:var(--ink-3)}
+.ql-tog{flex:0 0 auto;font-size:11.5px;font-weight:600;border-radius:8px;padding:5px 11px;cursor:pointer;border:1px solid var(--stroke);background:var(--card);color:var(--ink-3)}
+.ql-tog.on{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.ql-tog:hover{border-color:var(--accent)}

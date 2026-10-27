@@ -935,6 +935,10 @@ function seenInboundMsg(tid, id) {
    все 4 оси квалификации закрыты. НЕ применять к живому снимку воронки (там нужна текущая стадия). */
 function everReachedQual(db, l, mode) {
   if (!l) return false;
+  /* РУЧНОЙ ОВЕРРАЙД аналитика (из попапа «квал-лиды»): true = засчитать квалом, false = снять. Авторитетен
+     над авто-логикой во ВСЕХ местах подсчёта квалов (аналитика/гео/CPQL). null/undefined → авто-логика. */
+  if (l.qualManual === true) return true;
+  if (l.qualManual === false) return false;
   const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
   const inQualNow = QUAL.includes(l.stage);
   if (mode === 'current') return inQualNow;                                  /* режим «снимок»: только текущая стадия */
@@ -8457,6 +8461,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'PATCH') {
         const b = await readBody(req);
         if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); if (b.stage === 'deal' && !lead.dealAt) lead.dealAt = Date.now(); }
+        if (b.qualManual !== undefined) { lead.qualManual = (b.qualManual === true || b.qualManual === false) ? b.qualManual : null; if (lead.qualManual === null) delete lead.qualManual; }   /* ручной оверрайд квала из попапа аналитики (true/false/null=авто) */
         if (b.dealValue !== undefined) lead.dealValue = Math.max(0, Math.round(+b.dealValue || 0)) || null;           /* сумма сделки (цена объекта) — для ROI/ROAS по рекламе */
         if (b.dealCommission !== undefined) lead.dealCommission = Math.max(0, Math.round(+b.dealCommission || 0)) || null;  /* наша комиссия с этой сделки */
         if (b.broker !== undefined) { const nb = b.broker || null; const _changed = nb !== lead.broker; const _actB = sessionRole(req) && sessionRole(req).brokerId; if (_changed) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; if (_changed && nb && nb !== _actB) notifyBrokerAssigned(db, nb, [lead], 'Передан вам (назначение руководителем).').catch(() => {}); }
@@ -13583,7 +13588,9 @@ ${SCR}
       const creaMedia = {}; for (const a of adsInScope(db, u.searchParams.get('contractorId'))) if (a.name && a.media && a.media.url && !creaMedia[a.name]) creaMedia[a.name] = { type: a.media.type || 'image', url: a.media.url };
       for (const dir of Object.keys(creatives)) for (const row of creatives[dir]) if (creaMedia[row.key]) row.media = creaMedia[row.key];
       const qleads = {}; for (const l of leads.filter(isQual).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) { const dir = dirOf(l); (qleads[dir] = qleads[dir] || []).push({ date: l.createdAt ? new Date(l.createdAt).toISOString().slice(5, 10) : '', name: l.name, country: canon(countryOf(l)), flag: flag(canon(countryOf(l))), status: namesCfg[l.stage] || l.stage, adset: (l.ads && l.ads.adsetName) || '—', ad: (l.ads && (l.ads.adName || l.ads.name)) || '—' }); }
-      return json(res, 200, { geo: { mode: geoGroup, groups: geoGroups, totalCounted: totCounted }, quality: { campaigns, adsets, creatives, qleads }, totalSpend: Math.round(totalSpend), qualStages: QUAL, hasLeads: leads.length });
+      /* полный список лидов в scope — для попапа «квал-лиды» (клик по счётчику квалов): id для правки, флаг isQual */
+      const scopeLeads = leads.map(l => ({ id: l.id, name: l.name, phone: l.phone || '', country: canon(countryOf(l)), flag: flag(canon(countryOf(l))), dir: dirOf(l), stage: namesCfg[l.stage] || l.stage, isQual: isQual(l), qualManual: (l.qualManual === true || l.qualManual === false) ? l.qualManual : null, createdAt: l.createdAt || 0 })).sort((a, b) => (b.isQual - a.isQual) || (b.createdAt - a.createdAt));
+      return json(res, 200, { geo: { mode: geoGroup, groups: geoGroups, totalCounted: totCounted }, quality: { campaigns, adsets, creatives, qleads }, scopeLeads, totalSpend: Math.round(totalSpend), qualStages: QUAL, hasLeads: leads.length });
     }
     if (p === '/api/ads/import' && req.method === 'POST') {
       const b = await readBody(req);

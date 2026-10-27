@@ -12167,6 +12167,33 @@ function restructureAdsTabs(root) {
     Object.entries(panels).forEach(([pk, p]) => p.hidden = pk !== k);
   }));
 }
+/* Попап «квал-лиды»: клик по счётчику квалов (бюджет-карточка / гео-клетка) → список лидов выборки с
+   ручной правкой статуса квала (убрать/добавить). Правка пишет lead.qualManual → пересчитывает CPQL/гео/рекомендации. */
+window.openQualLeads = async function (scope) {
+  scope = scope || {};
+  if (!window._qlCtx) { toast('Откройте вкладку «Реклама → Аналитика»', 'Данные по квалам ещё не загружены'); return; }
+  let dirty = false;
+  const bd = modal({ title: 'Квал-лиды' + (scope.title ? ' · ' + scope.title : ''), sub: 'Отметьте или снимите квал вручную — применится в аналитике (CPQL · гео · рекомендации)', body: '<div id="qlBody" style="max-height:62vh;overflow:auto;margin:4px -4px 0">Загрузка…</div>', wide: true, actions: [{ label: 'Готово', onClick: () => { closeModal(); if (dirty && window._qlCtx) window._qlCtx.reload(); } }] });
+  const draw = () => {
+    let list = (window._qlCtx.leads || []).slice();
+    if (scope.dir) list = list.filter(l => l.dir === scope.dir);
+    if (scope.country) list = list.filter(l => l.country === scope.country);
+    list.sort((a, b) => (b.isQual - a.isQual) || ((b.createdAt || 0) - (a.createdAt || 0)));
+    const qn = list.filter(l => l.isQual).length;
+    const rows = list.map(l => `<div class="ql-row ${l.isQual ? 'on' : ''}">
+        <span class="ql-fl">${l.flag || '•'}</span>
+        <span class="ql-nm">${esc(l.name || '—')}<i>${esc(l.country || '')} · ${esc(l.stage || '')}${l.qualManual != null ? ' · вручную' : ''}</i></span>
+        ${l.qualManual != null ? `<button class="ql-rst" data-qlrst="${esc(l.id)}" title="Вернуть авто-подсчёт">авто</button>` : ''}
+        <button class="ql-tog ${l.isQual ? 'on' : ''}" data-qltog="${esc(l.id)}">${l.isQual ? 'квал ✓' : '+ квал'}</button>
+      </div>`).join('') || '<div class="empty" style="padding:22px;text-align:center;color:var(--muted);font-size:12.5px">Нет лидов в этой выборке</div>';
+    const box = $('#qlBody', bd); if (!box) return;
+    box.innerHTML = `<div class="ql-sum"><b>${qn}</b> квал из <b>${list.length}</b> лид${scope.title ? ' · ' + esc(scope.title) : ''}</div>${rows}`;
+    const setQ = async (id, val) => { const lead = (window._qlCtx.leads || []).find(x => x.id === id); if (!lead) return; try { await api.patch('/leads/' + id, { qualManual: val }); lead.qualManual = val; lead.isQual = (val === true) ? true : (val === false ? false : lead.isQual); dirty = true; draw(); } catch (e) { toast('Не вышло', e.message); } };
+    $$('[data-qltog]', box).forEach(b => b.addEventListener('click', () => { const lead = (window._qlCtx.leads || []).find(x => x.id === b.dataset.qltog); setQ(b.dataset.qltog, !(lead && lead.isQual)); }));
+    $$('[data-qlrst]', box).forEach(b => b.addEventListener('click', () => setQ(b.dataset.qlrst, null)));
+  };
+  draw();
+};
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
 PAGES.ads = async (root) => {
   await ensureFx();
@@ -12178,6 +12205,8 @@ PAGES.ads = async (root) => {
   const treeD = await api.get('/ads/tree' + rq + ctSuf).catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
   const geoGroupMode = PAGE_STATE.anaGeoGroup === 'direction' ? 'direction' : 'lang';
   const la = await api.get('/ads/leadanalytics' + (rq ? rq + '&' : '?') + 'geoGroup=' + geoGroupMode + (adCid ? '&contractorId=' + encodeURIComponent(adCid) : '')).catch(() => ({ geo: { groups: [], mode: geoGroupMode }, quality: { adsets: {}, creatives: {}, qleads: {} }, totalSpend: 0, hasLeads: 0 }));
+  /* контекст для попапа «квал-лиды» (клик по счётчику квалов → список с ручной правкой статуса) */
+  window._qlCtx = { leads: la.scopeLeads || [], params: (rq ? rq + '&' : '?') + 'geoGroup=' + geoGroupMode + (adCid ? '&contractorId=' + encodeURIComponent(adCid) : ''), reload: () => { try { PAGES.ads(root); } catch (_) {} } };
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
   const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
@@ -12189,7 +12218,7 @@ PAGES.ads = async (root) => {
       <div class="adrecs-kpi">
         <div><b>${recs.totals.cpql ? _rm(recs.totals.cpql) : '—'}</b><i>CPQL средний</i></div>
         <div><b>${recs.totals.cpl ? _rm(recs.totals.cpl) : '—'}</b><i>CPL средний</i></div>
-        <div><b>${recs.totals.quals || 0}</b><i>квалов</i></div>
+        <div class="ql-clk-card" data-qlall title="Открыть список квал-лидов — можно поправить статус"><b>${recs.totals.quals || 0}</b><i>квалов</i></div>
         <div><b>${_rm(recs.totals.spend)}</b><i>расход</i></div>
         ${recs.totals.deals ? `<div class="adrecs-kpi-deal"><b>${recs.totals.cac ? _rm(recs.totals.cac) : '—'}</b><i>CAC · цена сделки (${recs.totals.deals})</i></div>${recs.totals.roas != null ? `<div class="adrecs-kpi-deal"><b>${recs.totals.roas}×</b><i>ROAS · возврат</i></div>` : ''}` : ''}
       </div>
@@ -12290,7 +12319,7 @@ PAGES.ads = async (root) => {
         : geoToggle + `<div class="muted" style="font-size:10.5px;margin:8px 0 10px">Spend по странам — оценочный (общий Spend × доля лидов страны). Квал — фактические из CRM.</div>` + la.geo.groups.map(g => `
           <div class="ana-geo-grp"><div class="ana-geo-gh">${esc(g.label)} <span class="muted">· ${g.countries.length} стран · ${g.totalTech} лид · ${g.totalQual} квал · ~${cm2(g.spend)}</span></div>
           <table class="tbl mp-cmp"><thead><tr><th>#</th><th>Страна</th><th class="num">Тех.лиды</th><th class="num">Spend ~</th><th class="num">CPL тех.</th><th class="num">Квал.</th><th class="num">CPL квал.</th></tr></thead><tbody>
-          ${g.countries.map((c, i) => `<tr><td class="muted">${i + 1}</td><td>${c.flag} ${esc(c.country)}${i === 0 ? ' <span class="mini-badge ok">топ</span>' : ''}</td><td class="num"><b>${c.techLeads}</b></td><td class="num">${cm2(c.spend)}</td><td class="num">${cm2(c.cplTech)}</td><td class="num"><b>${c.qualLeads || '—'}</b></td><td class="num">${c.qualLeads ? cm2(c.cplQual) : '—'}</td></tr>`).join('')}
+          ${g.countries.map((c, i) => `<tr><td class="muted">${i + 1}</td><td>${c.flag} ${esc(c.country)}${i === 0 ? ' <span class="mini-badge ok">топ</span>' : ''}</td><td class="num"><b>${c.techLeads}</b></td><td class="num">${cm2(c.spend)}</td><td class="num">${cm2(c.cplTech)}</td><td class="num"><b class="ql-clk" data-qlgeo="${esc(c.country)}" data-qldir="${esc(g.label)}" title="Открыть квал-лидов страны — можно поправить статус">${c.qualLeads || '—'}</b></td><td class="num">${c.qualLeads ? cm2(c.cplQual) : '—'}</td></tr>`).join('')}
           </tbody></table></div>`).join('');
       /* ── КАЧЕСТВО: рейтинг adset + креативов + детально (порт TargetPoint, минималистично) ── */
       const qBadge = (b) => b === 'leader' ? '<span class="mini-badge ok">лидер</span>' : b === 'eff' ? '<span class="mini-badge ai">эффект.</span>' : b === 'low' ? '<span class="mini-badge">мало данных</span>' : '';
@@ -12594,6 +12623,9 @@ PAGES.ads = async (root) => {
     };
     if (planN) { planN.addEventListener('input', calcPlan); calcPlan(); }
   }
+  /* клик по счётчику квалов (бюджет-карточка / гео-клетка) → попап списка квал-лидов с ручной правкой */
+  $$('[data-qlall]', root).forEach(b => b.addEventListener('click', () => window.openQualLeads({ title: 'все направления' })));
+  $$('[data-qlgeo]', root).forEach(b => b.addEventListener('click', () => window.openQualLeads({ country: b.dataset.qlgeo, dir: b.dataset.qldir, title: b.dataset.qlgeo })));
   /* «Отчёт за период» одной кнопкой — собрать текст из данных (его же шлют клиенту/застройщику руками) */
   if (recs && recs.ready) $('#adRecsReport', root)?.addEventListener('click', async () => {
     const _pm = n => '$' + Math.round(n || 0).toLocaleString('ru-RU');
