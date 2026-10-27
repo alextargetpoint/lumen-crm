@@ -7853,7 +7853,12 @@ PAGES.waProfile = async (root) => {
               <button class="btn btn-sm" id="myTgUnbind" style="align-self:flex-start">${ic(I.x || I.link)}Отвязать всё</button>
               <button class="btn btn-sm" id="myTgUnbindRot" title="Отвязать все аккаунты и выдать НОВЫЙ код — старые ссылки/аккаунты больше не подключатся" style="align-self:flex-start">${ic(I.refresh || I.spark)}Отвязать и сбросить код</button>
             </div>
+            <div class="set-row" style="border-top:1px solid var(--stroke);padding-top:11px;margin-top:3px">
+              <div class="sp"><div class="sl">QR при отвале номера — в мой Telegram</div><div class="sd">Если рабочий WhatsApp-номер отвалился, бот сам пришлёт сюда свежий QR для пересканирования — не нужно идти в CRM.</div></div>
+              <label class="switch"><input type="checkbox" id="myAutoQr" ${(STATE.me && STATE.me.autoQr !== false) ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+            </div>
           </div>`;
+          $('#myAutoQr', box)?.addEventListener('change', async function () { try { await api.post('/brokers/my-autoqr', { on: this.checked }); toast(this.checked ? 'Включено' : 'Выключено', 'QR при отвале номера — в Telegram', true); } catch (e) { toast('Не вышло', e.message); this.checked = !this.checked; } });
           $('#myTgCode2', box)?.addEventListener('click', function () { navigator.clipboard.writeText('/start ' + (code || '')); toast('Скопировано', 'Отправь боту с другого своего аккаунта', true); });
           const doUnbind = async (rotate) => {
             if (!await uiConfirm(rotate ? 'Отвязать всё и сбросить код?' : 'Отвязать все Telegram-аккаунты?', rotate ? 'Все твои привязанные аккаунты отключатся, выдадим новый код. Старые ссылки больше не подключатся.' : 'Все твои привязанные аккаунты отключатся. Сможешь подключиться заново — тем же кодом с нужных аккаунтов.', { ok: 'Отвязать', danger: true })) return;
@@ -12207,7 +12212,7 @@ PAGES.ads = async (root) => {
   const adContractors = await api.get('/contractors').catch(() => []);
   const d = await api.get('/ads' + rq + ctSuf);
   const treeD = await api.get('/ads/tree' + rq + ctSuf).catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
-  const geoGroupMode = PAGE_STATE.anaGeoGroup === 'direction' ? 'direction' : 'lang';
+  const geoGroupMode = ['direction', 'adset', 'campaign', 'creative'].includes(PAGE_STATE.anaGeoGroup) ? PAGE_STATE.anaGeoGroup : 'lang';
   const la = await api.get('/ads/leadanalytics' + (rq ? rq + '&' : '?') + 'geoGroup=' + geoGroupMode + (adCid ? '&contractorId=' + encodeURIComponent(adCid) : '')).catch(() => ({ geo: { groups: [], mode: geoGroupMode }, quality: { adsets: {}, creatives: {}, qleads: {} }, totalSpend: 0, hasLeads: 0 }));
   /* контекст для попапа «квал-лиды» (клик по счётчику квалов → список с ручной правкой статуса) */
   window._qlCtx = { leads: la.scopeLeads || [], params: (rq ? rq + '&' : '?') + 'geoGroup=' + geoGroupMode + (adCid ? '&contractorId=' + encodeURIComponent(adCid) : ''), reload: () => { try { PAGES.ads(root); } catch (_) {} } };
@@ -12317,7 +12322,7 @@ PAGES.ads = async (root) => {
       const SUBNAMES = { geo: 'Гео', quality: 'Качество лидов' };
       const seg = ['geo', 'quality'].map(k => `<button class="ana-sub-b ${sub === k ? 'on' : ''}" data-anasub="${k}">${SUBNAMES[k]}</button>`).join('');
       /* ── ГЕО по стране лида (порт логики TargetPoint) ── */
-      const geoToggle = `<div class="ana-geo-toggle"><button class="ana-gt ${la.geo.mode === 'lang' ? 'on' : ''}" data-geogroup="lang">По языкам</button><button class="ana-gt ${la.geo.mode === 'direction' ? 'on' : ''}" data-geogroup="direction">По направлениям</button></div>`;
+      const geoToggle = `<div class="ana-geo-toggle">${[['lang', 'По языкам'], ['direction', 'По направлениям'], ['campaign', 'По кампаниям'], ['adset', 'По адсетам'], ['creative', 'По креативам']].map(([k, n]) => `<button class="ana-gt ${la.geo.mode === k ? 'on' : ''}" data-geogroup="${k}">${n}</button>`).join('')}</div>`;
       const geoTbl = !la.geo.groups.length
         ? '<div class="empty" style="padding:26px;text-align:center">Нет лидов с определённой страной за период.<br><span class="muted" style="font-size:11px">Страна берётся из доп-поля «Страна» карточки лида или из кода телефона. CRM-лиды приходят через приём (Albato).</span></div>'
         : geoToggle + `<div class="muted" style="font-size:10.5px;margin:8px 0 10px">Spend по странам — оценочный (общий Spend × доля лидов страны). Квал — фактические из CRM.</div>` + la.geo.groups.map(g => `

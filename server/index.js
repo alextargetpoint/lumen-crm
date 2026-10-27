@@ -13556,7 +13556,7 @@ ${SCR}
       for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
       /* Гео (по стране лида) + Качество (рейтинг adset/креативов по квалам, детально) — порт логики дашборда TargetPoint. */
       const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
-      const geoGroup = u.searchParams.get('geoGroup') === 'direction' ? 'direction' : 'lang';
+      const geoGroup = ['direction', 'adset', 'campaign', 'creative'].includes(u.searchParams.get('geoGroup')) ? u.searchParams.get('geoGroup') : 'lang';
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
       const namesCfg = (db.settings.stagesCfg && db.settings.stagesCfg.names) || {};
       const campMap = db.settings.adCampaignMap || {}; const langMap = db.settings.adCampaignLangMap || {};
@@ -13585,13 +13585,19 @@ ${SCR}
         return 'OTHER';
       };
       const dirOf = (l) => { const dk = campMap[l.ads && l.ads.campaignName]; return dk ? dirName(dk) : 'Прочее (вне плана)'; };
+      /* вариации разбивки: направление / язык / адсет / кампания / креатив */
+      const groupKeyOf = (l) => geoGroup === 'direction' ? dirOf(l)
+        : geoGroup === 'adset' ? ((l.ads && l.ads.adsetName) || '— без адсета')
+        : geoGroup === 'campaign' ? ((l.ads && l.ads.campaignName) || '— без кампании')
+        : geoGroup === 'creative' ? ((l.ads && (l.ads.adName || l.ads.name)) || '— без креатива')
+        : langOf(l);
       const _cid = u.searchParams.get('contractorId'); const _scopeIds = _cid ? new Set(adsInScope(db, _cid).map(a => String(a.adId))) : null; const leads = (db.leads || []).filter(l => inR(l) && (!_cid || l.vendorId === _cid || (_scopeIds && _scopeIds.has(resolveLeadAdId(db, l)))));
       /* totalSpend за период */
       let totalSpend = 0; for (const a of adsInScope(db, u.searchParams.get('contractorId'))) totalSpend += (from || to) ? adRangeMetrics(a, from, to).spend : (a.spend || 0);
       /* ── ГЕО ── */
       const byGroup = {}; let totCounted = 0;
       const LANG_TITLE = { RU: '🇷🇺 RU', EN: '🌐 EN', AR: '🇦🇪 AR', ES: '🇪🇸 ES', DE: '🇩🇪 DE', FR: '🇫🇷 FR', IT: '🇮🇹 IT', TR: '🇹🇷 TR', TH: '🇹🇭 TH', ID: '🇮🇩 ID', OTHER: '🌍 Без языка' };
-      for (const l of leads) { const c0 = canon(countryOf(l)); if (!c0) continue; const gk = geoGroup === 'direction' ? dirOf(l) : langOf(l); const g = byGroup[gk] = byGroup[gk] || { key: gk, label: geoGroup === 'lang' ? (LANG_TITLE[gk] || gk) : gk, countries: {}, totalTech: 0, totalQual: 0 }; const cc = g.countries[c0] = g.countries[c0] || { country: c0, flag: flag(c0), techLeads: 0, qualLeads: 0 }; cc.techLeads++; g.totalTech++; totCounted++; if (isQual(l)) { cc.qualLeads++; g.totalQual++; } }
+      for (const l of leads) { const c0 = canon(countryOf(l)); if (!c0) continue; const gk = groupKeyOf(l); const g = byGroup[gk] = byGroup[gk] || { key: gk, label: geoGroup === 'lang' ? (LANG_TITLE[gk] || gk) : gk, countries: {}, totalTech: 0, totalQual: 0 }; const cc = g.countries[c0] = g.countries[c0] || { country: c0, flag: flag(c0), techLeads: 0, qualLeads: 0 }; cc.techLeads++; g.totalTech++; totCounted++; if (isQual(l)) { cc.qualLeads++; g.totalQual++; } }
       const geoGroups = Object.values(byGroup).sort((a, b) => b.totalTech - a.totalTech).map(g => { const groupSpend = totCounted ? totalSpend * (g.totalTech / totCounted) : 0; const countries = Object.values(g.countries).sort((a, b) => b.techLeads - a.techLeads).map(c => { const sp = g.totalTech ? groupSpend * (c.techLeads / g.totalTech) : 0; return { country: c.country, flag: c.flag, techLeads: c.techLeads, qualLeads: c.qualLeads, spend: Math.round(sp), cplTech: c.techLeads ? +(sp / c.techLeads).toFixed(1) : 0, cplQual: c.qualLeads ? +(sp / c.qualLeads).toFixed(1) : 0 }; }); return { key: g.key, label: g.label, totalTech: g.totalTech, totalQual: g.totalQual, spend: Math.round(groupSpend), countries }; });
       /* ── КАЧЕСТВО: рейтинг adset + креативов + детально, по направлениям ── */
       const rankBy = (keyFn) => { const byDir = {}; for (const l of leads) { const dir = dirOf(l); const k = (keyFn(l) || '—'); const d = byDir[dir] = byDir[dir] || {}; const e = d[k] = d[k] || { key: k, total: 0, qual: 0 }; e.total++; if (isQual(l)) e.qual++; } const out = {}; for (const dir of Object.keys(byDir)) { const arr = Object.values(byDir[dir]).map(e => ({ ...e, qualRate: e.total ? +(e.qual / e.total * 100).toFixed(1) : 0 })).sort((a, b) => b.qual - a.qual || b.total - a.total); const MINQ = 3, MINL = 8; const elig = arr.filter(a => a.qual >= MINQ && a.total >= MINL); const leader = elig.slice().sort((a, b) => b.qual - a.qual || b.qualRate - a.qualRate)[0]; const eff = elig.slice().sort((a, b) => b.qualRate - a.qualRate || b.qual - a.qual)[0]; arr.forEach(a => { a.badge = (leader && a.key === leader.key) ? 'leader' : (eff && a.key === eff.key) ? 'eff' : (a.qual > 0 && (a.qual < MINQ || a.total < MINL)) ? 'low' : ''; }); out[dir] = arr; } return out; };
