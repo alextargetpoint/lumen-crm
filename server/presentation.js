@@ -212,6 +212,29 @@ function collContentsItem(pr, k) {
     price: (pr.priceFrom != null && pr.priceFrom !== '') ? { kind: 'from', amount: pr.priceFrom, currency: cur } : null,
   };
 }
+/* Rich-карточка объекта для умного пикера (экраны «Новая презентация» / «Добавить объект»):
+   превью-обложка, регион/страна, тип, цена, диапазон площадей, число фото, флаг «есть готовая
+   презентация» и готовый lower-case search-блоб для быстрого клиентского фильтра. */
+function pickerItem(db, pr) {
+  const gi = geoInfo(pr.geo);
+  const cur = pr.currency || gi.currency;
+  const areas = (pr.units || []).map(u => +u.area).filter(Boolean);
+  const region = (db.settings && db.settings.geoNames && db.settings.geoNames[pr.geo]) || gi.region || '';
+  const country = gi.country || '';
+  const hasPres = (db.presentations || []).some(x => x && x.projectId === pr.id && x.kind !== 'collection' && x.status !== 'archived');
+  return {
+    id: pr.id, name: pr.name || 'Объект',
+    geo: pr.geo, geoName: region, region: region, country: country,
+    type: pr.type || '',
+    priceFrom: (pr.priceFrom != null && pr.priceFrom !== '') ? pr.priceFrom : null, currency: cur,
+    areaFrom: areas.length ? Math.min.apply(null, areas) : null,
+    areaTo: areas.length ? Math.max.apply(null, areas) : null,
+    image: (pr.images || [])[0] || '',
+    photos: (pr.images || []).length,
+    hasPres: hasPres,                                   // есть готовая одиночная презентация объекта → её можно переиспользовать
+    search: [pr.name, region, country, pr.type].filter(Boolean).join(' ').toLowerCase(),
+  };
+}
 // пометка «Объект k из N» в eyebrow (locationLabel) обложки объекта внутри подборки
 function tagObjectHeroSeq(objSections, pr, k, n) {
   const hero = (objSections || []).filter(s => s.family === 'hero')[0]; if (!hero) return;
@@ -789,7 +812,7 @@ function publicProjection(snap) {
 
 module.exports = {
   SCHEMA_VERSION, RENDERER_VERSION, TOK, T,
-  draftFromProperty, draftCollection, replaceObjectInCollection, addObjectsToCollection, moveObjectInCollection, objectUpdates, applyObjectUpdates, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
+  draftFromProperty, draftCollection, replaceObjectInCollection, addObjectsToCollection, moveObjectInCollection, objectUpdates, applyObjectUpdates, pickerItem, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
 };
