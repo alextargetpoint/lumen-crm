@@ -4244,6 +4244,24 @@ function runBillingTick() {
           ? { active: true, level: g.level, daysLeft: g.daysLeft, amount: g.amount, dueAt: g.dueAt, graceEndsAt: g.graceEndsAt, numbers: g.numbers, claim: g.clientClaim || null }
           : { active: false };
         if (JSON.stringify(next) !== JSON.stringify(db.settings.billingGate || null)) { db.settings.billingGate = next; store.saveNow(); }
+        /* === ПОДПИСКА: гейт + уведомления клиенту на переходах (soon/overdue/expired), с учётом exempt.
+           Сам статус/баннер — в db.settings.subGate; жёсткая блокировка доступа добавляется отдельно. === */
+        try {
+          if (db.settings.billing) {
+            const sg = billing.subGate(db);
+            if (JSON.stringify(sg) !== JSON.stringify(db.settings.subGate || null)) { db.settings.subGate = sg; store.saveNow(); }
+            const sub = (db.settings.billing.sub = db.settings.billing.sub || {});
+            const D = 86400e3;
+            if (sg.level === 'soon' || sg.level === 'overdue' || sg.level === 'expired') {
+              if (sub.notifiedLevel !== sg.level) {
+                if (sg.level === 'soon') notify(db, { type: 'billing', level: 'warn', title: 'Скоро списание за подписку', text: `Через ${sg.daysLeft} дн. продлеваем подписку Lumen — $${sg.amount}/мес. Оплатите заранее, чтобы работа не прерывалась.`, dedupKey: 'sub-soon', cooldownMs: 3 * D });
+                else if (sg.level === 'overdue') notify(db, { type: 'billing', level: 'warn', title: 'Подписка не оплачена', text: `Срок подписки истёк. Доступ пока сохраняется ещё ${Math.max(0, Math.ceil((sg.graceEndsAt - Date.now()) / D))} дн. Оплатите $${sg.amount}, чтобы не прерывать работу.`, dedupKey: 'sub-overdue', cooldownMs: 1 * D });
+                else notify(db, { type: 'billing', level: 'critical', title: sg.exempt ? 'Подписка истекла (доступ сохранён)' : 'Подписка приостановлена', text: sg.exempt ? 'Срок подписки истёк, но ваш аккаунт освобождён от блокировки — доступ сохранён.' : `Подписка не оплачена сверх грейса — доступ приостановлен до оплаты $${sg.amount}.`, dedupKey: 'sub-expired', cooldownMs: 2 * D });
+                sub.notifiedLevel = sg.level; store.saveNow();
+              }
+            } else if (sub.notifiedLevel) { sub.notifiedLevel = null; store.saveNow(); }   /* продлили/оплатили → сброс, чтобы в следующий цикл напомнить заново */
+          }
+        } catch (_) {}
       });
     }
     /* фактическое списание расходников Group A (ИИ/телефония/STT) с баланса — по ВСЕМ тенантам, вкл. primary */
