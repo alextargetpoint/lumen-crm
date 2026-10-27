@@ -10357,7 +10357,7 @@ PAGES.presentations = async (root) => {
   $$('[data-pdf]', root).forEach(b => b.addEventListener('click', () => window.open('/pres/' + b.dataset.pdf + '/print?format=portrait_a4', '_blank')));
   $$('[data-link]', root).forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations/' + b.dataset.link + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); } }));
   $$('[data-more]', root).forEach(b => b.addEventListener('click', () => openPresMore(items.find(x => x.id === b.dataset.more))));
-  $('#presNew', root)?.addEventListener('click', () => {
+  $('#presNew', root)?.addEventListener('click', async () => {
     if (!propList.length) { toast('Нет объектов', 'Добавьте объект в Базе'); return; }
     let selPreset = 'gallerywhite';
     const PRESETS_UI = [
@@ -10366,9 +10366,50 @@ PAGES.presentations = async (root) => {
       { id: 'terracotta', name: 'Terracotta Atelier', sw: ['#FBF7F2', '#A6533D', '#392D28'] },
     ];
     const presetBtns = PRESETS_UI.map(p => `<button class="btn pres1-preset" data-preset="${p.id}" style="flex:1;min-width:140px;justify-content:flex-start;gap:8px${p.id === selPreset ? ';background:var(--accent-weak,rgba(120,110,90,.12));border-color:var(--accent,#8a6d3b);font-weight:600' : ''}"><span style="display:inline-flex;gap:2px">${p.sw.map(c => `<i style="width:11px;height:14px;border-radius:2px;background:${c};border:1px solid rgba(0,0,0,.12);display:inline-block"></i>`).join('')}</span>${esc(p.name)}</button>`).join('');
+    /* умный пикер: rich-карточки с превью + живой поиск (данные из /presentations/objects — pickerItem) */
+    let objs = [];
+    try { objs = (await api.get('/presentations/objects')).items || []; } catch (e) {}
+    if (!objs.length) objs = propList.map(p => ({ id: p.id, name: p.name || p.id, image: (p.images || [])[0] || '', region: (p.geoName || ''), type: p.type || '', priceFrom: p.priceFrom, currency: p.currency, photos: (p.images || []).length, search: String((p.name || '') + ' ' + (p.type || '')).toLowerCase() }));
+    const curSym = c => ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£' }[c] || '$');
+    const objCard = o => {
+      const price = (o.priceFrom != null && o.priceFrom !== '') ? 'от ' + curSym(o.currency) + Number(o.priceFrom).toLocaleString('ru-RU') : '';
+      const sub = [o.region, o.type].filter(Boolean).join(' · ') || '—';
+      return `<button class="np-card" data-pp="${esc(o.id)}" data-s="${esc((o.search || o.name || '').toLowerCase())}">
+        <span class="np-thumb"${o.image ? ` style="background-image:url('${esc(absU(o.image))}')"` : ''}>${o.image ? '' : ic(I.building)}</span>
+        <span class="np-main"><b>${esc(o.name)}</b><em>${esc(sub)}</em>${price ? `<i class="np-price">${esc(price)}</i>` : ''}</span>
+        <span class="np-meta">${o.hasPres ? `<i class="np-has" title="Есть готовая презентация — она переиспользуется">${ic(I.check)}</i>` : ''}<i class="np-ph">${o.photos || 0} фото</i></span>
+      </button>`;
+    };
+    const npStyle = `<style>
+      .np-wrap{display:flex;flex-direction:column;gap:12px}
+      .np-sec{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+      .np-presets{display:flex;gap:8px;flex-wrap:wrap}
+      .np-searchrow{display:flex;align-items:center;gap:9px;border:1px solid var(--stroke);border-radius:11px;padding:10px 13px;background:var(--card,#fff)}
+      .np-searchrow svg{width:17px;height:17px;color:var(--muted);flex:0 0 auto}
+      .np-searchrow input{border:0;outline:0;background:transparent;font:inherit;width:100%;color:var(--ink)}
+      .np-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;max-height:52vh;overflow:auto;padding:2px}
+      .np-card{display:flex;align-items:center;gap:12px;text-align:left;border:1px solid var(--stroke);border-radius:13px;padding:10px;background:var(--card,#fff);cursor:pointer;transition:border-color .14s,box-shadow .14s,transform .05s}
+      .np-card:hover{border-color:var(--accent,#8a6d3b);box-shadow:0 4px 16px rgba(20,16,12,.08)}
+      .np-card:active{transform:translateY(.5px)}
+      .np-thumb{flex:0 0 auto;width:62px;height:50px;border-radius:9px;background:var(--hover,#f0ece6) center/cover no-repeat;border:1px solid var(--stroke);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+      .np-thumb svg{width:20px;height:20px}
+      .np-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+      .np-main b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .np-main em{font-style:normal;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .np-price{font-size:12.5px;font-weight:600;color:var(--ink)}
+      .np-meta{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+      .np-has{color:#1E9E6A;display:inline-flex}.np-has svg{width:16px;height:16px}
+      .np-ph{font-size:11px;color:var(--muted);white-space:nowrap}
+      .np-none{padding:24px;text-align:center;color:var(--muted);font-size:13px}
+    </style>`;
     modal({
       title: 'Новая презентация', sub: 'Выберите оформление и объект — соберём черновик и откроем конструктор', wide: true,
-      body: `<div style="display:flex;flex-direction:column;gap:8px"><div class="muted" style="font-size:12px">Оформление (пресет):</div><div style="display:flex;gap:8px;flex-wrap:wrap">${presetBtns}</div><div class="muted" style="font-size:12px;margin-top:4px">Объект:</div><div style="display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow:auto">` + propList.slice(0, 60).map(p => `<button class="btn pres-pick" data-pp="${esc(p.id)}" style="justify-content:flex-start">${ic(I.building)}${esc(p.name || p.id)}</button>`).join('') + '</div></div>',
+      body: npStyle + `<div class="np-wrap">
+        <div class="np-sec">Оформление</div><div class="np-presets">${presetBtns}</div>
+        <div class="np-sec">Объект (${objs.length})</div>
+        <div class="np-searchrow">${ic(I.search)}<input id="npSearch" placeholder="Поиск — название, локация, тип" autocomplete="off"></div>
+        <div class="np-grid" id="npGrid">${objs.map(objCard).join('')}<div class="np-none" id="npNone" style="display:none;grid-column:1/-1">Ничего не найдено</div></div>
+      </div>`,
       actions: [{ label: 'Отмена' }],
     });
     setTimeout(() => {
@@ -10377,7 +10418,8 @@ PAGES.presentations = async (root) => {
         $$('.pres1-preset').forEach(x => { x.style.background = ''; x.style.borderColor = ''; x.style.fontWeight = ''; });
         b.style.background = 'var(--accent-weak, rgba(120,110,90,.12))'; b.style.borderColor = 'var(--accent, #8a6d3b)'; b.style.fontWeight = '600';
       }));
-      $$('.pres-pick').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp, presetId: selPreset }); if (r && r.id) { closeModal(); openEditor(r.id); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } }));
+      const si = $('#npSearch'); if (si) { si.focus(); si.addEventListener('input', () => { const q = si.value.trim().toLowerCase(); let vis = 0; $$('.np-card').forEach(c => { const ok = !q || (c.dataset.s || '').indexOf(q) >= 0; c.style.display = ok ? '' : 'none'; if (ok) vis++; }); const n = $('#npNone'); if (n) n.style.display = vis ? 'none' : 'block'; }); }
+      $$('.np-card').forEach(b => b.addEventListener('click', async () => { try { const r = await api.post('/presentations', { projectId: b.dataset.pp, presetId: selPreset }); if (r && r.id) { closeModal(); openEditor(r.id); } else toast('Не вышло', (r && r.error) || ''); } catch (e) { toast('Не вышло', e.message); } }));
     }, 40);
   });
   $('#presNewColl', root)?.addEventListener('click', () => {
