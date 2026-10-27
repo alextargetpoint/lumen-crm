@@ -139,9 +139,12 @@ function usageEstimate(db) {
   const usageForecast = +(usageTotal / elapsedDays * 30).toFixed(2);
   /* аренда номеров = ПОКУПКА номера (номер даётся на 1 месяц; продление = списание с баланса ежемесячно).
      По факту: берём реально уплаченную цену за номер (n.priceUsd), фоллбэк — ставка типа (дефолт $9/мес).
-     Считаем только купленные виртуальные номера (свой номер по QR не арендуется). Провайдер СКРЫТ. */
-  const waQrNums  = (((db.settings.waGray  || {}).numbers) || []).filter(n => n && n.source === 'yesim');
-  const tgNums    = (((db.settings.tgGray  || {}).numbers) || []).filter(Boolean);
+     Считаем ВСЕ арендованные номера (Yesim/VSIM/simbye/подключённые вручную), КРОМЕ собственного
+     номера клиента по QR (помечается n.own / n.notRented / source:'own'|'self'). Раньше фильтр
+     source==='yesim' НЕ считал номера, подключённые вручную через VSIM (Пхукет) → недобор аренды. */
+  const isOwnNum  = n => !!(n && (n.own === true || n.notRented === true || n.source === 'own' || n.source === 'self'));
+  const waQrNums  = (((db.settings.waGray  || {}).numbers) || []).filter(n => n && !isOwnNum(n));
+  const tgNums    = (((db.settings.tgGray  || {}).numbers) || []).filter(n => n && !isOwnNum(n));
   const cloudNums = Object.values(((db.settings.telephony || {}).otpNumbers) || db.otpNumbers || {});
   const telNums   = (((db.settings.telephony || {}).fromNumbers) || []).filter(Boolean).map(n => (typeof n === 'string' ? {} : n));
   const sumPrice = (arr, fallback) => +arr.reduce((s, n) => s + (+((n && n.priceUsd) || fallback)), 0).toFixed(2);
