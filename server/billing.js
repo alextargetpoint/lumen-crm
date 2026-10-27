@@ -265,8 +265,12 @@ function subGate(db) {
   else if (daysLeft >= 1) level = 'soon';
   else if (now < graceEndsAt) level = 'overdue';
   else level = 'expired';
-  const blocked = level === 'expired' && !exempt;
-  return { level, exempt, blocked, daysLeft, dueAt: end, graceEndsAt, graceDays: cfg.graceDays, amount, currency: 'USD' };
+  /* enforce — явный opt-in владельца (db.settings.billing.enforce===true). Без него доступ НЕ блокируем,
+     даже если подписка истекла (безопасный дефолт: на деплое никого не отключаем). Демо (exempt) не блок никогда. */
+  const enforce = b.enforce === true;
+  const expired = level === 'expired';
+  const blocked = expired && !exempt && enforce;
+  return { level, exempt, enforce, expired, blocked, daysLeft, dueAt: end, graceEndsAt, graceDays: cfg.graceDays, amount, currency: 'USD' };
 }
 
 /* ---- сменить план/цикл/места ---- */
