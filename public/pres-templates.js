@@ -202,17 +202,16 @@
     /* Явно выбранный вариант компоновки обложки (ТЗ §4/§6: тип страницы ≠ макет).
        bottom=фото снизу · right=фото справа · full=фото на весь лист · text=без фото.
        Переопределяет пресет-дефолт; если не задан — поведение как раньше (ниже по пресету). */
-    const cover = ctx.section.coverLayout;
-    if (cover && fmt.orient === 'portrait') {
+    /* Эффективная обложка = явный выбор ИЛИ дефолт пресета. Рендерим ВСЕ портретные обложки
+       через один и тот же набор из 4 макетов (full/bottom/right/text) — тогда выбранный в панели
+       «Композиция» макет 1:1 совпадает с живым рендером и PDF (раньше пресеты без явного coverLayout
+       падали в необъявленный макет lp-hero-port, из-за чего панель показывала одно, холст — другое). */
+    const cover = ctx.section.coverLayout || (presetId === 'gallerywhite' ? 'bottom' : presetId === 'terracotta' ? 'right' : 'full');
+    if (fmt.orient === 'portrait') {
       if (cover === 'bottom') return [`<div class="lp-safe lp-hero-gw">
         <div class="lp-hero-gw-head">${brandMark}${loc}${title}${sub}</div>
         <div class="lp-hero-gw-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
       </div>`];
-      if (cover === 'full') return [`
-        <div class="lp-bleed" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
-        <div class="lp-hero-ug">${brandMark}${loc}${title}${sub}
-          ${metrics.length ? `<div class="lp-hero-ug-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}
-        </div>`];
       if (cover === 'right') return [`
         <div class="lp-hero-split">
           <div class="lp-hero-split-txt">${brandMark}${loc}${title}${sub}
@@ -225,33 +224,11 @@
           ${metrics.length ? `<div class="lp-hero-metrics" style="margin-top:auto">${metrics.map(metricCell).join('')}</div>` : ''}
         </div>
       </div>`];
-    }
-    /* Gallery White — обложка-галерея: логотип+крупное название сверху, фото в прямоугольнике снизу, белые поля (ТЗ §3) */
-    if (presetId === 'gallerywhite' && fmt.orient === 'portrait') {
-      return [`<div class="lp-safe lp-hero-gw">
-        <div class="lp-hero-gw-head">${brandMark}${loc}${title}${sub}</div>
-        <div class="lp-hero-gw-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
-      </div>`];
-    }
-    /* Urban Graphite — большое фото + графитовая полоса снизу с названием и логотипом (ТЗ §4) */
-    if (presetId === 'graphite' && fmt.orient === 'portrait') {
+      /* full (и дефолт) — фото на весь лист + блок текста снизу */
       return [`
         <div class="lp-bleed" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
-        <div class="lp-hero-ug">
-          ${brandMark}${loc}${title}${sub}
+        <div class="lp-hero-ug">${brandMark}${loc}${title}${sub}
           ${metrics.length ? `<div class="lp-hero-ug-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}
-        </div>`];
-    }
-    /* Terracotta Atelier — split-обложка: цветная текстовая панель ~42% + фото ~58% (ТЗ §5) */
-    if (presetId === 'terracotta' && fmt.orient === 'portrait') {
-      return [`
-        <div class="lp-hero-split">
-          <div class="lp-hero-split-txt">
-            ${brandMark}${loc}${title}${sub}
-            ${metrics.length ? `<div class="lp-hero-split-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}
-            ${price}
-          </div>
-          <div class="lp-hero-split-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
         </div>`];
     }
 
