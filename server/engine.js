@@ -504,6 +504,21 @@ async function nextTouchDraft(db, lead, opts = {}) {
 }
 function tickChains(db) {
   const nowT = Date.now();
+  /* ⭐ЖЁСТКИЙ СТОП ПО ТИШИНЕ (верхнеуровневый рубильник, независим от цепочки/дожима): клиент не выходил на
+     связь > N дней → лид в «Спящие», авто-касания/дожимы прекращаются. ref = последнее входящее от клиента,
+     а если не отвечал ни разу — дата создания. 0 дней = выключено. */
+  const _sg = guardCfg(db);
+  if (_sg.enabled && _sg.maxSilenceDays > 0) {
+    const cut = nowT - _sg.maxSilenceDays * 864e5;
+    for (const l of db.leads) {
+      if (!l.ai || ['deal', 'lost', 'sleeping'].includes(l.stage)) continue;
+      const ref = l.lastInboundAt || l.createdAt || 0;
+      if (ref && ref < cut) {
+        l.stage = 'sleeping'; l.ai.reengage = null; delete l.ai.nextDraft; delete l.ai._reengageText;
+        ai.pushEvent(db, { type: 'sleep', leadId: l.id, text: `${l.name}: тишина > ${_sg.maxSilenceDays} дн — авто-стоп, лид в «Спящие»` });
+      }
+    }
+  }
   const actives = db.sequences.filter(s => s.active);
   if (!actives.length) return;
   /* глобальный выключатель авто-цепочек на новые лиды (Воронка → контрол цепочек).
@@ -778,6 +793,7 @@ function guardCfg(db) {
       : 'Если тема сейчас не актуальна — просто напишите «нет», и я больше не буду беспокоить. А если интересно, с радостью помогу дальше.',
     maxTouchesNoReply: Math.max(0, Math.min(30, g.maxTouchesNoReply != null ? +g.maxTouchesNoReply : 5)),  /* 0 = без потолка */
     pauseOnOffline: g.pauseOnOffline !== false,                     /* не слать, пока номер не на связи (прошлое не ушло) */
+    maxSilenceDays: Math.max(0, Math.min(365, g.maxSilenceDays != null ? +g.maxSilenceDays : 0)),  /* 0 = выкл; жёсткий стоп: клиент молчит > N дней → Спящие */
   };
 }
 /* последнее исходящее не ушло (номер разлогинен/офлайн)? → проактивные касания ставим на паузу,
