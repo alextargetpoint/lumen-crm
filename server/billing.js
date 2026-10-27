@@ -221,7 +221,49 @@ function view(db) {
     usageLive: usageEstimate(db),
     stripeReady: !!process.env.STRIPE_SECRET_KEY,
     daysLeft: b.currentPeriodEnd ? Math.max(0, Math.ceil((b.currentPeriodEnd - Date.now()) / 86400e3)) : null,
+    gate: subGate(db),                 // состояние доступа по подписке (level/blocked/grace) — для баннера и enforcement
+    exempt: subExempt(db),             // демо/наш клиент — не блокируется
   };
+}
+
+const SUB_DAY = 86400e3;
+/* освобождён ли тенант от блокировки по подписке (демо / наш клиент / партнёр) — НИКОГДА не блокируем.
+   Флаг ставится вручную владельцем: db.settings.billing.exempt = true. */
+function subExempt(db) {
+  const b = (db.settings && db.settings.billing) || {};
+  return b.exempt === true || b.demo === true;
+}
+function subCfg(db) {
+  const s = (((db.settings && db.settings.billing) || {}).sub) || {};
+  return { graceDays: s.graceDays != null ? s.graceDays : 5, remindDaysBefore: s.remindDaysBefore != null ? s.remindDaysBefore : 3 };
+}
+/* Состояние доступа по ПОДПИСКЕ — зеркалит farm.gateFor для расходников.
+   level: trial | active | soon | overdue | expired | none
+   • soon     — ≤ remindDaysBefore дней до списания (мягкое напоминание)
+   • overdue  — 0 дней / просрочка, но в грейсе (доступ ещё есть, жёсткое напоминание)
+   • expired  — сверх грейса → blocked=true (доступ закрыть), КРОМЕ exempt
+   blocked НИКОГДА не true для exempt-тенанта. */
+function subGate(db) {
+  const b = (db.settings && db.settings.billing) || {};
+  const now = Date.now();
+  const cfg = subCfg(db);
+  const exempt = subExempt(db);
+  const q = quote(b.plan, b.cycle, b.seats, b.addons);
+  const amount = (q && q.recurringNow != null) ? q.recurringNow : ((q && q.monthlyTotal) || 0);
+  if (b.status === 'trial' && b.trialEndsAt && b.trialEndsAt > now) {
+    return { level: 'trial', exempt, blocked: false, daysLeft: Math.max(0, Math.ceil((b.trialEndsAt - now) / SUB_DAY)), dueAt: b.trialEndsAt, amount, currency: 'USD' };
+  }
+  const end = b.currentPeriodEnd || 0;
+  if (!end) return { level: 'none', exempt, blocked: false, daysLeft: null, dueAt: null, amount, currency: 'USD' };
+  const daysLeft = Math.ceil((end - now) / SUB_DAY);
+  const graceEndsAt = end + cfg.graceDays * SUB_DAY;
+  let level;
+  if (daysLeft > cfg.remindDaysBefore) level = 'active';
+  else if (daysLeft >= 1) level = 'soon';
+  else if (now < graceEndsAt) level = 'overdue';
+  else level = 'expired';
+  const blocked = level === 'expired' && !exempt;
+  return { level, exempt, blocked, daysLeft, dueAt: end, graceEndsAt, graceDays: cfg.graceDays, amount, currency: 'USD' };
 }
 
 /* ---- сменить план/цикл/места ---- */
@@ -428,4 +470,4 @@ function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
   b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
   store.save();
 }
-module.exports = { PRICES, ADDONS, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, settleUsage, setRates, addUsage, creditTopup, chargeBalance, confirmSubscriptionCrypto };
+module.exports = { PRICES, ADDONS, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, settleUsage, setRates, addUsage, creditTopup, chargeBalance, confirmSubscriptionCrypto, subGate, subExempt };
