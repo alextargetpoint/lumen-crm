@@ -12231,6 +12231,7 @@ PAGES.ads = async (root) => {
         <div><b>${recs.totals.cpql ? _rm(recs.totals.cpql) : '—'}</b><i>CPQL средний</i></div>
         <div><b>${recs.totals.cpl ? _rm(recs.totals.cpl) : '—'}</b><i>CPL средний</i></div>
         <div class="ql-clk-card" data-qlall title="Открыть список квал-лидов — можно поправить статус"><b>${recs.totals.quals || 0}</b><i>квалов</i></div>
+        ${recs.totals.pot ? `<div class="ql-clk-card" data-qlallpot title="Потенциальные квалы — вышли в коммуникацию, но не дожаты"><b>${recs.totals.pot}</b><i>потенц.</i></div>` : ''}
         <div><b>${_rm(recs.totals.spend)}</b><i>расход</i></div>
         ${recs.totals.deals ? `<div class="adrecs-kpi-deal"><b>${recs.totals.cac ? _rm(recs.totals.cac) : '—'}</b><i>CAC · цена сделки (${recs.totals.deals})</i></div>${recs.totals.roas != null ? `<div class="adrecs-kpi-deal"><b>${recs.totals.roas}×</b><i>ROAS · возврат</i></div>` : ''}` : ''}
       </div>
@@ -12637,6 +12638,7 @@ PAGES.ads = async (root) => {
   }
   /* клик по счётчику квалов (бюджет-карточка / гео-клетка) → попап списка квал-лидов с ручной правкой */
   $$('[data-qlall]', root).forEach(b => b.addEventListener('click', () => window.openQualLeads({ title: 'все направления' })));
+  $$('[data-qlallpot]', root).forEach(b => b.addEventListener('click', () => window.openQualLeads({ mode: 'pot', title: 'все · потенц.' })));
   $$('[data-qlgeo]', root).forEach(b => b.addEventListener('click', () => window.openQualLeads({ country: b.dataset.qlgeo, dir: b.dataset.qldir, title: b.dataset.qlgeo })));
   $$('[data-qlgeopot]', root).forEach(b => b.addEventListener('click', () => window.openQualLeads({ country: b.dataset.qlgeopot, dir: b.dataset.qldir, mode: 'pot', title: b.dataset.qlgeopot + ' · потенц.' })));
   $$('[data-qlrank]', root).forEach(b => b.addEventListener('click', () => { const t = b.dataset.qltype, k = b.dataset.qlrank; if (t && k) window.openQualLeads({ [t]: k, title: k }); }));

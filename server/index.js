@@ -1001,16 +1001,17 @@ function adBudgetRecommendations(db, opts = {}) {
     const m = adRangeMetrics(ad, from, to);
     const crm = idx[ad.adId] || [];
     const quals = crm.filter(l => everReachedQual(db, l, 'peak')).length;
+    const pot = crm.filter(l => everPotentialQual(db, l, 'peak')).length;
     const deals = crm.filter(l => l.stage === 'deal' || l.dealAt || l.dealValue).length;
     const revenue = crm.reduce((s, l) => s + (+l.dealCommission || 0), 0);
     const leads = crm.length || m.leadsMeta || 0;
     if (m.spend <= 0 && leads <= 0) continue;
-    rows.push({ adId: ad.adId, name: ad.name || ad.adId, campaign: ad.campaignName || '—', geo: ad.geo || '', fmt: adFormatOf(ad.name), spend: m.spend, leads, quals, deals, revenue,
+    rows.push({ adId: ad.adId, name: ad.name || ad.adId, campaign: ad.campaignName || '—', geo: ad.geo || '', fmt: adFormatOf(ad.name), spend: m.spend, leads, quals, pot, deals, revenue,
       cpl: leads ? Math.round(m.spend / leads) : null, cpql: quals ? Math.round(m.spend / quals) : null, cac: deals ? Math.round(m.spend / deals) : null });
   }
   if (!rows.length) return { ready: false, reason: 'За период нет расхода/лидов по синкнутым кампаниям.' };
   const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
-  const totSpend = sum('spend'), totLeads = sum('leads'), totQuals = sum('quals'), totDeals = sum('deals'), totRevenue = sum('revenue');
+  const totSpend = sum('spend'), totLeads = sum('leads'), totQuals = sum('quals'), totPot = sum('pot'), totDeals = sum('deals'), totRevenue = sum('revenue');
   const avgCpl = totLeads ? Math.round(totSpend / totLeads) : null;
   const avgCpql = totQuals ? Math.round(totSpend / totQuals) : null;
   const cac = totDeals ? Math.round(totSpend / totDeals) : null;                 /* цена привлечения СДЕЛКИ */
@@ -1038,7 +1039,7 @@ function adBudgetRecommendations(db, opts = {}) {
   /* разбивки для планировщика «цель→бюджет+сплит» (только где есть квалы → достоверный CPQL) */
   const byGeo = geoRows.map(x => ({ key: x.g, name: gn(x.g), spend: x.spend, leads: x.leads, quals: x.quals, cpql: x.cpql })).sort((a, b) => a.cpql - b.cpql);
   const byFmt = Object.entries(roll('fmt')).map(([f, v]) => ({ key: f, name: f, spend: v.spend, leads: v.leads, quals: v.quals, cpql: v.quals ? Math.round(v.spend / v.quals) : null })).filter(x => x.cpql && x.key !== 'другое').sort((a, b) => a.cpql - b.cpql);
-  return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, deals: totDeals, revenue: totRevenue, cpl: avgCpl, cpql: avgCpql, cac, roas }, byGeo, byFmt, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
+  return { ready: true, period: { from, to }, totals: { spend: totSpend, leads: totLeads, quals: totQuals, pot: totPot, deals: totDeals, revenue: totRevenue, cpl: avgCpl, cpql: avgCpql, cac, roas }, byGeo, byFmt, rows: rows.slice(0, 50), recommendations: recs.slice(0, 12) };
 }
 
 /* профиль «идеального лида» (ICP): по каждому измерению — что доминирует среди КВАЛ-лидов +
