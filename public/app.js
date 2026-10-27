@@ -17205,14 +17205,15 @@ function wireRbacTemplates(root) {
 }
 function rbacRowHtml(b) {
   const inits = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-  const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = roleTplHide(rt);
-  const shown = RBAC_SECTIONS.filter(s => !defHide.includes(s) && !ind.includes(s)).length;
+  const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const shw = b.showPages || []; const defHide = roleTplHide(rt);
+  const isVisSec = (s) => { const byRole = defHide.includes(s), byInd = ind.includes(s), byShow = shw.includes(s); return !((byRole || byInd) && !byShow); };
+  const shown = RBAC_SECTIONS.filter(isVisSec).length;
   return `<div class="rbac-row" data-rbacid="${b.id}" data-name="${esc((b.name || '').toLowerCase())}">
     <button class="rbac-main" data-rbactoggle><span class="rbac-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><span class="rbac-nm"><b>${esc(b.name || 'Сотрудник')}</b>${b.contractorId ? '<span class="rbac-ctbadge" title="Подрядчик трафика — видит только свои лиды">подрядчик</span>' : ''}<i>${RBAC_ROLES[rt]} · ${shown}/${RBAC_SECTIONS.length} разделов</i></span><span class="rbac-chev">${ic(I.chev)}</span></button>
     <div class="rbac-body" hidden>
       <div class="rbac-role"><span>Роль</span><select class="sh-sel rbac-roleSel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === rt ? 'selected' : ''}>${n}</option>`).join('')}</select><button class="btn-ghost rbac-del" title="Убрать сотрудника">${ic(I.x)}</button></div>
-      <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const byInd = ind.includes(s); const hidden = byRole || byInd; return `<button class="rbac-sec ${hidden ? 'off' : 'on'} ${byRole ? 'locked' : ''}" data-sec="${s}"${byRole ? ' disabled title="Закрыто ролью — смени роль, чтобы открыть"' : ''}>${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
-      <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — дополнительно скрыть/показать. Серые закрыты ролью.</div>
+      <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const vis = isVisSec(s); const granted = byRole && shw.includes(s); return `<button class="rbac-sec ${vis ? 'on' : 'off'}${byRole ? ' byrole' : ''}${granted ? ' granted' : ''}" data-sec="${s}" title="${byRole ? (granted ? 'Открыт вручную сверх роли — клик, чтобы снова закрыть' : 'Закрыт ролью — клик, чтобы открыть этому человеку персонально') : 'Клик — скрыть/показать раздел'}">${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
+      <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — <b>персонально</b> открыть или скрыть, даже сверх роли. Пунктирные — закрыты ролью (можно открыть кликом).</div>
       ${(() => {
         const lf = b.leadFilter || {}; const restrict = ((lf.tags || []).length || (lf.sources || []).length || (lf.contractors || []).length) > 0;
         const roleHint = rt === 'broker' ? 'видит только свои лиды' : 'видит все лиды агентства';
@@ -17253,12 +17254,20 @@ function wireRbac(root) {
     tgl.addEventListener('click', () => { const bd = rowEl.querySelector('.rbac-body'); bd.hidden = !bd.hidden; rowEl.classList.toggle('open', !bd.hidden); });
     const sel = rowEl.querySelector('.rbac-roleSel');
     if (sel) sel.addEventListener('change', async () => { try { await api.patch('/brokers/' + id, { roleType: sel.value }); toast('Роль обновлена', RBAC_ROLES[sel.value] || '', true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); } });
-    rowEl.querySelectorAll('.rbac-sec:not(.locked)').forEach(chip => chip.addEventListener('click', async () => {
+    rowEl.querySelectorAll('.rbac-sec').forEach(chip => chip.addEventListener('click', async () => {
       const b = (STATE.brokers || []).find(x => x.id === id); if (!b) return;
-      const ind = new Set(b.hidePages || []); const s = chip.dataset.sec;
-      if (ind.has(s)) ind.delete(s); else ind.add(s);
-      const arr = [...ind]; chip.classList.toggle('off'); chip.classList.toggle('on');
-      try { await api.patch('/brokers/' + id, { hidePages: arr }); b.hidePages = arr; } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
+      const s = chip.dataset.sec;
+      const defHide = roleTplHide(b.roleType || 'broker');
+      const hide = new Set(b.hidePages || []); const show = new Set(b.showPages || []);
+      const byRole = defHide.includes(s);
+      const curVis = !((byRole || hide.has(s)) && !show.has(s));
+      if (curVis) { if (show.has(s)) show.delete(s); if (!byRole) hide.add(s); }   /* видимый → скрыть */
+      else { if (byRole) show.add(s); else hide.delete(s); }                        /* скрытый → открыть (сверх роли через show) */
+      const hArr = [...hide], sArr = [...show];
+      const nowVis = !((byRole || hArr.includes(s)) && !sArr.includes(s));
+      chip.classList.toggle('on', nowVis); chip.classList.toggle('off', !nowVis); chip.classList.toggle('granted', byRole && sArr.includes(s));
+      try { await api.patch('/brokers/' + id, { hidePages: hArr, showPages: sArr }); b.hidePages = hArr; b.showPages = sArr; }
+      catch (e) { toast('Не вышло', e.message); chip.classList.toggle('on', curVis); chip.classList.toggle('off', !curVis); }
     }));
     const del = rowEl.querySelector('.rbac-del');
     if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!await uiConfirm('Убрать сотрудника из системы?', 'Доступ к CRM для него закроется.', { ok: 'Убрать', danger: true })) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
@@ -17298,8 +17307,10 @@ function openInviteEmployee() {
         const email = ($('#rbEmail', bd).value || '').trim();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('Нужен корректный e-mail'); return false; }
         const hidePages = [...bd.querySelectorAll('#rbSecs .rbac-sec.off')].map(x => x.dataset.nsec);
+        const _dh = roleTplHide($('#rbRl', bd).value);
+        const showPages = [...bd.querySelectorAll('#rbSecs .rbac-sec.on')].map(x => x.dataset.nsec).filter(s => _dh.includes(s));   /* открыто сверх роли */
         try {
-          const r = await api.post('/brokers/invite', { name: ($('#rbNm', bd).value || '').trim(), email, phone: ($('#rbPhone', bd).value || '').trim(), roleType: $('#rbRl', bd).value, hidePages });
+          const r = await api.post('/brokers/invite', { name: ($('#rbNm', bd).value || '').trim(), email, phone: ($('#rbPhone', bd).value || '').trim(), roleType: $('#rbRl', bd).value, hidePages, showPages });
           if (r.mailed) toast('Приглашение отправлено', email, true);
           else { if (r.link) { try { navigator.clipboard.writeText(r.link); } catch (_) {} } toast('Сотрудник создан', r.mailErr ? ('письмо не ушло (' + r.mailErr + ') — ссылка скопирована, передайте вручную') : 'ссылка-приглашение скопирована', true); }
           await loadState(); render();

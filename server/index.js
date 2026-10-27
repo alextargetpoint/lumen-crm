@@ -7235,6 +7235,7 @@ const server = http.createServer(async (req, res) => {
       /* роль + персональные правки разделов прямо при приглашении (ТЗ: раздача доступов до конца) */
       if (bb.roleType && ['broker', 'assistant', 'marketer', 'analyst', 'manager'].includes(bb.roleType)) br.roleType = bb.roleType;
       if (Array.isArray(bb.hidePages)) br.hidePages = bb.hidePages.filter(x => typeof x === 'string').slice(0, 40);
+      if (Array.isArray(bb.showPages)) br.showPages = bb.showPages.filter(x => typeof x === 'string').slice(0, 40);   /* открыть разделы сверх роли сразу при приглашении */
       /* подрядчик трафика → участник со scoped-видимостью (только свои лиды по тегу) + связь с подрядчиком */
       if (bb.leadFilter && typeof bb.leadFilter === 'object') br.leadFilter = { sources: (bb.leadFilter.sources || []).slice(0, 20).map(String), tags: (bb.leadFilter.tags || []).slice(0, 20).map(x => String(x).slice(0, 40)), contractors: (bb.leadFilter.contractors || []).slice(0, 20).map(x => String(x).slice(0, 40)) };
       if (bb.contractorId) br.contractorId = String(bb.contractorId).slice(0, 40);
@@ -8210,7 +8211,7 @@ const server = http.createServer(async (req, res) => {
         sequences: IS_BROKER ? db.sequences.filter(sq => !sq.ownerId || sq.ownerId === ROLE.brokerId || sq.visibility === 'agency' || (sq.sharedWith || []).includes(ROLE.brokerId)) : db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}),
-        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...roleHide(db, MEMBER.roleType), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
+        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...roleHide(db, MEMBER.roleType), ...(MEMBER.hidePages || [])])].filter(pg => !(MEMBER.showPages || []).includes(pg)).filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
     }
     /* гейт баланса: клиент (владелец/маркетолог) сообщает основателю об оплате расходников */
@@ -9314,6 +9315,7 @@ const server = http.createServer(async (req, res) => {
       if (b.substituteId !== undefined) br.substituteId = b.substituteId && db.brokers.some(x => x.id === b.substituteId && x.id !== br.id) ? b.substituteId : null;
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
       if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
+      if (Array.isArray(b.showPages)) br.showPages = b.showPages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное ОТКРЫТИЕ разделов сверх роли (редактируемо после приглашения) */
       if (typeof b.busyIcsUrl === 'string') { br.busyIcsUrl = b.busyIcsUrl.trim().slice(0, 500); refreshIcsBusy(br); }   /* личный ICS-календарь → занятость для ИИ */
       /* ручные повторяющиеся блоки занятости: [{dow:1..7, from:'HH:MM', to:'HH:MM', label?}] — «не ставить созвоны в это окно» */
       if (Array.isArray(b.busyBlocks)) {
