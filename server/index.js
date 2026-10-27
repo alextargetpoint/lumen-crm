@@ -4250,6 +4250,9 @@ function runBillingTick() {
           if (db.settings.billing) {
             const sg = billing.subGate(db);
             if (JSON.stringify(sg) !== JSON.stringify(db.settings.subGate || null)) { db.settings.subGate = sg; store.saveNow(); }
+            /* зеркалим флаг блокировки в реестр — лёгкий гейт запроса читает его ДО загрузки БД.
+               sg.blocked=true только при enforce && expired && !exempt → по умолчанию никого не блокирует. */
+            try { const reg = store.getRegistry(); if (reg.tenants[tid] && !!reg.tenants[tid].subBlocked !== !!sg.blocked) { reg.tenants[tid].subBlocked = !!sg.blocked; store.saveRegistry(); } } catch (_) {}
             const sub = (db.settings.billing.sub = db.settings.billing.sub || {});
             const D = 86400e3;
             if (sg.level === 'soon' || sg.level === 'overdue' || sg.level === 'expired') {
@@ -5379,6 +5382,9 @@ const server = http.createServer(async (req, res) => {
   ensureTenantDefaults(db);   /* дефолты настроек — для КАЖДОГО тенанта на каждом запросе (идемпотентно). Иначе агентства не получали automations/ai.autoOff/social и т.п. — они были только у primary */
   /* SaaS: приостановленный админом тенант — блок всех API-операций (кроме платформенного админа) */
   if (_tid !== store.PRIMARY && _reg.tenants[_tid] && _reg.tenants[_tid].suspended && p.startsWith('/api/') && !p.startsWith('/api/admin/')) return json(res, 403, { error: 'Аккаунт приостановлен. Свяжитесь с поддержкой.' });
+  /* блок по подписке (enforce && истекла сверх грейса && не demo). Self-recovery разрешён: /api/state (чтобы
+     приложение загрузилось и показало paywall) + /api/billing* (оплатить). Логин/логаут — /auth/* (не /api/, не гейтятся). */
+  if (_tid !== store.PRIMARY && _reg.tenants[_tid] && _reg.tenants[_tid].subBlocked && p.startsWith('/api/') && p !== '/api/state' && !p.startsWith('/api/billing') && !p.startsWith('/api/admin/')) return json(res, 403, { error: 'Подписка приостановлена — оплатите, чтобы восстановить доступ.', subBlocked: true });
   /* заголовки безопасности на все ответы: анти-кликджекинг + анти-MIME-sniffing + реферер-политика */
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -8076,6 +8082,15 @@ const server = http.createServer(async (req, res) => {
       }
       if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/plan$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); if (!PLANS[b.plan]) return json(res, 400, { error: 'нет плана' }); reg.tenants[am[1]].plan = b.plan; store.saveRegistry(); adminLog('plan', { tid: am[1], plan: b.plan }); return json(res, 200, { ok: true }); }
       if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/suspend$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); reg.tenants[am[1]].suspended = !!b.suspended; store.saveRegistry(); adminLog('suspend', { tid: am[1], suspended: reg.tenants[am[1]].suspended }); return json(res, 200, { ok: true, suspended: reg.tenants[am[1]].suspended }); }
+      /* флаги подписки тенанта: enforce (включить авто-блок при истечении) + exempt (демо/наш клиент — не блокировать никогда).
+         Безопасно: enforce по умолчанию выкл → авто-блок не сработает, пока владелец явно не включит его этому тенанту. */
+      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/billing-flags$/)) && req.method === 'POST') {
+        const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' });
+        let out = {};
+        store.runInTenant(am[1], () => { const d = store.get(); d.settings.billing = d.settings.billing || {}; if (b.enforce !== undefined) d.settings.billing.enforce = !!b.enforce; if (b.exempt !== undefined) d.settings.billing.exempt = !!b.exempt; store.saveNow(); out = { enforce: !!d.settings.billing.enforce, exempt: !!d.settings.billing.exempt }; });
+        adminLog('billing-flags', Object.assign({ tid: am[1] }, out));
+        return json(res, 200, Object.assign({ ok: true }, out));
+      }
       if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)$/)) && req.method === 'DELETE') {
         const tid = am[1]; if (tid === store.PRIMARY) return json(res, 400, { error: 'нельзя удалить primary' });
         if (!reg.tenants[tid]) return json(res, 404, { error: 'нет тенанта' });
