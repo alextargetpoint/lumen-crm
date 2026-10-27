@@ -212,6 +212,25 @@ function settleUsage(db) {
   return { ok: false, error: r.error, owed: delta, balance: r.balance };   /* нехватка баланса → долг висит, спишется при пополнении */
 }
 
+/* ЕЖЕМЕСЯЧНАЯ аренда номеров: раньше заряжалась ОДИН раз при покупке (renewsAt ставился, но никто его
+   не продлевал → со 2-го месяца номера шли бесплатно). Теперь списываем numbersMonthly (уже дедуплено:
+   WA+TG на одном номере = 1×$10) раз в 30 дней с баланса.
+   Мягко: первый заряд через 30 дней после внедрения (rentalNextAt=now+30д на первом прогоне — без
+   ретро-сюрприза). Нехватка баланса → НЕ двигаем дату (retry в след. тик, долг виден в lowBalanceCheck). */
+function chargeRentalsDue(db) {
+  const b = db.settings && db.settings.billing; if (!b) return { ok: true, charged: 0 };
+  b.usage = b.usage || { periodStart: Date.now() };
+  const now = Date.now();
+  let nm = 0;
+  try { nm = +(usageEstimate(db).numbersMonthly || 0); } catch (_) { return { ok: true, charged: 0 }; }
+  if (!(nm > 0)) { if (b.usage.rentalNextAt) b.usage.rentalNextAt = null; return { ok: true, charged: 0 }; }
+  if (b.usage.rentalNextAt == null) { b.usage.rentalNextAt = now + 30 * SUB_DAY; return { ok: true, charged: 0, scheduledAt: b.usage.rentalNextAt }; }
+  if (now < b.usage.rentalNextAt) return { ok: true, charged: 0, nextAt: b.usage.rentalNextAt };
+  const r = chargeBalance(db, nm, 'Аренда номеров (WhatsApp/Telegram/телефония) — месяц');
+  if (r.ok) { b.usage.rentalNextAt = now + 30 * SUB_DAY; return { ok: true, charged: r.charged, balance: r.balance, nextAt: b.usage.rentalNextAt }; }
+  return { ok: false, error: r.error, owed: nm, balance: r.balance };   /* нехватка → дату не двигаем, повторим при пополнении */
+}
+
 /* ---- полный вид кабинета для фронта ---- */
 function view(db) {
   const b = db.settings.billing;
@@ -477,4 +496,4 @@ function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
   b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
   store.save();
 }
-module.exports = { PRICES, ADDONS, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, settleUsage, setRates, addUsage, creditTopup, chargeBalance, confirmSubscriptionCrypto, subGate, subExempt };
+module.exports = { PRICES, ADDONS, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, settleUsage, chargeRentalsDue, setRates, addUsage, creditTopup, chargeBalance, confirmSubscriptionCrypto, subGate, subExempt };
