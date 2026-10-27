@@ -4270,7 +4270,15 @@ function runBillingTick() {
     /* фактическое списание расходников Group A (ИИ/телефония/STT) с баланса — по ВСЕМ тенантам, вкл. primary */
     for (const tid of store.listTenants()) {
       store.runInTenant(tid, () => {
-        try { const db = store.get(); if (db.settings && db.settings.billing) { const r = billing.settleUsage(db); if (r && (r.charged > 0 || r.baseline != null)) store.saveNow(); } } catch (_) {}
+        try {
+          const db = store.get();
+          if (db.settings && db.settings.billing) {
+            const r = billing.settleUsage(db);
+            const rr = billing.chargeRentalsDue(db);                       /* ежемесячная аренда номеров с баланса */
+            if (rr && !rr.ok) { try { lowBalanceCheck(db); } catch (_) {} } /* нехватка на аренду → предупреждение (сам сейвит) */
+            if ((r && (r.charged > 0 || r.baseline != null)) || (rr && (rr.charged > 0 || rr.scheduledAt))) store.saveNow();
+          }
+        } catch (_) {}
       });
     }
   } catch (_) {}
