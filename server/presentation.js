@@ -440,20 +440,35 @@ function ensureContentsSection(coll) {
 /* Единая пересборка «соединяющих» подборки — вызывается после любого изменения состава
    объектов (добавление/замена). Пересобирает оглавление, пометки «k из N», сравнение.
    Заголовок/подводку оглавления, набранные вручную, НЕ затирает (только items). */
-function syncCollectionConnectors(db, coll) {
+// объект «виден», если хотя бы одна его секция включена (скрытие = enabled:false на всех секциях объекта)
+function collObjVisible(coll, k) { return objSectionsOf(coll, k).some(function (s) { return s.enabled !== false; }); }
+function syncCollectionConnectors(db, coll, opts) {
+  opts = opts || {};
   const propsByK = collObjectProps(db, coll);  // по стабильному индексу k
-  const order = collObjectOrder(coll);         // k в порядке отображения
+  const order = collObjectOrder(coll).filter(function (k) { return collObjVisible(coll, k); });  // ВИДИМЫЕ объекты в порядке отображения
   const M = order.length;
   if (M >= 2) {
-    const toc = ensureContentsSection(coll);
-    toc.contentBindings = toc.contentBindings || {};
-    toc.contentBindings.items = ov(order.map((k, pos) => collContentsItem(propsByK[k] || {}, pos)));
-    const sb = toc.contentBindings.subtitle;
-    if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + M + ' ' + ruPlural(M, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
+    const toc = opts.create === false ? (coll.orderedSections || []).filter(s => s.family === 'contents')[0] : ensureContentsSection(coll);
+    if (toc) {
+      toc.contentBindings = toc.contentBindings || {};
+      toc.contentBindings.items = ov(order.map((k, pos) => collContentsItem(propsByK[k] || {}, pos)));
+      const sb = toc.contentBindings.subtitle;
+      if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + M + ' ' + ruPlural(M, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
+    }
     order.forEach((k, pos) => tagObjectHeroSeq(objSectionsOf(coll, k), propsByK[k] || {}, pos, M));
   }
   const cmp = (coll.orderedSections || []).filter(s => s.family === 'comparison')[0];
   if (cmp && M >= 2) { const c = buildComparison(db, order.map(k => propsByK[k] || {})); cmp.contentBindings = cmp.contentBindings || {}; cmp.contentBindings.criteria = ov(c.criteria); cmp.contentBindings.objects = ov(c.objects); }
+}
+/* Клон подборки с «соединяющими», пересчитанными под ТЕКУЩИЙ видимый порядок — для ВЫВОДА
+   (web/PDF/preview), без мутации хранимых данных. Благодаря этому скрытие/перетаскивание любого
+   блока (включая «Сравнение») сразу даёт корректную нумерацию «Объект k из N», оглавление и
+   сравнение — не дожидаясь явной пересборки. create:false → не создаёт оглавление, если его убрали. */
+function withLiveConnectives(db, coll) {
+  if (!coll || coll.kind !== 'collection') return coll;
+  const clone = JSON.parse(JSON.stringify(coll));
+  syncCollectionConnectors(db, clone, { create: false });
+  return clone;
 }
 /* Diff объекта в подборке против живой карточки (ТЗ v3 §14, экран «Обновить данные объекта»).
    «В подборке» = значение в документе (override если правлено, иначе cached из источника);
@@ -606,7 +621,8 @@ function brokerPoints(b) {
 function renderPages(db, pres, broker, format) {
   const ctx = ctxFor(db, pres, broker, format);
   // broker appendix sections appended at the very end (TZ §18,§19) if enabled and not already present
-  const doc = withBrokerAppendix(pres);
+  let doc = withBrokerAppendix(pres);
+  doc = withLiveConnectives(db, doc);   // соединяющие под текущий видимый порядок (без мутации хранимого)
   return T.renderDocument(doc, ctx);
 }
 function withBrokerAppendix(pres) {
