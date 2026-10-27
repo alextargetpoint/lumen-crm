@@ -3664,6 +3664,21 @@ async function handleOwnerWaQr(db, chatId, text) {
   if (cmd !== '/qr' && cmd !== '/rescan' && cmd !== '/пересканировать') return false;
   const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const arg = parts.slice(1).join(' ').trim();
+  /* БРОКЕР НАСТРАИВАЕТ САМ: /qr off | /qr on — получать ли авто-QR при отвале номера (в личку). Владельцу
+     тот же /qr off|on переключает общий тумблер автоматизации. */
+  const _argL = arg.toLowerCase().replace(/^авто\s*/, '');
+  if (['off', 'on', 'выкл', 'вкл', 'стоп', 'старт'].includes(_argL)) {
+    const turnOff = ['off', 'выкл', 'стоп'].includes(_argL);
+    if (_isBroker && !_isOwner) {
+      const b = (db.brokers || []).find(x => x.active !== false && tgbridge.brokerChatIds(x).includes(String(chatId)));
+      if (b) { b.autoQrOptOut = turnOff; store.save(); }
+      await tgbridge.notify(db, chatId, turnOff ? '🔕 Авто-QR при отвале номера <b>выключен</b> для вас. Включить обратно: <code>/qr on</code>. Вручную запросить QR всегда можно: <code>/qr</code>.' : '🔔 Авто-QR при отвале номера <b>включён</b> — пришлю свежий QR в этот чат автоматически.');
+    } else {
+      db.settings.automations = db.settings.automations || {}; db.settings.automations.autoQrOnDrop = !turnOff; store.save();
+      await tgbridge.notify(db, chatId, turnOff ? '🔕 Авто-QR при отвале <b>выключен</b> для агентства (/qr on — включить).' : '🔔 Авто-QR при отвале <b>включён</b> для агентства.');
+    }
+    return true;
+  }
   const nums = ((db.settings.waGray || {}).numbers) || [];
   if (!waWorkerReady(db)) { await tgbridge.notify(db, chatId, '⚠️ WhatsApp-воркер не подключён — QR запросить нечем. Проверьте настройки воркера в CRM.'); return true; }
   if (!nums.length) { await tgbridge.notify(db, chatId, 'В CRM нет подключённых WhatsApp-номеров. Добавьте номер в разделе «Номера».'); return true; }
@@ -3673,7 +3688,9 @@ async function handleOwnerWaQr(db, chatId, text) {
   if (!arg) {
     const list = nums.map(n => `• <b>${esc(n.label || n.phone)}</b> (${esc(n.phone)}) — ${stText(n.phone)}`).join('\n');
     const ex = nums[0].label || nums[0].phone;
-    await tgbridge.notify(db, chatId, `📱 <b>WhatsApp-номера</b>\n${list}\n\nЧтобы получить новый QR, отправьте:\n<code>/qr ${esc(ex)}</code>`);
+    const _myB = (db.brokers || []).find(x => x.active !== false && tgbridge.brokerChatIds(x).includes(String(chatId)));
+    const _autoLine = (_isBroker && !_isOwner) ? `\n\n🔔 Авто-QR при отвале: ${_myB && _myB.autoQrOptOut ? 'выключен (<code>/qr on</code> — включить)' : 'включён — пришлю QR сюда сам'}.` : '';
+    await tgbridge.notify(db, chatId, `📱 <b>WhatsApp-номера</b>\n${list}\n\nЧтобы получить новый QR, отправьте:\n<code>/qr ${esc(ex)}</code>${_autoLine}`);
     return true;
   }
   /* резолв номера: по цифрам (точно → подстрока) или по метке */
@@ -3721,20 +3738,24 @@ async function autoQrOnDrop(db, n, who) {
     const nowT = Date.now();
     if (n._autoQrAt && nowT - n._autoQrAt < 30 * 60e3) return;   /* не чаще раза в 30 мин */
     const targets = new Set();
-    if (db.settings.ownerTgChatId) targets.add(String(db.settings.ownerTgChatId));
+    if (db.settings.ownerTgChatId) targets.add(String(db.settings.ownerTgChatId));   /* основатель/админ — всегда */
     const br = n.brokerId ? (db.brokers || []).find(b => b.id === n.brokerId) : null;
-    if (br) { try { for (const c of tgbridge.brokerChatIds(br)) targets.add(String(c)); } catch (_) {} }
+    if (br && !br.autoQrOptOut) { try { for (const c of tgbridge.brokerChatIds(br)) targets.add(String(c)); } catch (_) {} }   /* брокер-владелец номера (если сам не отключил) */
     if (!targets.size) return;
     n._autoQrAt = nowT; store.save();
-    await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/logout').catch(() => {});
-    await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/start');
     let qr = '', connected = false;
-    for (let i = 0; i < 20; i++) {
-      await new Promise(r => setTimeout(r, 1500));
-      let s; try { s = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(n.phone)); } catch (_) { continue; }
-      const ss = (s && s.session) || {};
-      if (ss.status === 'connected') { connected = true; break; }
-      if (ss.status === 'qr' && ss.qr) { qr = ss.qr; break; }
+    /* если у воркера УЖЕ готов QR (статус qr) — шлём его СРАЗУ, без logout/start: мгновенно и не прерываем скан */
+    try { const s0 = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(n.phone)); const ss0 = (s0 && s0.session) || {}; if (ss0.status === 'connected') connected = true; else if (ss0.status === 'qr' && ss0.qr) qr = ss0.qr; } catch (_) {}
+    if (!qr && !connected) {   /* нет готового QR → пересобираем сессию */
+      await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/logout').catch(() => {});
+      await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/start');
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 1500));
+        let s; try { s = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(n.phone)); } catch (_) { continue; }
+        const ss = (s && s.session) || {};
+        if (ss.status === 'connected') { connected = true; break; }
+        if (ss.status === 'qr' && ss.qr) { qr = ss.qr; break; }
+      }
     }
     const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     for (const cid of targets) {
@@ -4102,7 +4123,7 @@ async function waDropWatch() {
             /* ⭐ЗАЛИП: номер застрял не-connected (reconnecting/qr/none) >20 мин — воркер явно не восстановился сам.
                Авто-QR (как при logged_out), иначе номер висит в reconnecting вечно и брокер пингует владельца вручную.
                autoQrOnDrop рейт-лимитит (30 мин/номер) и шлёт свежий QR в TG владельцу+брокеру. */
-            if (cur !== 'logged_out' && _downMs > 20 * 60e3) autoQrOnDrop(db, n, who).catch(() => {});
+            if (cur !== 'logged_out' && (cur === 'qr' || _downMs > 6 * 60e3)) autoQrOnDrop(db, n, who).catch(() => {});
             if (!n.suspectBanned && _downMs > 24 * 3600e3) {
               n.suspectBanned = true;
               notify(db, { type: 'wa', level: 'warn', title: 'Номер не возвращается — возможно, забанен', text: `«${who}» не на связи больше суток. Если номер окончательно заблокирован WhatsApp — замените его: «Номера» → «Заменить» (новый покупается за $10 с вашего баланса).`, dedupKey: 'wa-suspect:' + _nk, cooldownMs: 24 * 3600e3 });
