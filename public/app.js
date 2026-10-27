@@ -6497,7 +6497,7 @@ async function openGrayMove(id, currentPhone, onDone) {
     actions: [{ label: 'Отмена' }] });
   setTimeout(() => { $$('.gm-pick').forEach(b => b.addEventListener('click', async () => { try { await api.post('/leads/' + id + '/gray-move', { phone: b.dataset.mv }); toast('Диалог переведён', 'Следующее сообщение уйдёт с нового номера', true); closeModal(); if (onDone) onDone(); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
 }
-async function openLeadModal(id) {
+async function openLeadModal(id, backScope) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
   /* задачи ЭТОГО лида — показываем прямо в карточке (блок справа), без перехода в «Мои задачи» */
@@ -6582,6 +6582,7 @@ async function openLeadModal(id) {
     sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> ${channelBadges(l)} · ${l.geoName} ${clientTzBadge(l)} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
     wide: 'card',
     body: `
+      ${backScope ? `<button class="lc-qlback" id="lcQlBack" title="Вернуться к списку, откуда открыли">${ic(I.chev)}К списку ${backScope.mode === 'pot' ? 'потенц-квалов' : 'квал-лидов'}${backScope.title ? ' · ' + esc(backScope.title) : ''}</button>` : ''}
       <div class="lc-funnel">${FUNNEL_STEPS.map((st, i) => `<div class="lcf-step ${i < stepIdx ? 'done' : ''} ${i === stepIdx ? 'cur' : ''}"><i></i><span>${stageName(st)}</span></div>`).join('')}${l.stage === 'sleeping' ? '<div class="lcf-step warn cur"><i></i><span>Спит</span></div>' : ''}${l.stage === 'lost' ? '<div class="lcf-step bad cur"><i></i><span>Закрыт</span></div>' : ''}</div>
       ${l.hint ? `<div class="lc-hint ${l.hint.kind}">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
       ${l.playTip ? `<div class="lc-hint info" style="border-style:dashed">${ic(I.flame)}<span><b>Приём:</b> ${esc(l.playTip.tip)}</span></div>` : ''}
@@ -6769,10 +6770,11 @@ async function openLeadModal(id) {
       let changed = false;
       if (needWa) { try { await api.post(`/leads/${id}/wa-check`, {}); changed = true; } catch (_) {} }
       if (needTg) { try { await api.post(`/leads/${id}/tg-check`, {}); changed = true; } catch (_) {} }
-      if (changed) { try { openLeadModal(id); } catch (_) {} }
+      if (changed) { try { openLeadModal(id, backScope); } catch (_) {} }
     })(); }
-  $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id); }); }));
-  $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); openLeadModal(l.id); });   /* перерисовать — чтобы блок суммы сделки появился/скрылся по стадии */
+  $('#lcQlBack', bd)?.addEventListener('click', () => { closeModal(); try { window.openQualLeads(backScope); } catch (_) {} });   /* вернуться к списку квал/потенц-лидов, откуда открыли */
+  $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id, backScope); }); }));
+  $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); openLeadModal(l.id, backScope); });   /* перерисовать — чтобы блок суммы сделки появился/скрылся по стадии */
   $('#mDealVal', bd)?.addEventListener('change', async (e) => { try { await api.patch('/leads/' + l.id, { dealValue: +e.target.value || 0 }); l.dealValue = +e.target.value || null; const h = bd.querySelector('.lc-deal-hint'); if (h && l.dealValue) h.innerHTML = ic(I.check) + ' учтётся в ROI/ROAS рекламы'; } catch (_) {} });
   $('#mDealCom', bd)?.addEventListener('change', async (e) => { try { await api.patch('/leads/' + l.id, { dealCommission: +e.target.value || 0 }); } catch (_) {} });
   $('#mSpam', bd)?.addEventListener('click', async (e) => {   /* #580: невалидный номер → в спам (закрыт) + тег «неверный номер» */
@@ -12206,7 +12208,7 @@ window.openQualLeads = async function (scope) {
     const setQ = async (id, val) => { const lead = leads.find(x => x.id === id); if (!lead) return; try { await api.patch('/leads/' + id, { qualManual: val }); lead.qualManual = val; lead.isQual = (val === true) ? true : (val === false ? false : lead.isQual); dirty = true; draw(); } catch (e) { toast('Не вышло', e.message); } };
     $$('[data-qltog]', box).forEach(b => b.addEventListener('click', () => { const lead = leads.find(x => x.id === b.dataset.qltog); setQ(b.dataset.qltog, !(lead && lead.isQual)); }));
     $$('[data-qlrst]', box).forEach(b => b.addEventListener('click', () => setQ(b.dataset.qlrst, null)));
-    $$('[data-qlopen]', box).forEach(b => b.addEventListener('click', () => { const id = b.dataset.qlopen; closeModal(); if (dirty) reload(); try { openLeadModal(id); } catch (_) {} }));
+    $$('[data-qlopen]', box).forEach(b => b.addEventListener('click', () => { const id = b.dataset.qlopen; closeModal(); if (dirty) reload(); try { openLeadModal(id, scope); } catch (_) {} }));
   };
   draw();
 };
