@@ -873,3 +873,4 @@ input[type=number] { -moz-appearance: textfield; }
 .ql-nm.ql-open{background:none;border:0;text-align:left;font-family:inherit;cursor:pointer;padding:0}
 .ql-nm.ql-open:hover,.ql-nm.ql-open:hover i{color:var(--accent)}
 .ql-nm.ql-open i svg{width:11px;height:11px;vertical-align:-1px;opacity:.55}
+.ql-pot{flex:0 0 auto;font-size:10px;font-weight:600;color:var(--warn);background:var(--warn-bg);border-radius:7px;padding:2px 7px}
