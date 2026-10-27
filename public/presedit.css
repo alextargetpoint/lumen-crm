@@ -367,6 +367,18 @@ button{font-family:inherit;cursor:pointer}
 .pe-input,.pe-textarea,.pe-select{width:100%;border:1px solid var(--pe-line);border-radius:9px;padding:11px 12px;font-size:14px;font-family:inherit;background:#fff;color:var(--pe-ink)}
 .pe-textarea{resize:vertical;min-height:76px;line-height:1.45}
 .pe-input:focus,.pe-textarea:focus,.pe-select:focus{outline:0;border-color:var(--pe-sel)}
+/* кастомная выпадашка (замена нативного select) */
+.pe-sel2{display:inline-flex;align-items:center;gap:8px;width:100%;border:1px solid var(--pe-line);border-radius:9px;padding:11px 12px;font-size:14px;font-family:inherit;background:#fff;color:var(--pe-ink);cursor:pointer;text-align:left;transition:border-color .14s,box-shadow .14s}
+.pe-sel2:hover{border-color:#d9d3c7}
+.pe-sel2:active{transform:translateY(.5px)}
+.pe-sel2-v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe-sel2-sm{padding:7px 10px;font-size:13px;border-radius:8px}
+.pe-sel2-chev{flex:0 0 auto;color:var(--pe-mut);display:inline-flex;transition:transform .16s}
+.pe-sel2-chev svg{width:16px;height:16px}
+.pe-menu.pe-menu-wide{max-height:min(340px,60vh);overflow-y:auto}
+.pe-menu button span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe-menu button.on{background:color-mix(in srgb,var(--pe-sel) 12%,transparent);color:var(--pe-sel);font-weight:600}
+.pe-menu button.on svg{color:var(--pe-sel)}
 .pe-row{display:flex;gap:12px}.pe-row>*{flex:1}
 .pe-src{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--pe-mut);margin-top:6px}
 .pe-src .chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--pe-line);border-radius:20px;padding:3px 9px;font-weight:600}
@@ -580,12 +592,13 @@ button{font-family:inherit;cursor:pointer}
 .pe-selectcard-chev{color:var(--pe-mut)}.pe-selectcard-chev svg{width:18px;height:18px}
 .pe-selectcard-sel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0}
 /* бренд-карточка */
-.pe-brandcard{display:flex;align-items:center;gap:12px;border:1px solid var(--pe-line);border-radius:12px;padding:12px 13px;background:var(--pe-hi)}
+.pe-brandcard{display:flex;flex-direction:column;align-items:stretch;gap:12px;border:1px solid var(--pe-line);border-radius:12px;padding:13px;background:var(--pe-hi)}
+.pe-brandcard-main{display:flex;align-items:center;gap:12px;min-width:0}
 .pe-brandcard-logo{flex:0 0 auto;min-width:46px;max-width:70px;height:46px;padding:0 8px;border-radius:10px;background:#fff;border:1px solid var(--pe-line);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;letter-spacing:.03em;text-align:center;line-height:1.15;color:var(--pe-ink);overflow:hidden}
 .pe-brandcard-tx{flex:1;min-width:0}
 .pe-brandcard-tx b{display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pe-brandcard-tx span{display:block;font-size:11.5px;color:var(--pe-mut)}
-.pe-brandcard-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--pe-line);background:#fff;border-radius:9px;padding:8px 10px;font-size:12px;font-weight:600;color:var(--pe-ink);cursor:pointer;white-space:nowrap}
+.pe-brandcard-tx span{display:block;font-size:11.5px;color:var(--pe-mut);line-height:1.35}
+.pe-brandcard-btn{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;border:1px solid var(--pe-line);background:#fff;border-radius:9px;padding:9px 10px;font-size:12.5px;font-weight:600;color:var(--pe-ink);cursor:pointer;white-space:nowrap;transition:border-color .14s,background .14s}
 .pe-brandcard-btn:hover{background:#fff;border-color:#d9d3c7}
 .pe-brandcard-btn svg{width:15px;height:15px}
 /* макеты страницы — большие живые превью */

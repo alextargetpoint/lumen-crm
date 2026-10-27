@@ -462,7 +462,7 @@
     broker: function (s) {
       return '<p class="hint">Страницы брокера берутся из раздела «Визитка брокера» и добавляются в конец документа.</p>' +
         '<div class="pe-switchrow"><span style="font-size:13px">Добавлять визитку брокера</span><button class="pe-toggle' + ((S.pres.brokerAppendix && S.pres.brokerAppendix.enabled) ? ' on' : '') + '" data-act="toggleBroker"></button></div>' +
-        (S.brokers.length ? '<div class="pe-field"><label>Брокер</label><select class="pe-select" data-act="pickBroker">' + S.brokers.map(function (b) { return '<option value="' + b.id + '"' + (b.id === S.pres.brokerId ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select></div>' : '');
+        (S.brokers.length ? '<div class="pe-field"><label>Брокер</label>' + sel2('broker', (S.brokers.filter(function (b) { return b.id === S.pres.brokerId; })[0] || {}).name || 'Выберите брокера', 'pe-sel2-field') + '</div>' : '');
     },
     comparison: function (s) { return '<p class="hint">Сравнение настраивается на уровне подборки.</p>'; },
     contents: function (s) {
@@ -479,15 +479,47 @@
 
   function priceField(s) {
     var p = cval(s, 'price') || { kind: 'from', amount: '', currency: 'USD' };
+    var kindLabel = ({ from: 'от', exact: 'точная', range: 'диапазон', on_request: 'по запросу' })[p.kind || 'from'];
     return '<div class="pe-field"><label>Цена</label>' +
-      '<div class="pe-row"><select class="pe-select" data-price="kind">' +
-        [['from', 'от'], ['exact', 'точная'], ['range', 'диапазон'], ['on_request', 'по запросу']].map(function (o) { return '<option value="' + o[0] + '"' + (p.kind === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
-      '</select>' + curSelect('price-cur', p.currency) + '</div>' +
+      '<div class="pe-row">' + sel2('pricekind', kindLabel) + curSelect('price-cur', p.currency) + '</div>' +
       (p.kind === 'on_request' ? '' : '<input class="pe-input" style="margin-top:8px" data-price="amount" value="' + esc(p.amount || '') + '" placeholder="180000">') +
       (isSource(s, 'price') ? '<div class="pe-src"><span class="chip">' + ic('db') + 'Из CRM</span></div>' : '') +
     '</div>';
   }
-  function curSelect(dataAttr, cur) { return '<select class="pe-select" data-' + dataAttr.replace(/[^a-z-]/g, '') + '="1" data-cursel="' + dataAttr + '">' + ['USD', 'EUR', 'THB', 'AED', 'RUB', 'GBP'].map(function (c) { return '<option' + (c === cur ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>'; }
+  function curSelect(dataAttr, cur) { return sel2('cur:' + dataAttr, cur || 'USD', 'pe-sel2-cur'); }
+
+  /* ===== кастомные выпадающие списки (без нативного <select>) — единый стиль дашборда ===== */
+  var SEL2 = { _n: 0 };                       // реестр ad-hoc списков (модалки): id → {items,cur,onpick}
+  // триггер по известному «виду» (font/pagetype/broker/pricekind/cur:*) — логика в sel2Dispatch
+  function sel2(kind, curLabel, cls) {
+    return '<button type="button" class="pe-sel2 ' + (cls || '') + '" data-sel2="' + kind + '"><span class="pe-sel2-v">' + esc(curLabel) + '</span><span class="pe-sel2-chev">' + ic('chev') + '</span></button>';
+  }
+  // ad-hoc триггер (модалки/разовые) с собственными items+callback
+  function sel2Ad(items, cur, onpick, cls) {
+    var id = 's' + (++SEL2._n); SEL2[id] = { items: items, cur: cur, onpick: onpick };
+    var curItem = items.filter(function (o) { return String(o.v) === String(cur); })[0] || { t: '—' };
+    return '<button type="button" class="pe-sel2 ' + (cls || '') + '" data-sel2="reg:' + id + '"><span class="pe-sel2-v">' + esc(curItem.t) + '</span><span class="pe-sel2-chev">' + ic('chev') + '</span></button>';
+  }
+  function sel2Dispatch(kind) {
+    var s = curSection();
+    if (kind === 'font') return { items: TOK.FONT_PAIRS.map(function (f) { return { v: f.id, t: f.heading.family + ' + ' + f.body.family }; }), cur: S.pres.theme.fontPairId, apply: function (v) { mutate(function () { S.pres.theme.fontPairId = v; }); } };
+    if (kind === 'pagetype') { var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker']; return { items: types.map(function (f) { return { v: f, t: FAM_LABEL[f] || f }; }), cur: (s || {}).family, apply: function (v) { mutate(function () { curSection().family = v; }); } }; }
+    if (kind === 'broker') return { items: S.brokers.map(function (b) { return { v: b.id, t: b.name }; }), cur: S.pres.brokerId, apply: function (v) { S.pres.brokerId = v; S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = true; scheduleSave(); render(); } };
+    if (kind === 'pricekind') return { items: [['from', 'от'], ['exact', 'точная'], ['range', 'диапазон'], ['on_request', 'по запросу']].map(function (o) { return { v: o[0], t: o[1] }; }), cur: (cval(s, 'price') || {}).kind || 'from', apply: function (v) { var p = cval(s, 'price') || { currency: 'USD' }; p.kind = v; setOverride(s, 'price', Object.assign({}, p)); var ib = document.getElementById('peInsp'); if (ib) { ib.innerHTML = inspBody(); wireInsp(); } liveCanvas(); scheduleSave(); } };
+    if (kind.indexOf('cur:') === 0) {
+      var which = kind.slice(4);
+      var cur = which === 'price-cur' ? ((cval(s, 'price') || {}).currency || 'USD') : (((cval(s, 'plan') || {}).basePrice || {}).currency || 'USD');
+      return { items: ['USD', 'EUR', 'THB', 'AED', 'RUB', 'GBP'].map(function (c) { return { v: c, t: c }; }), cur: cur, apply: function (v) { if (which === 'price-cur') { var p = cval(s, 'price') || {}; p.currency = v; setOverride(s, 'price', Object.assign({}, p)); } else { var pl = cval(s, 'plan') || {}; pl.basePrice = pl.basePrice || {}; pl.basePrice.currency = v; setOverride(s, 'plan', Object.assign({}, pl)); } liveCanvas(); scheduleSave(); } };
+    }
+    return { items: [], cur: null, apply: function () {} };
+  }
+  function sel2Open(el) {
+    var k = el.getAttribute('data-sel2'), items, cur, onpick;
+    if (k.indexOf('reg:') === 0) { var r = SEL2[k.slice(4)]; if (!r) return; items = r.items; cur = r.cur; onpick = r.onpick; }
+    else { var d = sel2Dispatch(k); items = d.items; cur = d.cur; onpick = d.apply; }
+    if (!items.length) return;
+    menu(el, items.map(function (o) { return { t: o.t, ic: (String(o.v) === String(cur) ? 'check' : null), fn: function () { onpick(o.v, el); } }; }), { width: Math.max(el.getBoundingClientRect().width, 200), activeVal: cur });
+  }
 
   function metricsField(s, key, label) {
     var arr = cval(s, key) || [];
@@ -550,8 +582,7 @@
     var s = curSection(); if (!s) return '';
     var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker'];
     var h = '<div class="pe-sec-label">Тип страницы</div>' +
-      '<div class="pe-selectcard"><span class="pe-selectcard-val">' + esc(FAM_LABEL[s.family] || s.family) + '</span><span class="pe-selectcard-chev">' + ic('chev') + '</span>' +
-      '<select class="pe-selectcard-sel" data-act="setType">' + types.map(function (f) { return '<option value="' + f + '"' + (f === s.family ? ' selected' : '') + '>' + esc(FAM_LABEL[f] || f) + '</option>'; }).join('') + '</select></div>';
+      '<div class="pe-selectcard" data-sel2="pagetype"><span class="pe-selectcard-val">' + esc(FAM_LABEL[s.family] || s.family) + '</span><span class="pe-selectcard-chev">' + ic('chev') + '</span></div>';
     var layouts = layoutsFor(s);
     h += '<div class="pe-sec-head"><span class="pe-sec-label" style="margin:0">Макет страницы</span><span class="pe-sec-cnt">' + layouts.length + ' ' + plural(layouts.length, 'макет', 'макета', 'макетов') + '</span></div>';
     h += '<div class="pe-layouts' + (layouts.length === 1 ? ' single' : '') + '">' + layouts.map(function (l) {
@@ -612,15 +643,14 @@
       TOK.PALETTES.map(function (p) { return '<button class="pe-paldot' + (p.id === th.paletteId ? ' on' : '') + '" data-act="pickPalette" data-pal="' + p.id + '" title="' + esc(p.name) + '" style="background:' + p.c.accent + '"></button>'; }).join('') + '</div>';
     /* шрифты — карточка с превью «Aa» + нативный select оверлеем (клик по карточке → список) */
     h += '<div class="pe-sec-label" style="margin-top:20px">Шрифты</div>' +
-      '<div class="pe-fontcard"><span class="pe-fontcard-aa" style="font-family:\'' + esc(fp.heading.family) + '\',Georgia,serif">Aa</span>' +
+      '<div class="pe-fontcard" data-sel2="font"><span class="pe-fontcard-aa" style="font-family:\'' + esc(fp.heading.family) + '\',Georgia,serif">Aa</span>' +
       '<div class="pe-fontcard-tx"><b>' + esc(fp.heading.family) + ' + ' + esc(fp.body.family) + '</b><span>' + esc(fp.character || 'Шрифтовая пара') + '</span></div>' +
-      '<span class="pe-fontcard-chev">' + ic('chev') + '</span>' +
-      '<select class="pe-fontcard-sel" data-act="pickFont">' + TOK.FONT_PAIRS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === th.fontPairId ? ' selected' : '') + '>' + esc(f.heading.family) + ' + ' + esc(f.body.family) + '</option>'; }).join('') + '</select></div>';
+      '<span class="pe-fontcard-chev">' + ic('chev') + '</span></div>';
     /* бренд — карточка с логотипом + кнопкой «Настройки агентства» */
     var logoTx = brand.logoText || brand.name || '—';
     h += '<div class="pe-sec-label" style="margin-top:20px">Бренд</div>' +
-      '<div class="pe-brandcard"><span class="pe-brandcard-logo">' + esc(logoTx) + '</span>' +
-      '<div class="pe-brandcard-tx"><b>' + esc(brand.name || logoTx) + '</b><span>Меняется в настройках агентства</span></div>' +
+      '<div class="pe-brandcard"><div class="pe-brandcard-main"><span class="pe-brandcard-logo">' + esc(logoTx) + '</span>' +
+      '<div class="pe-brandcard-tx"><b>' + esc(brand.name || logoTx) + '</b><span>Логотип, палитра и шрифты меняются в настройках агентства</span></div></div>' +
       '<button class="pe-brandcard-btn" data-act="agencySettings" title="Открыть настройки агентства">' + ic('gear') + '<span>Настройки агентства</span></button></div>';
     var cr = TOK.contrast(pal.c.text, pal.c.background); var ok = cr >= 4.5;
     h += '<div class="pe-contrast' + (ok ? '' : ' bad') + '" style="margin-top:16px"><div class="ic">' + ic(ok ? 'check' : 'x') + '</div><div><b>' + (ok ? 'Контраст пройден' : 'Низкий контраст') + '</b><p>Текст на фоне ' + cr.toFixed(1) + ':1 — ' + (ok ? 'норма WCAG' : 'ниже 4.5:1') + '</p></div></div>';
@@ -643,6 +673,11 @@
 
   /* ================= WIRING ================= */
   function wire() {
+    /* кастомные выпадашки: один делегированный обработчик на всё приложение (инспектор/модалки) */
+    if (!document._sel2Wired) {
+      document._sel2Wired = true;
+      document.addEventListener('click', function (e) { var t = e.target.closest('[data-sel2]'); if (!t) return; e.preventDefault(); e.stopPropagation(); sel2Open(t); }, true);
+    }
     root.querySelectorAll('[data-act]').forEach(function (el) {
       if (el.closest('#peInsp')) return;   /* кнопки инспектора вешает wireInsp/wireAddPanel — иначе двойной клик (тумблеры не срабатывали) */
       var act = el.getAttribute('data-act');
@@ -1688,14 +1723,18 @@
     });
   }
   function updatesModal(k, data) {
-    var rows = data.diffs.map(function (d) {
+    function decCtl(d) {
       var def = d.edited ? 'keep' : 'update';
+      var opts = [{ v: 'update', t: 'Обновить' }, { v: 'keep', t: d.edited ? 'Сохранить мой текст' : 'Оставить' }];
+      var id = 's' + (++SEL2._n);
+      SEL2[id] = { items: opts, cur: def, onpick: function (v, el) { el.setAttribute('data-puval', v); el.querySelector('.pe-sel2-v').textContent = (opts.filter(function (o) { return o.v === v; })[0] || {}).t; SEL2[id].cur = v; count(); } };
+      return '<button type="button" class="pe-sel2 pe-sel2-sm" data-sel2="reg:' + id + '" data-pukey="' + esc(d.key) + '" data-puval="' + def + '"><span class="pe-sel2-v">' + esc(opts.filter(function (o) { return o.v === def; })[0].t) + '</span><span class="pe-sel2-chev">' + ic('chev') + '</span></button>';
+    }
+    var rows = data.diffs.map(function (d) {
       return '<div class="pu-row"><div class="pu-field">' + esc(d.field) + '</div>' +
         '<div class="pu-doc">' + esc(puFmt(d.inDoc)) + (d.edited ? '<span class="pu-tag">изменено вручную</span>' : '') + '</div>' +
         '<div class="pu-card">' + esc(puFmt(d.inCard)) + '</div>' +
-        '<div class="pu-dec"><select data-pukey="' + esc(d.key) + '">' +
-          '<option value="update"' + (def === 'update' ? ' selected' : '') + '>Обновить</option>' +
-          '<option value="keep"' + (def === 'keep' ? ' selected' : '') + '>' + (d.edited ? 'Сохранить мой текст' : 'Оставить') + '</option></select></div></div>';
+        '<div class="pu-dec">' + decCtl(d) + '</div></div>';
     }).join('');
     var ov = document.createElement('div'); ov.className = 'pu-overlay';
     ov.innerHTML = '<div class="pu-box"><div class="pu-hd"><h2>Обновить данные объекта</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
@@ -1704,13 +1743,13 @@
       '<div class="pu-foot"><div class="pu-note"><b class="pu-count"></b><span>Опубликованная версия не изменится</span></div>' +
       '<div class="pu-acts"><button class="pe-btn pe-btn-primary" data-puapply>Применить к черновику</button><button class="pe-btn pe-btn-ghost" data-puclose>Отмена</button></div></div></div>';
     document.body.appendChild(ov);
-    function count() { var n = 0; ov.querySelectorAll('[data-pukey]').forEach(function (s) { if (s.value === 'update') n++; }); ov.querySelector('.pu-count').textContent = 'Будут обновлены ' + n + ' ' + plural(n, 'поле', 'поля', 'полей'); }
+    function count() { var n = 0; ov.querySelectorAll('[data-pukey]').forEach(function (s) { if (s.getAttribute('data-puval') === 'update') n++; }); var c = ov.querySelector('.pu-count'); if (c) c.textContent = 'Будут обновлены ' + n + ' ' + plural(n, 'поле', 'поля', 'полей'); }
     function close() { ov.remove(); }
-    ov.querySelectorAll('[data-pukey]').forEach(function (s) { s.addEventListener('change', count); }); count();
+    count();
     ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     ov.querySelector('[data-puapply]').addEventListener('click', function () {
-      var fields = []; ov.querySelectorAll('[data-pukey]').forEach(function (s) { if (s.value === 'update') fields.push(s.getAttribute('data-pukey')); });
+      var fields = []; ov.querySelectorAll('[data-pukey]').forEach(function (s) { if (s.getAttribute('data-puval') === 'update') fields.push(s.getAttribute('data-pukey')); });
       if (!fields.length) { close(); return; }
       api('POST', '/' + ID + '/apply-updates', { index: k, fields: fields }).then(function (r) { close(); if (r.status === 200) { toast('Обновлено', 'Применено к черновику', true); reloadPres(); } else toast('Не удалось'); });
     });
@@ -1719,11 +1758,16 @@
     var fams = ['editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'custom'];
     menu(anchor, fams.map(function (f) { return { t: FAM_LABEL[f], ic: 'plus', fn: function () { mutate(function () { var ns = { id: 's' + Math.random().toString(16).slice(2, 8), family: f, enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: FAM_LABEL[f] } } }; var insAt = sections().length; sections().splice(insAt, 0, ns); S.pageIdx = insAt; }); } }; }));
   }
-  function menu(anchor, items) {
+  function menu(anchor, items, opts) {
+    opts = opts || {};
     closeMenu(); var r = anchor.getBoundingClientRect();
-    var m = document.createElement('div'); m.className = 'pe-menu'; m.id = 'peMenu';
-    m.innerHTML = items.map(function (it, i) { return it.sep ? '<hr>' : '<button data-i="' + i + '"' + (it.danger ? ' class="danger"' : '') + '>' + ic(it.ic) + esc(it.t) + '</button>'; }).join('');
-    document.body.appendChild(m); m.style.top = (r.bottom + 4) + 'px'; m.style.left = Math.min(r.left, window.innerWidth - 200) + 'px';
+    var m = document.createElement('div'); m.className = 'pe-menu' + (opts.width ? ' pe-menu-wide' : ''); m.id = 'peMenu';
+    m.innerHTML = items.map(function (it, i) { return it.sep ? '<hr>' : '<button data-i="' + i + '"' + ((it.ic === 'check') ? ' class="on"' : (it.danger ? ' class="danger"' : '')) + '>' + (it.ic ? ic(it.ic) : '') + '<span>' + esc(it.t) + '</span></button>'; }).join('');
+    document.body.appendChild(m);
+    var w = opts.width || Math.max(r.width, 180); m.style.minWidth = w + 'px';
+    var top = r.bottom + 4, left = Math.min(r.left, window.innerWidth - w - 8);
+    if (top + m.offsetHeight > window.innerHeight - 8) top = Math.max(8, r.top - m.offsetHeight - 4);   // не влезает вниз → вверх
+    m.style.top = top + 'px'; m.style.left = Math.max(8, left) + 'px';
     m.querySelectorAll('button[data-i]').forEach(function (b) { b.addEventListener('click', function () { var it = items[+b.getAttribute('data-i')]; closeMenu(); it.fn(); }); });
     setTimeout(function () { document.addEventListener('click', closeMenu, { once: true }); }, 0);
   }
@@ -1808,7 +1852,7 @@
         '<div class="pe-ov-body"><div class="pe-ov-mid"><div class="pe-exprev" id="peExPrev"></div></div>' +
         '<div class="pe-ov-right">' +
           pubBlock() +
-          '<div class="pe-hd">Выбранный формат</div><select class="pe-select" data-exfmt>' + TOK.FORMATS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === fmt ? ' selected' : '') + '>' + esc(f.label) + '</option>'; }).join('') + '</select>' +
+          '<div class="pe-hd">Выбранный формат</div>' + sel2Ad(TOK.FORMATS.map(function (f) { return { v: f.id, t: f.label }; }), fmt, function (v) { fmt = v; refresh(); }, 'pe-sel2-field') +
           '<div class="pe-hd">Проверка содержимого</div>' + checks +
           '<div class="pe-hd">Способ экспорта</div>' +
             '<div class="pe-radio' + (method === 'pdf' ? ' on' : '') + '" data-method="pdf"><div class="r"></div><div><b>PDF</b><span>Готовый файл для скачивания</span></div></div>' +
@@ -1843,7 +1887,6 @@
     }
     function rewire() {
       ov.querySelectorAll('[data-x]').forEach(function (b) { b.onclick = function () { ov.remove(); }; });
-      var fs = ov.querySelector('[data-exfmt]'); if (fs) fs.onchange = function () { fmt = fs.value; paintPrev(); };
       ov.querySelectorAll('[data-method]').forEach(function (m) { m.onclick = function () { method = m.getAttribute('data-method'); refresh(); }; });
       ov.querySelectorAll('[data-q]').forEach(function (q) { q.onclick = function () { quality = q.getAttribute('data-q'); refresh(); }; });
       var dl = ov.querySelector('[data-dl]'); if (dl) dl.onclick = function () { window.open('/pres/' + ID + '/print?format=' + fmt + '&q=' + quality, '_blank'); };
