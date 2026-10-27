@@ -122,6 +122,8 @@ button{font-family:inherit;cursor:pointer}
 .pe-grp:not(.open) .pe-grp-car svg{transform:rotate(-90deg)}
 .pe-grp-hd b{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pe-grp-n{color:var(--pe-mut);font-size:11.5px;background:var(--pe-hi);border-radius:100px;padding:2px 8px}
+.pe-grp-reuse{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#e8f3ec;color:#2f8f5b;margin-left:4px}
+.pe-grp-reuse svg{width:11px;height:11px}
 .pe-grp-menu{display:flex;color:var(--pe-mut);padding:2px;border-radius:6px}
 .pe-grp-menu:hover{background:var(--pe-line)}
 .pe-grp-pages{padding:2px 8px 8px;display:flex;flex-direction:column;gap:2px}

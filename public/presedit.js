@@ -189,11 +189,12 @@
       if (g.type === 'object') {
         var open = S.openGroups && S.openGroups[g.k];
         var hasSel = g.idx.indexOf(S.pageIdx) >= 0;
+        var reused = S.pres.reusedObjectPres && S.pres.reusedObjectPres[g.k];
         var sub = open ? '<div class="pe-grp-pages">' + g.idx.map(function (i) {
           return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '"><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(pageNavLabel(sections()[i])) + '</span></div>';
         }).join('') + '</div>' : '';
         return '<div class="pe-grp' + (open ? ' open' : '') + (hasSel ? ' act' : '') + '">' +
-          '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '"><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
+          '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '"><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b>' + (reused ? '<span class="pe-grp-reuse" title="Собрано из готовой презентации объекта">' + ic('check') + '</span>' : '') + '<span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
       }
       var i0 = g.idx[0];
       return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + '" data-pg="' + i0 + '">' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span></div>';

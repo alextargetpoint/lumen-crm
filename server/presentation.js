@@ -219,6 +219,31 @@ function tagObjectHeroSeq(objSections, pr, k, n) {
   hero.contentBindings = hero.contentBindings || {};
   hero.contentBindings.locationLabel = ov(['Объект ' + (k + 1) + ' из ' + n].concat([gi.region, gi.country].filter(Boolean)));
 }
+/* Готовая презентация объекта под переиспользование в подборке: берём последнюю готовую
+   (иначе — последнюю черновую) одиночную презентацию этого объекта в этом же тенанте.
+   Ассеты одиночной презентации всегда живые из карточки (assetsForProperty) — та же схема
+   imgN/planN/map, что и в подборке, поэтому неймспейс o{k}_ переносит их 1:1. */
+function findObjectPresentation(db, projectId) {
+  if (!projectId) return null;
+  const list = (db.presentations || []).filter(p => p && p.projectId === projectId
+    && (!p.kind || p.kind === 'object') && p.status !== 'archived'
+    && Array.isArray(p.orderedSections) && p.orderedSections.some(s => s && s.family !== 'broker'));
+  if (!list.length) return null;
+  list.sort((a, b) => {
+    const ar = a.status === 'ready' ? 1 : 0, br = b.status === 'ready' ? 1 : 0;
+    if (ar !== br) return br - ar;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+  return list[0];
+}
+/* Базовые секции объекта для подборки: если у брокера есть готовая презентация этого
+   объекта — переиспользуем её (со всей ручной полировкой: тексты/макеты/порядок/фокус),
+   иначе собираем типовую через draftFromProperty. Возвращает {sections, reusedFrom}. */
+function objectBaseSections(db, pr) {
+  const existing = findObjectPresentation(db, pr.id);
+  if (existing) return { sections: JSON.parse(JSON.stringify(existing.orderedSections || [])), reusedFrom: existing.id };
+  return { sections: (draftFromProperty(db, pr, null).orderedSections || []), reusedFrom: null };
+}
 function draftCollection(db, properties, broker, opts) {
   opts = opts || {};
   const props = (properties || []).filter(Boolean);
@@ -252,14 +277,16 @@ function draftCollection(db, properties, broker, opts) {
       },
     });
   }
-  // Объекты: секции каждого объекта с неймспейсом ассетов (без его собственного брокер-финала)
+  // Объекты: секции каждого объекта (из готовой презентации объекта, иначе типовые) с неймспейсом ассетов
+  const reused = {};
   props.forEach((pr, k) => {
-    const d = draftFromProperty(db, pr, null);
-    if (N >= 2) tagObjectHeroSeq(d.orderedSections, pr, k, N);
+    const base = objectBaseSections(db, pr);
+    if (base.reusedFrom) reused[k] = base.reusedFrom;
+    if (N >= 2) tagObjectHeroSeq(base.sections, pr, k, N);
     const amap = assetsForProperty(pr);
     const ns = 'o' + k + '_';
     Object.keys(amap).forEach(key => { assets[ns + key] = amap[key]; });
-    (d.orderedSections || []).filter(s => s.family !== 'broker').forEach(s => {
+    base.sections.filter(s => s.family !== 'broker').forEach(s => {
       sections.push(Object.assign({}, s, {
         id: ns + s.id,
         assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })),
@@ -289,7 +316,7 @@ function draftCollection(db, properties, broker, opts) {
     locale: 'ru-RU', draftRevision: 1, sourceRevision: 'crm',
     theme: presetTh || { paletteId: opts.paletteId || defaultPalette(first.geo), fontPairId: 'editorial' },
     defaultFormat: opts.format || 'portrait_a4', status: 'draft',
-    orderedSections: sections, collectionAssets: assets,
+    orderedSections: sections, collectionAssets: assets, reusedObjectPres: reused,
     brokerAppendix: { enabled: !!(broker && broker.name), profileId: broker ? broker.id : null, pageTypes: ['broker_intro', 'broker_contacts'] },
     updatedAt: Date.now(), updatedBy: null,
   };
@@ -312,13 +339,14 @@ function replaceObjectInCollection(db, coll, oldPid, newPid) {
   Object.keys(coll.collectionAssets).forEach(k => { if (k.startsWith(ns)) delete coll.collectionAssets[k]; });
   const amap = assetsForProperty(newPr);
   Object.keys(amap).forEach(key => { coll.collectionAssets[ns + key] = amap[key]; });
-  const d = draftFromProperty(db, newPr, null);
-  const newSecs = (d.orderedSections || []).filter(s => s.family !== 'broker').map(s => Object.assign({}, s, {
+  const base = objectBaseSections(db, newPr);
+  const newSecs = base.sections.filter(s => s.family !== 'broker').map(s => Object.assign({}, s, {
     id: ns + s.id, assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })),
   }));
   const at = insertAt < 0 ? coll.orderedSections.length : insertAt;
   coll.orderedSections.splice(at, 0, ...newSecs);
   coll.projectIds[idx] = newPid;
+  coll.reusedObjectPres = Object.assign({}, coll.reusedObjectPres); if (base.reusedFrom) coll.reusedObjectPres[idx] = base.reusedFrom; else delete coll.reusedObjectPres[idx];
   // «соединяющие» заново: оглавление, пометки «k из N», колонка сравнения
   syncCollectionConnectors(db, coll);
   coll.draftRevision = (coll.draftRevision || 1) + 1;
@@ -345,8 +373,9 @@ function addObjectsToCollection(db, coll, newPids) {
     const ns = 'o' + k + '_';
     const amap = assetsForProperty(pr);
     Object.keys(amap).forEach(key => { coll.collectionAssets[ns + key] = amap[key]; });
-    const d = draftFromProperty(db, pr, null);
-    (d.orderedSections || []).filter(s => s.family !== 'broker').forEach(s => {
+    const base = objectBaseSections(db, pr);
+    coll.reusedObjectPres = Object.assign({}, coll.reusedObjectPres); if (base.reusedFrom) coll.reusedObjectPres[k] = base.reusedFrom;
+    base.sections.filter(s => s.family !== 'broker').forEach(s => {
       built.push(Object.assign({}, s, { id: ns + s.id, assetRefs: (s.assetRefs || []).map(r => Object.assign({}, r, { assetId: ns + r.assetId })) }));
     });
   });
