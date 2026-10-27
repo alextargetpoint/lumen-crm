@@ -12171,26 +12171,30 @@ function restructureAdsTabs(root) {
    ручной правкой статуса квала (убрать/добавить). Правка пишет lead.qualManual → пересчитывает CPQL/гео/рекомендации. */
 window.openQualLeads = async function (scope) {
   scope = scope || {};
-  if (!window._qlCtx) { toast('Откройте вкладку «Реклама → Аналитика»', 'Данные по квалам ещё не загружены'); return; }
-  let dirty = false;
-  const bd = modal({ title: 'Квал-лиды' + (scope.title ? ' · ' + scope.title : ''), sub: 'Отметьте или снимите квал вручную — применится в аналитике (CPQL · гео · рекомендации)', body: '<div id="qlBody" style="max-height:62vh;overflow:auto;margin:4px -4px 0">Загрузка…</div>', wide: true, actions: [{ label: 'Готово', onClick: () => { closeModal(); if (dirty && window._qlCtx) window._qlCtx.reload(); } }] });
+  const params = (window._qlCtx && window._qlCtx.params) || '?geoGroup=direction';
+  const reload = (window._qlCtx && window._qlCtx.reload) || (() => {});
+  let dirty = false, leads = [];
+  const bd = modal({ title: 'Квал-лиды' + (scope.title ? ' · ' + scope.title : ''), sub: 'Отметьте или снимите квал вручную — применится в аналитике (CPQL · гео · рекомендации)', body: '<div id="qlBody" style="max-height:62vh;overflow:auto;margin:4px -4px 0">Загрузка…</div>', wide: true, actions: [{ label: 'Готово', onClick: () => { closeModal(); if (dirty) reload(); } }] });
+  /* свежий фетч — не зависим от устаревшего _qlCtx (с теми же параметрами периода/подрядчика, что и страница) */
+  try { const la = await api.get('/ads/leadanalytics' + params); leads = la.scopeLeads || []; } catch (e) { leads = (window._qlCtx && window._qlCtx.leads) || []; }
   const draw = () => {
-    let list = (window._qlCtx.leads || []).slice();
-    if (scope.dir) list = list.filter(l => l.dir === scope.dir);
-    if (scope.country) list = list.filter(l => l.country === scope.country);
+    let list = leads.slice();
+    if (scope.country) list = list.filter(l => l.country === scope.country);           /* страна — основной фильтр */
+    if (scope.dir) { const byDir = list.filter(l => l.dir === scope.dir); if (byDir.length) list = byDir; }   /* направление — уточняет, но не обнуляет (группировка могла смениться) */
     list.sort((a, b) => (b.isQual - a.isQual) || ((b.createdAt || 0) - (a.createdAt || 0)));
     const qn = list.filter(l => l.isQual).length;
     const rows = list.map(l => `<div class="ql-row ${l.isQual ? 'on' : ''}">
         <span class="ql-fl">${l.flag || '•'}</span>
-        <span class="ql-nm">${esc(l.name || '—')}<i>${esc(l.country || '')} · ${esc(l.stage || '')}${l.qualManual != null ? ' · вручную' : ''}</i></span>
+        <button class="ql-nm ql-open" data-qlopen="${esc(l.id)}" title="Открыть карточку и переписку — перепроверить вручную">${esc(l.name || '—')}<i>${esc(l.country || '')} · ${esc(l.stage || '')}${l.qualManual != null ? ' · вручную' : ''} ${ic(I.chev)}</i></button>
         ${l.qualManual != null ? `<button class="ql-rst" data-qlrst="${esc(l.id)}" title="Вернуть авто-подсчёт">авто</button>` : ''}
         <button class="ql-tog ${l.isQual ? 'on' : ''}" data-qltog="${esc(l.id)}">${l.isQual ? 'квал ✓' : '+ квал'}</button>
-      </div>`).join('') || '<div class="empty" style="padding:22px;text-align:center;color:var(--muted);font-size:12.5px">Нет лидов в этой выборке</div>';
+      </div>`).join('') || '<div class="empty" style="padding:22px;text-align:center;color:var(--muted);font-size:12.5px">Нет лидов в этой выборке за период</div>';
     const box = $('#qlBody', bd); if (!box) return;
     box.innerHTML = `<div class="ql-sum"><b>${qn}</b> квал из <b>${list.length}</b> лид${scope.title ? ' · ' + esc(scope.title) : ''}</div>${rows}`;
-    const setQ = async (id, val) => { const lead = (window._qlCtx.leads || []).find(x => x.id === id); if (!lead) return; try { await api.patch('/leads/' + id, { qualManual: val }); lead.qualManual = val; lead.isQual = (val === true) ? true : (val === false ? false : lead.isQual); dirty = true; draw(); } catch (e) { toast('Не вышло', e.message); } };
-    $$('[data-qltog]', box).forEach(b => b.addEventListener('click', () => { const lead = (window._qlCtx.leads || []).find(x => x.id === b.dataset.qltog); setQ(b.dataset.qltog, !(lead && lead.isQual)); }));
+    const setQ = async (id, val) => { const lead = leads.find(x => x.id === id); if (!lead) return; try { await api.patch('/leads/' + id, { qualManual: val }); lead.qualManual = val; lead.isQual = (val === true) ? true : (val === false ? false : lead.isQual); dirty = true; draw(); } catch (e) { toast('Не вышло', e.message); } };
+    $$('[data-qltog]', box).forEach(b => b.addEventListener('click', () => { const lead = leads.find(x => x.id === b.dataset.qltog); setQ(b.dataset.qltog, !(lead && lead.isQual)); }));
     $$('[data-qlrst]', box).forEach(b => b.addEventListener('click', () => setQ(b.dataset.qlrst, null)));
+    $$('[data-qlopen]', box).forEach(b => b.addEventListener('click', () => { const id = b.dataset.qlopen; closeModal(); if (dirty) reload(); try { openLeadModal(id); } catch (_) {} }));
   };
   draw();
 };

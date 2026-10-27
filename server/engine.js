@@ -353,6 +353,7 @@ function handover(db, lead, brokerId, opts = {}) {
   if (lead.broker !== broker.id) control.recordOwner(db, lead, broker.id, 'auto', 'передача брокеру');
   lead.broker = broker.id;
   lead.stage = 'handover';
+  lead.stagePeakQual = true;      /* НАСТОЯЩАЯ передача после квалификации — метим high-water (чтобы квал считался и если лид потом ушёл в диалог/сон) */
   lead.handoverAt = Date.now();   /* точка отсчёта SLA «коснись за N минут» */
   lead.slaFlag = null;
   broker.load += 1;

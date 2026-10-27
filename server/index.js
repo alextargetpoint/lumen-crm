@@ -943,8 +943,9 @@ function everReachedQual(db, l, mode) {
   const inQualNow = QUAL.includes(l.stage);
   if (mode === 'current') return inQualNow;                                  /* режим «снимок»: только текущая стадия */
   if (inQualNow) return true;                                                /* сейчас в квале */
-  if (l.stagePeakQual) return true;                                          /* forward-пометка прохождения квала */
-  if (l.handoverAt) return true;                                             /* был передан брокеру = прошёл квал */
+  if (l.stagePeakQual) return true;                                          /* forward-пометка прохождения квала (ставится при РЕАЛЬНОЙ передаче handover) */
+  /* ⚠️ handoverAt САМ ПО СЕБЕ больше НЕ квалифицирует: его выставляет и простое НАЗНАЧЕНИЕ брокеру
+     (массовое/ручное/маршрутизация), что завышало квалы. Настоящая передача после квала метит stagePeakQual (см. выше). */
   if (l.quals && ai.AXES.every(a => l.quals[a])) return true;               /* все 4 оси закрыты = был квалифицирован (durable) */
   return false;
 }
