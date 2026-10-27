@@ -1562,13 +1562,16 @@
   function cropFmtModal(s, idx, ref, url, iw, ih) {
     var mode = ref.fit === 'contain' ? 'fit' : 'fill';
     var imgA = iw / ih;
+    var clamp01 = function (v) { return Math.max(0, Math.min(1, v)); };
+    var focal = { x: (ref.focalPoint && ref.focalPoint.x != null) ? ref.focalPoint.x : 0.5, y: (ref.focalPoint && ref.focalPoint.y != null) ? ref.focalPoint.y : 0.5 };
     var ov = document.createElement('div'); ov.className = 'pu-overlay';
     function suggestFit(fmtA) { return fmtA < 0.9 && imgA > 1.25; }
+    function bgPos() { return (focal.x * 100).toFixed(1) + '% ' + (focal.y * 100).toFixed(1) + '%'; }
     function fmtPrev(fmt) {
       var a = FMT_ASPECT[fmt]; var fit = mode === 'fit';
       var portrait = a < 1;
       return '<div class="cf-fmt"><div class="cf-fmt-hd">' + esc(FMT_LABEL2[fmt]) + (suggestFit(a) && !fit ? '<span class="cf-warn-dot"></span>' : '') + '</div>' +
-        '<div class="cf-fmt-frame' + (portrait ? ' port' : ' land') + '"><div class="cf-fmt-img" style="background-image:url(\'' + esc(url) + '\');background-size:' + (fit ? 'contain' : 'cover') + '"></div></div>' +
+        '<div class="cf-fmt-frame' + (portrait ? ' port' : ' land') + '"><div class="cf-fmt-img" style="background-image:url(\'' + esc(url) + '\');background-size:' + (fit ? 'contain' : 'cover') + ';background-position:' + bgPos() + '"></div></div>' +
         '<div class="cf-fmt-ex">' + esc(FMT_EX[fmt]) + '</div></div>';
     }
     function warnBox() {
@@ -1576,28 +1579,50 @@
       if (mode === 'fill' && suggestFit(curA)) return '<div class="cf-warn">' + ic('warn') + '<div><b>Для вертикальной обложки лучше макет с полями.</b><span>Так объект выглядит гармоничнее и сохраняются пропорции.</span></div></div>';
       return '';
     }
+    function paintMain() {
+      var el = ov.querySelector('.cf-main-img'); if (!el) return;
+      el.style.backgroundSize = (mode === 'fit' ? 'contain' : 'cover');
+      el.style.backgroundPosition = bgPos();
+      ov.querySelector('.cf-main').classList.toggle('cf-pan', mode === 'fill');
+    }
     function paint() {
-      ov.querySelector('.cf-main-img').style.backgroundSize = (mode === 'fit' ? 'contain' : 'cover');
+      paintMain();
       ov.querySelectorAll('[data-cfmode]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-cfmode') === mode); });
       ov.querySelector('.cf-prevs').innerHTML = fmtPrev('portrait_a4') + fmtPrev('landscape_16_9');
       ov.querySelector('.cf-warnbox').innerHTML = warnBox();
     }
     var modes = [['fill', 'Заполнить область', 'Приоритет на крупный план, часть фото может быть обрезана'], ['fit', 'Сохранить объект целиком', 'На фото останется весь объект, без обрезки важных элементов']];
+    var mainAsp = (FMT_ASPECT[S.fmt] || 0.707);   // окно кадрирования = пропорции текущего формата
     ov.innerHTML = '<div class="pu-box cf-box"><div class="pu-hd"><h2>Кадрирование под формат</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
       '<div class="cf-grid"><div class="cf-left">' +
-        '<div class="cf-main"><div class="cf-main-img" style="background-image:url(\'' + esc(url) + '\')"></div><div class="cf-cropframe"></div></div>' +
+        '<div class="cf-main" style="aspect-ratio:' + mainAsp + '"><div class="cf-main-img" style="background-image:url(\'' + esc(url) + '\')"></div><div class="cf-pan-hint">' + ic('grip') + 'Перетащите фото, чтобы выбрать видимую область</div></div>' +
         '<div class="cf-src">Исходное фото · ' + iw + ' × ' + ih + '</div>' +
         '<div class="cf-modes">' + modes.map(function (m) { return '<button class="cf-mode" data-cfmode="' + m[0] + '"><span class="cf-radio"></span><span class="cf-mode-tx"><b>' + esc(m[1]) + '</b><span>' + esc(m[2]) + '</span></span></button>'; }).join('') + '</div>' +
       '</div><div class="cf-right"><div class="cf-prevs"></div><div class="cf-warnbox"></div>' +
-        '<div class="cf-acts"><button class="pe-btn pe-btn-primary" data-cfapply>Применить кадрирование</button><button class="pe-btn pe-btn-ghost" data-puclose>Выбрать другой макет</button></div>' +
+        '<div class="cf-acts"><button class="pe-btn pe-btn-primary" data-cfapply>Применить кадрирование</button><button class="pe-btn pe-btn-ghost" data-cfreset>Центрировать</button><button class="pe-btn pe-btn-ghost" data-puclose>Отмена</button></div>' +
       '</div></div></div>';
     document.body.appendChild(ov);
     function close() { ov.remove(); }
     ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     ov.querySelectorAll('[data-cfmode]').forEach(function (b) { b.addEventListener('click', function () { mode = b.getAttribute('data-cfmode'); paint(); }); });
+    ov.querySelector('[data-cfreset]').addEventListener('click', function () { focal = { x: 0.5, y: 0.5 }; paint(); });
+    /* перетаскивание фото внутри окна кадрирования → пан точки фокуса (как на холсте) */
+    var mainImg = ov.querySelector('.cf-main-img');
+    mainImg.addEventListener('mousedown', function (e) {
+      if (mode !== 'fill' || e.button !== 0) return;
+      e.preventDefault();
+      var rect = mainImg.getBoundingClientRect(); var sx = e.clientX, sy = e.clientY; var f0 = { x: focal.x, y: focal.y };
+      function mv(ev) { focal.x = clamp01(f0.x - (ev.clientX - sx) / rect.width); focal.y = clamp01(f0.y - (ev.clientY - sy) / rect.height); paintMain(); }
+      function up() { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); ov.querySelector('.cf-prevs').innerHTML = fmtPrev('portrait_a4') + fmtPrev('landscape_16_9'); }
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+    });
     ov.querySelector('[data-cfapply]').addEventListener('click', function () {
-      mutate(function () { ref.fit = mode === 'fit' ? 'contain' : 'cover'; ref.cropsByFormat = ref.cropsByFormat || {}; ref.cropsByFormat[S.fmt] = { mode: mode }; });
+      mutate(function () {
+        ref.fit = mode === 'fit' ? 'contain' : 'cover';
+        if (mode === 'fill') ref.focalPoint = { x: +focal.x.toFixed(3), y: +focal.y.toFixed(3) }; else delete ref.focalPoint;
+        ref.cropsByFormat = ref.cropsByFormat || {}; ref.cropsByFormat[S.fmt] = { mode: mode, focalPoint: mode === 'fill' ? { x: +focal.x.toFixed(3), y: +focal.y.toFixed(3) } : null };
+      });
       close(); toast('Кадрирование применено', null, true);
     });
     paint();
