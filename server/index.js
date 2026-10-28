@@ -168,6 +168,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 const llm = require('./llm');
 const voiceagent = require('./voiceagent');   /* ИИ-голосовой агент: разговорный обзвон спящей базы */
 const reanimation = require('./reanimation'); /* ROI-аналитика реанимации спящей базы */
+const amocrm = require('./amocrm');           /* двусторонний синк с amoCRM (API v4) */
 const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
@@ -9251,6 +9252,42 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/wake/roi' && req.method === 'GET') {
       return json(res, 200, reanimation.roiStats(db, { brokerHourRate: +(((db.settings.billing || {}).brokerHourRate) || 15) }));
+    }
+    /* amoCRM: сохранить конфиг подключения + проверить связь (ping /account) */
+    if (p === '/api/integrations/amo' && req.method === 'GET') {
+      const a = (db.settings.integrations || {}).amo || {};
+      return json(res, 200, { subdomain: a.subdomain || '', pipelineId: a.pipelineId || '', statusMap: a.statusMap || {}, fields: a.fields || {}, pullStages: a.pullStages !== false, enabled: !!a.enabled, connected: !!a.lastOkAt, lastPullAt: a.lastPullAt || 0, hasToken: !!a.token });
+    }
+    if (p === '/api/integrations/amo' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const s = db.settings.integrations = db.settings.integrations || {};
+      const prev = s.amo || {};
+      s.amo = Object.assign({}, prev, {
+        subdomain: String(b.subdomain || prev.subdomain || '').trim(),
+        token: b.token != null ? String(b.token).trim() : prev.token,
+        pipelineId: b.pipelineId != null ? b.pipelineId : prev.pipelineId,
+        statusMap: b.statusMap || prev.statusMap || {},
+        fields: b.fields || prev.fields || {},
+        pullStages: b.pullStages !== false,
+        enabled: b.enabled !== false,
+      });
+      store.save();
+      try { await amocrm.makeApi(s.amo).ping(); s.amo.lastOkAt = Date.now(); store.save(); return json(res, 200, { ok: true, connected: true }); }
+      catch (e) { s.amo.lastOkAt = 0; store.save(); return json(res, 200, { ok: true, connected: false, error: e.message }); }
+    }
+    /* amoCRM: ручной синк (пуш подходящих лидов + пулл изменений) */
+    if (p === '/api/integrations/amo/sync' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' });
+      const a = (db.settings.integrations || {}).amo;
+      if (!a || !a.enabled || !a.token || !a.subdomain) return json(res, 400, { error: 'amoCRM не подключён — заполните поддомен и токен в настройках интеграции' });
+      const cfg = Object.assign({}, a, { now: Date.now() });
+      try {
+        const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0 });
+        a.lastPullAt = Date.now(); a.lastOkAt = Date.now(); store.save();
+        audit(db, req, 'amoCRM синк', { pushed: r.pushed, pulled: r.pull && r.pull.pulled });
+        return json(res, 200, r);
+      } catch (e) { return json(res, 500, { error: e.message }); }
     }
     if (p === '/api/wake/preview' && req.method === 'GET') {
       const csv = (k) => { const v = u.searchParams.get(k); return v ? v.split(',').map(x => x.trim()).filter(Boolean) : []; };
