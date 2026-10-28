@@ -1601,7 +1601,7 @@ const ROLE_CAPS = {
   broker: { name: 'Брокер', leads: 'own', allow: [] },
   qualifier: { name: 'Квалификатор', leads: 'all', allow: ['reports'] },   /* прожимает входящие заявки до передачи брокеру; видит все диалоги */
   assistant: { name: 'Ассистент', leads: 'all', allow: ['reports', 'voice'] },
-  marketer: { name: 'Маркетолог', leads: 'own', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports'] },
+  marketer: { name: 'Маркетолог', leads: 'all', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports'] },   /* маркетолог ВИДИТ всю воронку/диалоги (аналитика, как analyst); лиды не ДЕРЖИТ — это маршрутизация, не видимость */
   analyst: { name: 'Аналитик', leads: 'all', allow: ['ads', 'campaigns', 'reports'] },
   manager: { name: 'Менеджер', leads: 'all', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports', 'sequences', 'voice', 'templates', 'numbers'] },
 };
