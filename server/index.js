@@ -166,6 +166,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
   '.ppt': 'application/vnd.ms-powerpoint', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
 
 const llm = require('./llm');
+const voiceagent = require('./voiceagent');   /* ИИ-голосовой агент: разговорный обзвон спящей базы */
 const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
@@ -4934,6 +4935,58 @@ async function telnyxOnAnswered(db, payload, cs) {
   }
 }
 
+/* --- ИИ-ГОЛОСОВОЙ АГЕНТ: инициировать разговорный звонок лиду (stage='agent') --- */
+async function telnyxInitiateAgentCall(db, lead) {
+  const t = db.settings.telephony || {};
+  if (t.provider !== 'telnyx' || !telnyxKey(t) || !t.connId) throw new Error('Telnyx не настроен (нужны API-ключ + Connection ID)');
+  if (!lead || !lead.phone) throw new Error('у лида нет телефона');
+  lead.voiceCall = { _live: { history: [], phase: 'init' } };                 /* свежее состояние звонка */
+  store.save();
+  const cs = Buffer.from(JSON.stringify({ leadId: lead.id, stage: 'agent' })).toString('base64');
+  return telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: e164(lead.phone), from: pickCallerId(t, lead.phone), client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
+}
+/* Telnyx-событие звонка агента → voiceagent.advance → исполнение actions через telnyxApi.
+   Состояние разговора живёт в lead.voiceCall._live (переживает stateless-вебхуки). */
+async function handleVoiceAgent(db, et, pl, cs) {
+  const lead = cs.leadId ? db.leads.find(l => l.id === cs.leadId) : null;
+  if (!lead) return;
+  const ccid = pl.call_control_id;
+  lead.voiceCall = lead.voiceCall || {};
+  let state = lead.voiceCall._live || { history: [], phase: 'init' };
+  const now = Date.now();
+  const ev = voiceagent.mapTelnyxEvent(et, pl, now);
+  if (!ev) return;                                                            /* событие агенту не нужно (промежуточная транскрипция и пр.) */
+
+  const cfg = { agency: (db.settings.agency && db.settings.agency.name) || 'агентство недвижимости' };
+  const lang = (lead.lang && /^(ru|en|de|tr|fr|es|ar)/i.test(lead.lang)) ? String(lead.lang).slice(0, 2).toLowerCase() : 'ru';
+  const ttsLang = { ru: 'ru-RU', en: 'en-US', de: 'de-DE', tr: 'tr-TR', fr: 'fr-FR', es: 'es-ES', ar: 'ar-SA' }[lang] || 'ru-RU';
+  const deps = {
+    lead, cfg, maxTurns: (db.settings.voiceAgent || {}).maxTurns || 14,
+    openingLine: () => voiceagent.openingLine(lead, cfg),
+    turn: (history, opts) => llm.voiceTurn(db, lead, history, opts),
+    scoreCall: (tr, ctx) => llm.reviewCall(tr, ctx),
+  };
+  let r; try { r = await voiceagent.advance(state, ev, deps); } catch (e) { console.error('[voiceagent]', e.message); return; }
+  state = r.state; lead.voiceCall._live = state;
+  if (et === 'call.answered') lead.call = { status: 'in_call', at: now };
+  store.save();
+  for (const a of (r.actions || [])) {
+    try {
+      if (a.type === 'record') await telnyxApi(db, 'POST', `/calls/${ccid}/actions/record_start`, { format: 'mp3', channels: 'single' });
+      else if (a.type === 'transcribe') await telnyxApi(db, 'POST', `/calls/${ccid}/actions/transcription_start`, { transcription_tracks: 'inbound', language: 'auto' });
+      else if (a.type === 'speak') await telnyxApi(db, 'POST', `/calls/${ccid}/actions/speak`, { payload: a.text, voice: 'female', language: ttsLang });
+      else if (a.type === 'hangup') await telnyxApi(db, 'POST', `/calls/${ccid}/actions/hangup`, {});
+      else if (a.type === 'finalize') {
+        const rec = await voiceagent.finalize(db, lead, state, deps);
+        if (lead.voiceCall) delete lead.voiceCall._live;
+        try { ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `ИИ-звонок: ${rec.reached ? 'разговор' : 'нет ответа'} · ${rec.durSec}с` + (rec.score ? ` · оценка ${rec.score.overall}/100` : '') + (rec.optout ? ' · опт-аут' : '') }); } catch (_) {}
+        lead.call = { status: 'ended', at: Date.now() }; store.save();
+      }
+    } catch (e) { console.error('[voiceagent-act]', a.type, e.message); }
+  }
+  store.save();
+}
+
 /* --- Twilio Voice: click-to-call (звоним брокеру → TwiML соединяет с клиентом → запись → транскрипт) --- */
 const e164 = (p) => { const s = String(p || '').replace(/[^\d+]/g, ''); return s.startsWith('+') ? s : '+' + s; };
 /* ГЕО-ПОДБОР caller-ID (local presence): клиент видит номер своей страны → выше отклик.
@@ -6982,6 +7035,8 @@ const server = http.createServer(async (req, res) => {
       const ev = b.data || {}; const et = ev.event_type; const pl = ev.payload || {};
       try {
         let cs = {}; try { cs = JSON.parse(Buffer.from(pl.client_state || '', 'base64').toString('utf8') || '{}'); } catch (_) {}
+        /* ИИ-голосовой агент — собственный разговорный поток (answered/transcription/speak.ended/hangup) */
+        if (cs.stage === 'agent') { await handleVoiceAgent(db, et, pl, cs); return json(res, 200, { ok: true }); }
         /* живой статус звонка в карточке лида */
         const setCall = (st, cause) => { if (!cs.leadId) return; const l = db.leads.find(x => x.id === cs.leadId); if (!l) return; l.call = { status: st, cause: cause || null, at: Date.now() }; store.save(); };
         if (et === 'call.initiated') { if (cs.stage === 'broker') setCall('dialing'); }
@@ -8958,6 +9013,32 @@ const server = http.createServer(async (req, res) => {
       }
       try { await initiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone, to: lead.phone || '' }); }
       catch (e) { lead.call = { status: 'ended', cause: 'failed', at: Date.now() }; store.save(); let msg = e.message || 'ошибка звонка'; if (/not allowed|denied|blocked|destination|forbidden|10015|restrict/i.test(msg)) msg += ' — похоже, страна номера не разрешена: Telnyx → Voice → Outbound Voice Profiles → Default → включите нужную страну.'; return json(res, 400, { error: msg }); }
+    }
+
+    /* ИИ-ГОЛОСОВОЙ АГЕНТ: позвонить ОДНОМУ лиду (разговорный обзвон) — тест/точечно */
+    if ((m = p.match(/^\/api\/voice\/call\/([^/]+)$/)) && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не настроен (нужен ключ Gemini)' });
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      if (lead.voiceOptOut || lead.marketingOptOut) return json(res, 400, { error: 'клиент отказался от обзвона' });
+      try { const r0 = await telnyxInitiateAgentCall(db, lead); return json(res, 200, { ok: true, callId: (r0 && r0.data && r0.data.call_control_id) || null, to: lead.phone }); }
+      catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* ИИ-ГОЛОСОВОЙ АГЕНТ: кампания реанимации — обзвонить спящую базу (батчем, по приоритету wakeScore) */
+    if (p === '/api/voice/campaign' && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не настроен (нужен ключ Gemini)' });
+      const t = db.settings.telephony || {};
+      if (t.provider !== 'telnyx' || !telnyxKey(t) || !t.connId) return json(res, 400, { error: 'Telnyx не настроен (API-ключ + Connection ID)' });
+      const b = await readBody(req);
+      const filters = { stages: Array.isArray(b.stages) ? b.stages : ['sleeping'], geo: b.geo || null, olderDays: +b.olderDays || 0, limit: Math.min(100, +b.limit || 25), cooldownDays: +b.cooldownDays || 14 };
+      const targets = voiceagent.pickTargets(db, filters, { wakeScore: engine.wakeScore, now: Date.now() });
+      if (!targets.length) return json(res, 200, { ok: true, started: 0, note: 'нет подходящих спящих лидов по фильтрам' });
+      const batch = Math.min(targets.length, Math.max(1, +b.batch || 5));   /* одновременно звоним пачкой (не ддосим провайдера) */
+      let started = 0; const errors = [];
+      for (const lead of targets.slice(0, batch)) {
+        try { await telnyxInitiateAgentCall(db, lead); started++; } catch (e) { errors.push({ leadId: lead.id, error: e.message }); }
+      }
+      audit(db, req, 'ИИ-обзвон: старт кампании', { targets: targets.length, started });
+      return json(res, 200, { ok: true, matched: targets.length, started, batch, errors: errors.slice(0, 5), remaining: Math.max(0, targets.length - batch) });
     }
 
     /* ИИ первое касание: разбор лида + готовое персональное сообщение */

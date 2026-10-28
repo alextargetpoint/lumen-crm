@@ -41,6 +41,43 @@ function transcriptText(state) {
 
 function clientTurns(state) { return ((state && state.history) || []).filter(h => h.who === 'client').length; }
 
+/* обработка ЗАВЕРШЁННОЙ реплики клиента (вызывается из utterance[listening] и из flush буфера на speakEnded) */
+async function processClientTurn(state, text, now, deps, cfg, maxTurns, acts) {
+  state.history.push({ who: 'client', text, at: now });
+  state.lastClientAt = now;
+
+  if (OPTOUT_RE.test(text)) {                                         /* опт-аут → мягкий выход */
+    const bye = optoutLine(cfg);
+    state.history.push({ who: 'agent', text: bye, at: now });
+    state.optout = true; state.endReason = 'optout'; state.phase = 'speaking'; state.pendingHangup = true;
+    acts.push({ type: 'optout' }, { type: 'speak', text: bye });
+    return { state, actions: acts };
+  }
+
+  state.turns = (state.turns || 0) + 1;
+  const wrap = state.turns >= maxTurns;                               /* потолок ходов → завершаем */
+  let t = { say: '', done: false };
+  try { if (deps.turn) t = await deps.turn(state.history, { wrap }); } catch (e) { t = { say: '', done: false, error: e.message }; }
+  const say = String((t && t.say) || '').trim();
+  const done = !!(t && t.done) || wrap;
+  if (t && t.extracted && typeof t.extracted === 'object') {
+    state.extracted = Object.assign({}, state.extracted);
+    for (const k of ['budget', 'timeline', 'type', 'region']) { const v = String((t.extracted[k] || '')).trim(); if (v) state.extracted[k] = v; }
+  }
+
+  if (done) {
+    const line = say || wrapLine(cfg);
+    state.history.push({ who: 'agent', text: line, at: now });
+    state.endReason = state.endReason || (wrap ? 'maxturns' : ((t && t.reason) || 'done'));
+    state.phase = 'speaking'; state.pendingHangup = true;
+    acts.push({ type: 'speak', text: line });
+    return { state, actions: acts };
+  }
+  if (say) { state.history.push({ who: 'agent', text: say, at: now }); state.phase = 'speaking'; acts.push({ type: 'speak', text: say }); }
+  else { state.phase = 'listening'; }                                 /* LLM молчит — слушаем дальше */
+  return { state, actions: acts };
+}
+
 /* ───────── ГЛАВНАЯ СТЕЙТ-МАШИНА ─────────
    (state, event, deps) → { state, actions }.  Чистая (кроме deps.turn — async LLM).
    deps: { turn(history,{wrap}) → {say,done,reason,extracted}, maxTurns, cfg, lead } */
@@ -66,6 +103,10 @@ async function advance(state, event, deps) {
   if (event.type === 'speakEnded') {
     if (state.pendingHangup) { state.phase = 'ending'; acts.push({ type: 'hangup' }); return { state, actions: acts }; }
     state.phase = 'listening';
+    if (state._pending) {                                             /* клиент говорил ПОКА агент вещал (barge-in) → обработать буфер */
+      const p = state._pending; state._pending = '';
+      return await processClientTurn(state, p, now, deps, cfg, maxTurns, acts);
+    }
     return { state, actions: acts };
   }
 
@@ -73,40 +114,11 @@ async function advance(state, event, deps) {
     const text = String(event.text || '').trim();
     if (!text) return { state, actions: acts };                       /* пустое — игнор */
     if (state.pendingHangup || state.phase === 'ending' || state.phase === 'done') return { state, actions: acts };
-    state.history.push({ who: 'client', text, at: now });
-    state.lastClientAt = now;
-
-    /* опт-аут → мягкий выход */
-    if (OPTOUT_RE.test(text)) {
-      const bye = optoutLine(cfg);
-      state.history.push({ who: 'agent', text: bye, at: now });
-      state.optout = true; state.endReason = 'optout'; state.phase = 'speaking'; state.pendingHangup = true;
-      acts.push({ type: 'optout' }, { type: 'speak', text: bye });
+    if (state.phase === 'speaking') {                                 /* агент ещё говорит — буферизуем, обработаем на speakEnded */
+      state._pending = ((state._pending || '') + ' ' + text).trim();
       return { state, actions: acts };
     }
-
-    state.turns = (state.turns || 0) + 1;
-    const wrap = state.turns >= maxTurns;                             /* потолок ходов → завершаем */
-    let t = { say: '', done: false };
-    try { if (deps.turn) t = await deps.turn(state.history, { wrap }); } catch (e) { t = { say: '', done: false, error: e.message }; }
-    const say = String((t && t.say) || '').trim();
-    const done = !!(t && t.done) || wrap;
-    if (t && t.extracted && typeof t.extracted === 'object') {
-      state.extracted = Object.assign({}, state.extracted);
-      for (const k of ['budget', 'timeline', 'type', 'region']) { const v = String((t.extracted[k] || '')).trim(); if (v) state.extracted[k] = v; }
-    }
-
-    if (done) {
-      const line = say || wrapLine(cfg);
-      state.history.push({ who: 'agent', text: line, at: now });
-      state.endReason = state.endReason || (wrap ? 'maxturns' : ((t && t.reason) || 'done'));   /* потолок ходов помечаем явно */
-      state.phase = 'speaking'; state.pendingHangup = true;
-      acts.push({ type: 'speak', text: line });
-      return { state, actions: acts };
-    }
-    if (say) { state.history.push({ who: 'agent', text: say, at: now }); state.phase = 'speaking'; acts.push({ type: 'speak', text: say }); }
-    else { state.phase = 'listening'; }                                /* LLM молчит — просто слушаем дальше */
-    return { state, actions: acts };
+    return await processClientTurn(state, text, now, deps, cfg, maxTurns, acts);
   }
 
   if (event.type === 'hangup') {
@@ -178,4 +190,21 @@ function pickTargets(db, filters, deps) {
     .map(x => x.lead);
 }
 
-module.exports = { advance, finalize, pickTargets, openingLine, optoutLine, wrapLine, transcriptText, clientTurns, OPTOUT_RE };
+/* Telnyx-событие → событие стейт-машины (чистый маппинг — тестируем отдельно от сети).
+   Возвращает null для событий, которые агенту не нужны (промежуточная транскрипция и прочее). */
+function mapTelnyxEvent(et, pl, now) {
+  pl = pl || {}; now = now || Date.now();
+  if (et === 'call.answered') return { type: 'answered', at: now };
+  if (et === 'call.speak.ended' || et === 'call.speak_ended') return { type: 'speakEnded', at: now };
+  if (et === 'call.transcription') {
+    const td = pl.transcription_data || pl.transcription || {};
+    if (td.is_final === false) return null;                         /* промежуточный кусок — ждём финал */
+    const text = String(td.transcript || td.text || '').trim();
+    if (!text) return null;
+    return { type: 'utterance', text, at: now };
+  }
+  if (et === 'call.hangup') return { type: 'hangup', at: now, cause: String(pl.hangup_cause || '').toLowerCase() };
+  return null;
+}
+
+module.exports = { advance, finalize, pickTargets, mapTelnyxEvent, openingLine, optoutLine, wrapLine, transcriptText, clientTurns, OPTOUT_RE };
