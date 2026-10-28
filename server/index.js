@@ -169,7 +169,8 @@ const llm = require('./llm');
 const voiceagent = require('./voiceagent');   /* ИИ-голосовой агент: разговорный обзвон спящей базы */
 const reanimation = require('./reanimation'); /* ROI-аналитика реанимации спящей базы */
 const amocrm = require('./amocrm');           /* двусторонний синк с amoCRM (API v4) */
-const amoSyncing = new Set();                 /* блокировка параллельного синка по тенанту (ручной + авто-тик) */
+const bitrix = require('./bitrix');           /* двусторонний синк с Bitrix24 (REST) */
+const amoSyncing = new Set();                 /* блокировка параллельного синка по тенанту (ручной + авто-тик): ключи tid / tid:bx */
 const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
@@ -1872,6 +1873,8 @@ function publicSettings(db) {
   if (s.metaAds) { if (s.metaAds.token) { s.metaAds.tokenSet = true; delete s.metaAds.token; } if (s.metaAds.log) s.metaAds.log = s.metaAds.log.slice(0, 12); }
   /* SEC: long-lived токен amoCRM — секрет, наружу только флаг tokenSet + статус connected */
   if (s.integrations && s.integrations.amo) { const a = s.integrations.amo; if (a.token) { a.tokenSet = true; delete a.token; } a.connected = !!a.lastOkAt; }
+  /* SEC: вебхук-URL Bitrix содержит токен в пути — секрет. Наружу только флаг + статус */
+  if (s.integrations && s.integrations.bitrix) { const bx = s.integrations.bitrix; if (bx.webhook) { bx.webhookSet = true; delete bx.webhook; } bx.connected = !!bx.lastOkAt; }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -4349,17 +4352,29 @@ async function runAmoSyncTick() {
     try {
       await store.runInTenant(tid, async () => {
         const db = store.get();
-        const a = (db.settings.integrations || {}).amo;
-        if (!a || !a.enabled || !a.token || !a.subdomain || !a.lastOkAt) return;   /* connected ⇔ lastOkAt */
-        if (amoSyncing.has(tid)) return;                                           /* ручной синк уже идёт — не наслаиваемся */
-        amoSyncing.add(tid);
-        try {
-          const cfg = Object.assign({}, a, { now: Date.now(), pushBatch: 50 });
-          const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0, save: () => store.saveNow() });
-          const pullOk = r.pull && !r.pull.error;
-          if (pullOk || r.pushed > 0) { a.lastOkAt = Date.now(); if (pullOk) a.lastPullAt = Date.now(); store.saveNow(); }
-          else { a.lastOkAt = 0; store.saveNow(); }   /* связь отвалилась (сменили/отозвали токен) → снимаем «подключён», авто-синк затихает до ручного переподключения */
-        } finally { amoSyncing.delete(tid); }
+        const integ = db.settings.integrations || {};
+        const a = integ.amo;
+        if (a && a.enabled && a.token && a.subdomain && a.lastOkAt && !amoSyncing.has(tid)) {   /* connected ⇔ lastOkAt */
+          amoSyncing.add(tid);
+          try {
+            const cfg = Object.assign({}, a, { now: Date.now(), pushBatch: 50 });
+            const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0, save: () => store.saveNow() });
+            const pullOk = r.pull && !r.pull.error;
+            if (pullOk || r.pushed > 0) { a.lastOkAt = Date.now(); if (pullOk) a.lastPullAt = Date.now(); store.saveNow(); }
+            else { a.lastOkAt = 0; store.saveNow(); }   /* связь отвалилась → снимаем «подключён», авто-синк затихает до ручного переподключения */
+          } finally { amoSyncing.delete(tid); }
+        }
+        const bx = integ.bitrix, bk = tid + ':bx';
+        if (bx && bx.enabled && bx.webhook && bx.lastOkAt && !amoSyncing.has(bk)) {
+          amoSyncing.add(bk);
+          try {
+            const cfg = Object.assign({}, bx, { now: Date.now(), pushBatch: 50 });
+            const r = await bitrix.syncAll(db, { api: bitrix.makeApi(bx), cfg, since: bx.lastPullAt || 0, save: () => store.saveNow() });
+            const pullOk = r.pull && !r.pull.error;
+            if (pullOk || r.pushed > 0) { bx.lastOkAt = Date.now(); if (pullOk) bx.lastPullAt = Date.now(); store.saveNow(); }
+            else { bx.lastOkAt = 0; store.saveNow(); }
+          } finally { amoSyncing.delete(bk); }
+        }
       });
     } catch (_) {}
   }
@@ -9323,6 +9338,47 @@ const server = http.createServer(async (req, res) => {
         audit(db, req, 'amoCRM синк', { pushed: r.pushed, pushErr: r.pushErr, pulled: r.pull && r.pull.pulled, alive: amoAlive });
         return json(res, 200, Object.assign({ connected: amoAlive }, r));
       } catch (e) { a.lastOkAt = 0; store.save(); return json(res, 500, { error: e.message }); }
+      finally { amoSyncing.delete(_tid); }
+    }
+    /* Bitrix24: статус / сохранить вебхук (+ping profile) / ручной синк */
+    if (p === '/api/integrations/bitrix' && req.method === 'GET') {
+      const bx = (db.settings.integrations || {}).bitrix || {};
+      return json(res, 200, { categoryId: bx.categoryId || '', stageMap: bx.stageMap || {}, fields: bx.fields || {}, pullStages: bx.pullStages !== false, enabled: !!bx.enabled, connected: !!bx.lastOkAt, lastPullAt: bx.lastPullAt || 0, webhookSet: !!bx.webhook });
+    }
+    if (p === '/api/integrations/bitrix' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const s = db.settings.integrations = db.settings.integrations || {};
+      const prev = s.bitrix || {};
+      s.bitrix = Object.assign({}, prev, {
+        webhook: b.webhook != null ? String(b.webhook).trim() : prev.webhook,
+        categoryId: b.categoryId != null ? b.categoryId : prev.categoryId,
+        stageMap: b.stageMap || prev.stageMap || {},
+        fields: b.fields || prev.fields || {},
+        pullStages: b.pullStages !== false,
+        enabled: b.enabled !== false,
+      });
+      store.save();
+      try { await bitrix.makeApi(s.bitrix).ping(); s.bitrix.lastOkAt = Date.now(); store.save(); return json(res, 200, { ok: true, connected: true }); }
+      catch (e) { s.bitrix.lastOkAt = 0; store.save(); return json(res, 200, { ok: true, connected: false, error: e.message }); }
+    }
+    if (p === '/api/integrations/bitrix/sync' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' });
+      const bx = (db.settings.integrations || {}).bitrix;
+      if (!bx || !bx.enabled || !bx.webhook) return json(res, 400, { error: 'Bitrix не подключён — вставьте вебхук-URL в настройках интеграции' });
+      const _tid = store.currentTid() + ':bx';
+      if (amoSyncing.has(_tid)) return json(res, 409, { error: 'синк Bitrix уже идёт — подождите завершения' });
+      amoSyncing.add(_tid);
+      const cfg = Object.assign({}, bx, { now: Date.now() });
+      try {
+        const r = await bitrix.syncAll(db, { api: bitrix.makeApi(bx), cfg, since: bx.lastPullAt || 0, save: () => store.saveNow() });
+        const pullOk = r.pull && !r.pull.error;
+        const alive = pullOk || r.pushed > 0;
+        if (alive) { bx.lastOkAt = Date.now(); if (pullOk) bx.lastPullAt = Date.now(); store.save(); }
+        else { bx.lastOkAt = 0; store.save(); }
+        audit(db, req, 'Bitrix синк', { pushed: r.pushed, pushErr: r.pushErr, pulled: r.pull && r.pull.pulled, alive });
+        return json(res, 200, Object.assign({ connected: alive }, r));
+      } catch (e) { bx.lastOkAt = 0; store.save(); return json(res, 500, { error: e.message }); }
       finally { amoSyncing.delete(_tid); }
     }
     if (p === '/api/wake/preview' && req.method === 'GET') {

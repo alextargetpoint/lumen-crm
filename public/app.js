@@ -19514,6 +19514,37 @@ PAGES.settings = async (root) => {
             <button class="btn" id="amoSync" ${amo.connected ? '' : 'disabled title="сначала подключите amo"'}>${ic(I.refresh || I.spark)}Синхронизировать сейчас</button>
             <span id="amoStat" class="muted" style="font-size:11.5px">${amo.lastPullAt ? 'последний синк: ' + new Date(amo.lastPullAt).toLocaleString('ru-RU') : ''}</span>
           </div>`;
+  /* ── двусторонний синк с Bitrix24 (вебхук-URL) ── */
+  const bx = (s.integrations || {}).bitrix || {};
+  const bxStages = [['qualified', 'Квалифицирован'], ['handover', 'У брокера'], ['viewing', 'Показ'], ['deal', 'Сделка'], ['lost', 'Закрыт']];
+  const bxFields = [['budget', 'Бюджет'], ['timeline', 'Сроки'], ['type', 'Тип объекта'], ['purpose', 'Цель'], ['region', 'Регион']];
+  const bitrixForm = `
+          <div class="muted" style="font-size:12.3px;line-height:1.6;margin-bottom:12px">Lumen работает <b>поверх</b> Bitrix24 — без миграции. Lumen-лид зеркалится в <b>сделку</b> (crm.deal). Нужен <b>входящий вебхук</b>: Bitrix24 → Разработчикам → Другое → Входящий вебхук → права <b>crm</b> → скопируйте URL вида <code>https://ваш.bitrix24.ru/rest/1/xxxx/</code>.</div>
+          <div class="set-row">
+            <div class="sp"><div class="sl">Синк включён</div><div class="sd">${bx.connected ? '<span style="color:var(--ok,#2FA98C)">✓ связь с Bitrix подтверждена</span>' : 'вставьте вебхук-URL, нажмите «Сохранить и проверить»'}</div></div>
+            <label class="switch"><input type="checkbox" id="bxEnabled" ${bx.enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          </div>
+          <div class="form-row"><label>Вебхук-URL (с токеном в адресе — хранится как секрет)</label><input id="bxWebhook" type="password" placeholder="${bx.webhookSet ? '•••••• сохранён' : 'https://company.bitrix24.ru/rest/1/xxxxxxxx/'}"></div>
+          <div class="form-row"><label>ID воронки (CATEGORY_ID, 0 — общая)</label><input id="bxCat" value="${esc(bx.categoryId != null ? bx.categoryId : '')}" placeholder="напр. 1 (пусто = общая воронка)"></div>
+          ${coll('Сопоставление стадий → STAGE_ID Bitrix', `
+            <div class="muted" style="font-size:11.5px;margin-bottom:8px">STAGE_ID из вашей воронки, напр. <code>C1:NEW</code>, <code>C1:WON</code> (C{воронка}:{код}). Пустое — стадию не пушим.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            ${bxStages.map(([k, n]) => `<div class="form-row" style="margin:0"><label>${n}</label><input data-bxstage="${k}" value="${esc((bx.stageMap || {})[k] || '')}" placeholder="C1:NEW"></div>`).join('')}
+            </div>`, { open: false })}
+          ${coll('Сопоставление полей → UF_CRM коды', `
+            <div class="muted" style="font-size:11.5px;margin-bottom:8px">Код пользовательского поля сделки, напр. <code>UF_CRM_1612...</code>. Списки (enum) определяются автоматически. Пустое — поле не пушим.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            ${bxFields.map(([k, n]) => `<div class="form-row" style="margin:0"><label>${n}</label><input data-bxfield="${k}" value="${esc((bx.fields || {})[k] ? (typeof bx.fields[k] === 'object' ? (bx.fields[k].id || bx.fields[k].code || '') : bx.fields[k]) : '')}" placeholder="UF_CRM_..."></div>`).join('')}
+            </div>`, { open: false })}
+          <div class="set-row">
+            <div class="sp"><div class="sl">Тянуть стадии из Bitrix</div><div class="sd">Брокер двигает сделку в Bitrix → подтягиваем в Lumen. Свои непустые квалы НЕ затираются.</div></div>
+            <label class="switch"><input type="checkbox" id="bxPull" ${bx.pullStages !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-accent" id="bxSave">Сохранить и проверить</button>
+            <button class="btn" id="bxSync" ${bx.connected ? '' : 'disabled title="сначала подключите Bitrix"'}>${ic(I.refresh || I.spark)}Синхронизировать сейчас</button>
+            <span id="bxStat" class="muted" style="font-size:11.5px">${bx.lastPullAt ? 'последний синк: ' + new Date(bx.lastPullAt).toLocaleString('ru-RU') : ''}</span>
+          </div>`;
   root.innerHTML = `
     <div class="set-sec-h">${ic(I.users)}Аккаунт и команда</div>
     ${linkCard('data-ovgo="roles"', I.users, 'Роли и доступы', 'Кто из команды что видит и какие карточки лидов — права на сервере', `${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}`)}
@@ -19552,6 +19583,7 @@ PAGES.settings = async (root) => {
 
     <div class="set-sec-h">${ic(I.link)}Внешние CRM · двусторонний синк</div>
     ${coll(`${ic(I.link)}amoCRM — работаем поверх, статусы и поля зеркалим${amo.connected ? ' <span class="badge ok" style="margin-left:6px">подключён</span>' : ''}`, amoForm, { open: false })}
+    ${coll(`${ic(I.link)}Bitrix24 — работаем поверх, лиды → сделки${bx.connected ? ' <span class="badge ok" style="margin-left:6px">подключён</span>' : ''}`, bitrixForm, { open: false })}
 
     <div class="set-sec-h">${ic(I.gear)}Оформление и обучение</div>
     <div class="glass card">
@@ -19584,6 +19616,28 @@ PAGES.settings = async (root) => {
     try {
       const r = await api.post('/integrations/amo/sync', {});
       toast('Синк amoCRM', `отправлено: ${r.pushed || 0}${r.pushErr ? ' (ошибок ' + r.pushErr + ')' : ''} · подтянуто из amo: ${(r.pull && r.pull.pulled) || 0}`, true);
+      await loadState(); PAGES.settings(root);
+    } catch (e) { toast('Синк не прошёл', e.message); btn.disabled = false; btn.innerHTML = o; }
+  });
+  /* ── Bitrix24: сохранить вебхук + проверить, затем ручной синк ── */
+  $('#bxSave', root)?.addEventListener('click', async () => {
+    const btn = $('#bxSave', root); const o = btn.innerHTML; btn.disabled = true; btn.textContent = 'Проверяю…';
+    const stageMap = {}; $$('[data-bxstage]', root).forEach(i => { if (i.value.trim()) stageMap[i.dataset.bxstage] = i.value.trim(); });
+    const fields = {}; $$('[data-bxfield]', root).forEach(i => { if (i.value.trim()) fields[i.dataset.bxfield] = i.value.trim(); });
+    const body = { categoryId: $('#bxCat', root).value.trim(), stageMap, fields, pullStages: $('#bxPull', root).checked, enabled: $('#bxEnabled', root).checked };
+    const wh = $('#bxWebhook', root).value.trim(); if (wh) body.webhook = wh;
+    try {
+      const r = await api.post('/integrations/bitrix', body);
+      if (r.connected) toast('Bitrix24 подключён', 'связь с порталом подтверждена', true);
+      else toast('Сохранено, но связь не прошла', r.error || 'проверьте вебхук-URL');
+      await loadState(); PAGES.settings(root);
+    } catch (e) { toast('Ошибка', e.message); btn.disabled = false; btn.innerHTML = o; }
+  });
+  $('#bxSync', root)?.addEventListener('click', async () => {
+    const btn = $('#bxSync', root); const o = btn.innerHTML; btn.disabled = true; btn.textContent = 'Синхронизирую…';
+    try {
+      const r = await api.post('/integrations/bitrix/sync', {});
+      toast('Синк Bitrix24', `отправлено: ${r.pushed || 0}${r.pushErr ? ' (ошибок ' + r.pushErr + ')' : ''} · подтянуто: ${(r.pull && r.pull.pulled) || 0}`, true);
       await loadState(); PAGES.settings(root);
     } catch (e) { toast('Синк не прошёл', e.message); btn.disabled = false; btn.innerHTML = o; }
   });
