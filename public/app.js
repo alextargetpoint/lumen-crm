@@ -6381,6 +6381,15 @@ function voiceCardHtml(l) {
   </div>`;
 }
 
+/* ---------- карточка лида: скор-карта ПЕРЕПИСКИ (оценка диалога ИИ по методологии) ---------- */
+function dialogueCardHtml(l) {
+  const v = l && l.dialogueReview; if (!v) return '';
+  const cls = v.overall >= 70 ? 'hi' : v.overall >= 40 ? 'mid' : 'lo';
+  const dims = Array.isArray(v.dims) ? v.dims.slice(0, 6).map(d => `<div class="lc-vc-dim"><span>${esc(d.label || d.key)}</span><span class="lc-vc-bar"><i style="width:${Math.max(0, Math.min(100, +d.score || 0))}%"></i></span><b>${+d.score || 0}</b></div>`).join('') : '';
+  const fix = (Array.isArray(v.nextScripts) && v.nextScripts.length) ? `<div class="lc-vc-fix">${ic(I.spark)}<span>${esc(v.nextScripts[0])}</span></div>` : '';
+  return `<div class="lc-vc"><div class="lc-vc-hd">${ic(I.chat)}<b>Оценка переписки</b><span class="lc-vc-meta">${ago(v.at)}</span><span class="lc-vc-score ${cls}">${v.overall}<small>/100</small></span></div>${v.verdict ? `<div class="lc-vc-verdict">${esc(v.verdict)}</div>` : ''}${dims ? `<div class="lc-vc-dims">${dims}</div>` : ''}${fix}</div>`;
+}
+
 /* ---------- карточка лида: файлы + голосовые ---------- */
 function fvSize(b) { return b >= 1048576 ? (b / 1048576).toFixed(1).replace(/\.0$/, '') + ' МБ' : Math.max(1, Math.round(b / 1024)) + ' КБ'; }
 function fvDur(s) { s = Math.round(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -6634,10 +6643,12 @@ async function openLeadModal(id, backScope) {
             <div class="lc-pc-btns"><button class="btn btn-accent btn-sm" id="lcPcSend" title="Отправить клиенту в текущий диалог с того же номера (без «первого касания»)">${ic(I.send)}Отправить в диалог</button><button class="btn btn-sm" id="lcPcUse">В первое касание</button><button class="btn-ghost btn-sm" id="lcPcDismiss">Скрыть</button></div>
           </div>`; })() : ''}
           ${voiceCardHtml(l)}
+          ${dialogueCardHtml(l)}
           <div class="lc-note-row lc-callrow">
             <button class="btn btn-sm" id="lcCallBtn" title="Загрузить запись звонка/Zoom — расшифруется сама">${ic(I.mic || I.phone)}Запись</button>
             <button class="btn btn-sm" id="lcDial" title="Позвонить через телефонию — Twilio соединит вас с лидом, запись и транскрипт лягут в карточку">${ic(I.phone)}Позвонить</button>
             ${(l.voiceOptOut || l.marketingOptOut) ? '' : `<button class="btn btn-sm" id="lcVoiceAI" title="ИИ-агент сам позвонит лиду, проведёт разговор и положит транскрипт + оценку + бюджет/срок в карточку">${ic(I.spark)}ИИ-звонок</button>`}
+            <button class="btn btn-sm" id="lcReviewDlg" title="ИИ оценит переписку по методологии продаж (оси + вердикт + что исправить)">${ic(I.chat)}Оценить переписку</button>
             <input type="file" id="lcCallFile" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.webm" style="display:none">
           </div>
           ${intakeCardHtml ? coll('Заявка из рекламы', intakeCardHtml, { open: true, icon: I.bolt }) : ''}
@@ -7038,6 +7049,14 @@ async function openLeadModal(id, backScope) {
       startCallWatch(l.id);
     } catch (e) { toast('Не удалось', e.message); }
     setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
+  });
+  $('#lcReviewDlg', bd)?.addEventListener('click', async () => {
+    const btn = $('#lcReviewDlg', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.chat) + 'Оцениваю…';
+    try {
+      const r = await api.post('/leads/' + l.id + '/review-dialogue', {});
+      toast('Переписка оценена', 'Оценка ' + (r.review ? r.review.overall + '/100' : '') + ' — скор-карта в карточке', true);
+      openLeadModal(l.id, backScope);   /* перерисуем карточку — появится скор-карта */
+    } catch (e) { toast('Не удалось', e.message); btn.disabled = false; btn.innerHTML = old; }
   });
   $('[data-goseq]', bd)?.addEventListener('click', () => go('sequences'));   /* из «Первого касания» → к цепочкам касаний */
   if (l.call && l.call.status && l.call.status !== 'ended' && (Date.now() - (l.call.at || 0)) < 120000) startCallWatch(l.id);   /* карточка открыта во время активного звонка → сразу показываем статус */
