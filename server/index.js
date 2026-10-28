@@ -4133,7 +4133,12 @@ async function waDropWatch() {
           /* исходящий «waiting»: получатели не расшифровывают наши сообщения (retry-receipt). Воркер сам пересобирает сессию */
           const retryIn = +s.retryIn || 0;
           const retryBad = cur === 'connected' && retryIn >= 5 && s.lastRetryAt && (Date.now() - s.lastRetryAt < 20 * 60e3);
-          if (retryBad) notify(db, { type: 'wa', level: 'critical', title: 'Клиенты не получают сообщения', text: `С «${who}» устройства клиентов не расшифровывают сообщения («Waiting for this message»). Воркер пересобирает сессию сам; если не восстановится за несколько минут — пересканируйте номер по QR.`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
+          /* ⚠️ГЛУШИМ ЛОЖНУЮ ТРЕВОГУ: если контроль доставки (канарейка) недавно прошёл — номер доказанно
+             доставляет, а ретраи идут от ХОЛОДНЫХ контактов (у их устройства нет сессии с нами) и
+             саморассасываются. Рескан тут не поможет. Громко кричим только если доставка НЕ подтверждена. */
+          const canaryOkRecent = n.canaryOkAt && (Date.now() - n.canaryOkAt < 60 * 60e3);
+          if (retryBad && !canaryOkRecent) notify(db, { type: 'wa', level: 'critical', title: 'Клиенты не получают сообщения', text: `С «${who}» устройства клиентов не расшифровывают сообщения («Waiting for this message»). Воркер пересобирает сессию сам; если не восстановится за несколько минут — пересканируйте номер по QR.`, dedupKey: _hkey, cooldownMs: 3 * 3600e3 });
+          n._retryNoise = !!(retryBad && canaryOkRecent);   /* ретраи есть, но доставка подтверждена канарейкой → холодные контакты, не поломка */
           /* ⭐АВТО-ПОДОЗРЕНИЕ НА БАН: номер не возвращается >24ч → вероятно заблокирован WhatsApp. Ставим флаг
              (бейдж в UI + кнопка «Заменить») и ОДИН мягкий алерт. НЕ списываем деньги сами — замену клиент
              подтверждает кнопкой (покупка нового за свой баланс). Восстановление/бан-замена сбрасывают флаг. */
@@ -4149,7 +4154,7 @@ async function waDropWatch() {
               notify(db, { type: 'wa', level: 'warn', title: 'Номер не возвращается — возможно, забанен', text: `«${who}» не на связи больше суток. Если номер окончательно заблокирован WhatsApp — замените его: «Номера» → «Заменить» (новый покупается за $10 с вашего баланса).`, dedupKey: 'wa-suspect:' + _nk, cooldownMs: 24 * 3600e3 });
             }
           }
-          n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad, retryIn, retryBad });
+          n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null, decFails, decBad, retryIn, retryBad, canaryOk: !!(n.canary && n.canary.ok), canaryAt: (n.canary && n.canary.at) || 0, retryNoise: !!n._retryNoise });
           changed = true;
         }
         if (changed) store.save();
@@ -4158,6 +4163,47 @@ async function waDropWatch() {
   } finally { waDropWatchBusy = false; }
 }
 setInterval(() => { waDropWatch().catch(() => {}); }, 10 * 60e3);   /* каждые ~10 мин */
+
+/* ── КОНТРОЛЬНАЯ ДОСТАВКА (канарейка): каждый наш номер шлёт служебное сообщение ДРУГОМУ нашему
+   подключённому номеру; если тот его расшифровал (decFails не вырос) — ИСХОДЯЩЕЕ номера доказанно работает.
+   Это «ground truth» против ложных алертов «клиенты не получают»: ретраи холодных контактов (у их устройства
+   ещё нет сессии с нами) — норма и саморассасываются; они НЕ значат, что номер сломан. Канарейка отделяет
+   «номер реально не доставляет» от «холодный контакт просит ретрай». Раз в ~15 мин на номер. Настройка
+   automations.deliveryCanary (деф. вкл; стоимость — пара служебных сообщений между своими номерами, $0). ── */
+let canaryBusy = false;
+async function canaryTick() {
+  if (canaryBusy) return; canaryBusy = true;
+  try {
+    for (const tid of store.listTenants()) {
+      await store.runInTenant(tid, async () => {
+        const db = store.get(); const g = db.settings.waGray;
+        if (!g || !(g.numbers || []).length || !waWorkerReady(db)) return;
+        if ((db.settings.automations || {}).deliveryCanary === false) return;
+        let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || r || {}; } catch (_) { return; }
+        const conn = (g.numbers || []).filter(n => (live[waGraySid(n.phone)] || {}).status === 'connected');
+        if (conn.length < 2) return;   /* нужен хотя бы один партнёр-приёмник */
+        for (const n of conn) {
+          const nowT = Date.now();
+          if (n._canaryAt && nowT - n._canaryAt < 14 * 60e3) continue;
+          const partner = conn.find(p => p.phone !== n.phone); if (!partner) continue;
+          n._canaryAt = nowT;
+          const decBefore = +((live[waGraySid(partner.phone)] || {}).decFails) || 0;
+          try {
+            await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/send', { to: partner.phone, text: '[[lumen-canary]] 🔧 контроль доставки ' + nowT + ' (служебное)' });
+            await new Promise(r => setTimeout(r, 9000));
+            let live2 = {}; try { const r2 = await waGrayApi(db, 'GET', '/sessions'); live2 = r2.sessions || r2 || {}; } catch (_) { live2 = live; }
+            const decAfter = +((live2[waGraySid(partner.phone)] || {}).decFails) || 0;
+            const ok = decAfter <= decBefore;   /* партнёр расшифровал наше исходящее → доставка работает */
+            n.canary = { at: nowT, ok, partner: partner.realPhone || partner.phone };
+            if (ok) n.canaryOkAt = nowT;
+          } catch (e) { n.canary = { at: nowT, ok: false, err: (e && e.message) || 'ошибка' }; }
+        }
+        store.save();
+      });
+    }
+  } finally { canaryBusy = false; }
+}
+setInterval(() => { canaryTick().catch(() => {}); }, 15 * 60e3);   /* ~15 мин, вразнобой с warmup/drop-watch */
 
 /* ── Прогрев серого TELEGRAM (по best-practice схеме, чтобы аккаунты не отлетали) ──
    • Возрастной рамп лимита отправки на аккаунт: день0 ≈3 → +2/день → потолок (perDay|20).

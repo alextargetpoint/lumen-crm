@@ -15934,7 +15934,17 @@ PAGES.numbers = async (root) => {
   const telNums = (telData.list || []).filter(n => n && n.number);
   const NUMTAB = window.__numTab || (() => { try { return localStorage.getItem('lumen_numtab'); } catch (_) { return null; } })() || 'gray';   /* сохраняем под-вкладку при перезагрузке (была сброс на gray) */
   const brokerName = id => (STATE.brokers.find(b => b.id === id) || {}).name || '';
-  const grayStatusBadge = (live) => { const s = live && live.status; const base = s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; const decWarn = (live && live.decBad) ? ' <span class="badge bad" title="Сокет на связи, но номер не расшифровывает входящие (Bad MAC). Клиенты пишут — сообщения не доходят. Нажмите «Пересканировать».">⚠️ не читает входящие</span>' : ''; const retryWarn = (live && live.retryBad) ? ' <span class="badge bad" title="Клиенты не могут расшифровать наши сообщения («Waiting for this message»). Система авто-пересобирает сессии и временно шлёт с других номеров — рекомендуется «Пересканировать».">⚠️ клиенты не получают</span>' : ''; return base + decWarn + retryWarn; };
+  const grayStatusBadge = (live) => { const s = live && live.status; const base = s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; const decWarn = (live && live.decBad) ? ' <span class="badge bad" title="Сокет на связи, но номер не расшифровывает входящие (Bad MAC). Клиенты пишут — сообщения не доходят. Нажмите «Пересканировать».">⚠️ не читает входящие</span>' : '';
+    /* ретраи: если контрольная доставка (канарейка) недавно прошла — это ХОЛОДНЫЕ контакты (норма, доходит после авто-пересылки), мягкий бейдж; иначе — красный «клиенты не получают» */
+    const retryWarn = (live && live.retryBad) ? (live.retryNoise
+      ? ' <span class="badge" title="Ретраи есть, но контрольная доставка прошла — это холодные контакты (у их устройства ещё нет сессии с нами); сообщения доходят после авто-пересылки. Рескан не нужен.">ретраи · доставка ок</span>'
+      : ' <span class="badge bad" title="Клиенты не расшифровывают наши сообщения, и контроль доставки НЕ подтверждён — рекомендуется «Пересканировать».">⚠️ клиенты не получают</span>') : '';
+    /* контрольная доставка (канарейка): номер успешно доставил служебное сообщение другому нашему номеру */
+    const cAgo = (live && live.canaryAt) ? Math.round((Date.now() - live.canaryAt) / 60000) : null;
+    const canary = (cAgo != null && cAgo < 60) ? (live.canaryOk
+      ? ` <span class="badge ok" title="Контроль доставки: номер доставил служебное сообщение другому нашему номеру ${cAgo} мин назад — исходящее реально работает.">✓ доставка проверена</span>`
+      : ` <span class="badge bad" title="Контроль доставки НЕ прошёл ${cAgo} мин назад — номер реально не доставляет, нужен рескан.">✕ доставка не прошла</span>`) : '';
+    return base + decWarn + retryWarn + canary; };
   const warmLiveHtml = (w) => {
     if (!w || !w.running) return '<div class="muted" style="font-size:11.5px;margin-top:8px">Прогрев выключен. Включите тумблер выше — номера начнут аккуратную переписку между собой (нужно ≥2 на связи).</div>';
     const log = w.log || [];
