@@ -1869,6 +1869,8 @@ function publicSettings(db) {
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
   if (s.metaAds) { if (s.metaAds.token) { s.metaAds.tokenSet = true; delete s.metaAds.token; } if (s.metaAds.log) s.metaAds.log = s.metaAds.log.slice(0, 12); }
+  /* SEC: long-lived токен amoCRM — секрет, наружу только флаг tokenSet + статус connected */
+  if (s.integrations && s.integrations.amo) { const a = s.integrations.amo; if (a.token) { a.tokenSet = true; delete a.token; } a.connected = !!a.lastOkAt; }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -9284,10 +9286,15 @@ const server = http.createServer(async (req, res) => {
       const cfg = Object.assign({}, a, { now: Date.now() });
       try {
         const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0 });
-        a.lastPullAt = Date.now(); a.lastOkAt = Date.now(); store.save();
-        audit(db, req, 'amoCRM синк', { pushed: r.pushed, pulled: r.pull && r.pull.pulled });
-        return json(res, 200, r);
-      } catch (e) { return json(res, 500, { error: e.message }); }
+        /* «связь жива» только если amo реально ответил: пулл без ошибки ИЛИ был успешный пуш.
+           Иначе (всё 401/сеть упала) НЕ помечаем connected и НЕ двигаем lastPullAt (не проглатываем изменения). */
+        const pullOk = r.pull && !r.pull.error;
+        const amoAlive = pullOk || r.pushed > 0;
+        if (amoAlive) { a.lastOkAt = Date.now(); if (pullOk) a.lastPullAt = Date.now(); store.save(); }
+        else { a.lastOkAt = 0; store.save(); }
+        audit(db, req, 'amoCRM синк', { pushed: r.pushed, pushErr: r.pushErr, pulled: r.pull && r.pull.pulled, alive: amoAlive });
+        return json(res, 200, Object.assign({ connected: amoAlive }, r));
+      } catch (e) { a.lastOkAt = 0; store.save(); return json(res, 500, { error: e.message }); }
     }
     if (p === '/api/wake/preview' && req.method === 'GET') {
       const csv = (k) => { const v = u.searchParams.get(k); return v ? v.split(',').map(x => x.trim()).filter(Boolean) : []; };

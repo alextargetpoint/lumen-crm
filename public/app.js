@@ -19480,6 +19480,40 @@ PAGES.settings = async (root) => {
          <button class="btn btn-sm" id="gmeetDisconnect" style="margin-top:8px">Отключить Google Meet</button>`
       : `<div class="muted" style="font-size:12.3px;line-height:1.6;margin-bottom:10px">Подключите свой Google — при назначении видео-встречи ссылка Meet создастся автоматически <b>под вашим аккаунтом</b>. Без подключения используем бесплатную комнату Jitsi.</div>
          <button class="btn btn-accent" id="gmeetConnect" style="width:100%;justify-content:center">${ic(I.cal || I.spark)}Подключить Google Meet</button>`;
+  /* ── двусторонний синк с amoCRM: заход к агентствам на amo без миграции ── */
+  const amo = (s.integrations || {}).amo || {};
+  const amoStages = [['qualified', 'Квалифицирован'], ['handover', 'У брокера'], ['viewing', 'Показ'], ['deal', 'Сделка'], ['lost', 'Закрыт']];
+  const amoFields = [['budget', 'Бюджет'], ['timeline', 'Сроки'], ['type', 'Тип объекта'], ['purpose', 'Цель'], ['region', 'Регион']];
+  const amoForm = `
+          <div class="muted" style="font-size:12.3px;line-height:1.6;margin-bottom:12px">Lumen работает <b>поверх</b> вашего amoCRM — без миграции. ИИ ведёт переписку/обзвон и квалификацию, а имя, стадия, сумма и поля зеркалятся в amo, где у вас вся отчётность. Токен — долгоживущий (amo → Настройки → Интеграции → создать интеграцию → «Долгосрочный токен»).</div>
+          <div class="set-row">
+            <div class="sp"><div class="sl">Синк включён</div><div class="sd">${amo.connected ? '<span style="color:var(--ok,#2FA98C)">✓ связь с amo подтверждена</span>' : 'заполните поддомен и токен, нажмите «Сохранить и проверить»'}</div></div>
+            <label class="switch"><input type="checkbox" id="amoEnabled" ${amo.enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+            <div class="form-row"><label>Поддомен amoCRM</label><input id="amoSub" value="${esc(amo.subdomain || '')}" placeholder="mycompany (из mycompany.amocrm.ru)"></div>
+            <div class="form-row"><label>ID воронки (pipeline)</label><input id="amoPipe" value="${esc(amo.pipelineId || '')}" placeholder="напр. 7483920"></div>
+          </div>
+          <div class="form-row"><label>Долгосрочный токен</label><input id="amoToken" type="password" placeholder="${amo.tokenSet ? '•••••• сохранён' : 'eyJ0eXAiOiJKV1Qi… (долгоживущий токен интеграции)'}"></div>
+          ${coll('Сопоставление стадий → статусы amo (ID из вашей воронки)', `
+            <div class="muted" style="font-size:11.5px;margin-bottom:8px">ID статуса — в amo: Настройки воронки → наведите на статус → он в URL/API. Пустое поле — стадию не пушим.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            ${amoStages.map(([k, n]) => `<div class="form-row" style="margin:0"><label>${n}</label><input data-amostage="${k}" value="${esc((amo.statusMap || {})[k] || '')}" placeholder="status_id"></div>`).join('')}
+            </div>`, { open: false })}
+          ${coll('Сопоставление полей квалификации → custom fields amo (ID поля)', `
+            <div class="muted" style="font-size:11.5px;margin-bottom:8px">ID кастом-поля сделки — в amo: Настройки полей → поле → в API (field_id). Пустое — поле не пушим.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            ${amoFields.map(([k, n]) => `<div class="form-row" style="margin:0"><label>${n}</label><input data-amofield="${k}" value="${esc((amo.fields || {})[k] || '')}" placeholder="field_id"></div>`).join('')}
+            </div>`, { open: false })}
+          <div class="set-row">
+            <div class="sp"><div class="sl">Тянуть стадии из amo</div><div class="sd">Если брокер меняет статус в amo — подтягивать в Lumen. Свои непустые квалы Lumen НЕ затирает данными из amo.</div></div>
+            <label class="switch"><input type="checkbox" id="amoPull" ${amo.pullStages !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-accent" id="amoSave">Сохранить и проверить</button>
+            <button class="btn" id="amoSync" ${amo.connected ? '' : 'disabled title="сначала подключите amo"'}>${ic(I.refresh || I.spark)}Синхронизировать сейчас</button>
+            <span id="amoStat" class="muted" style="font-size:11.5px">${amo.lastPullAt ? 'последний синк: ' + new Date(amo.lastPullAt).toLocaleString('ru-RU') : ''}</span>
+          </div>`;
   root.innerHTML = `
     <div class="set-sec-h">${ic(I.users)}Аккаунт и команда</div>
     ${linkCard('data-ovgo="roles"', I.users, 'Роли и доступы', 'Кто из команды что видит и какие карточки лидов — права на сервере', `${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}`)}
@@ -19516,6 +19550,9 @@ PAGES.settings = async (root) => {
     <div class="set-sec-h">${ic(I.link)}Объекты и листинги</div>
     ${coll(`${ic(I.link)}Источники инвентаря и листинги`, inventoryForm, { open: false })}
 
+    <div class="set-sec-h">${ic(I.link)}Внешние CRM · двусторонний синк</div>
+    ${coll(`${ic(I.link)}amoCRM — работаем поверх, статусы и поля зеркалим${amo.connected ? ' <span class="badge ok" style="margin-left:6px">подключён</span>' : ''}`, amoForm, { open: false })}
+
     <div class="set-sec-h">${ic(I.gear)}Оформление и обучение</div>
     <div class="glass card">
       <div class="card-title">${ic(I.gear)}${t('Оформление','Appearance')}<span class="sub">${t('тема интерфейса и мастер настройки','interface theme and setup wizard')}</span></div>
@@ -19528,6 +19565,28 @@ PAGES.settings = async (root) => {
     ${linkCard('id="setGuides" onclick="window.openGuideCenter&&window.openGuideCenter()"', I.doc, 'Инструкции и гайды', 'Подключение Telegram-бота с экранами, воронка, WhatsApp-агент и другое')}
     ${coll(`${ic(I.eye)}Демо-режим`, demoForm, { open: false })}`;
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
+  /* ── amoCRM: сохранить конфиг + проверить связь, затем ручной синк ── */
+  $('#amoSave', root)?.addEventListener('click', async () => {
+    const btn = $('#amoSave', root); const o = btn.innerHTML; btn.disabled = true; btn.textContent = 'Проверяю…';
+    const statusMap = {}; $$('[data-amostage]', root).forEach(i => { if (i.value.trim()) statusMap[i.dataset.amostage] = i.value.trim(); });
+    const fields = {}; $$('[data-amofield]', root).forEach(i => { if (i.value.trim()) fields[i.dataset.amofield] = i.value.trim(); });
+    const body = { subdomain: $('#amoSub', root).value.trim(), pipelineId: $('#amoPipe', root).value.trim(), statusMap, fields, pullStages: $('#amoPull', root).checked, enabled: $('#amoEnabled', root).checked };
+    const tok = $('#amoToken', root).value.trim(); if (tok) body.token = tok;
+    try {
+      const r = await api.post('/integrations/amo', body);
+      if (r.connected) toast('amoCRM подключён', 'связь с аккаунтом подтверждена', true);
+      else toast('Сохранено, но связь не прошла', r.error || 'проверьте поддомен и токен');
+      await loadState(); PAGES.settings(root);
+    } catch (e) { toast('Ошибка', e.message); btn.disabled = false; btn.innerHTML = o; }
+  });
+  $('#amoSync', root)?.addEventListener('click', async () => {
+    const btn = $('#amoSync', root); const o = btn.innerHTML; btn.disabled = true; btn.textContent = 'Синхронизирую…';
+    try {
+      const r = await api.post('/integrations/amo/sync', {});
+      toast('Синк amoCRM', `отправлено: ${r.pushed || 0}${r.pushErr ? ' (ошибок ' + r.pushErr + ')' : ''} · подтянуто из amo: ${(r.pull && r.pull.pulled) || 0}`, true);
+      await loadState(); PAGES.settings(root);
+    } catch (e) { toast('Синк не прошёл', e.message); btn.disabled = false; btn.innerHTML = o; }
+  });
   $('#portalSave')?.addEventListener('click', async () => {
     const body = {};
     $$('[data-portal]', root).forEach(inp => { if (inp.value.trim()) body[inp.dataset.portal] = { key: inp.value.trim() }; });
