@@ -7586,6 +7586,9 @@ const server = http.createServer(async (req, res) => {
     const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length || (MEMBER.leadFilter.contractors || []).length)) ? MEMBER.leadFilter : null;
     const matchesLeadFilter = (l) => { if (!LF) return true; const byTag = (LF.tags || []).length && (l.tags || []).some(t => LF.tags.includes(t)); const bySrc = (LF.sources || []).length && LF.sources.includes(l.source); const byVendor = (LF.contractors || []).length && LF.contractors.includes(l.vendorId); return !!(byTag || bySrc || byVendor); };
     const canSeeLead = (l) => (!IS_BROKER || (CAP && CAP.leads === 'all') || l.broker === ROLE.brokerId) && matchesLeadFilter(l);
+    /* SEC: трафик-подрядчик — его собственный contractorId. Для него ФОРСИМ cid в ads-аналитике (игнорим
+       ?contractorId= из URL), чтобы он не мог запросить данные чужого подрядчика. Для остальных = null (не форсим). */
+    const scopedCid = (IS_BROKER && MEMBER && (MEMBER.contractorId || ((MEMBER.leadFilter || {}).contractors || [])[0])) || null;
     /* код доступа (pinPlain) виден ТОЛЬКО реальному владельцу (не брокеру, не в режиме preview) */
     const RR_STATE = realRole(req);
     const showSecret = RR_STATE && RR_STATE.role === 'owner' && !RR_STATE.previewAs;
@@ -12883,7 +12886,7 @@ const server = http.createServer(async (req, res) => {
        если у измерения факта нет — hasFact=false, UI покажет «факт не внесён». Опц. фильтры ?contractorId=&from=&to=. */
     if (p === '/api/mediaplans/analytics' && req.method === 'GET') {
       for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
-      const ctFilter = u.searchParams.get('contractorId') || '';
+      const ctFilter = (scopedCid || u.searchParams.get('contractorId')) || '';
       const fromF = u.searchParams.get('from') || '';
       const toF = u.searchParams.get('to') || '';
       let plans = db.mediaplans.slice();
@@ -13411,7 +13414,7 @@ ${SCR}
       const hasIn = (lid) => db.messages.some(x => x.leadId === lid && x.dir === 'in');
       const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
       const _leadIdx = buildLeadAdIndex(db);                                    /* атрибуция по adId + фолбэк по именам */
-      const stats = adsInScope(db, u.searchParams.get('contractorId')).map(ad => {
+      const stats = adsInScope(db, (scopedCid || u.searchParams.get('contractorId'))).map(ad => {
         const mine = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leads = mine.length;
         const dialogs = mine.filter(l => hasIn(l.id) || ['dialog', ...QUAL].includes(l.stage)).length;
@@ -13553,7 +13556,7 @@ ${SCR}
       const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; for (const p of (x.dailyR || [])) m.dmap[p.d] = (m.dmap[p.d] || 0) + (p.spend || 0); };
       const camps = {};
       const _leadIdx = buildLeadAdIndex(db);                                    /* атрибуция по adId + фолбэк по именам */
-      const _ADS = adsInScope(db, u.searchParams.get('contractorId'));
+      const _ADS = adsInScope(db, (scopedCid || u.searchParams.get('contractorId')));
       for (const ad of _ADS) {
         const crmLeads = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leadsCRM = crmLeads.length;
@@ -13648,9 +13651,9 @@ ${SCR}
         : geoGroup === 'campaign' ? ((l.ads && l.ads.campaignName) || '— без кампании')
         : geoGroup === 'creative' ? ((l.ads && (l.ads.adName || l.ads.name)) || '— без креатива')
         : langOf(l);
-      const _cid = u.searchParams.get('contractorId'); const _scopeIds = _cid ? new Set(adsInScope(db, _cid).map(a => String(a.adId))) : null; const leads = (db.leads || []).filter(l => inR(l) && (!_cid || l.vendorId === _cid || (_scopeIds && _scopeIds.has(resolveLeadAdId(db, l)))));
+      const _cid = (scopedCid || u.searchParams.get('contractorId')); const _scopeIds = _cid ? new Set(adsInScope(db, _cid).map(a => String(a.adId))) : null; const leads = (db.leads || []).filter(l => inR(l) && (!_cid || l.vendorId === _cid || (_scopeIds && _scopeIds.has(resolveLeadAdId(db, l)))));
       /* totalSpend за период */
-      let totalSpend = 0; for (const a of adsInScope(db, u.searchParams.get('contractorId'))) totalSpend += (from || to) ? adRangeMetrics(a, from, to).spend : (a.spend || 0);
+      let totalSpend = 0; for (const a of adsInScope(db, (scopedCid || u.searchParams.get('contractorId')))) totalSpend += (from || to) ? adRangeMetrics(a, from, to).spend : (a.spend || 0);
       /* ── ГЕО ── */
       const byGroup = {}; let totCounted = 0;
       const LANG_TITLE = { RU: '🇷🇺 RU', EN: '🌐 EN', AR: '🇦🇪 AR', ES: '🇪🇸 ES', DE: '🇩🇪 DE', FR: '🇫🇷 FR', IT: '🇮🇹 IT', TR: '🇹🇷 TR', TH: '🇹🇭 TH', ID: '🇮🇩 ID', OTHER: '🌍 Без языка' };
@@ -13662,7 +13665,7 @@ ${SCR}
       const adsets = rankBy(l => l.ads && l.ads.adsetName);
       const creatives = rankBy(l => l.ads && (l.ads.adName || l.ads.name));
       /* превью креатива по имени объявления (что загружено в дерево) — цепляем к строкам рейтинга креативов */
-      const creaMedia = {}; for (const a of adsInScope(db, u.searchParams.get('contractorId'))) if (a.name && a.media && a.media.url && !creaMedia[a.name]) creaMedia[a.name] = { type: a.media.type || 'image', url: a.media.url };
+      const creaMedia = {}; for (const a of adsInScope(db, (scopedCid || u.searchParams.get('contractorId')))) if (a.name && a.media && a.media.url && !creaMedia[a.name]) creaMedia[a.name] = { type: a.media.type || 'image', url: a.media.url };
       for (const dir of Object.keys(creatives)) for (const row of creatives[dir]) if (creaMedia[row.key]) row.media = creaMedia[row.key];
       const qleads = {}; for (const l of leads.filter(isQual).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) { const dir = dirOf(l); (qleads[dir] = qleads[dir] || []).push({ date: l.createdAt ? new Date(l.createdAt).toISOString().slice(5, 10) : '', name: l.name, country: canon(countryOf(l)), flag: flag(canon(countryOf(l))), status: namesCfg[l.stage] || l.stage, adset: (l.ads && l.ads.adsetName) || '—', ad: (l.ads && (l.ads.adName || l.ads.name)) || '—' }); }
       /* полный список лидов в scope — для попапа «квал-лиды» (клик по счётчику квалов): id для правки, флаг isQual */
