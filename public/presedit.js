@@ -972,8 +972,11 @@
         });
       }
     } else if (document.querySelector('.pe-insp .pe-photo-prev[data-idx]')) {
-      stage.querySelectorAll('.lp-bleed, img.lp-cover').forEach(function (el) {
+      /* и ЗАПОЛНЕННОЕ фото (img.lp-cover / .lp-bleed), и ПУСТОЙ плейсхолдер (.lp-ph.lp-cover — напр. карта
+         локации без картинки) делаем кликабельными: клик по пустому полю → выбор фото → «Найти фото». */
+      stage.querySelectorAll('.lp-bleed, img.lp-cover, .lp-ph.lp-cover').forEach(function (el) {
         el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-idx', '0');
+        if (el.classList.contains('lp-ph')) el.classList.add('pe-ced-empty');   /* пустой слот → подсказка «добавить фото» */
       });
     }
     /* списки (метрики/места/преимущества): клик по пункту → фокус его строки в панели.
@@ -1197,7 +1200,9 @@
       if (!el) { ceDeselect(); return; }                      /* клик по пустому месту страницы → снять выбор */
       if (el.getAttribute('contenteditable') === 'true') return;
       e.stopPropagation();
-      if (el.classList.contains('pe-ced-list')) ceListSelect(el); else if (el.classList.contains('pe-ced-photo')) cePhotoSelect(el); else ceSelect(el);
+      if (el.classList.contains('pe-ced-list')) ceListSelect(el);
+      else if (el.classList.contains('pe-ced-photo')) { cePhotoSelect(el); if (el.classList.contains('pe-ced-empty')) ceFloatAction('replace'); }   /* пустой слот → сразу открыть «Найти фото» */
+      else ceSelect(el);
     });
     stage.addEventListener('dblclick', function (e) {
       var tx = e.target.closest('.pe-ced-text');

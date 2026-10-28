@@ -556,6 +556,10 @@ button{font-family:inherit;cursor:pointer}
 .pe-ced-photo{cursor:pointer}
 .pe-ced-photo.pe-sel{background:transparent!important;outline:2px solid var(--pe-sel);outline-offset:-2px}
 .pe-ced-photo:hover{outline-color:color-mix(in srgb,var(--pe-sel) 55%,transparent);outline-offset:-2px}
+/* пустой слот фото (карта локации / обложка без картинки) — подсказка «добавить фото» */
+.pe-ced-photo.pe-ced-empty{position:relative;cursor:pointer}
+.pe-ced-photo.pe-ced-empty::after{content:'＋ Добавить фото';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;font:600 13px/1.1 'Manrope',system-ui,sans-serif;letter-spacing:.01em;color:var(--pe-sel);background:color-mix(in srgb,var(--pe-sel) 8%,transparent);opacity:0;transition:opacity .14s;pointer-events:none;border-radius:inherit}
+.pe-ced-photo.pe-ced-empty:hover::after{opacity:1}
 /* плавающая мини-панель быстрых действий над выбранным элементом (как в референсе) */
 .pe-canvas{position:relative}
 .pe-floatbar{position:absolute;z-index:40;display:none;align-items:center;gap:2px;background:#fff;border:1px solid var(--pe-line);border-radius:10px;padding:4px;box-shadow:0 6px 22px rgba(20,16,12,.18);white-space:nowrap}
