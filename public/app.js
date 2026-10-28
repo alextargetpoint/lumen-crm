@@ -10691,8 +10691,27 @@ PAGES.collections = async (root) => {
     try { const r = await api.post('/presentations/' + b.dataset.ccpub + '/publish', {}); if (r.url) { try { navigator.clipboard.writeText(r.url); } catch (_) {} toast('Ссылка скопирована', r.url, true); window.open(r.url, '_blank'); } else toast('Не вышло', r.error || 'исправьте ошибки'); } catch (e) { toast('Не вышло', e.message); }
   }));
 };
+/* панель ROI реанимации — что разбуженная база вернула деньгами (ответ на «ROI ×765» конкурента) */
+function wakeRoiHtml(r) {
+  if (!r || !r.reanimated) return '';
+  const mn = v => '$' + Number(v || 0).toLocaleString('ru-RU');
+  const tile = (v, k, cls) => `<div class="wroi-t${cls ? ' ' + cls : ''}"><div class="wroi-v">${v}</div><div class="wroi-k">${esc(k)}</div></div>`;
+  return `<div class="wroi glass card">
+    <div class="card-title">${ic(I.spark)}Что вернула реанимация<span class="sub">по реальным данным — разбуженные лиды → деньги</span></div>
+    <div class="wroi-grid">
+      ${tile(r.reanimated, 'разбужено лидов')}
+      ${tile(r.replied + ` <small>· ${r.replyRate}%</small>`, 'ответили')}
+      ${tile(r.qualified + ` <small>· ${r.qualRate}%</small>`, 'квалифицировано')}
+      ${tile(r.deals + ` <small>· ${r.dealRate}%</small>`, 'сделок', 'ok')}
+      ${tile(mn(r.revenue), 'выручка возвращена', 'hi')}
+      ${tile(mn(r.savedVsBroker) + ` <small>· ${r.hoursSaved}ч</small>`, 'экономия vs ручная работа')}
+      ${r.voiceCalls ? tile(r.voiceReached + ' / ' + r.voiceCalls, 'ИИ-звонков (дозвон/всего)') : ''}
+    </div>
+  </div>`;
+}
+
 PAGES.wake = async (root) => {
-  const [preview, campaigns] = await Promise.all([api.get('/wake/preview'), api.get('/campaigns')]);
+  const [preview, campaigns, roi] = await Promise.all([api.get('/wake/preview'), api.get('/campaigns'), api.get('/wake/roi').catch(() => null)]);
   PAGE_STATE.wakePreview = preview;
   const segs = { A: preview.filter(p => p.segment === 'A'), B: preview.filter(p => p.segment === 'B'), C: preview.filter(p => p.segment === 'C') };
   root.innerHTML = `
@@ -10708,6 +10727,7 @@ PAGES.wake = async (root) => {
         <span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'mark', hue: '#5B2BD8' })}
+    ${wakeRoiHtml(roi)}
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.wake)}Скоринг спящих<span class="sub">кого разбудить сначала</span></div>

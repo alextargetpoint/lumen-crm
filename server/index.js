@@ -167,6 +167,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 
 const llm = require('./llm');
 const voiceagent = require('./voiceagent');   /* ИИ-голосовой агент: разговорный обзвон спящей базы */
+const reanimation = require('./reanimation'); /* ROI-аналитика реанимации спящей базы */
 const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
@@ -9248,6 +9249,9 @@ const server = http.createServer(async (req, res) => {
       catch (e) { return json(res, 500, { error: e.message }); }
     }
 
+    if (p === '/api/wake/roi' && req.method === 'GET') {
+      return json(res, 200, reanimation.roiStats(db, { brokerHourRate: +(((db.settings.billing || {}).brokerHourRate) || 15) }));
+    }
     if (p === '/api/wake/preview' && req.method === 'GET') {
       const csv = (k) => { const v = u.searchParams.get(k); return v ? v.split(',').map(x => x.trim()).filter(Boolean) : []; };
       const filters = {
