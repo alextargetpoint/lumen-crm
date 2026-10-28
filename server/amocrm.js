@@ -14,6 +14,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 const https = require('https');
+const http = require('http');
 
 const digits = (p) => String(p || '').replace(/\D/g, '');
 const qv = (q) => (q && typeof q === 'object') ? (q.value != null ? q.value : q.num) : q;   /* quals: {value}/{num}/плоское */
@@ -153,11 +154,16 @@ async function syncAll(db, deps) {
 /* ───────── ТОНКИЙ HTTP-АДАПТЕР amoCRM API v4 (не тестируется моками — живой amo) ───────── */
 function makeApi(cfg) {
   cfg = cfg || {};
-  const host = (cfg.subdomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-  const base = host.includes('.') ? host : (host + '.amocrm.ru');
+  /* Переопределение базы для ЛОКАЛЬНОГО мок-сервера (tools/crm-mock): cfg.apiBase или env AMO_API_BASE
+     вида http://localhost:4100. Прод без override ходит на {subdomain}.amocrm.ru по https. */
+  const override = cfg.apiBase || process.env.AMO_API_BASE || '';
+  const host0 = (cfg.subdomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const base = host0.includes('.') ? host0 : (host0 + '.amocrm.ru');
+  let mod = https, opts = { host: base, port: 443 };
+  if (override) { const u = new URL(override); mod = u.protocol === 'http:' ? http : https; opts = { host: u.hostname, port: u.port || (mod === http ? 80 : 443) }; }
   const req = (method, path, body) => new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
-    const r = https.request({ host: base, path, method, headers: { Authorization: 'Bearer ' + (cfg.token || ''), 'Content-Type': 'application/json', ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) } }, (resp) => {
+    const r = mod.request({ ...opts, path, method, headers: { Authorization: 'Bearer ' + (cfg.token || ''), 'Content-Type': 'application/json', ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) } }, (resp) => {
       let d = ''; resp.on('data', c => d += c); resp.on('end', () => {
         let j = {}; try { j = d ? JSON.parse(d) : {}; } catch (_) {}
         if (resp.statusCode >= 300) return reject(new Error('amo ' + resp.statusCode + ': ' + (j && j.title ? j.title : d.slice(0, 120))));
