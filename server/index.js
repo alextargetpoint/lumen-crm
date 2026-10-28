@@ -169,6 +169,7 @@ const llm = require('./llm');
 const voiceagent = require('./voiceagent');   /* ИИ-голосовой агент: разговорный обзвон спящей базы */
 const reanimation = require('./reanimation'); /* ROI-аналитика реанимации спящей базы */
 const amocrm = require('./amocrm');           /* двусторонний синк с amoCRM (API v4) */
+const amoSyncing = new Set();                 /* блокировка параллельного синка по тенанту (ручной + авто-тик) */
 const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
@@ -4350,11 +4351,15 @@ async function runAmoSyncTick() {
         const db = store.get();
         const a = (db.settings.integrations || {}).amo;
         if (!a || !a.enabled || !a.token || !a.subdomain || !a.lastOkAt) return;   /* connected ⇔ lastOkAt */
-        const cfg = Object.assign({}, a, { now: Date.now(), pushLimit: 30 });
-        const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0 });
-        const pullOk = r.pull && !r.pull.error;
-        if (pullOk || r.pushed > 0) { a.lastOkAt = Date.now(); if (pullOk) a.lastPullAt = Date.now(); store.saveNow(); }
-        else { a.lastOkAt = 0; store.saveNow(); }   /* связь отвалилась (сменили/отозвали токен) → снимаем «подключён», авто-синк затихает до ручного переподключения */
+        if (amoSyncing.has(tid)) return;                                           /* ручной синк уже идёт — не наслаиваемся */
+        amoSyncing.add(tid);
+        try {
+          const cfg = Object.assign({}, a, { now: Date.now(), pushBatch: 50 });
+          const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0, save: () => store.saveNow() });
+          const pullOk = r.pull && !r.pull.error;
+          if (pullOk || r.pushed > 0) { a.lastOkAt = Date.now(); if (pullOk) a.lastPullAt = Date.now(); store.saveNow(); }
+          else { a.lastOkAt = 0; store.saveNow(); }   /* связь отвалилась (сменили/отозвали токен) → снимаем «подключён», авто-синк затихает до ручного переподключения */
+        } finally { amoSyncing.delete(tid); }
       });
     } catch (_) {}
   }
@@ -9303,9 +9308,12 @@ const server = http.createServer(async (req, res) => {
       if (IS_BROKER) return json(res, 403, { error: 'только владелец' });
       const a = (db.settings.integrations || {}).amo;
       if (!a || !a.enabled || !a.token || !a.subdomain) return json(res, 400, { error: 'amoCRM не подключён — заполните поддомен и токен в настройках интеграции' });
+      const _tid = store.currentTid();
+      if (amoSyncing.has(_tid)) return json(res, 409, { error: 'синк amoCRM уже идёт — подождите завершения' });
+      amoSyncing.add(_tid);
       const cfg = Object.assign({}, a, { now: Date.now() });
       try {
-        const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0 });
+        const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0, save: () => store.saveNow() });
         /* «связь жива» только если amo реально ответил: пулл без ошибки ИЛИ был успешный пуш.
            Иначе (всё 401/сеть упала) НЕ помечаем connected и НЕ двигаем lastPullAt (не проглатываем изменения). */
         const pullOk = r.pull && !r.pull.error;
@@ -9315,6 +9323,7 @@ const server = http.createServer(async (req, res) => {
         audit(db, req, 'amoCRM синк', { pushed: r.pushed, pushErr: r.pushErr, pulled: r.pull && r.pull.pulled, alive: amoAlive });
         return json(res, 200, Object.assign({ connected: amoAlive }, r));
       } catch (e) { a.lastOkAt = 0; store.save(); return json(res, 500, { error: e.message }); }
+      finally { amoSyncing.delete(_tid); }
     }
     if (p === '/api/wake/preview' && req.method === 'GET') {
       const csv = (k) => { const v = u.searchParams.get(k); return v ? v.split(',').map(x => x.trim()).filter(Boolean) : []; };
