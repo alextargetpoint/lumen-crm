@@ -877,3 +877,25 @@ input[type=number] { -moz-appearance: textfield; }
 .lc-qlback{display:inline-flex;align-items:center;gap:5px;background:var(--bg-2);border:1px solid var(--stroke);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--ink-2);cursor:pointer;margin:0 0 12px;font-family:inherit}
 .lc-qlback:hover{color:var(--accent);border-color:var(--accent)}
 .lc-qlback svg{width:13px;height:13px;transform:rotate(180deg)}
+/* скор-карта ИИ-звонка (голосовой агент) */
+.lc-vc{border:1px solid var(--stroke);border-radius:13px;background:var(--card,#fff);padding:14px 15px;margin-bottom:12px}
+.lc-vc-hd{display:flex;align-items:center;gap:8px;font-size:14px}
+.lc-vc-hd svg{width:16px;height:16px;color:var(--accent)}
+.lc-vc-hd b{font-weight:650}
+.lc-vc-meta{color:var(--muted);font-size:12px}
+.lc-vc-score{margin-left:auto;font-size:21px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.lc-vc-score small{font-size:11px;font-weight:600;color:var(--muted)}
+.lc-vc-score.hi{color:#15935a}.lc-vc-score.mid{color:#b9770f}.lc-vc-score.lo{color:#d23b3b}
+.lc-vc-verdict{margin-top:9px;font-size:13px;color:var(--ink-2);line-height:1.5}
+.lc-vc-jts{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.lc-vc-jt{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;background:var(--bg-2);border:1px solid var(--stroke);border-radius:999px;padding:4px 10px}
+.lc-vc-jt i{font-style:normal;font-weight:500;color:var(--muted)}
+.lc-vc-dims{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.lc-vc-dim{display:grid;grid-template-columns:118px 1fr 26px;align-items:center;gap:9px;font-size:12px}
+.lc-vc-dim>span:first-child{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc-vc-bar{height:6px;border-radius:999px;background:var(--stroke);overflow:hidden}
+.lc-vc-bar i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.lc-vc-dim b{text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
+.lc-vc-fix{display:flex;gap:8px;align-items:flex-start;margin-top:11px;font-size:12.5px;color:var(--ink-2);background:var(--accent-weak,rgba(120,110,90,.08));border-radius:9px;padding:9px 11px}
+.lc-vc-fix svg{width:15px;height:15px;color:var(--accent);flex:0 0 auto;margin-top:1px}
+.lc-vc-tr{font-size:12.5px;line-height:1.6;color:var(--ink-2);max-height:280px;overflow:auto}

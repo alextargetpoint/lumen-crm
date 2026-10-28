@@ -6359,6 +6359,28 @@ function cfControl(f, val) {
   return `<input type="${itype}" data-cf="${key}" data-cft="${t}" value="${esc(v)}" placeholder="—">`;
 }
 
+/* ---------- карточка лида: скор-карта ИИ-звонка (результат голосового агента) ---------- */
+function voiceCardHtml(l) {
+  const v = l && l.voiceCall;
+  if (!v || (!v.reached && !(v.score))) return '';
+  const sc = v.score, ex = v.extracted || {};
+  const JT = [['budget', 'Бюджет'], ['timeline', 'Срок'], ['type', 'Тип'], ['region', 'Регион']];
+  const jtbd = JT.filter(([k]) => ex[k]).map(([k, lbl]) => `<span class="lc-vc-jt"><i>${esc(lbl)}</i>${esc(String(ex[k]))}</span>`).join('');
+  const dims = (sc && Array.isArray(sc.dims)) ? sc.dims.slice(0, 6).map(d => `<div class="lc-vc-dim"><span>${esc(d.label || d.key)}</span><span class="lc-vc-bar"><i style="width:${Math.max(0, Math.min(100, +d.score || 0))}%"></i></span><b>${+d.score || 0}</b></div>`).join('') : '';
+  const END = { done: 'разговор завершён', handover: 'передан брокеру', qualified: 'квалифицирован', not_interested: 'не заинтересован', callback: 'просил перезвонить', wrap: 'завершён', optout: 'просил не звонить', maxturns: 'лимит реплик', hangup: 'сброс', no_answer: 'нет ответа', completed: 'завершён' };
+  const endLabel = END[v.endReason] || v.endReason || '';
+  const cls = sc ? (sc.overall >= 70 ? 'hi' : sc.overall >= 40 ? 'mid' : 'lo') : '';
+  const tr = v.transcript ? coll('Транскрипт звонка', `<div class="lc-vc-tr">${esc(v.transcript).replace(/\n/g, '<br>')}</div>`, { open: false, icon: I.doc }) : '';
+  const fixes = (sc && Array.isArray(sc.nextScripts) && sc.nextScripts.length) ? `<div class="lc-vc-fix">${ic(I.spark)}<span>${esc(sc.nextScripts[0])}</span></div>` : '';
+  return `<div class="lc-vc">
+    <div class="lc-vc-hd">${ic(I.phone)}<b>ИИ-звонок</b><span class="lc-vc-meta">${fvDur(v.durSec)} · ${esc(endLabel)}${v.optout ? ' · опт-аут' : ''}</span>${sc ? `<span class="lc-vc-score ${cls}">${sc.overall}<small>/100</small></span>` : ''}</div>
+    ${sc && sc.verdict ? `<div class="lc-vc-verdict">${esc(sc.verdict)}</div>` : ''}
+    ${jtbd ? `<div class="lc-vc-jts">${jtbd}</div>` : ''}
+    ${dims ? `<div class="lc-vc-dims">${dims}</div>` : ''}
+    ${fixes}${tr}
+  </div>`;
+}
+
 /* ---------- карточка лида: файлы + голосовые ---------- */
 function fvSize(b) { return b >= 1048576 ? (b / 1048576).toFixed(1).replace(/\.0$/, '') + ' МБ' : Math.max(1, Math.round(b / 1024)) + ' КБ'; }
 function fvDur(s) { s = Math.round(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -6610,9 +6632,11 @@ async function openLeadModal(id, backScope) {
             <div class="lc-pc-msg">${esc(l.postCall.message)}</div>
             <div class="lc-pc-btns"><button class="btn btn-accent btn-sm" id="lcPcSend" title="Отправить клиенту в текущий диалог с того же номера (без «первого касания»)">${ic(I.send)}Отправить в диалог</button><button class="btn btn-sm" id="lcPcUse">В первое касание</button><button class="btn-ghost btn-sm" id="lcPcDismiss">Скрыть</button></div>
           </div>`; })() : ''}
+          ${voiceCardHtml(l)}
           <div class="lc-note-row lc-callrow">
             <button class="btn btn-sm" id="lcCallBtn" title="Загрузить запись звонка/Zoom — расшифруется сама">${ic(I.mic || I.phone)}Запись</button>
             <button class="btn btn-sm" id="lcDial" title="Позвонить через телефонию — Twilio соединит вас с лидом, запись и транскрипт лягут в карточку">${ic(I.phone)}Позвонить</button>
+            ${(l.voiceOptOut || l.marketingOptOut) ? '' : `<button class="btn btn-sm" id="lcVoiceAI" title="ИИ-агент сам позвонит лиду, проведёт разговор и положит транскрипт + оценку + бюджет/срок в карточку">${ic(I.spark)}ИИ-звонок</button>`}
             <input type="file" id="lcCallFile" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.webm" style="display:none">
           </div>
           ${intakeCardHtml ? coll('Заявка из рекламы', intakeCardHtml, { open: true, icon: I.bolt }) : ''}
@@ -7002,6 +7026,15 @@ async function openLeadModal(id, backScope) {
       toast('📞 Звоним ВАМ' + (r.from ? ' · ' + r.from : ''), 'Снимите трубку — затем соединим с клиентом' + (r.to ? ' (' + r.to + ')' : '') + '. Не звонит ~20 сек? Проверьте, что страна вашего номера включена в Telnyx → Outbound Voice Profile.', true);
       startCallWatch(l.id);
     } catch (e) { toast('Звонок не пошёл', e.message); }
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
+  });
+  $('#lcVoiceAI', bd)?.addEventListener('click', async () => {
+    const btn = $('#lcVoiceAI', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Звоню…';
+    try {
+      await api.post('/voice/call/' + l.id, {});
+      toast('🤖 ИИ звонит лиду', 'Агент сам проведёт разговор. Транскрипт, оценка и бюджет/срок появятся в карточке после звонка.', true);
+      startCallWatch(l.id);
+    } catch (e) { toast('Не удалось', e.message); }
     setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
   });
   $('[data-goseq]', bd)?.addEventListener('click', () => go('sequences'));   /* из «Первого касания» → к цепочкам касаний */
@@ -10668,13 +10701,38 @@ PAGES.wake = async (root) => {
         })()}
       </div>
       <div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-accent page-primary" id="newCmp">${ic(I.plus)}Новая кампания</button></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px"><button class="btn" id="voiceCmp" title="ИИ-агент сам обзвонит спящих по телефону, проведёт разговор и положит транскрипт + оценку + бюджет/срок в карточки">${ic(I.phone)}ИИ-обзвон спящих</button><button class="btn btn-accent page-primary" id="newCmp">${ic(I.plus)}Новая кампания</button></div>
         <div id="cmpList">${campaigns.map(cmpCard).join('') || '<div class="glass card empty">Кампаний ещё нет</div>'}</div>
       </div>
     </div>`;
   $('#newCmp').addEventListener('click', newCampaignModal);
+  $('#voiceCmp', root)?.addEventListener('click', voiceCampaignModal);
   wireCampaigns(root);
 };
+
+/* ИИ-обзвон спящих: модалка настроек → POST /voice/campaign (батч звонков ИИ-агентом) */
+function voiceCampaignModal() {
+  const sleeping = (PAGE_STATE.wakePreview || []).length;
+  modal({
+    title: 'ИИ-обзвон спящих', sub: 'ИИ-агент сам позвонит, проведёт разговор и положит транскрипт + оценку + бюджет/срок в карточки', wide: false,
+    body: `<div style="display:flex;flex-direction:column;gap:12px">
+      <div class="muted" style="font-size:12.5px;line-height:1.5">В базе <b>${sleeping}</b> спящих. Агент звонит по приоритету (свежесть + вовлечённость), пропускает отписавшихся и тех, кому звонили недавно. Разговор — на языке клиента, с мягким выходом по просьбе.</div>
+      <div class="form-row"><label>Сколько позвонить сейчас (пачка)</label><input id="vcBatch" type="number" min="1" max="50" value="5" class="inp" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px"></div>
+      <div class="form-row"><label>Молчат дольше, дней</label><input id="vcDays" type="number" min="0" max="365" value="14" class="inp" style="width:100%;padding:9px 12px;border:1px solid var(--stroke);border-radius:9px"></div>
+      <div class="note" style="font-size:11.5px;color:var(--muted)">⚠️ Нужен настроенный Telnyx (телефония) и ключ ИИ. Звонки тарифицируются с баланса расходников.</div>
+    </div>`,
+    actions: [{ label: 'Отмена' }, { label: 'Запустить обзвон', cls: 'btn-accent', onClick: async () => {
+      const batch = Math.max(1, Math.min(50, +($('#vcBatch') || {}).value || 5));
+      const olderDays = Math.max(0, +($('#vcDays') || {}).value || 14);
+      try {
+        const r = await api.post('/voice/campaign', { batch, olderDays, limit: 100 });
+        closeModal();
+        if (r.started) toast('🤖 Обзвон запущен', `Звоним ${r.started} из ${r.matched} спящих. Результаты (оценка + бюджет/срок) появятся в карточках по мере разговоров.`, true);
+        else toast('Некого звонить', r.note || 'нет подходящих лидов по фильтрам');
+      } catch (e) { toast('Не удалось', e.message); }
+    } }],
+  });
+}
 PAGES.wake.refresh = async () => {
   const list = $('#cmpList');
   if (!list) return;
@@ -16053,6 +16111,8 @@ PAGES.numbers = async (root) => {
       </div>`; }).join('')}
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Серых номеров пока нет — нажмите «Подключить по QR» выше.</div>`}
 
+    <div class="glass card mb" id="ctrlDelivCard"><div class="card-title">${ic(I.shield || I.spark)}Контроль доставки<span class="sub">доходят ли наши сообщения на контрольные номера</span></div><div class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5">Контрольный номер — твоё устройство, заведённое как лид. Если оно <b>отвечает</b> — наши сообщения реально доходят. «Отметить контрольным» — на карточке лида. Канарейка между нашими номерами идёт отдельно (бейджи на карточках номеров выше).</div><div id="ctrlDelivBody" style="font-size:12px">Загрузка…</div></div>
+
     ${grayNums.length ? (() => { const w = grayData.warmup || {}; return `<div class="glass card mb">
       <div class="card-title">${ic(I.bolt)}Прогрев номеров<span class="sub">авто-переписка между номерами с задержками</span></div>
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Подключённые личные номера аккуратно переписываются между собой (нужно <b>≥2 на связи</b>), имитируя живую активность — так номер «отлёживается» перед рассылками и реже улетает в бан. Неофициальный метод (протокол WhatsApp Web).</div>
@@ -16612,6 +16672,17 @@ PAGES.numbers = async (root) => {
   /* серые карточки: QR-переподключение, закреп за брокером, удаление — прямо со страницы */
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
   $$('[data-grayrescan]', root).forEach(b => b.addEventListener('click', () => openGrayRescan(b.dataset.grayrescan)));
+  /* Контроль доставки: фактический статус по контрольным номерам (ответил/не дошло/отправлено) */
+  (async () => {
+    const box = $('#ctrlDelivBody', root); if (!box) return;
+    try {
+      const d = await api.get('/wa/control-status'); const items = d.items || [];
+      if (!items.length) { box.innerHTML = '<div class="muted">Контрольных номеров пока нет. Заведи своё устройство как лид и отметь его «контрольным» на карточке лида (кнопка в блоке статуса).</div>'; return; }
+      const VB = { ok: ['ok', '✓ доходят'], fail: ['bad', '✕ не дошло'], sent: ['warn', 'отправлено, ответа нет'], idle: ['', 'нет данных'] };
+      box.innerHTML = items.map(it => { const [cls, lbl] = VB[it.verdict] || VB.idle; const t = it.verdict === 'ok' ? ' · ответил ' + ago(it.repliedAt) : it.verdict === 'fail' ? ' · ' + ago(it.failAt) : it.verdict === 'sent' ? ' · ' + ago(it.outAt) : ''; return `<div class="cd-row" data-cdopen="${esc(it.id)}" title="Открыть карточку и переписку"><span class="cd-nm">${esc(it.name || '—')}<i>${esc(it.phone || '')}</i></span><span class="badge ${cls}">${lbl}${t}</span></div>`; }).join('');
+      $$('[data-cdopen]', box).forEach(b => b.addEventListener('click', () => { try { openLeadModal(b.dataset.cdopen); } catch (_) {} }));
+    } catch (e) { box.innerHTML = '<div class="muted">Не удалось загрузить: ' + esc(e.message) + '</div>'; }
+  })();
   $$('[data-grayreplace]', root).forEach(b => b.addEventListener('click', () => replaceGrayNumber(b.dataset.grayreplace)));
   $$('[data-graycheck]', root).forEach(b => b.addEventListener('click', async () => {
     const phone = b.dataset.graycheck; const old = b.innerHTML;
