@@ -2007,7 +2007,11 @@ function analytics(db, opts = {}) {
   /* SEC: брокер (leads:'own') видит аналитику ТОЛЬКО по своим лидам; агентские срезы по коллегам (byBroker) скрыты.
      Владелец и брокер с capability leads:'all' — полная аналитика (onlyBroker не передаётся). */
   const onlyBroker = opts.onlyBroker || null;
-  const leads = onlyBroker ? db.leads.filter(l => l.broker === onlyBroker) : db.leads;
+  /* SEC: трафик-подрядчик (роль analyst + leadFilter.contractors) видит аналитику ТОЛЬКО по своим лидам
+     (его vendorId), не по всем кампаниям агентства. Срезы по коллегам (byBroker) тоже скрыты. */
+  const onlyVendors = (opts.onlyVendors && opts.onlyVendors.length) ? new Set(opts.onlyVendors.map(String)) : null;
+  const leads = onlyBroker ? db.leads.filter(l => l.broker === onlyBroker)
+    : (onlyVendors ? db.leads.filter(l => onlyVendors.has(String(l.vendorId || ''))) : db.leads);
   const by = (st) => leads.filter(l => l.stage === st).length;
   const contacted = leads.filter(l => db.messages.some(m => m.leadId === l.id && m.dir === 'out'));
   const replied = contacted.filter(l => db.messages.some(m => m.leadId === l.id && m.dir === 'in'));
@@ -2023,7 +2027,7 @@ function analytics(db, opts = {}) {
   }
 
   /* ── по брокерам: нагрузка → квалы → сделки ── */
-  const byBroker = onlyBroker ? [] : (db.brokers || []).filter(b => b.active !== false).map(b => {
+  const byBroker = (onlyBroker || onlyVendors) ? [] : (db.brokers || []).filter(b => b.active !== false).map(b => {
     const bl = leads.filter(l => l.broker === b.id);
     const inWork = bl.filter(l => ['handover', 'viewing'].includes(l.stage)).length;
     const q = bl.filter(isQ).length;
@@ -8263,7 +8267,7 @@ const server = http.createServer(async (req, res) => {
         /* цепочки: владелец видит все; брокер — агентские (base) + свои + расшаренные всем (agency) или лично ему */
         sequences: IS_BROKER ? db.sequences.filter(sq => !sq.ownerId || sq.ownerId === ROLE.brokerId || sq.visibility === 'agency' || (sq.sharedWith || []).includes(ROLE.brokerId)) : db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
-        analytics: analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}),
+        analytics: analytics(db, (IS_BROKER && LF && (LF.contractors || []).length) ? { onlyVendors: LF.contractors } : (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}),
         me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), autoQr: IS_BROKER ? !(MEMBER.autoQrOptOut) : ((db.settings.automations || {}).autoQrOnDrop !== false), hidePages: IS_BROKER ? [...new Set([...roleHide(db, MEMBER.roleType), ...(MEMBER.hidePages || [])])].filter(pg => !(MEMBER.showPages || []).includes(pg)).filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
     }
@@ -15467,7 +15471,7 @@ ${SCR}
     if (p === '/api/call-reviews' && req.method === 'GET')
       return json(res, 200, (db.callReviews || []).slice(0, 60));
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, (IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})) : db.events).slice(0, 60));
-    if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}));
+    if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db, (IS_BROKER && LF && (LF.contractors || []).length) ? { onlyVendors: LF.contractors } : (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}));
     if (p === '/api/demo/reset' && req.method === 'POST') {
       if (!getSession(req) || (ROLE && ROLE.role === 'broker')) return json(res, 403, { error: 'только владелец' });
       /* НЕ теряем доступ и деньги: сохраняем вход/секреты/биллинг/бренд/betaAll, наполняем демо-данными остальное */
