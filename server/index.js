@@ -4341,6 +4341,26 @@ function runBillingTick() {
 setInterval(runBillingTick, 6 * 60 * 60e3);   /* каждые 6 ч */
 setTimeout(runBillingTick, 15e3);             /* и вскоре после старта — чтобы гейты подтянулись сразу */
 
+/* ── авто-синк amoCRM по всем тенантам: только enabled+connected (успешный ping/синк), чтобы не долбить мёртвые/неверные конфиги.
+   Стоимость — на стороне amo (их API-лимит 7 rps/аккаунт), нам $0. Cost-safe: раз в ~20 мин, лимит пуша на цикл. ── */
+async function runAmoSyncTick() {
+  for (const tid of store.listTenants()) {
+    try {
+      await store.runInTenant(tid, async () => {
+        const db = store.get();
+        const a = (db.settings.integrations || {}).amo;
+        if (!a || !a.enabled || !a.token || !a.subdomain || !a.lastOkAt) return;   /* connected ⇔ lastOkAt */
+        const cfg = Object.assign({}, a, { now: Date.now(), pushLimit: 30 });
+        const r = await amocrm.syncAll(db, { api: amocrm.makeApi(a), cfg, since: a.lastPullAt || 0 });
+        const pullOk = r.pull && !r.pull.error;
+        if (pullOk || r.pushed > 0) { a.lastOkAt = Date.now(); if (pullOk) a.lastPullAt = Date.now(); store.saveNow(); }
+        else { a.lastOkAt = 0; store.saveNow(); }   /* связь отвалилась (сменили/отозвали токен) → снимаем «подключён», авто-синк затихает до ручного переподключения */
+      });
+    } catch (_) {}
+  }
+}
+setInterval(() => { runAmoSyncTick().catch(() => {}); }, 20 * 60e3);   /* ~20 мин */
+
 /* Проверка связи с Viber BSP (Infobip): валиден ли ключ+baseUrl+доступ.
    Безопасно — GET баланса (сообщение НЕ шлём и не тратим). Если передан `to` — ещё и
    реальная тест-отправка на этот номер (проверяет верификацию отправителя). */
