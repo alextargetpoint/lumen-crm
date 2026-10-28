@@ -481,6 +481,33 @@ ${fuTech ? '\nИЗ ПЛЕЙБУКА АГЕНТСТВА:\n' + fuTech : ''}${chain
   throw new Error('брак LLM (followup): ' + lastBad);
 }
 
+/* ГОЛОСОВОЙ ХОД: следующая реплика ИИ-агента в ЖИВОМ ТЕЛЕФОННОМ разговоре (реанимация спящего).
+   history = [{who:'agent'|'client', text}]. Отличие от переписки: КОРОТКО (1-2 фразы), вслух,
+   разговорно, ОДИН вопрос за ход, без markdown/эмодзи/ссылок, на языке клиента.
+   → {say, done, reason, extracted:{budget,timeline,type,region}}. */
+async function voiceTurn(db, lead, history, opts = {}) {
+  if (!available()) return { say: '', done: false, reason: 'no_llm' };
+  const hist = (history || []).slice(-16)
+    .map(h => (h.who === 'client' ? 'КЛИЕНТ' : 'ТЫ') + ': ' + String(h.text || '').replace(/\s+/g, ' ')).join('\n');
+  const goal = opts.wrap
+    ? 'Разговор пора завершать. Тепло попрощайся ОДНОЙ короткой фразой и скажи, что передашь детали менеджеру — он свяжется. Верни done:true, reason:"wrap".'
+    : 'Цель: мягко вернуть спящего клиента к диалогу о недвижимости и по ходу естественно выяснить бюджет, сроки, тип и регион — ПО ОДНОМУ за реплику, не допросом. Если клиент готов к следующему шагу (созвон/встреча/передача брокеру) ИЛИ явно не заинтересован — заверши (done:true).';
+  const base = buildPrompt(db, lead, hist, { voice: true });
+  const prompt = base + `
+
+Это ЖИВОЙ ТЕЛЕФОННЫЙ разговор (голос), НЕ переписка. ${goal}
+Речь ВСЛУХ: КОРОТКО (1, максимум 2 коротких предложения), разговорно и естественно, как живой человек по телефону. ОДИН вопрос за реплику. БЕЗ markdown, эмодзи, списков, ссылок, цен в виде таблиц. На ЯЗЫКЕ клиента (как он говорит).
+Верни строго JSON:
+{"say":"что ТЫ говоришь ВСЛУХ сейчас (1-2 коротких предложения, на языке клиента)","done":true|false,"reason":"qualified|not_interested|callback|handover|wrap|continue","extracted":{"budget":"","timeline":"","type":"","region":""}}`;
+  let out;
+  try { out = await callGemini(prompt, 7000, 300); } catch (e) { return { say: '', done: false, reason: 'error', error: e.message, extracted: {} }; }
+  let say = humanize(String((out && out.say) || '').trim());
+  say = say.replace(/\s+/g, ' ').slice(0, 400);
+  const done = !!(out && out.done);
+  const ex = (out && out.extracted && typeof out.extracted === 'object') ? out.extracted : {};
+  return { say, done, reason: (out && out.reason) || (done ? 'done' : 'continue'), extracted: ex };
+}
+
 /* ВАРИАТИВНЫЙ ДОЖИМ: несколько РАЗНЫХ заходов за раз (разные методологии + форма голосового),
    чтобы брокер выбирал угол, а не спамил один и тот же перенос созвона. */
 async function followupVariants(db, lead, n) {
@@ -1789,6 +1816,6 @@ async function diarize(text) {
   return t;
 }
 
-module.exports = { available, diarize, reply, followup, followupVariants, summarize, extractQuals, extractCardFacts, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, diarize, reply, followup, followupVariants, voiceTurn, summarize, extractQuals, extractCardFacts, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
