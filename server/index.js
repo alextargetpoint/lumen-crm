@@ -11308,15 +11308,21 @@ const server = http.createServer(async (req, res) => {
       const now = Date.now(), DAY = 864e5;
       const isCtrl = (l) => l.control === true || /контрол|control|^тест\b|^test\b|тест\s*\d/i.test(l.name || '');
       const items = (db.leads || []).filter(isCtrl).map(l => {
+        const msgs = l.messages || [];
+        const lastOut = [...msgs].reverse().find(m => m.dir === 'out') || null;   /* статус ПОСЛЕДНЕГО нашего сообщения — главный сигнал доставки (double-tick) */
         const repliedAt = l.lastInboundAt || 0;
         const failAt = (l.deliveryWarn && l.deliveryWarn.at) || 0;
-        const outAt = (l.lastDir === 'out' ? (l.lastMsgAt || 0) : 0);
+        const outAt = lastOut ? (lastOut.at || 0) : 0;
+        const outStatus = lastOut ? String(lastOut.status || '') : '';
+        const outCh = lastOut ? String(lastOut.channel || '') : '';
         let verdict;
-        if (repliedAt && repliedAt >= failAt && (now - repliedAt < 3 * DAY)) verdict = 'ok';          /* устройство получило и ответило */
-        else if (failAt && (now - failAt < DAY)) verdict = 'fail';                                    /* наше сообщение не расшифровалось у него */
-        else if (outAt && (now - outAt < 3 * DAY)) verdict = 'sent';                                  /* отправили, ответа нет — проверить устройство */
+        if (repliedAt && repliedAt >= failAt && (now - repliedAt < 3 * DAY)) verdict = 'ok';          /* ответил = точно получает */
+        else if (outStatus === 'read') verdict = 'read';                                              /* прочитано (синие галочки) */
+        else if (outStatus === 'delivered') verdict = 'delivered';                                    /* доставлено на устройство (double-tick) */
+        else if (['failed', 'undelivered', 'error'].includes(outStatus) || (failAt && (now - failAt < DAY))) verdict = 'fail';   /* не дошло */
+        else if (outAt && (now - outAt < 3 * DAY)) verdict = 'sent';                                  /* отправлено (одна галочка), доставка ещё не подтверждена */
         else verdict = 'idle';
-        return { id: l.id, name: l.name, phone: l.phone, repliedAt, failAt, outAt, broker: l.broker || null, verdict };
+        return { id: l.id, name: l.name, phone: l.phone, repliedAt, failAt, outAt, outStatus, outCh, broker: l.broker || null, verdict };
       }).sort((a, b) => (b.repliedAt || b.outAt || 0) - (a.repliedAt || a.outAt || 0));
       return json(res, 200, { ok: true, items });
     }
@@ -15621,6 +15627,23 @@ ${SCR}
     }
     if (p === '/api/call-reviews' && req.method === 'GET')
       return json(res, 200, (db.callReviews || []).slice(0, 60));
+    /* Оценка ПЕРЕПИСКИ (не звонка): диалог в мессенджере → скоринг по той же методологии → скор-карта в карточке.
+       On-demand (по кнопке) — не жжём токены на каждое сообщение. Хранится в lead.dialogueReview. */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/review-dialogue$/)) && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      if (IS_BROKER && !canSeeLead(lead)) return json(res, 403, { error: 'чужой лид' });
+      const msgs = (db.messages || []).filter(x => x.leadId === lead.id && x.channel !== 'email').slice(-50);
+      const transcript = msgs.map(x => (x.dir === 'in' ? 'Клиент' : 'Брокер/ИИ') + ': ' + (x.text || (x.media ? '[' + (x.media.type || 'медиа') + ']' : ''))).join('\n').trim();
+      if (transcript.length < 40) return json(res, 400, { error: 'мало переписки для оценки — нужно хотя бы несколько сообщений' });
+      try {
+        const review = await llm.reviewCall(transcript, { geo: db.settings.geoNames[lead.geo] || lead.geo || '', lead: lead.name || '', channel: 'переписка в мессенджере' });
+        lead.dialogueReview = { at: Date.now(), overall: review.overall, verdict: review.verdict, dims: review.dims, scores: review.scores, mistakes: review.mistakes, nextScripts: review.nextScripts };
+        try { ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `ИИ оценил переписку: ${review.overall}/100` }); } catch (_) {}
+        store.save();
+        return json(res, 200, { ok: true, review: lead.dialogueReview });
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился с разбором: ' + e.message }); }
+    }
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, (IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})) : db.events).slice(0, 60));
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db, (IS_BROKER && LF && (LF.contractors || []).length) ? { onlyVendors: LF.contractors } : (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}));
     if (p === '/api/demo/reset' && req.method === 'POST') {

@@ -16680,8 +16680,9 @@ PAGES.numbers = async (root) => {
     try {
       const d = await api.get('/wa/control-status'); const items = d.items || [];
       if (!items.length) { box.innerHTML = '<div class="muted">Контрольных номеров пока нет. Заведи своё устройство как лид и отметь его «контрольным» на карточке лида (кнопка в блоке статуса).</div>'; return; }
-      const VB = { ok: ['ok', '✓ доходят'], fail: ['bad', '✕ не дошло'], sent: ['warn', 'отправлено, ответа нет'], idle: ['', 'нет данных'] };
-      box.innerHTML = items.map(it => { const [cls, lbl] = VB[it.verdict] || VB.idle; const t = it.verdict === 'ok' ? ' · ответил ' + ago(it.repliedAt) : it.verdict === 'fail' ? ' · ' + ago(it.failAt) : it.verdict === 'sent' ? ' · ' + ago(it.outAt) : ''; return `<div class="cd-row" data-cdopen="${esc(it.id)}" title="Открыть карточку и переписку"><span class="cd-nm">${esc(it.name || '—')}<i>${esc(it.phone || '')}</i></span><span class="badge ${cls}">${lbl}${t}</span></div>`; }).join('');
+      const VB = { ok: ['ok', '✓ получает · ответил'], read: ['ok', '✓ прочитано'], delivered: ['ok', '✓ доставлено'], fail: ['bad', '✕ не дошло'], sent: ['warn', 'отправлено · ждём доставку'], idle: ['', 'нет данных'] };
+      const chL = (c) => c === 'tg' ? ' · Telegram' : c === 'wa' ? ' · WhatsApp' : '';
+      box.innerHTML = items.map(it => { const [cls, lbl] = VB[it.verdict] || VB.idle; const when = it.verdict === 'ok' ? ' ' + ago(it.repliedAt) : it.verdict === 'fail' ? ' ' + ago(it.failAt) : (it.outAt ? ' ' + ago(it.outAt) : ''); return `<div class="cd-row" data-cdopen="${esc(it.id)}" title="Открыть карточку и переписку"><span class="cd-nm">${esc(it.name || '—')}<i>${esc(it.phone || '')}${chL(it.outCh)}</i></span><span class="badge ${cls}" title="Статус последнего нашего сообщения">${lbl}${when}</span></div>`; }).join('');
       $$('[data-cdopen]', box).forEach(b => b.addEventListener('click', () => { try { openLeadModal(b.dataset.cdopen); } catch (_) {} }));
     } catch (e) { box.innerHTML = '<div class="muted">Не удалось загрузить: ' + esc(e.message) + '</div>'; }
   })();
