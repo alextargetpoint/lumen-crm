@@ -242,6 +242,13 @@ function tagObjectHeroSeq(objSections, pr, k, n) {
   hero.contentBindings = hero.contentBindings || {};
   hero.contentBindings.locationLabel = ov(['Объект ' + (k + 1) + ' из ' + n].concat([gi.region, gi.country].filter(Boolean)));
 }
+// снять пометку «Объект k из N» → обычная локация (когда в подборке остался 1 видимый объект)
+function untagObjectHero(objSections, pr) {
+  const hero = (objSections || []).filter(s => s.family === 'hero')[0]; if (!hero) return;
+  const gi = geoInfo((pr || {}).geo);
+  hero.contentBindings = hero.contentBindings || {};
+  hero.contentBindings.locationLabel = ov([gi.region, gi.country].filter(Boolean));
+}
 /* Готовая презентация объекта под переиспользование в подборке: берём последнюю готовую
    (иначе — последнюю черновую) одиночную презентацию этого объекта в этом же тенанте.
    Ассеты одиночной презентации всегда живые из карточки (assetsForProperty) — та же схема
@@ -468,10 +475,16 @@ function collObjVisible(coll, k) { return objSectionsOf(coll, k).some(function (
 function syncCollectionConnectors(db, coll, opts) {
   opts = opts || {};
   const propsByK = collObjectProps(db, coll);  // по стабильному индексу k
-  const order = collObjectOrder(coll).filter(function (k) { return collObjVisible(coll, k); });  // ВИДИМЫЕ объекты в порядке отображения
+  const allOrder = collObjectOrder(coll);
+  const order = allOrder.filter(function (k) { return collObjVisible(coll, k); });  // ВИДИМЫЕ объекты в порядке отображения
   const M = order.length;
+  const toc0 = (coll.orderedSections || []).filter(s => s.family === 'contents')[0];
+  const cmp = (coll.orderedSections || []).filter(s => s.family === 'comparison')[0];
   if (M >= 2) {
-    const toc = opts.create === false ? (coll.orderedSections || []).filter(s => s.family === 'contents')[0] : ensureContentsSection(coll);
+    // вернуть соединяющие страницы, которые МЫ авто-скрыли при M<2 (пользовательское скрытие не трогаем)
+    if (toc0 && toc0._autoOff) { toc0.enabled = true; delete toc0._autoOff; }
+    if (cmp && cmp._autoOff) { cmp.enabled = true; delete cmp._autoOff; }
+    const toc = opts.create === false ? toc0 : ensureContentsSection(coll);
     if (toc) {
       toc.contentBindings = toc.contentBindings || {};
       toc.contentBindings.items = ov(order.map((k, pos) => collContentsItem(propsByK[k] || {}, pos)));
@@ -479,9 +492,14 @@ function syncCollectionConnectors(db, coll, opts) {
       if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + M + ' ' + ruPlural(M, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
     }
     order.forEach((k, pos) => tagObjectHeroSeq(objSectionsOf(coll, k), propsByK[k] || {}, pos, M));
+    if (cmp) { const c = buildComparison(db, order.map(k => propsByK[k] || {})); cmp.contentBindings = cmp.contentBindings || {}; cmp.contentBindings.criteria = ov(c.criteria); cmp.contentBindings.objects = ov(c.objects); }
+  } else {
+    // M < 2: оглавление/сравнение/«k из N» бессмысленны для одного объекта → авто-скрываем соединяющие и снимаем пометки.
+    // _autoOff помечает, что скрыли МЫ (не пользователь) — чтобы вернуть при росте состава назад до ≥2.
+    if (toc0 && toc0.enabled !== false) { toc0.enabled = false; toc0._autoOff = true; }
+    if (cmp && cmp.enabled !== false) { cmp.enabled = false; cmp._autoOff = true; }
+    allOrder.forEach(k => untagObjectHero(objSectionsOf(coll, k), propsByK[k] || {}));
   }
-  const cmp = (coll.orderedSections || []).filter(s => s.family === 'comparison')[0];
-  if (cmp && M >= 2) { const c = buildComparison(db, order.map(k => propsByK[k] || {})); cmp.contentBindings = cmp.contentBindings || {}; cmp.contentBindings.criteria = ov(c.criteria); cmp.contentBindings.objects = ov(c.objects); }
 }
 /* Клон подборки с «соединяющими», пересчитанными под ТЕКУЩИЙ видимый порядок — для ВЫВОДА
    (web/PDF/preview), без мутации хранимых данных. Благодаря этому скрытие/перетаскивание любого
@@ -815,4 +833,5 @@ module.exports = {
   draftFromProperty, draftCollection, replaceObjectInCollection, addObjectsToCollection, moveObjectInCollection, objectUpdates, applyObjectUpdates, pickerItem, pushHistory, historyList, restoreVersion, brandFor, assetsForProperty, assetsFor, renderPages, withBrokerAppendix,
   documentHTML, documentFromSnapshot, validate, makeSnapshot, publicProjection,
   setTidGetter, geoInfo, defaultPalette, titleOf, ctxFor,
+  syncCollectionConnectors, withLiveConnectives, collObjectOrder, collObjVisible,
 };
