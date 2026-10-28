@@ -478,6 +478,14 @@ function syncCollectionConnectors(db, coll, opts) {
   const allOrder = collObjectOrder(coll);
   const order = allOrder.filter(function (k) { return collObjVisible(coll, k); });  // ВИДИМЫЕ объекты в порядке отображения
   const M = order.length;
+  // персонализация обложки: «Подготовлено для X» (showClientName+clientName) ↔ гео-подпись первого объекта
+  const intro = (coll.orderedSections || []).find(s => s.family === 'hero' && !/^o\d+_/.test(String(s.id || '')));
+  if (intro) {
+    intro.contentBindings = intro.contentBindings || {};
+    const nm = (coll.showClientName !== false && coll.clientName) ? String(coll.clientName).trim() : '';
+    if (nm) intro.contentBindings.locationLabel = ov(['Подготовлено для ' + nm]);
+    else { const gi = geoInfo((propsByK[order[0]] || {}).geo); intro.contentBindings.locationLabel = ov([gi.region, gi.country].filter(Boolean)); }
+  }
   const toc0 = (coll.orderedSections || []).filter(s => s.family === 'contents')[0];
   const cmp = (coll.orderedSections || []).filter(s => s.family === 'comparison')[0];
   if (M >= 2) {

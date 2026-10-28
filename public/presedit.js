@@ -26,6 +26,7 @@
     { key: 'photo', f: 'gallery', label: 'Фото', ic: 'image' },
     { key: 'gallery', f: 'gallery', label: 'Галерея', ic: 'image' },
     { key: 'metrics', f: 'metrics', label: 'Характеристики', ic: 'grid' },
+    { key: 'benefits', f: 'benefits', label: 'Преимущества', ic: 'grid' },
     { key: 'floorplan', f: 'floorplan', label: 'Планировка', ic: 'crop' },
     { key: 'payment', f: 'payment', label: 'Условия оплаты', ic: 'doc' },
     { key: 'location', f: 'location', label: 'Расположение', ic: 'pin' },
@@ -115,6 +116,7 @@
   function scheduleSave() { setSave('saving'); clearTimeout(S._saveT); S._saveT = setTimeout(save, 800); }
   function save() {
     var changes = { theme: S.pres.theme, defaultFormat: S.pres.defaultFormat, orderedSections: S.pres.orderedSections, brokerAppendix: S.pres.brokerAppendix, brokerId: S.pres.brokerId };
+    if (S.pres.kind === 'collection') { changes.clientName = S.pres.clientName || ''; changes.showClientName = S.pres.showClientName !== false; }   /* персонализация обложки подборки */
     api('PATCH', '/' + ID, { expectedRevision: S.pres.draftRevision, changes: changes }).then(function (r) {
       if (r.status === 200) { S.pres.draftRevision = r.json.revision; setSave('saved'); }
       else if (r.status === 409) { setSave('err'); S.pres.draftRevision = r.json.currentRevision; /* retry once with new rev */ setTimeout(save, 400); }
@@ -503,7 +505,7 @@
   function sel2Dispatch(kind) {
     var s = curSection();
     if (kind === 'font') return { items: TOK.FONT_PAIRS.map(function (f) { return { v: f.id, t: f.heading.family + ' + ' + f.body.family }; }), cur: S.pres.theme.fontPairId, apply: function (v) { mutate(function () { S.pres.theme.fontPairId = v; }); } };
-    if (kind === 'pagetype') { var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker']; return { items: types.map(function (f) { return { v: f, t: FAM_LABEL[f] || f }; }), cur: (s || {}).family, apply: function (v) { mutate(function () { curSection().family = v; }); } }; }
+    if (kind === 'pagetype') { var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker']; return { items: types.map(function (f) { return { v: f, t: FAM_LABEL[f] || f }; }), cur: (s || {}).family, apply: function (v) { var c = curSection(); if (c && { contents: 1, comparison: 1, recommendation: 1, broker: 1 }[c.family]) return; mutate(function () { curSection().family = v; }); } }; }
     if (kind === 'broker') return { items: S.brokers.map(function (b) { return { v: b.id, t: b.name }; }), cur: S.pres.brokerId, apply: function (v) { S.pres.brokerId = v; S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = true; scheduleSave(); render(); } };
     if (kind === 'pricekind') return { items: [['from', 'от'], ['exact', 'точная'], ['range', 'диапазон'], ['on_request', 'по запросу']].map(function (o) { return { v: o[0], t: o[1] }; }), cur: (cval(s, 'price') || {}).kind || 'from', apply: function (v) { var p = cval(s, 'price') || { currency: 'USD' }; p.kind = v; setOverride(s, 'price', Object.assign({}, p)); var ib = document.getElementById('peInsp'); if (ib) { ib.innerHTML = inspBody(); wireInsp(); } liveCanvas(); scheduleSave(); } };
     if (kind.indexOf('cur:') === 0) {
@@ -580,9 +582,15 @@
   /* Тип страницы (ЧТО) отдельно от макета (КАК) — ТЗ §4/§6. Макет — большие живые превью. */
   function compositionTab() {
     var s = curSection(); if (!s) return '';
-    var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker'];
-    var h = '<div class="pe-sec-label">Тип страницы</div>' +
-      '<div class="pe-selectcard" data-sel2="pagetype"><span class="pe-selectcard-val">' + esc(FAM_LABEL[s.family] || s.family) + '</span><span class="pe-selectcard-chev">' + ic('chev') + '</span></div>';
+    // соединяющие/авто-управляемые страницы: тип менять нельзя (одна смена = потеря авто-оглавления/сравнения)
+    var LOCKED_TYPE = { contents: 1, comparison: 1, recommendation: 1, broker: 1 };
+    var h = '<div class="pe-sec-label">Тип страницы</div>';
+    if (LOCKED_TYPE[s.family]) {
+      h += '<div class="pe-selectcard" style="opacity:.75;cursor:default"><span class="pe-selectcard-val">' + esc(FAM_LABEL[s.family] || s.family) + '</span><span class="pe-selectcard-chev" style="opacity:.4">' + ic('lock') + '</span></div>' +
+        '<div class="pe-infobox" style="margin-top:6px">' + ic('doc') + '<span>Соединяющая страница — собирается автоматически из состава подборки, тип не меняется. Содержимое правится во вкладке «Содержание», видимость — в навигаторе.</span></div>';
+    } else {
+      h += '<div class="pe-selectcard" data-sel2="pagetype"><span class="pe-selectcard-val">' + esc(FAM_LABEL[s.family] || s.family) + '</span><span class="pe-selectcard-chev">' + ic('chev') + '</span></div>';
+    }
     var layouts = layoutsFor(s);
     h += '<div class="pe-sec-head"><span class="pe-sec-label" style="margin:0">Макет страницы</span><span class="pe-sec-cnt">' + layouts.length + ' ' + plural(layouts.length, 'макет', 'макета', 'макетов') + '</span></div>';
     h += '<div class="pe-layouts' + (layouts.length === 1 ? ' single' : '') + '">' + layouts.map(function (l) {
