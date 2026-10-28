@@ -8624,6 +8624,7 @@ const server = http.createServer(async (req, res) => {
         const b = await readBody(req);
         if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); if (b.stage === 'deal' && !lead.dealAt) lead.dealAt = Date.now(); }
         if (b.qualManual !== undefined) { lead.qualManual = (b.qualManual === true || b.qualManual === false) ? b.qualManual : null; if (lead.qualManual === null) delete lead.qualManual; }   /* ручной оверрайд квала из попапа аналитики (true/false/null=авто) */
+        if (b.control !== undefined) { if (b.control) lead.control = true; else delete lead.control; }   /* контрольный номер (мониторинг доставки) */
         if (b.dealValue !== undefined) lead.dealValue = Math.max(0, Math.round(+b.dealValue || 0)) || null;           /* сумма сделки (цена объекта) — для ROI/ROAS по рекламе */
         if (b.dealCommission !== undefined) lead.dealCommission = Math.max(0, Math.round(+b.dealCommission || 0)) || null;  /* наша комиссия с этой сделки */
         if (b.broker !== undefined) { const nb = b.broker || null; const _changed = nb !== lead.broker; const _actB = sessionRole(req) && sessionRole(req).brokerId; if (_changed) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; if (_changed && nb && nb !== _actB) notifyBrokerAssigned(db, nb, [lead], 'Передан вам (назначение руководителем).').catch(() => {}); }
@@ -11298,6 +11299,26 @@ const server = http.createServer(async (req, res) => {
       else if (!send) text = `🔴 Отправка не работает (${sendErr || 'сокет не отвечает'}). Приём: ${recvNote}. Рекомендую рескан.`;
       else text = `🟡 Отправка работает. Приём точно проверить нечем: ${recvNote}. Для надёжной проверки подключите второй номер.`;
       return json(res, 200, { ok: true, connected: true, send, recv, verdict, crossFrom, decBefore, text });
+    }
+    /* КОНТРОЛЬ ДОСТАВКИ по контрольным номерам: берём лиды, помеченные контрольными (l.control) ИЛИ названные
+       «Контрольный…»/«Тест…», и честно показываем, доходят ли наши сообщения — по факту ответа устройства
+       (lastInboundAt = они получили и написали) / провала доставки (deliveryWarn) / отправки без ответа. */
+    if (p === '/api/wa/control-status' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const now = Date.now(), DAY = 864e5;
+      const isCtrl = (l) => l.control === true || /контрол|control|^тест\b|^test\b|тест\s*\d/i.test(l.name || '');
+      const items = (db.leads || []).filter(isCtrl).map(l => {
+        const repliedAt = l.lastInboundAt || 0;
+        const failAt = (l.deliveryWarn && l.deliveryWarn.at) || 0;
+        const outAt = (l.lastDir === 'out' ? (l.lastMsgAt || 0) : 0);
+        let verdict;
+        if (repliedAt && repliedAt >= failAt && (now - repliedAt < 3 * DAY)) verdict = 'ok';          /* устройство получило и ответило */
+        else if (failAt && (now - failAt < DAY)) verdict = 'fail';                                    /* наше сообщение не расшифровалось у него */
+        else if (outAt && (now - outAt < 3 * DAY)) verdict = 'sent';                                  /* отправили, ответа нет — проверить устройство */
+        else verdict = 'idle';
+        return { id: l.id, name: l.name, phone: l.phone, repliedAt, failAt, outAt, broker: l.broker || null, verdict };
+      }).sort((a, b) => (b.repliedAt || b.outAt || 0) - (a.repliedAt || a.outAt || 0));
+      return json(res, 200, { ok: true, items });
     }
     /* статус одного номера (CRM опрашивает раз в ~1.5с пока status==='qr') */
     if (p === '/api/wa/gray/status' && req.method === 'GET') {

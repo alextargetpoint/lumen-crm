@@ -877,6 +877,14 @@ input[type=number] { -moz-appearance: textfield; }
 .lc-qlback{display:inline-flex;align-items:center;gap:5px;background:var(--bg-2);border:1px solid var(--stroke);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--ink-2);cursor:pointer;margin:0 0 12px;font-family:inherit}
 .lc-qlback:hover{color:var(--accent);border-color:var(--accent)}
 .lc-qlback svg{width:13px;height:13px;transform:rotate(180deg)}
+
+.cd-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer}
+.cd-row:hover{background:var(--bg-2)}
+.cd-nm{display:flex;flex-direction:column;min-width:0;font-size:13px;font-weight:600;color:var(--navy-900)}
+.cd-nm i{font-style:normal;font-weight:400;font-size:11px;color:var(--ink-3)}
+.lc-ctrl-row{margin:0 0 12px}
+.lc-ctrl{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.lc-ctrl i{font-style:normal;font-weight:400;font-size:11px;color:var(--ink-3)}
 /* скор-карта ИИ-звонка (голосовой агент) */
 .lc-vc{border:1px solid var(--stroke);border-radius:13px;background:var(--card,#fff);padding:14px 15px;margin-bottom:12px}
 .lc-vc-hd{display:flex;align-items:center;gap:8px;font-size:14px}

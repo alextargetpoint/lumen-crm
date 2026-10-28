@@ -6590,6 +6590,7 @@ async function openLeadModal(id, backScope) {
     </div>` : ''}
     ${l.phoneInvalid ? `<div class="lc-badphone"><span class="lc-badphone-tx">${ic(I.flag)}Номер <b>${esc(l.phone)}</b> невалиден (не E.164) — операторы режут звук и доставку.</span><button class="btn btn-sm" id="mSpam">В спам / неверный номер</button></div>` : ''}
     ${l.icpMatch && l.icpMatch.score >= 60 && !['deal', 'lost'].includes(l.stage) ? `<div class="lc-icp"><span class="lc-icp-tx">${ic(I.star)}<b>Профильный лид · ${l.icpMatch.score}%</b> совпадения с вашими квал/закрытыми клиентами${l.icpMatch.matched && l.icpMatch.matched.length ? ` (${l.icpMatch.matched.join(', ')})` : ''}. Такие чаще доходят до сделки — приоритет на звонок.</span></div>` : ''}
+    <div class="lc-ctrl-row"><label class="lc-ctrl"><input type="checkbox" id="mCtrl" ${l.control ? 'checked' : ''}> Контрольный номер <i>— моё устройство для проверки доставки (попадёт в виджет «Контроль доставки» в «Номерах»)</i></label></div>
     <div class="lp-sec">Следующий шаг</div>
     <div class="lc-note-row">
       <input id="lcNaText" placeholder="например: дожать по подборке" value="${esc((l.nextAction || {}).text || '')}">
@@ -6798,6 +6799,7 @@ async function openLeadModal(id, backScope) {
       if (changed) { try { openLeadModal(id, backScope); } catch (_) {} }
     })(); }
   $('#lcQlBack', bd)?.addEventListener('click', () => { closeModal(); try { window.openQualLeads(backScope); } catch (_) {} });   /* вернуться к списку квал/потенц-лидов, откуда открыли */
+  $('#mCtrl', bd)?.addEventListener('change', async function () { try { await api.patch('/leads/' + l.id, { control: this.checked }); l.control = this.checked; toast(this.checked ? 'Отмечен контрольным' : 'Снята отметка', 'Для контроля доставки', true); } catch (e) { toast('Не вышло', e.message); this.checked = !this.checked; } });
   $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id, backScope); }); }));
   $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); openLeadModal(l.id, backScope); });   /* перерисовать — чтобы блок суммы сделки появился/скрылся по стадии */
   $('#mDealVal', bd)?.addEventListener('change', async (e) => { try { await api.patch('/leads/' + l.id, { dealValue: +e.target.value || 0 }); l.dealValue = +e.target.value || null; const h = bd.querySelector('.lc-deal-hint'); if (h && l.dealValue) h.innerHTML = ic(I.check) + ' учтётся в ROI/ROAS рекламы'; } catch (_) {} });
