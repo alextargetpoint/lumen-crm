@@ -66,6 +66,7 @@ async function callGemini(prompt, timeoutMs = 8000, maxTokens = 500) {
 }
 
 const playbook = require('./playbook');
+const retrieval = require('./retrieval');   /* заземление на реальном инвентаре агентства (доменный moat) */
 
 /* ИИ-герои квалификатора: ползунки → конкретные инструкции промпта; авто-подбор по гео */
 const HEROES = {
@@ -298,6 +299,7 @@ ${mentalityBlock(lead)}
 ${LIVE_STYLE}
 ${objectionHint(db, lead)}
 ${trainingBlock(db)}
+${retrieval.inventoryBlock(db, lead)}
 ЖЁСТКИЕ ЗАПРЕТЫ (нарушение = брак):
 - НЕ называй конкретные цены, доходности, скидки и сроки сдачи, которых НЕТ в этом промпте или в словах клиента${hasTrainedFacts(db) ? ' (блок «ПРОВЕРЕННЫЕ ФАКТЫ» выше — это подтверждённые данные, их называть МОЖНО)' : ''}. Нет данных — скажи ${SOLO ? '«уточню и вернусь с точной цифрой»' : '«уточню у эксперта и вернусь с точной цифрой»'}.
 - НЕ обещай («гарантирую», «точно вырастет»), не давай юридических/налоговых советов — только ${SOLO ? '«это детально разберём на созвоне»' : '«этот вопрос разберёт эксперт на созвоне»'}.
@@ -1816,6 +1818,6 @@ async function diarize(text) {
   return t;
 }
 
-module.exports = { available, diarize, reply, followup, followupVariants, voiceTurn, summarize, extractQuals, extractCardFacts, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, diarize, reply, followup, followupVariants, voiceTurn, buildPrompt, summarize, extractQuals, extractCardFacts, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractPropertyFromPdf, extractUnits, extractCatalog, findProjects, translateFields, compareProjects, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, collectFaq, FAQ_CATS, composePostCall, composeCarousel, classifyPhotos, curatePhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
