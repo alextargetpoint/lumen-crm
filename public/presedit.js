@@ -19,7 +19,7 @@
   var esc = T.esc;
   var FAM_LABEL = { hero: 'Обложка', editorial: 'О проекте', metrics: 'Показатели', gallery: 'Галерея',
     location: 'Локация', floorplan: 'Планировка', payment: 'План оплаты', comparison: 'Сравнение',
-    benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная', contents: 'Содержание' };
+    benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная', contents: 'Содержание', recommendation: 'Рекомендация брокера' };
   /* библиотека блоков (макет «Добавить блок») — key уникален, f = family движка */
   var BLOCK_TYPES = [
     { key: 'editorial', f: 'editorial', label: 'Текст', ic: 'text' },
@@ -189,12 +189,14 @@
       var m = String(s.id || '').match(/^o(\d+)_/);
       if (m) { var k = +m[1]; if (!objMap[k]) { objMap[k] = { type: 'object', k: k, label: (S.projects[k] && S.projects[k].name) || ('Объект ' + (k + 1)), idx: [] }; groups.push(objMap[k]); } objMap[k].idx.push(i); }
       else if (s.family === 'comparison') groups.push({ type: 'comparison', label: 'Сравнение', idx: [i] });
+      else if (s.family === 'contents') groups.push({ type: 'contents', label: 'Содержание', idx: [i] });
+      else if (s.family === 'recommendation') groups.push({ type: 'recommendation', label: 'Рекомендация брокера', idx: [i] });
       else if (s.family === 'broker') { var bg = null; groups.forEach(function (g) { if (g.type === 'broker') bg = g; }); if (!bg) { bg = { type: 'broker', label: 'Контакты брокера', idx: [] }; groups.push(bg); } bg.idx.push(i); }
       else { var ig = null; groups.forEach(function (g) { if (g.type === 'intro') ig = g; }); if (!ig) { ig = { type: 'intro', label: 'Вступление', idx: [] }; groups.push(ig); } ig.idx.push(i); }
     });
     return groups;
   }
-  function grpIcon(t) { return '<span class="pe-grp-ic">' + ic(t === 'comparison' ? 'grid' : t === 'broker' ? 'phone' : 'text') + '</span>'; }
+  function grpIcon(t) { return '<span class="pe-grp-ic">' + ic(t === 'comparison' ? 'grid' : t === 'broker' ? 'phone' : t === 'contents' ? 'doc' : t === 'recommendation' ? 'sparkle' : 'text') + '</span>'; }
   function navCollection() {
     var groups = collectionGroups();
     var html = groups.map(function (g) {
@@ -469,6 +471,13 @@
       h += fld('Заголовок', inp('title', cval(s, 'title')), s, 'title');
       h += itemsField(s);
       h += photoField(s, 0, 'Фотография');
+      return h;
+    },
+    recommendation: function (s) {
+      var h = fld('Надзаголовок', inp('eyebrow', joinArr(cval(s, 'eyebrow'))));
+      h += fld('Заголовок', inp('title', cval(s, 'title')), s, 'title');
+      h += fld('Текст рекомендации', txt('body', cval(s, 'body')), s, 'body');
+      h += fld('Подпись (автор)', inp('author', cval(s, 'author')), s, 'author');
       return h;
     },
     broker: function (s) {
