@@ -310,10 +310,15 @@
     if (fam === 'broker') { return '<div class="pe-bl-cells"><div><b>' + esc(((S.broker || {}).name) || 'Брокер') + '</b><span>контакты</span></div></div>'; }
     return '<div class="pe-bl-empty">Блок с текущими данными объекта</div>';
   }
+  // целостность подборки: новая/копируемая страница наследует префикс o{k}_ объекта (иначе сирота в «Вступлении»)
+  function objPrefixOf(sec) { var m = sec && String(sec.id || '').match(/^o(\d+)_/); return m ? ('o' + m[1] + '_') : ''; }
+  function newSecId(pfx) { return (pfx || '') + 's' + Math.random().toString(16).slice(2, 8); }
+  function isObjHero(sec) { return S.isColl && sec && sec.family === 'hero' && /^o\d+_/.test(String(sec.id || '')); }
   function insertBlock(fam) {
     mutate(function () {
-      var ns = { id: 's' + Math.random().toString(16).slice(2, 8), family: fam, enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: FAM_LABEL[fam] || 'Блок' } } };
       var at = Math.min(sections().length, S.pageIdx + 1);
+      var pfx = S.isColl ? objPrefixOf(sections()[S.pageIdx]) : '';   // на странице объекта → блок уходит в ЭТОТ объект, а не в сироты
+      var ns = { id: newSecId(pfx), family: fam, enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: FAM_LABEL[fam] || 'Блок' } } };
       sections().splice(at, 0, ns); S.pageIdx = at;
     });
     S.addMode = false; render();
@@ -1398,12 +1403,12 @@
   function pageMenu(anchor, i) {
     var s = sections()[i];
     menu(anchor, [
-      { t: 'Дублировать', ic: 'copy', fn: function () { mutate(function () { var c = JSON.parse(JSON.stringify(s)); c.id = 's' + Math.random().toString(16).slice(2, 8); sections().splice(i + 1, 0, c); }); } },
+      { t: 'Дублировать', ic: 'copy', fn: function () { mutate(function () { var c = JSON.parse(JSON.stringify(s)); c.id = newSecId(objPrefixOf(s)); sections().splice(i + 1, 0, c); }); } },
       { t: s.enabled === false ? 'Показать' : 'Скрыть', ic: 'eye', fn: function () { mutate(function () { s.enabled = s.enabled === false; }); } },
       { t: 'Вверх', ic: 'up', fn: function () { if (i > 0) mutate(function () { sections().splice(i - 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i - 1; }); } },
       { t: 'Вниз', ic: 'down', fn: function () { if (i < sections().length - 1) mutate(function () { sections().splice(i + 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i + 1; }); } },
       { sep: 1 },
-      { t: 'Удалить', ic: 'trash', danger: 1, fn: function () { mutate(function () { sections().splice(i, 1); S.pageIdx = Math.max(0, S.pageIdx - (i <= S.pageIdx ? 1 : 0)); }); } },
+      { t: 'Удалить', ic: 'trash', danger: 1, fn: function () { if (isObjHero(s)) { toast('Обложку объекта удалять нельзя', 'Чтобы убрать объект целиком — «Исключить из подборки» в меню объекта (⋯).'); return; } mutate(function () { sections().splice(i, 1); S.pageIdx = Math.max(0, S.pageIdx - (i <= S.pageIdx ? 1 : 0)); }); } },
     ]);
   }
   function objMenu(anchor, k) {
@@ -1429,14 +1434,17 @@
   function bulkOp(op) {
     var idxs = (S.multiSel || []).slice().sort(function (a, b) { return a - b; });
     if (!idxs.length) return;
+    var skippedHeroes = 0;
+    if (op === 'del') { var keep = idxs.filter(function (i) { if (isObjHero(sections()[i])) { skippedHeroes++; return false; } return true; }); idxs = keep; }   // обложки объектов не удаляем массово — остался бы объект без обложки
     mutate(function () {
       var secs = sections();
       if (op === 'hide') { idxs.forEach(function (i) { if (secs[i]) secs[i].enabled = false; }); }
       else if (op === 'dup') {
-        // дублируем по убыванию, чтобы индексы не сдвигались
-        idxs.slice().reverse().forEach(function (i) { var s = secs[i]; if (!s) return; var c = JSON.parse(JSON.stringify(s)); c.id = 's' + Math.random().toString(16).slice(2, 8); secs.splice(i + 1, 0, c); });
+        // дублируем по убыванию, чтобы индексы не сдвигались; копия наследует префикс объекта
+        idxs.slice().reverse().forEach(function (i) { var s = secs[i]; if (!s) return; var c = JSON.parse(JSON.stringify(s)); c.id = newSecId(objPrefixOf(s)); secs.splice(i + 1, 0, c); });
       } else if (op === 'del') { idxs.slice().reverse().forEach(function (i) { secs.splice(i, 1); }); }
     });
+    if (skippedHeroes) toast('Обложки объектов пропущены', 'Чтобы убрать объект — «Исключить из подборки» в меню объекта (⋯).');
     var n = idxs.length;
     S.multiSel = []; if (op === 'del') { S.multiMode = false; S.pageIdx = Math.min(S.pageIdx, sections().length - 1); }
     render();
