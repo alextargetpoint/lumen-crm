@@ -91,9 +91,10 @@
   }
 
   /* ---------- mutation + autosave + undo ---------- */
-  function snapshotState() { return JSON.stringify({ o: S.pres.orderedSections, t: S.pres.theme, f: S.pres.defaultFormat, a: S.pres.brokerAppendix }); }
+  function snapshotState() { return JSON.stringify({ o: S.pres.orderedSections, t: S.pres.theme, f: S.pres.defaultFormat, a: S.pres.brokerAppendix, i: S.pres.projectIds, ca: S.pres.collectionAssets, ro: S.pres.reusedObjectPres, cn: S.pres.clientName, sc: S.pres.showClientName }); }
   function pushUndo() { S.undo.push(snapshotState()); if (S.undo.length > 50) S.undo.shift(); S.redo = []; }
-  function restore(str) { var o = JSON.parse(str); S.pres.orderedSections = o.o; S.pres.theme = o.t; S.pres.defaultFormat = o.f; S.pres.brokerAppendix = o.a; }
+  // откатываем ВЕСЬ связанный стейт подборки вместе (иначе old orderedSections ложатся на new projectIds → рассинхрон)
+  function restore(str) { var o = JSON.parse(str); S.pres.orderedSections = o.o; S.pres.theme = o.t; S.pres.defaultFormat = o.f; S.pres.brokerAppendix = o.a; if ('i' in o) S.pres.projectIds = o.i; if ('ca' in o) S.pres.collectionAssets = o.ca; if ('ro' in o) S.pres.reusedObjectPres = o.ro; if ('cn' in o) S.pres.clientName = o.cn; if ('sc' in o) S.pres.showClientName = o.sc; }
   function mutate(fn, opts) { pushUndo(); fn(); scheduleSave(); if (!opts || opts.render !== false) render(); revalidate(); }
   /* переупорядочивание страниц (drag в навигаторе): сдвигаем секцию from→to (до/после), селект следует */
   function reorderPages(from, to, after) {
@@ -113,12 +114,21 @@
   function doRedo() { if (!S.redo.length) return; S.undo.push(snapshotState()); restore(S.redo.pop()); scheduleSave(); render(); revalidate(); }
   function onKey(e) { if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); } else if (e.key === 'Escape') { if (typeof ceCloseCtx === 'function') ceCloseCtx(); } }
 
-  function scheduleSave() { setSave('saving'); clearTimeout(S._saveT); S._saveT = setTimeout(save, 800); }
+  function scheduleSave() { setSave('saving'); S._pending = true; clearTimeout(S._saveT); S._saveT = setTimeout(save, 800); }
   function save() {
+    S._pending = false;
     var changes = { theme: S.pres.theme, defaultFormat: S.pres.defaultFormat, orderedSections: S.pres.orderedSections, brokerAppendix: S.pres.brokerAppendix, brokerId: S.pres.brokerId };
     if (S.pres.kind === 'collection') { changes.clientName = S.pres.clientName || ''; changes.showClientName = S.pres.showClientName !== false; }   /* персонализация обложки подборки */
+    var sentJson = S.pres.kind === 'collection' ? JSON.stringify(S.pres.orderedSections) : null;
     api('PATCH', '/' + ID, { expectedRevision: S.pres.draftRevision, changes: changes }).then(function (r) {
-      if (r.status === 200) { S.pres.draftRevision = r.json.revision; setSave('saved'); }
+      if (r.status === 200) {
+        S.pres.draftRevision = r.json.revision; setSave('saved');
+        /* сервер пересобрал «соединяющие» (сменилась видимость/состав) → синхронизируем канву редактора,
+           но ТОЛЬКО если за время запроса не началась новая правка (иначе затрём ввод) и состав реально изменился */
+        if (!S._pending && r.json.orderedSections && JSON.stringify(r.json.orderedSections) !== sentJson) {
+          S.pres.orderedSections = r.json.orderedSections; render(); revalidate();
+        }
+      }
       else if (r.status === 409) { setSave('err'); S.pres.draftRevision = r.json.currentRevision; /* retry once with new rev */ setTimeout(save, 400); }
       else setSave('err');
     }).catch(function () { setSave('err'); });
@@ -1751,7 +1761,7 @@
 
   /* ---------- «Обновить данные объекта» — diff подборки ↔ карточка (макет) ---------- */
   function puFmt(v) { if (v == null || v === '') return 'Нет данных'; if (typeof v === 'number') return v.toLocaleString('ru-RU'); var s = String(v); return s.length > 72 ? s.slice(0, 72) + '…' : s; }
-  function reloadPres() { api('GET', '/' + ID + '?full=1').then(function (r) { if (r.status === 200) { S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {}; S.projects = r.json.projects || S.projects; render(); revalidate(); } }); }
+  function reloadPres() { api('GET', '/' + ID + '?full=1').then(function (r) { if (r.status === 200) { S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {}; S.projects = r.json.projects || S.projects; S.undo = []; S.redo = []; render(); revalidate(); } }); }   /* серверная операция (replace/add/move) сменила состав → старые undo-снимки больше не применимы к новому состоянию */
   function openObjectUpdates(k) {
     api('POST', '/' + ID + '/object-updates', { index: k }).then(function (r) {
       if (r.status !== 200) { toast('Не удалось', (r.json && r.json.error) || ''); return; }

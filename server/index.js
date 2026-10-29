@@ -195,7 +195,7 @@ ${PRES_FAVICON}
 <link rel="stylesheet" href="/pres-styles.css?v=14"><link rel="stylesheet" href="/presedit.css?v=35">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=17"></script><script src="/presedit.js?v=45"></script>
+<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=17"></script><script src="/presedit.js?v=46"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
@@ -18128,9 +18128,11 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         if (typeof ch.variantName === 'string') pres.variantName = ch.variantName.trim().slice(0, 60);
         if (typeof ch.clientName === 'string') pres.clientName = ch.clientName.trim().slice(0, 80);   /* персонализация обложки подборки «Подготовлено для …» */
         if (ch.showClientName !== undefined) pres.showClientName = ch.showClientName !== false;
+        // подборка: пересобрать «соединяющие» на хранимом доке (оглавление/«k из N»/сравнение/обложка) → редактор и любой consumer видят консистентно
+        if (pres.kind === 'collection' && Array.isArray(ch.orderedSections)) { try { presentation.syncCollectionConnectors(db, pres, { create: false }); } catch (e) {} }   /* create:false — не воскрешать удалённое пользователем оглавление */
         pres.draftRevision = (pres.draftRevision || 1) + 1; pres.updatedAt = Date.now(); pres.updatedBy = R.brokerId || 'owner';
         store.save();
-        return json(res, 200, { ok: true, revision: pres.draftRevision });
+        return json(res, 200, { ok: true, revision: pres.draftRevision, orderedSections: pres.kind === 'collection' ? pres.orderedSections : undefined });
       }
       // replace object in a collection (TZ v3 §8) — new object takes old one's place
       if ((mm = p.match(/^\/api\/presentations\/(pres_[a-f0-9]+)\/replace-object$/)) && req.method === 'POST') {
