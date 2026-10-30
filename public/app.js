@@ -3259,6 +3259,7 @@ async function render() {
         mountHeroVideos(c0);
         applyI18n(c0);  /* авто-перевод контента при LANG='en' (пер-нодовый, по словарю) */
         try { renderCompareBar(); } catch (_) {}   /* глобальная панель сравнения: появляется/исчезает на каждом переходе */
+        try { if (typeof asstVisibility === 'function') { asstVisibility(); if (CUR === 'funnel') asstPoll(); } } catch (_) {}   /* Помощник: показ пилюли только на воронке */
         /* анти-дубль заголовка: раздел со своим крупным заголовком (.ha-title/.sh-h-t/.plo-h1) не должен
            повторять название ещё и в топбаре («сверху и снизу») — прячем текст топбара, оставляя эмблему/действия.
            Разделы без своего заголовка (Настройки/Профиль/Оплата/Роли/Воронка/Обзор) сохраняют заголовок топбара. */
@@ -20109,6 +20110,7 @@ window.addEventListener('popstate', () => {
     if (qp.has('zoom') || qp.has('gmeet')) history.replaceState(null, '', location.pathname + location.hash);
   } catch (_) {}
   mountFab();
+  mountAssistant();   /* «Помощник брокера» — плавающее окно подсказок над воронкой */
   watchVersion();   /* SPA-вкладка живёт долго → мягко сообщаем о новом деплое (частая путаница «вижу старую версию») */
   applyI18n(document.body);  /* перевод статичного chrome (топбар: «Новый лид», поиск) при LANG='en' */
   /* прелоадеру — минимум 900мс жизни (вихрь «дышит»), затем reveal после гарантированного paint (двойной rAF) */
@@ -20139,6 +20141,113 @@ function watchVersion() {
   };
   setInterval(check, 180000);
 }
+
+/* ---------- «Помощник брокера»: плавающее окно подсказок над воронкой ---------- */
+const ASST_STAGE = { new: 'Новые', touch: 'Первое касание', dialog: 'В диалоге с ИИ', qualified: 'Квалифицирован', handover: 'У брокера', viewing: 'Показ', deal: 'Сделка', sleeping: 'Спящие', lost: 'Закрыт' };
+let ASST = { count: 0, items: [], idx: 0, open: false, expanded: false, pickBroker: false, busy: false, applied: null, loaded: false, err: '' };
+function mountAssistant() {
+  if (document.getElementById('lasst')) return;
+  const wrap = el('<div id="lasst" class="lasst" hidden><div class="lasst-panel" id="lasstPanel" role="dialog" aria-label="Помощник брокера" hidden></div>' +
+    '<button class="lasst-pill" id="lasstPill" aria-label="Помощник"><span class="lasst-ic">' + ic(I.spark) + '</span><span class="lasst-tx">Помощник</span><span class="lasst-badge" id="lasstBadge" hidden>0</span></button></div>');
+  document.body.appendChild(wrap);
+  $('#lasstPill', wrap).addEventListener('click', () => { ASST.open ? asstClose() : asstOpen(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ASST.open) asstClose(); });
+  document.addEventListener('click', (e) => { if (ASST.open && !e.target.closest('#lasst')) asstClose(); });
+  asstVisibility(); asstPoll();
+  setInterval(asstPoll, 45000);
+}
+function asstVisibility() { const w = $('#lasst'); if (!w) return; const show = (CUR === 'funnel'); w.hidden = !show; if (!show && ASST.open) asstClose(); }
+async function asstPoll() { if (CUR !== 'funnel') { asstVisibility(); return; } try { const r = await api.get('/assistant/summary'); ASST.count = r.count || 0; asstPaintBadge(); } catch (_) {} }
+function asstPaintBadge() { const b = $('#lasstBadge'); if (!b) return; b.hidden = !ASST.count; b.textContent = ASST.count > 99 ? '99+' : ASST.count; const pill = $('#lasstPill'); if (pill) pill.classList.toggle('has', !!ASST.count); }
+async function asstOpen() {
+  ASST.open = true; ASST.expanded = false; ASST.pickBroker = false; ASST.applied = null; ASST.err = '';
+  const p = $('#lasstPanel'); p.hidden = false; $('#lasst').classList.add('open');
+  asstRender();   /* сразу скелет */
+  try { const r = await api.get('/assistant/recommendations?limit=30'); ASST.items = r.items || []; ASST.count = r.total || ASST.items.length; ASST.idx = Math.min(ASST.idx, Math.max(0, ASST.items.length - 1)); ASST.loaded = true; asstPaintBadge(); }
+  catch (e) { ASST.err = e.message || 'ошибка'; }
+  asstRender();
+}
+function asstClose() { ASST.open = false; const p = $('#lasstPanel'); if (p) p.hidden = true; const w = $('#lasst'); if (w) w.classList.remove('open'); }
+function asstCur() { return ASST.items[ASST.idx] || null; }
+function asstRender() {
+  const p = $('#lasstPanel'); if (!p) return;
+  const hd = (body) => '<div class="la-hd"><b>Помощник</b><span class="la-pos">' + (ASST.items.length ? (ASST.idx + 1) + ' из ' + ASST.items.length : '') + '</span><button class="la-x" aria-label="Закрыть">✕</button></div>' + body;
+  if (!ASST.loaded && !ASST.err) { p.innerHTML = hd('<div class="la-skel"><i></i><i></i><i></i></div>'); wireClose(p); return; }
+  if (ASST.err) { p.innerHTML = hd('<div class="la-empty">' + esc(ASST.err) + '<button class="la-btn la-ghost" id="laRetry">Повторить</button></div>'); wireClose(p); const rb = $('#laRetry', p); if (rb) rb.onclick = asstOpen; return; }
+  if (ASST.applied) { const a = ASST.applied; p.innerHTML = hd('<div class="la-done"><div class="la-done-t">' + ic(I.check) + ' ' + esc(a.text) + '</div><div class="la-row">' + (a.actionId ? '<button class="la-btn la-ghost" id="laUndo">Отменить</button>' : '') + '<button class="la-btn la-primary" id="laNext">' + (ASST.items.length ? 'Следующая подсказка' : 'Готово') + '</button></div></div>'); wireClose(p);
+    const u = $('#laUndo', p); if (u) u.onclick = () => asstUndo(a.actionId); $('#laNext', p).onclick = () => { ASST.applied = null; if (!ASST.items.length) asstClose(); else asstRender(); }; return; }
+  const r = asstCur();
+  if (!r) { p.innerHTML = hd('<div class="la-empty">Всё разобрано. Новые подсказки появятся после обновления диалогов 👌</div>'); wireClose(p); return; }
+  const title = { qualify: 'Готова к квалификации', assign_broker: (r.needsBroker ? 'Передать заявку брокеру' : 'Подтвердить передачу'), clarify_information: 'Уточнить информацию' }[r.type] || r.summary;
+  const stageLine = r.expectedStage ? '<div class="la-stage"><span>' + esc(ASST_STAGE[r.currentStage] || r.currentStage) + '</span>' + ic(I.chev || I.arrow) + '<span class="la-stage-to">' + esc(ASST_STAGE[r.expectedStage] || r.expectedStage) + '</span></div>' : '';
+  const why = ASST.expanded ? '<div class="la-why-body">' + (r.criteria || []).map(c => {
+    const st = c.status === 'confirmed' ? 'ok' : c.status === 'contradictory' ? 'warn' : 'miss';
+    const lbl = { interest: 'Интерес', contact: 'Контакт', down_payment: 'Первый взнос', budget: 'Бюджет', geo: 'География', type: 'Тип', timeline: 'Срок' }[c.key] || c.key;
+    const ev = (c.evidence || [])[0];
+    return '<div class="la-cr ' + st + '"><span class="la-cr-d"></span><div><b>' + esc(lbl) + '</b>' + (ev && ev.quote ? '<i>«' + esc(ev.quote) + '»</i>' : '') + '</div></div>';
+  }).join('') + '</div>' : '';
+  let actions;
+  if (r.type === 'assign_broker' && ASST.pickBroker) {
+    const brs = (STATE.brokers || []).filter(b => b.active !== false);
+    actions = '<div class="la-brokers">' + brs.map(b => '<button class="la-brk" data-brk="' + esc(b.id) + '">' + esc(b.name) + '</button>').join('') + (brs.length ? '' : '<div class="la-empty2">Нет брокеров</div>') + '</div>';
+  } else {
+    const primLbl = { qualify: 'Квалифицировать', assign_broker: (r.needsBroker ? 'Выбрать брокера' : 'Подтвердить передачу'), clarify_information: 'Создать задачу' }[r.type];
+    const canDo = r.type !== 'assign_broker' || (r.can && r.can.assign);
+    actions = '<div class="la-row">' + (canDo ? '<button class="la-btn la-primary" id="laDo"' + (ASST.busy ? ' disabled' : '') + '>' + esc(primLbl) + '</button>' : '<span class="la-noperm">Передача — у руководителя</span>') +
+      '<button class="la-btn la-ghost" id="laLater">Позже</button><button class="la-btn la-icon" id="laMore" aria-label="Ещё">…</button></div>';
+  }
+  const body = '<div class="la-lead" id="laLead">' + esc(r.leadName || 'Клиент') + '</div>' +
+    '<div class="la-title">' + esc(title) + '</div>' +
+    '<div class="la-reason">' + esc(r.summary) + '</div>' + stageLine +
+    (r.criteria && r.criteria.length ? '<button class="la-why" id="laWhy">' + (ASST.expanded ? 'Скрыть' : 'Почему рекомендуем') + '</button>' + why : '') +
+    actions +
+    (ASST.count > ASST.items.length ? '' : '') +
+    '<button class="la-all" id="laAll">Все подсказки · ' + ASST.items.length + '</button>';
+  p.innerHTML = hd(body); wireClose(p);
+  const lead = $('#laLead', p); if (lead) lead.onclick = () => { asstClose(); if (typeof openLeadModal === 'function') openLeadModal(r.leadId, 'funnel'); };
+  const why1 = $('#laWhy', p); if (why1) why1.onclick = () => { ASST.expanded = !ASST.expanded; asstRender(); };
+  const doB = $('#laDo', p); if (doB) doB.onclick = () => { if (r.type === 'assign_broker' && r.needsBroker) { ASST.pickBroker = true; asstRender(); } else asstApply(r); };
+  const later = $('#laLater', p); if (later) later.onclick = (e) => asstLaterMenu(e, r);
+  const more = $('#laMore', p); if (more) more.onclick = (e) => asstMoreMenu(e, r);
+  const all = $('#laAll', p); if (all) all.onclick = () => asstAllList();
+  p.querySelectorAll('[data-brk]').forEach(b => b.onclick = () => asstApply(r, b.dataset.brk));
+  function wireClose(root) { const x = root.querySelector('.la-x'); if (x) x.onclick = asstClose; }
+}
+function asstAllList() {
+  const p = $('#lasstPanel'); if (!p) return;
+  p.innerHTML = '<div class="la-hd"><b>Все подсказки</b><span class="la-pos">' + ASST.items.length + '</span><button class="la-x" aria-label="Закрыть">✕</button></div>' +
+    '<div class="la-list">' + ASST.items.map((r, i) => '<button class="la-li" data-i="' + i + '"><b>' + esc(r.leadName || 'Клиент') + '</b><span>' + esc({ qualify: 'Квалифицировать', assign_broker: 'Передать', clarify_information: 'Уточнить' }[r.type] || '') + '</span></button>').join('') + '</div>';
+  p.querySelector('.la-x').onclick = asstClose;
+  p.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { ASST.idx = +b.dataset.i; ASST.expanded = false; ASST.pickBroker = false; asstRender(); });
+}
+function asstLaterMenu(e, r) { e.stopPropagation(); const H = 36e5; const opts = [['Через час', Date.now() + H], ['Завтра', Date.now() + 24 * H]]; simpleMenu(e.currentTarget, opts.map(o => ({ t: o[0], fn: () => asstSnooze(r, o[1]) }))); }
+function asstMoreMenu(e, r) { e.stopPropagation(); simpleMenu(e.currentTarget, [{ t: 'Неактуально', fn: () => asstDismiss(r) }]); }
+function simpleMenu(anchor, items) {
+  const old = document.getElementById('laMenu'); if (old) old.remove();
+  const m = el('<div id="laMenu" class="la-menu"></div>'); items.forEach(it => { const b = el('<button>' + esc(it.t) + '</button>'); b.onclick = (ev) => { ev.stopPropagation(); m.remove(); it.fn(); }; m.appendChild(b); });
+  document.body.appendChild(m); const rc = anchor.getBoundingClientRect(); m.style.left = Math.min(rc.left, innerWidth - 180) + 'px'; m.style.top = (rc.top - m.offsetHeight - 6) + 'px';
+  setTimeout(() => document.addEventListener('click', function h() { m.remove(); document.removeEventListener('click', h); }), 0);
+}
+function asstDrop(id) { ASST.items = ASST.items.filter(r => r.id !== id); if (ASST.idx >= ASST.items.length) ASST.idx = Math.max(0, ASST.items.length - 1); ASST.count = Math.max(0, ASST.count - 1); asstPaintBadge(); }
+async function asstApply(r, brokerId) {
+  if (ASST.busy) return; ASST.busy = true; asstRender();
+  r._idem = r._idem || ('ik_' + Math.random().toString(16).slice(2));
+  try {
+    const body = { idempotencyKey: r._idem, expectedVersion: r.version }; if (brokerId) body.brokerId = brokerId;
+    const res = await api.post('/assistant/recommendations/' + r.id + '/apply', body);
+    const txt = { qualify: 'Квалифицирован', assign_broker: 'Передано брокеру', clarify_information: 'Задача создана' }[r.type] || 'Готово';
+    ASST.busy = false; ASST.pickBroker = false; asstDrop(r.id);
+    ASST.applied = { text: res.applied ? txt : (res.note || 'Готово'), actionId: res.actionId || null };
+    asstRender(); asstPoll();
+  } catch (e) {
+    ASST.busy = false;
+    if (e.status === 409) { toast('Данные клиента изменились', 'Обновил рекомендации', true); ASST.pickBroker = false; await asstOpen(); return; }
+    toast('Не вышло', e.message || ''); asstRender();
+  }
+}
+async function asstSnooze(r, until) { try { await api.post('/assistant/recommendations/' + r.id + '/snooze', { until }); asstDrop(r.id); toast('Отложено', null, true); asstRender(); } catch (e) { toast(e.message); } }
+async function asstDismiss(r) { try { await api.post('/assistant/recommendations/' + r.id + '/dismiss', {}); asstDrop(r.id); asstRender(); } catch (e) { toast(e.message); } }
+async function asstUndo(actionId) { try { await api.post('/assistant/actions/' + actionId + '/undo', {}); toast('Отменено', null, true); ASST.applied = null; await asstOpen(); } catch (e) { toast('Нельзя отменить', e.message || ''); } }
 
 /* ---------- плавающая кнопка быстрых действий (правый нижний угол) ---------- */
 function mountFab() {

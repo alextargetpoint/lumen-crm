@@ -134,8 +134,14 @@ function reconcileLead(db, lead, now) {
 
   let rec = existing.find(r => r.deduplicationKey === draft.deduplicationKey && (r.status === 'pending' || r.status === 'snoozed'));
   if (rec) {
-    // обновить основания/ревизию; снятие snooze по сроку делает getQueue
-    Object.assign(rec, { summary: draft.summary, criteria: draft.criteria, missing_fields: draft.missing_fields, contradictions: draft.contradictions, expectedStageId: draft.expectedStageId, expectedAssigneeId: draft.expectedAssigneeId, needsBroker: draft.needsBroker, sourceRevision: draft.sourceRevision, updatedAt: now, version: (rec.version || 1) + 1 });
+    // версию (и updatedAt) двигаем ТОЛЬКО при реальном изменении — иначе no-op reconcile на каждом опросе
+    // ломал бы expectedVersion у клиента (ложный 409 при apply)
+    const changed = rec.summary !== draft.summary || rec.sourceRevision !== draft.sourceRevision
+      || rec.expectedStageId !== draft.expectedStageId || rec.expectedAssigneeId !== draft.expectedAssigneeId
+      || !!rec.needsBroker !== !!draft.needsBroker
+      || (rec.missing_fields || []).join() !== (draft.missing_fields || []).join()
+      || JSON.stringify(rec.criteria || []) !== JSON.stringify(draft.criteria || []);
+    if (changed) Object.assign(rec, { summary: draft.summary, criteria: draft.criteria, missing_fields: draft.missing_fields, contradictions: draft.contradictions, expectedStageId: draft.expectedStageId, expectedAssigneeId: draft.expectedAssigneeId, needsBroker: draft.needsBroker, sourceRevision: draft.sourceRevision, updatedAt: now, version: (rec.version || 1) + 1 });
     return rec;
   }
   rec = Object.assign({
