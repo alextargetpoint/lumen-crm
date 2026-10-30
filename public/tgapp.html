@@ -477,6 +477,51 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .viewseg button.on{animation:tabpop .22s cubic-bezier(.22,1,.36,1)}
   @media (prefers-reduced-motion:reduce){.viewshow,.viewseg button.on{animation:none}}
   @keyframes td{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
+  /* ── массовое выделение чатов/лидов ── */
+  .row,.lrow{position:relative}
+  .row.rsel,.lrow.rsel{background:rgba(59,116,255,.15);box-shadow:inset 0 0 0 1.5px var(--acc)}
+  .row.rsel::after,.lrow.rsel::after{content:'✓';position:absolute;left:8px;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:var(--acc);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:var(--shacc);z-index:3}
+  #bulkbar{position:fixed;left:50%;transform:translateX(-50%) translateY(150%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(560px,calc(100% - 20px));background:var(--bg);border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 34px rgba(0,0,0,.55);display:flex;align-items:center;gap:8px;padding:8px 9px;z-index:9000;transition:transform .22s cubic-bezier(.2,.9,.3,1)}
+  #bulkbar.on{transform:translateX(-50%) translateY(0)}
+  #bulkbar .bb-x{flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:15px;cursor:pointer}
+  #bulkbar .bb-n{flex:0 0 auto;min-width:22px;height:24px;padding:0 8px;border-radius:12px;background:var(--acc);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  #bulkbar .bb-acts{flex:1;display:flex;gap:6px;justify-content:flex-end;overflow-x:auto;scrollbar-width:none}#bulkbar .bb-acts::-webkit-scrollbar{display:none}
+  #bulkbar .bb-b{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;padding:8px 11px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer}
+  #bulkbar .bb-b .ic{width:15px;height:15px;display:inline-flex}#bulkbar .bb-b .ic svg{width:15px;height:15px;fill:currentColor}
+  #bulkbar .bb-b:active{background:var(--acc);color:#fff;border-color:var(--acc)}
+  /* ── нижний шит (передать брокеру) ── */
+  .sheet{position:fixed;inset:0;z-index:9500;display:none}.sheet.on{display:block}
+  .sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+  .sheet-card{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:20px 20px 0 0;border-top:1px solid var(--line);padding:14px 14px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;animation:sheetin .25s cubic-bezier(.2,.9,.3,1)}
+  @keyframes sheetin{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sheet-h{font-size:15px;font-weight:700;margin:2px 4px 12px}
+  .sheet-i{display:flex;align-items:center;gap:11px;width:100%;padding:11px 10px;border-radius:14px;border:0;background:transparent;color:var(--ink);font-size:14px;cursor:pointer;text-align:left}
+  .sheet-i:active{background:rgba(255,255,255,.07)}
+  .sheet-ava{width:34px;height:34px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto}
+  /* ── переключатель вида лидов (Список/Доска) ── */
+  .lead-vtog{display:flex;gap:4px;padding:4px;margin:0 0 10px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:13px}
+  .lead-vtog button{flex:1;padding:8px;border:0;border-radius:10px;background:transparent;color:var(--ink);opacity:.55;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  .lead-vtog button.on{background:var(--bg);opacity:1;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+  /* ── КАНБАН ── */
+  .kanban{display:flex;gap:11px;overflow-x:auto;padding:2px 2px 16px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .kcol{flex:0 0 80%;max-width:300px;scroll-snap-align:start;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:15px;padding:9px;transition:.15s}
+  .kcol.kdrop{background:rgba(59,116,255,.14);border-color:var(--acc)}
+  .kcol-h{display:flex;align-items:center;gap:7px;padding:3px 4px 9px}
+  .kdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .kcol-nm{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kcol-c{font-size:11.5px;opacity:.65;background:rgba(255,255,255,.08);border-radius:9px;padding:1px 7px}
+  .kcol-body{display:flex;flex-direction:column;gap:8px;min-height:44px}
+  .kcard{background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:10px 11px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.22);touch-action:pan-y}
+  .kcard.kc-drag{opacity:.35}
+  .kcard.kc-ghost{position:fixed;transform:translate(-50%,-50%) rotate(-2deg);width:74%;max-width:280px;pointer-events:none;z-index:9600;box-shadow:0 14px 40px rgba(0,0,0,.55);opacity:.97}
+  .kc-top{display:flex;align-items:center;gap:7px}
+  .kc-nm{font-size:13.5px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kc-ai{font-size:10px;font-weight:700;color:var(--acc);border:1px solid var(--acc);border-radius:7px;padding:0 5px}
+  .kc-sub{font-size:11.5px;opacity:.6;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kc-foot{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px;opacity:.75}
+  .kc-ph{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kc-need{color:#f59e0b;font-weight:700}
+  .kc-score{margin-left:auto;font-weight:700;opacity:.9}
 </style>
 </head>
 <body>
@@ -708,19 +753,22 @@ function renderChats(){
       <span class="row-lead ic" data-lead="${c.id}" data-ic="user" title="Карточка лида"></span>
     </div>`).join(''):`<div class="empty">${CHFILTER==='mine'?'Никто не ждёт ответа — всё под контролем 👌':CHFILTER==='unread'?'Непрочитанных нет':CHFILTER==='all'?'Ничего не найдено':'В этом фильтре пусто'}</div>`;
   paintIcons($('#chats'));
-  document.querySelectorAll('#chats .row-lead').forEach(b=>b.onclick=e=>{e.stopPropagation();hap();openLeadCard(b.dataset.lead)});
-  document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{hap();openChat(r.dataset.id)});
+  document.querySelectorAll('#chats .row-lead').forEach(b=>b.onclick=e=>{e.stopPropagation();if(SELMODE){hap();toggleSel(b.dataset.lead);return}hap();openLeadCard(b.dataset.lead)});
+  bindRows($('#chats'),'.row',openChat);
   updateTabBadges();
 }
 
 /* ── мини-CRM: вкладка «Лиды» (все лиды брокера, группировка по стадии, тап → полная карточка) ── */
 let MODE='chats', LEADS=[], LGRP_CLOSED={}, TASKS=[], TSTATS={}, MEETS=[];
-const STG={new:['Новые','#8b93a7'],first_touch:['Первое касание','#6b8cff'],ai_dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleep:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
-const STG_ORDER=['new','first_touch','ai_dialog','qualified','handover','viewing','deal','sleep','lost'];
+let ME={role:'broker',brokers:[],brokerId:null};   /* заполняется в applyRole */
+let SELMODE=false, SEL=new Set();                   /* массовое выделение чатов/лидов */
+window._leadView='list';                            /* 'list' | 'kanban' */
+const STG={new:['Новые','#8b93a7'],touch:['Первое касание','#6b8cff'],dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleeping:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
+const STG_ORDER=['new','touch','dialog','qualified','handover','viewing','deal','sleeping','lost'];
 const H1={chats:'Чаты',leads:'Лиды',tasks:'Задачи',meets:'Встречи',ideas:'Копилка идей',mood:'Карта желаний',analytics:'Аналитика'};
 const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark',mood:'img',analytics:'spark'};
 function setSparkIcon(name){const sp=document.querySelector('.top h1 .spark');if(sp)sp.innerHTML=svg(name||'chat');}
-function setMode(m){MODE=m;
+function setMode(m){if(SELMODE)clearSelQuiet();MODE=m;
   document.querySelectorAll('#viewseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===m));
   $('#h1t').textContent=H1[m]||'Пульт';
   setSparkIcon(IC_MODE[m]);
@@ -927,7 +975,7 @@ function renderMeets(){
 /* ── АНАЛИТИКА ОСНОВАТЕЛЯ (роль owner) ── */
 let ROLE='broker';
 async function applyRole(){
-  try{const me=await jget('/tgapp/api/me');ROLE=me.role||'broker';}catch(e){ROLE='broker';}
+  try{const me=await jget('/tgapp/api/me');ROLE=me.role||'broker';ME=Object.assign(ME,me);}catch(e){ROLE='broker';}
   if(ROLE==='owner'){
     /* владелец видит ВСЁ: аналитику + все чаты/лиды/диалоги (надзор) + ведёт своих. Вкладка «Аналитика» появляется. */
     const sa=$('#segAnalytics'); if(sa)sa.style.display='';
@@ -1053,16 +1101,18 @@ function renderLeads(){
   let list=LEADS.filter(l=>!q||l.name.toLowerCase().includes(q)||(l.phone||'').includes(q));
   const need=LEADS.filter(l=>l.needsMe).length;
   $('#sub').textContent=LEADS.length?`${LEADS.length} лидов${need?' · '+need+' ждут вас':''}`:'Лидов пока нет';
-  if(!list.length){$('#leads').innerHTML='<div class="empty">'+(LEADS.length?'Ничего не найдено':'Лидов пока нет')+'</div>';return}
+  const tog=leadViewToggle();
+  if(window._leadView==='kanban'){renderLeadsKanban(tog);updateTabBadges();return}
+  if(!list.length){$('#leads').innerHTML=tog+'<div class="empty">'+(LEADS.length?'Ничего не найдено':'Лидов пока нет')+'</div>';wireLeadTog();updateTabBadges();return}
   const groups={};list.forEach(l=>{(groups[l.stage]=groups[l.stage]||[]).push(l)});
   const order=STG_ORDER.filter(s=>groups[s]).concat(Object.keys(groups).filter(s=>!STG_ORDER.includes(s)));
-  $('#leads').innerHTML=order.map(st=>{const g=groups[st];const meta=STG[st]||[st,'#8b93a7'];const closed=LGRP_CLOSED[st]?'closed':'';
+  $('#leads').innerHTML=tog+order.map(st=>{const g=groups[st];const meta=STG[st]||[st,'#8b93a7'];const closed=LGRP_CLOSED[st]?'closed':'';
     return `<div class="lgrp ${closed}" data-g="${esc(st)}">
       <div class="lgrp-h"><span class="lgrp-dot" style="background:${meta[1]};--sc:${meta[1]}"></span><span class="lgrp-nm">${esc(meta[0])}</span><span class="lgrp-c">${g.length}</span><span class="lgrp-ar ic" data-ic="chev"></span></div>
       <div class="lgrp-body">${g.map(leadRow).join('')}</div></div>`;}).join('');
-  paintIcons($('#leads'));
+  paintIcons($('#leads'));wireLeadTog();
   $('#leads').querySelectorAll('.lgrp-h').forEach(h=>h.onclick=()=>{const g=h.parentElement,st=g.dataset.g;LGRP_CLOSED[st]=!LGRP_CLOSED[st];g.classList.toggle('closed');hap()});
-  $('#leads').querySelectorAll('.lrow').forEach(r=>r.onclick=()=>{hap();openLeadCard(r.dataset.id)});
+  bindRows($('#leads'),'.lrow',openLeadCard);
   updateTabBadges();
 }
 
@@ -1422,9 +1472,94 @@ if(!INIT){$('#chats').innerHTML='<div class="empty">Откройте это пр
 else{
   fetch('/tgapp/api/prefs',{headers:H}).then(r=>r.json()).then(p=>{if(p&&(p.theme||p.accent)){PREFS=Object.assign(PREFS,p);try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme()}}).catch(()=>{});
   applyRole().then(()=>{ loadChats();prefetchLeadsBadge();prefetchDayBadges(); });
-  setInterval(()=>{ if($('#conv').classList.contains('open'))return; if(MODE==='analytics'){ loadAnalytics(); } else { loadChats();prefetchLeadsBadge();prefetchDayBadges(); } },6000);
+  setInterval(()=>{ if($('#conv').classList.contains('open')||SELMODE||window._kdrag)return; if(MODE==='analytics'){ loadAnalytics(); } else { loadChats();prefetchLeadsBadge();prefetchDayBadges(); } },6000);
   initA2HS();
 }
+
+/* ═══════════════ МАССОВОЕ ВЫДЕЛЕНИЕ (чаты/лиды) + КАНБАН ЛИДОВ ═══════════════ */
+function _plur(n,a,b,c){n=Math.abs(n)%100;const n1=n%10;if(n>10&&n<20)return c;if(n1>1&&n1<5)return b;if(n1===1)return a;return c}
+function wireLongPress(el,fn,ms){let t,sx,sy,moved;
+  const start=e=>{const p=(e.touches&&e.touches[0])||e;sx=p.clientX;sy=p.clientY;moved=false;t=setTimeout(()=>{if(!moved){hap('medium');fn()}},ms||300)};
+  const mv=e=>{const p=(e.touches&&e.touches[0])||e;if(Math.abs(p.clientX-sx)>8||Math.abs(p.clientY-sy)>8){moved=true;clearTimeout(t)}};
+  const end=()=>clearTimeout(t);
+  el.addEventListener('touchstart',start,{passive:true});el.addEventListener('touchmove',mv,{passive:true});el.addEventListener('touchend',end);el.addEventListener('touchcancel',end);
+  el.addEventListener('mousedown',e=>{if(e.button)return;start(e);const up=()=>{end();document.removeEventListener('mouseup',up)};document.addEventListener('mouseup',up)});
+}
+function clearSelQuiet(){SELMODE=false;SEL.clear();document.body.classList.remove('selmode');const b=$('#bulkbar');if(b)b.classList.remove('on')}
+function enterSel(){if(SELMODE)return;SELMODE=true;document.body.classList.add('selmode');renderBulkBar()}
+function exitSel(){clearSelQuiet();if(MODE==='chats')renderChats();else if(MODE==='leads')renderLeads()}
+function _cssId(s){return String(s).replace(/["\\]/g,'\\$&')}
+function toggleSel(id){if(SEL.has(id))SEL.delete(id);else SEL.add(id);
+  document.querySelectorAll('[data-id="'+_cssId(id)+'"]').forEach(el=>{if(el.classList.contains('row')||el.classList.contains('lrow'))el.classList.toggle('rsel',SEL.has(id))});
+  if(!SEL.size){exitSel();return}renderBulkBar()}
+/* привязка строк: тап = открыть (или выделить в селект-моде), долгое удержание = выделить */
+function bindRows(container,itemSel,openFn){container.querySelectorAll(itemSel).forEach(r=>{const id=r.dataset.id;if(!id)return;
+  if(SEL.has(id))r.classList.add('rsel');
+  r.onclick=e=>{if(e.target.closest('.row-lead'))return;if(SELMODE){hap();toggleSel(id)}else{hap();openFn(id)}};
+  wireLongPress(r,()=>{if(!SELMODE)enterSel();toggleSel(id)},300);
+})}
+function renderBulkBar(){let bar=$('#bulkbar');if(!bar){bar=document.createElement('div');bar.id='bulkbar';document.body.appendChild(bar)}
+  if(!SELMODE){bar.classList.remove('on');return}
+  const owner=ROLE==='owner';
+  bar.innerHTML='<button class="bb-x" data-bb="cancel">✕</button><div class="bb-n">'+SEL.size+'</div>'+
+    '<div class="bb-acts">'+
+    '<button class="bb-b" data-bb="ai_off"><span class="ic">'+svg('pause')+'</span>ИИ&nbsp;выкл</button>'+
+    '<button class="bb-b" data-bb="ai_on"><span class="ic">'+svg('spark')+'</span>ИИ&nbsp;вкл</button>'+
+    '<button class="bb-b" data-bb="xfer"><span class="ic">'+svg('user')+'</span>'+(owner?'Передать':'Себе')+'</button>'+
+    '</div>';
+  bar.classList.add('on');
+  bar.querySelectorAll('[data-bb]').forEach(b=>b.onclick=()=>bulkAction(b.dataset.bb));
+}
+function bulkAction(a){const ids=[...SEL];if(a==='cancel'){hap();exitSel();return}if(!ids.length)return;hap();
+  if(a==='xfer'){if(ROLE==='owner')openXferSheet(ids);else doBulk('assign',{brokerId:'me',ids});return}
+  if(a==='ai_off'||a==='ai_on')doBulk(a,{ids})}
+async function doBulk(action,extra){const ids=extra.ids||[...SEL];try{
+  const r=await jpost('/tgapp/api/leads/bulk',Object.assign({action,ids},extra));
+  toast(action==='ai_off'?'ИИ выключен · '+r.n:action==='ai_on'?'ИИ включён · '+r.n:'Передано · '+r.n);
+  exitSel();if(MODE==='chats')loadChats();else loadLeads();
+}catch(e){toast(e.message||'не вышло')}}
+function openXferSheet(ids){let sh=$('#xfersheet');if(!sh){sh=document.createElement('div');sh.id='xfersheet';sh.className='sheet';document.body.appendChild(sh)}
+  const brs=(ME.brokers||[]);
+  sh.innerHTML='<div class="sheet-bg" data-close></div><div class="sheet-card"><div class="sheet-h">Передать '+ids.length+' '+_plur(ids.length,'лид','лида','лидов')+'</div><div class="sheet-list">'+
+    '<button class="sheet-i" data-b="owner"><span class="sheet-ava">★</span>Себе (Основатель)</button>'+
+    (brs.map(b=>'<button class="sheet-i" data-b="'+esc(b.id)+'"><span class="sheet-ava">'+esc(ini(b.name))+'</span>'+esc(b.name)+'</button>').join('')||'<div class="empty">Нет брокеров в команде</div>')+
+    '</div></div>';
+  sh.classList.add('on');
+  sh.querySelector('[data-close]').onclick=()=>sh.classList.remove('on');
+  sh.querySelectorAll('[data-b]').forEach(x=>x.onclick=()=>{sh.classList.remove('on');doBulk('assign',{brokerId:x.dataset.b,ids})});
+}
+/* ── КАНБАН ── */
+function renderLeadsKanban(toggleHtml){
+  const q=($('#q').value||'').toLowerCase().trim();
+  const list=LEADS.filter(l=>!q||l.name.toLowerCase().includes(q)||(l.phone||'').includes(q));
+  const groups={};list.forEach(l=>{(groups[l.stage]=groups[l.stage]||[]).push(l)});
+  const cols=STG_ORDER.filter(s=>groups[s]).concat(Object.keys(groups).filter(s=>!STG_ORDER.includes(s)));
+  const board=cols.length?'<div class="kanban">'+cols.map(st=>{const g=groups[st];const meta=STG[st]||[st,'#8b93a7'];
+    return '<div class="kcol" data-st="'+esc(st)+'"><div class="kcol-h"><span class="kdot" style="background:'+meta[1]+'"></span><span class="kcol-nm">'+esc(meta[0])+'</span><span class="kcol-c">'+g.length+'</span></div><div class="kcol-body">'+g.map(kcard).join('')+'</div></div>'}).join('')+'</div>':'<div class="empty">Лидов пока нет</div>';
+  $('#leads').innerHTML=(toggleHtml||'')+board;
+  wireLeadTog();wireKanban($('#leads'));
+}
+function kcard(l){const sub=[l.geo,l.budget].filter(Boolean).join(' · ');
+  return '<div class="kcard" data-id="'+esc(l.id)+'"><div class="kc-top"><span class="kc-nm">'+esc(l.name)+'</span>'+(l.aiOn?'<span class="kc-ai">ИИ</span>':'')+'</div>'+
+    (sub?'<div class="kc-sub">'+esc(sub)+'</div>':'')+
+    '<div class="kc-foot">'+(l.phone?'<span class="kc-ph">'+esc(l.phone)+'</span>':'')+(l.needsMe?'<span class="kc-need">ждёт</span>':'')+'<span class="kc-score">'+(l.score||0)+'</span></div></div>'}
+function wireKanban(box){box.querySelectorAll('.kcard').forEach(card=>{
+  const id=card.dataset.id;let t,sx,sy,moved,dragging,ghost,curCol;
+  const P=e=>{const p=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;return{x:p.clientX,y:p.clientY}};
+  const start=e=>{const p=P(e);sx=p.x;sy=p.y;moved=false;dragging=false;t=setTimeout(()=>{dragging=true;window._kdrag=1;hap('medium');card.classList.add('kc-drag');ghost=card.cloneNode(true);ghost.className='kcard kc-ghost';document.body.appendChild(ghost);mg(p)},240)};
+  const mg=p=>{if(ghost){ghost.style.left=p.x+'px';ghost.style.top=p.y+'px'}};
+  const hl=p=>{const el=document.elementFromPoint(p.x,p.y);const col=el&&el.closest('.kcol');box.querySelectorAll('.kcol').forEach(c=>c.classList.toggle('kdrop',c===col));curCol=col};
+  const move=e=>{const p=P(e);if(!dragging){if(Math.abs(p.x-sx)>8||Math.abs(p.y-sy)>8){moved=true;clearTimeout(t)}return}e.preventDefault();mg(p);hl(p)};
+  const end=async()=>{clearTimeout(t);
+    if(dragging){const target=curCol;if(ghost){ghost.remove();ghost=null}card.classList.remove('kc-drag');box.querySelectorAll('.kcol').forEach(c=>c.classList.remove('kdrop'));dragging=false;window._kdrag=0;
+      if(target){const st=target.dataset.st;const lead=LEADS.find(l=>l.id===id);if(lead&&lead.stage!==st){const old=lead.stage;lead.stage=st;renderLeads();hap('medium');
+        try{await jpost('/tgapp/api/lead/'+id+'/stage',{stage:st});toast('Стадия: '+((STG[st]||[st])[0]))}catch(e){lead.stage=old;renderLeads();toast(e.message||'не вышло')}}}
+    } else if(!moved){hap();openLeadCard(id)}};
+  card.addEventListener('touchstart',start,{passive:true});card.addEventListener('touchmove',move,{passive:false});card.addEventListener('touchend',end);card.addEventListener('touchcancel',end);
+  card.addEventListener('mousedown',e=>{if(e.button)return;start(e);const mm=ev=>move(ev),mu=ev=>{end(ev);document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu)};document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu)});
+})}
+function leadViewToggle(){return '<div class="lead-vtog"><button class="'+(window._leadView!=='kanban'?'on':'')+'" data-lv="list">Список</button><button class="'+(window._leadView==='kanban'?'on':'')+'" data-lv="kanban">Доска</button></div>'}
+function wireLeadTog(){$('#leads').querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const v=b.dataset.lv;if(window._leadView===v)return;window._leadView=v;hap();renderLeads()})}
 </script>
 </body>
 </html>

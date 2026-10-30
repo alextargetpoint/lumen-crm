@@ -5848,7 +5848,9 @@ const server = http.createServer(async (req, res) => {
       let tam;
       /* кто я: роль + имя (бот строит навигацию по роли) */
       if (p === '/tgapp/api/me' && req.method === 'GET') {
-        return json(res, 200, { role: auser.role, name: auser.role === 'owner' ? 'Основатель' : (abroker && abroker.name) || '', agency: (db.settings.agency && db.settings.agency.name) || '' });
+        /* brokers — для «передать чат другому брокеру» (горячее действие); список видит только владелец */
+        const teamList = isOwner ? (db.brokers || []).filter(b => b.active !== false).map(b => ({ id: b.id, name: b.name })) : [];
+        return json(res, 200, { role: auser.role, brokerId: abroker && abroker.id, name: auser.role === 'owner' ? 'Основатель' : (abroker && abroker.name) || '', agency: (db.settings.agency && db.settings.agency.name) || '', brokers: teamList });
       }
       /* АНАЛИТИКА ДЛЯ ОСНОВАТЕЛЯ (сводка с телефона) */
       if (p === '/tgapp/api/analytics' && req.method === 'GET') {
@@ -6111,6 +6113,29 @@ const server = http.createServer(async (req, res) => {
         if (!['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal', 'sleeping', 'lost'].includes(st)) return json(res, 400, { error: 'плохая стадия' });
         if (lead.stage !== st) { lead.stage = st; markPeakQual(db, lead); capi.onStageChange(db, lead, st); ai.pushEvent(db, { type: 'stage', leadId: lead.id, text: `${lead.name}: стадия изменена брокером из бота → ${st}` }); store.save(); }
         return json(res, 200, { stage: lead.stage });
+      }
+      /* ── МАССОВЫЕ горячие действия (выделение чатов/лидов): выключить/включить ИИ, передать брокеру ── */
+      if (p === '/tgapp/api/leads/bulk' && req.method === 'POST') {
+        const b = await readBody(req);
+        const ids = Array.isArray(b.ids) ? b.ids.slice(0, 500) : [];
+        const action = String(b.action || '');
+        const targets = ids.map(id => db.leads.find(l => l.id === id)).filter(l => l && canSee(l));   /* только свои/видимые */
+        let n = 0;
+        if (action === 'ai_off' || action === 'ai_on') {
+          const on = action === 'ai_on';
+          targets.forEach(l => { l.ai = l.ai || {}; if (!!l.ai.enabled !== on) { l.ai.enabled = on; if (!on) l.ai.pausedBy = 'broker'; n++; } });
+        } else if (action === 'assign') {
+          /* передать другому брокеру — только владелец; брокер может забрать себе (brokerId:'me') */
+          let bid = String(b.brokerId || '');
+          if (bid === 'me') bid = abroker && abroker.id;
+          if (!isOwner && bid !== (abroker && abroker.id)) return json(res, 403, { error: 'передавать другим может только владелец' });
+          const target = (db.brokers || []).find(x => x.id === bid);
+          if (bid !== 'owner' && !target) return json(res, 400, { error: 'брокер не найден' });
+          const bname = bid === 'owner' ? 'Основатель' : (target && target.name) || '';
+          targets.forEach(l => { if (l.broker !== bid) { l.ownerHistory = l.ownerHistory || []; l.ownerHistory.push({ name: bname, at: Date.now(), by: auser.role === 'owner' ? 'owner' : (abroker && abroker.name), reason: 'передан из бота' }); l.broker = bid; n++; } });
+        } else return json(res, 400, { error: 'неизвестное действие' });
+        if (n) store.save();
+        return json(res, 200, { ok: true, n });
       }
       if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/note$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
