@@ -4382,6 +4382,25 @@ async function runAmoSyncTick() {
 }
 setInterval(() => { runAmoSyncTick().catch(() => {}); }, 20 * 60e3);   /* ~20 мин */
 
+/* Помощник брокера: периодическая сверка рекомендаций (ТЗ §9 — восстанавливает пропущенные
+   обновления). Дёшево ($0, детерминированно): по всем тенантам пересобираем только лиды в
+   dialog/qualified (пакетно, кап). Основной анализ всё равно ленивый при открытии окна. */
+function runAssistantTick() {
+  for (const tid of store.listTenants()) {
+    try {
+      store.runInTenant(tid, () => {
+        const db = store.get();
+        const leads = (db.leads || []).filter(l => l.stage === 'dialog' || l.stage === 'qualified').slice(0, 3000);
+        if (!leads.length && !(db.assistantRecs || []).length) return;
+        const before = JSON.stringify((db.assistantRecs || []).map(r => [r.id, r.status, r.version]));
+        assistant.reconcileMany(db, leads);
+        if (JSON.stringify((db.assistantRecs || []).map(r => [r.id, r.status, r.version])) !== before) store.saveNow();   /* сохраняем только при реальном изменении */
+      });
+    } catch (_) {}
+  }
+}
+setInterval(() => { try { runAssistantTick(); } catch (_) {} }, 5 * 60e3);   /* ~5 мин */
+
 /* Проверка связи с Viber BSP (Infobip): валиден ли ключ+baseUrl+доступ.
    Безопасно — GET баланса (сообщение НЕ шлём и не тратим). Если передан `to` — ещё и
    реальная тест-отправка на этот номер (проверяет верификацию отправителя). */

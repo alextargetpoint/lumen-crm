@@ -18,6 +18,8 @@ const CRIT_LABEL = {
   budget: 'Бюджет', geo: 'География', type: 'Тип объекта', timeline: 'Срок покупки',
 };
 const DOWNPAY_RE = /(первоначальн|первый взнос|первонач|down\s?payment|взнос\s*\d|внести\s*\d|могу\s*внести|downpayment|первый\s*платёж)/i;
+/* сигналы ПРОТИВОРЕЧИЯ намерению покупки (→ «проверить данные», НЕ уверенно квалифицировать) */
+const NEG_INTENT_RE = /(просто\s*смотр|пока\s*(не|ещё не)\s*готов|не\s*планир|передумал|раздумал|нет\s*бюджета|нет\s*денег|не\s*покупа|не\s*собира|только\s*аренд|хочу\s*снять|снять\s*квартир|в\s*аренду|не\s*актуальн|отложил|позже\s*вернус)/i;
 
 /* конфиг критериев для организации/воронки (мягкий дефолт; настраивается в settings.assistant) */
 function criteriaConfig(db) {
@@ -36,7 +38,12 @@ function evalCriterion(db, lead, key) {
   const ev = [];
   if (key === 'interest') {
     const src = q.purpose || q.type; // клиент сам сказал цель/тип → интерес подтверждён цитатой
-    if (src && (src.value || src.quote)) return { key, status: 'confirmed', evidence: [qualEvidence(q.purpose ? 'purpose' : 'type', src)] };
+    if (src && (src.value || src.quote)) {
+      // ПРОТИВОРЕЧИЕ: интерес «подтверждён» квалом, но свежее входящее говорит об отказе/аренде → проверить, а не квалифицировать
+      const neg = inboundMsgs(db, lead.id).slice(-5).reverse().find(m => NEG_INTENT_RE.test(String(m.text || '')));
+      if (neg) return { key, status: 'contradictory', evidence: [qualEvidence(q.purpose ? 'purpose' : 'type', src), msgEvidence(neg)] };
+      return { key, status: 'confirmed', evidence: [qualEvidence(q.purpose ? 'purpose' : 'type', src)] };
+    }
     return { key, status: 'missing', evidence: [] };
   }
   if (key === 'contact') {
@@ -88,6 +95,15 @@ function analyzeLead(db, lead, opts) {
         summary: 'Подтверждены критерии квалификации',
         criteria, missing_fields: [], contradictions: [],
         deduplicationKey: lead.id + ':qualify',
+      });
+    }
+    // противоречие в данных → предложить ПРОВЕРИТЬ (не уверенно квалифицировать, ТЗ §4)
+    if (contra.length) {
+      return Object.assign(base, {
+        type: 'clarify_information', expectedStageId: null, expectedAssigneeId: lead.broker || null,
+        summary: 'Проверьте данные: возможно противоречие — ' + contra.map(k => (CRIT_LABEL[k] || k).toLowerCase()).join(', '),
+        criteria, missing_fields: missing, contradictions: contra,
+        deduplicationKey: lead.id + ':verify:' + contra.sort().join(','),
       });
     }
     // не хватает критериев → уточнить (задача)
