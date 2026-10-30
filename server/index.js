@@ -170,6 +170,7 @@ const voiceagent = require('./voiceagent');   /* ИИ-голосовой аге�
 const reanimation = require('./reanimation'); /* ROI-аналитика реанимации спящей базы */
 const amocrm = require('./amocrm');           /* двусторонний синк с amoCRM (API v4) */
 const bitrix = require('./bitrix');           /* двусторонний синк с Bitrix24 (REST) */
+const assistant = require('./assistant');     /* «Помощник брокера»: рекомендации пропущенных действий */
 const amoSyncing = new Set();                 /* блокировка параллельного синка по тенанту (ручной + авто-тик): ключи tid / tid:bx */
 const wa = require('./wa');
 const comments = require('./comments');
@@ -8666,6 +8667,121 @@ const server = http.createServer(async (req, res) => {
       store.save();
       const spreadMin = action === 'chain' ? Math.round(chainOffset / 60000) : 0;   /* за сколько минут разложатся первые касания */
       return json(res, 200, { ok: true, done, spreadMin });
+    }
+
+    /* ═══════════════ ПОМОЩНИК БРОКЕРА (рекомендации пропущенных действий) ═══════════════ */
+    if (p === '/api/assistant' || p.indexOf('/api/assistant/') === 0) {
+      const canAssign = !IS_BROKER || (CAP && CAP.leads === 'all');   /* назначать брокеров может владелец/роль с leads:'all' */
+      const leadName = (id) => { const l = db.leads.find(x => x.id === id); return l ? l.name : ''; };
+      const pubRec = (r) => {
+        const l = db.leads.find(x => x.id === r.leadId) || {};
+        return {
+          id: r.id, leadId: r.leadId, leadName: l.name || '', type: r.type, status: r.status, summary: r.summary,
+          criteria: r.criteria || [], missing_fields: r.missing_fields || [], contradictions: r.contradictions || [],
+          currentStage: l.stage, expectedStage: r.expectedStageId || null,
+          expectedAssignee: r.expectedAssigneeId ? ((db.brokers.find(b => b.id === r.expectedAssigneeId) || {}).name || null) : null,
+          needsBroker: !!r.needsBroker, version: r.version || 1, createdAt: r.createdAt, snoozedUntil: r.snoozedUntil || null,
+          can: { qualify: true, assign: canAssign },   /* какие действия доступны этому пользователю */
+        };
+      };
+      const visibleLeads = () => db.leads.filter(l => (l.stage === 'dialog' || l.stage === 'qualified') && canSeeLead(l));
+      const recById = (id) => assistant.store(db).find(r => r.id === id);
+
+      if (p === '/api/assistant/summary' && req.method === 'GET') {
+        assistant.reconcileMany(db, visibleLeads()); store.save();
+        return json(res, 200, { count: assistant.getQueue(db, canSeeLead).length });
+      }
+      if (p === '/api/assistant/recommendations' && req.method === 'GET') {
+        assistant.reconcileMany(db, visibleLeads()); store.save();
+        const all = assistant.getQueue(db, canSeeLead);
+        const off = Math.max(0, +(u.searchParams.get('offset') || 0)), lim = Math.min(50, +(u.searchParams.get('limit') || 20));
+        return json(res, 200, { total: all.length, items: all.slice(off, off + lim).map(pubRec) });
+      }
+      let am;
+      if ((am = p.match(/^\/api\/assistant\/recommendations\/([^/]+)$/)) && req.method === 'GET') {
+        const r = recById(am[1]); if (!r) return json(res, 404, { error: 'not found' });
+        const l = db.leads.find(x => x.id === r.leadId); if (!l || !canSeeLead(l)) return json(res, 403, { error: 'чужой лид' });
+        return json(res, 200, pubRec(r));
+      }
+      if ((am = p.match(/^\/api\/assistant\/recommendations\/([^/]+)\/apply$/)) && req.method === 'POST') {
+        const r = recById(am[1]); if (!r) return json(res, 404, { error: 'not found' });
+        const lead = db.leads.find(x => x.id === r.leadId);
+        if (!lead || !canSeeLead(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req);
+        if (r.actionId && r._idemKey && r._idemKey === b.idempotencyKey) return json(res, 200, { ok: true, applied: true, idempotent: true, rec: pubRec(r) });
+        if (r.status !== 'pending') return json(res, 409, { error: 'рекомендация уже обработана', status: r.status, rec: pubRec(r) });
+        if (b.expectedVersion != null && +b.expectedVersion !== (r.version || 1)) return json(res, 409, { error: 'рекомендация обновилась', rec: pubRec(r) });
+        if (assistant.sourceRevision(db, lead) !== r.sourceRevision) { r.status = 'stale'; r.updatedAt = Date.now(); store.save(); return json(res, 409, { error: 'данные клиента изменились', rec: pubRec(r) }); }
+        /* перепроверка допустимого перехода по стабильным id стадий */
+        const act = { id: 'act_' + crypto.randomBytes(5).toString('hex'), recId: r.id, leadId: lead.id, type: r.type, by: (ROLE && ROLE.brokerId) || 'owner', at: Date.now(), undo: {} };
+        if (r.type === 'qualify') {
+          if (lead.stage !== 'dialog') return json(res, 409, { error: 'стадия уже не «в диалоге»', rec: pubRec(r) });
+          act.undo = { stage: lead.stage }; lead.stage = 'qualified'; markPeakQual(db, lead); capi.onStageChange(db, lead, 'qualified');
+          ai.pushEvent(db, { type: 'stage', leadId: lead.id, text: `${lead.name}: квалифицирован по рекомендации Помощника` });
+        } else if (r.type === 'assign_broker') {
+          if (lead.stage !== 'qualified') return json(res, 409, { error: 'стадия уже не «квалифицирован»', rec: pubRec(r) });
+          if (!canAssign) return json(res, 403, { error: 'назначать брокера может только руководитель' });
+          let bid = b.brokerId || r.expectedAssigneeId;
+          if (r.needsBroker && !b.brokerId) return json(res, 400, { error: 'выберите брокера' });
+          const br = db.brokers.find(x => x.id === bid && x.active !== false);
+          if (!br) return json(res, 400, { error: 'брокер не найден' });
+          act.undo = { stage: lead.stage, broker: lead.broker || null };
+          if (lead.broker !== br.id) { recordOwner(db, lead, br.id, ROLE && ROLE.role === 'broker' ? 'broker' : 'owner', 'передача по рекомендации Помощника'); if (lead.broker) { const old = db.brokers.find(x => x.id === lead.broker); if (old) old.load = Math.max(0, (old.load || 0) - 1); } lead.broker = br.id; br.load = (br.load || 0) + 1; }
+          lead.stage = 'handover'; capi.onStageChange(db, lead, 'handover'); if (!lead.handoverAt) lead.handoverAt = Date.now();
+          notifyBrokerAssigned(db, br.id, [lead], 'Передан вам по рекомендации Помощника.').catch(() => {});
+          ai.pushEvent(db, { type: 'stage', leadId: lead.id, text: `${lead.name}: передан брокеру ${br.name} по рекомендации Помощника` });
+        } else if (r.type === 'clarify_information') {
+          const dupe = (db.brokerTasks || []).some(t => t.leadId === lead.id && t.status !== 'done' && /уточн/i.test(t.title || ''));
+          if (dupe) { r.status = 'dismissed'; r.resolvedAt = Date.now(); store.save(); return json(res, 200, { ok: true, applied: false, note: 'задача на уточнение уже есть', rec: pubRec(r) }); }
+          const miss = (r.missing_fields || []).map(k => (assistant.CRIT_LABEL[k] || k).toLowerCase()).join(', ');
+          const t = { id: crypto.randomBytes(5).toString('hex'), brokerId: lead.broker || (ROLE && ROLE.brokerId) || null, title: 'Уточнить у клиента: ' + (miss || 'недостающие данные'), priority: 'high', status: 'todo', due: null, scheduled: new Date().toISOString().slice(0, 10), leadId: lead.id, meetingId: null, notes: 'Создано Помощником: ' + r.summary, sphere: null, subtasks: [], createdAt: Date.now(), doneAt: null };
+          db.brokerTasks = db.brokerTasks || []; db.brokerTasks.unshift(t); act.undo = { taskId: t.id };
+        } else return json(res, 400, { error: 'неизвестный тип' });
+        (db.assistantActions = db.assistantActions || []).unshift(act);
+        r.status = 'applied'; r.resolvedAt = Date.now(); r.resolvedBy = act.by; r.actionId = act.id; r._idemKey = b.idempotencyKey || null; r.version = (r.version || 1) + 1;
+        assistant.reconcileLead(db, lead);   /* после квалификации появится рекомендация передачи и т.п. */
+        store.save();
+        if (IS_BROKER) audit(db, req, 'Помощник: применена рекомендация', { leadId: lead.id, type: act.type });
+        return json(res, 200, { ok: true, applied: true, actionId: act.id, rec: pubRec(r) });
+      }
+      if ((am = p.match(/^\/api\/assistant\/recommendations\/([^/]+)\/snooze$/)) && req.method === 'POST') {
+        const r = recById(am[1]); if (!r || r.status !== 'pending') return json(res, 409, { error: 'нельзя отложить' });
+        const l = db.leads.find(x => x.id === r.leadId); if (!l || !canSeeLead(l)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); r.status = 'snoozed'; r.snoozedUntil = +b.until || (Date.now() + 36e5); r.updatedAt = Date.now(); r.version = (r.version || 1) + 1; store.save();
+        return json(res, 200, { ok: true, until: r.snoozedUntil });
+      }
+      if ((am = p.match(/^\/api\/assistant\/recommendations\/([^/]+)\/dismiss$/)) && req.method === 'POST') {
+        const r = recById(am[1]); if (!r) return json(res, 404, { error: 'not found' });
+        const l = db.leads.find(x => x.id === r.leadId); if (!l || !canSeeLead(l)) return json(res, 403, { error: 'чужой лид' });
+        r.status = 'dismissed'; r.resolvedAt = Date.now(); r.updatedAt = Date.now(); store.save();
+        return json(res, 200, { ok: true });
+      }
+      if ((am = p.match(/^\/api\/assistant\/actions\/([^/]+)\/undo$/)) && req.method === 'POST') {
+        const act = (db.assistantActions || []).find(a => a.id === am[1]); if (!act) return json(res, 404, { error: 'not found' });
+        const lead = db.leads.find(x => x.id === act.leadId); if (!lead || !canSeeLead(lead)) return json(res, 403, { error: 'чужой лид' });
+        if (act.undone) return json(res, 409, { error: 'уже отменено' });
+        if (act.type === 'qualify') {
+          if (lead.stage !== 'qualified') return json(res, 409, { error: 'нельзя отменить — стадию уже меняли', leadId: lead.id });
+          lead.stage = act.undo.stage || 'dialog'; markPeakQual(db, lead); capi.onStageChange(db, lead, lead.stage);
+        } else if (act.type === 'assign_broker') {
+          if (lead.stage !== 'handover') return json(res, 409, { error: 'нельзя отменить — стадию уже меняли', leadId: lead.id });
+          const cur = db.brokers.find(x => x.id === lead.broker); if (cur) cur.load = Math.max(0, (cur.load || 0) - 1);
+          lead.broker = act.undo.broker || null; if (lead.broker) { const bk = db.brokers.find(x => x.id === lead.broker); if (bk) bk.load = (bk.load || 0) + 1; }
+          lead.stage = act.undo.stage || 'qualified'; capi.onStageChange(db, lead, lead.stage); delete lead.handoverAt;
+        } else if (act.type === 'clarify_information') {
+          if (act.undo.taskId) db.brokerTasks = (db.brokerTasks || []).filter(t => t.id !== act.undo.taskId);
+        }
+        act.undone = true; act.undoneAt = Date.now();
+        const rec = assistant.store(db).find(x => x.id === act.recId); if (rec) { rec.status = 'pending'; rec.actionId = null; rec.resolvedAt = null; rec.updatedAt = Date.now(); }
+        assistant.reconcileLead(db, lead); store.save();
+        return json(res, 200, { ok: true });
+      }
+      if ((am = p.match(/^\/api\/assistant\/leads\/([^/]+)\/analyze$/)) && req.method === 'POST') {
+        const lead = db.leads.find(x => x.id === am[1]); if (!lead || !canSeeLead(lead)) return json(res, 403, { error: 'чужой лид' });
+        assistant.reconcileLead(db, lead); store.save();
+        return json(res, 200, { ok: true });
+      }
+      return json(res, 404, { error: 'no assistant route' });
     }
 
     if ((m = p.match(/^\/api\/leads\/([^/]+)/))) {
