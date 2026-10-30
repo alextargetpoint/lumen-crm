@@ -20,6 +20,8 @@ const CRIT_LABEL = {
 const DOWNPAY_RE = /(первоначальн|первый взнос|первонач|down\s?payment|взнос\s*\d|внести\s*\d|могу\s*внести|downpayment|первый\s*платёж)/i;
 /* сигналы ПРОТИВОРЕЧИЯ намерению покупки (→ «проверить данные», НЕ уверенно квалифицировать) */
 const NEG_INTENT_RE = /(просто\s*смотр|пока\s*(не|ещё не)\s*готов|не\s*планир|передумал|раздумал|нет\s*бюджета|нет\s*денег|не\s*покупа|не\s*собира|только\s*аренд|хочу\s*снять|снять\s*квартир|в\s*аренду|не\s*актуальн|отложил|позже\s*вернус)/i;
+/* сигналы интереса к ПОКУПКЕ в переписке (fallback, если квалы ещё не извлеклись) */
+const POS_INTENT_RE = /(купить|куплю|приобрест|инвестиц|под\s*сдачу|для\s*жизни|ищу\s*(кварт|апарт|вилл|дом|студи|объект)|нужн[аы]\s*(кварт|апарт|объект)|хочу\s*(кварт|апарт|вилл|дом|студи)|рассматрива|интересует\s*(кварт|апарт|объект|недвиж|проект)|бюджет\s*на\s*покупк|рассрочк|ипотек)/i;
 
 /* конфиг критериев для организации/воронки (мягкий дефолт; настраивается в settings.assistant) */
 function criteriaConfig(db) {
@@ -38,11 +40,16 @@ function evalCriterion(db, lead, key) {
   const ev = [];
   if (key === 'interest') {
     const src = q.purpose || q.type; // клиент сам сказал цель/тип → интерес подтверждён цитатой
-    if (src && (src.value || src.quote)) {
-      // ПРОТИВОРЕЧИЕ: интерес «подтверждён» квалом, но свежее входящее говорит об отказе/аренде → проверить, а не квалифицировать
-      const neg = inboundMsgs(db, lead.id).slice(-5).reverse().find(m => NEG_INTENT_RE.test(String(m.text || '')));
-      if (neg) return { key, status: 'contradictory', evidence: [qualEvidence(q.purpose ? 'purpose' : 'type', src), msgEvidence(neg)] };
-      return { key, status: 'confirmed', evidence: [qualEvidence(q.purpose ? 'purpose' : 'type', src)] };
+    const ins = inboundMsgs(db, lead.id);
+    // источник интереса: квал ИЛИ сообщение о покупке (fallback, когда квалы ещё не извлеклись)
+    let ev = null;
+    if (src && (src.value || src.quote)) ev = qualEvidence(q.purpose ? 'purpose' : 'type', src);
+    else { const posMsg = ins.slice(-8).reverse().find(m => POS_INTENT_RE.test(String(m.text || ''))); if (posMsg) ev = msgEvidence(posMsg); }
+    if (ev) {
+      // ПРОТИВОРЕЧИЕ: интерес подтверждён, но свежее входящее говорит об отказе/аренде → проверить, а не квалифицировать
+      const neg = ins.slice(-5).reverse().find(m => NEG_INTENT_RE.test(String(m.text || '')));
+      if (neg) return { key, status: 'contradictory', evidence: [ev, msgEvidence(neg)] };
+      return { key, status: 'confirmed', evidence: [ev] };
     }
     return { key, status: 'missing', evidence: [] };
   }
@@ -174,6 +181,14 @@ function reconcileLead(db, lead, now) {
 function reconcileMany(db, leads, now) { now = now || Date.now(); leads.forEach(l => reconcileLead(db, l, now)); }
 
 /* активная очередь для пользователя (canSee — предикат видимости лида) */
+/* срочность рекомендации: дольше ждёт + выше скоринг + «готовые к действию» типы выше.
+   Чтобы брокер первым бил по самому горячему (эффективная сортировка очереди). */
+function urgency(lead, now) {
+  const wait = Math.min(30, Math.max(0, (now - (lead.lastMsgAt || lead.createdAt || now)) / 864e5));   // дней ожидания (кап 30)
+  const score = Math.min(100, +lead.score || 0);
+  const typeBoost = lead.stage === 'qualified' ? 10 : 0;   // квалифицированные без хода — приоритетнее
+  return wait * 2 + score / 10 + typeBoost;
+}
 function getQueue(db, canSee, now) {
   now = now || Date.now();
   const byId = Object.create(null); (db.leads || []).forEach(l => byId[l.id] = l);
@@ -182,7 +197,7 @@ function getQueue(db, canSee, now) {
     if (r.status !== 'pending') return false;
     const lead = byId[r.leadId]; if (!lead || !canSee(lead)) return false;
     return true;
-  }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  }).sort((a, b) => { const ua = urgency(byId[a.leadId], now), ub = urgency(byId[b.leadId], now); if (ub !== ua) return ub - ua; return (b.updatedAt || 0) - (a.updatedAt || 0); });
 }
 
 module.exports = {
