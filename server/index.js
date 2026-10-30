@@ -5907,9 +5907,13 @@ const server = http.createServer(async (req, res) => {
         const list = db.leads.filter(canSee).map(l => {
           const v = leadView(db, l);
           const bud = (l.quals && l.quals.budget && l.quals.budget.value) || '';
+          const vendor = l.vendorId ? (db.mpContractors || []).find(c => c.id === l.vendorId) : null;
+          const broker = l.broker ? (db.brokers || []).find(x => x.id === l.broker) : null;
           return {
-            id: l.id, name: l.name, phone: l.phone, geo: v.geoName || '', stage: l.stage, score: l.score || 0,
+            id: l.id, name: l.name, phone: l.phone, geo: v.geoName || '', geoKey: l.geo || '', stage: l.stage, score: l.score || 0,
             budget: bud, tags: (l.tags || []).slice(0, 3), lastMsgAt: l.lastMsgAt || l.createdAt || 0, lastDir: l.lastDir || null,
+            createdAt: l.createdAt || 0, source: l.source || '', vendorId: l.vendorId || '', vendorName: (vendor && vendor.name) || '',
+            broker: l.broker || '', brokerName: l.broker === 'owner' ? 'Основатель' : ((broker && broker.name) || ''),
             aiOn: !!(l.ai && l.ai.enabled), unread: l.unread || 0,
             needsMe: !(l.ai && l.ai.enabled) && l.lastDir === 'in' && !['deal', 'lost'].includes(l.stage),
           };

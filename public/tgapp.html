@@ -498,8 +498,20 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .sheet-i{display:flex;align-items:center;gap:11px;width:100%;padding:11px 10px;border-radius:14px;border:0;background:transparent;color:var(--ink);font-size:14px;cursor:pointer;text-align:left}
   .sheet-i:active{background:rgba(255,255,255,.07)}
   .sheet-ava{width:34px;height:34px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto}
+  /* ── шапка лидов: вид + фильтры ── */
+  .lead-ctl{display:flex;gap:8px;margin:0 0 10px;align-items:stretch}
+  .lead-filt{position:relative;display:inline-flex;align-items:center;gap:6px;padding:0 13px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer}
+  .lead-filt svg{width:15px;height:15px;opacity:.75}
+  .lead-filt.on{border-color:var(--acc);color:var(--acc)}
+  .lead-filt .lf-b{min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--acc);color:#fff;font-size:10.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;font-style:normal}
+  .lf-grp{margin:0 0 14px}
+  .lf-gt{font-size:12px;color:var(--ink);opacity:.55;margin:0 2px 7px;font-weight:600}
+  .lf-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .lf-chip{padding:7px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);font-size:12.5px;cursor:pointer;transition:.12s}
+  .lf-chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .lf-reset{margin-left:auto;background:none;border:0;color:var(--acc);font-size:12.5px;font-weight:600;cursor:pointer}
   /* ── переключатель вида лидов (Список/Доска) ── */
-  .lead-vtog{display:flex;gap:4px;padding:4px;margin:0 0 10px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:13px}
+  .lead-vtog{flex:1;display:flex;gap:4px;padding:4px;margin:0;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:13px}
   .lead-vtog button{flex:1;padding:8px;border:0;border-radius:10px;background:transparent;color:var(--ink);opacity:.55;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
   .lead-vtog button.on{background:var(--bg);opacity:1;box-shadow:0 2px 8px rgba(0,0,0,.28)}
   /* ── КАНБАН ── */
@@ -1098,7 +1110,7 @@ function leadRow(l){const sub=[l.geo,l.budget].filter(Boolean).join(' · ');
 }
 function renderLeads(){
   const q=($('#q').value||'').toLowerCase().trim();
-  let list=LEADS.filter(l=>!q||l.name.toLowerCase().includes(q)||(l.phone||'').includes(q));
+  let list=LEADS.filter(l=>(!q||l.name.toLowerCase().includes(q)||(l.phone||'').includes(q))&&leadFilterPass(l));
   const need=LEADS.filter(l=>l.needsMe).length;
   $('#sub').textContent=LEADS.length?`${LEADS.length} лидов${need?' · '+need+' ждут вас':''}`:'Лидов пока нет';
   const tog=leadViewToggle();
@@ -1531,7 +1543,7 @@ function openXferSheet(ids){let sh=$('#xfersheet');if(!sh){sh=document.createEle
 /* ── КАНБАН ── */
 function renderLeadsKanban(toggleHtml){
   const q=($('#q').value||'').toLowerCase().trim();
-  const list=LEADS.filter(l=>!q||l.name.toLowerCase().includes(q)||(l.phone||'').includes(q));
+  const list=LEADS.filter(l=>(!q||l.name.toLowerCase().includes(q)||(l.phone||'').includes(q))&&leadFilterPass(l));
   const groups={};list.forEach(l=>{(groups[l.stage]=groups[l.stage]||[]).push(l)});
   const cols=STG_ORDER.filter(s=>groups[s]).concat(Object.keys(groups).filter(s=>!STG_ORDER.includes(s)));
   const board=cols.length?'<div class="kanban">'+cols.map(st=>{const g=groups[st];const meta=STG[st]||[st,'#8b93a7'];
@@ -1558,8 +1570,56 @@ function wireKanban(box){box.querySelectorAll('.kcard').forEach(card=>{
   card.addEventListener('touchstart',start,{passive:true});card.addEventListener('touchmove',move,{passive:false});card.addEventListener('touchend',end);card.addEventListener('touchcancel',end);
   card.addEventListener('mousedown',e=>{if(e.button)return;start(e);const mm=ev=>move(ev),mu=ev=>{end(ev);document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu)};document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu)});
 })}
-function leadViewToggle(){return '<div class="lead-vtog"><button class="'+(window._leadView!=='kanban'?'on':'')+'" data-lv="list">Список</button><button class="'+(window._leadView==='kanban'?'on':'')+'" data-lv="kanban">Доска</button></div>'}
-function wireLeadTog(){$('#leads').querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const v=b.dataset.lv;if(window._leadView===v)return;window._leadView=v;hap();renderLeads()})}
+/* ── фильтры лидов (как в десктопе: дата создания, таргетолог, брокер, направление, источник, статус) ── */
+let LFILTER={date:'all',vendor:'',broker:'',geo:'',source:'',flag:''};
+const LSRC={meta_form:'Lead Form',ctwa:'CTWA',site:'Сайт',manual:'Вручную',wa_inbound:'Входящий WA',ig_direct:'Instagram',tg_gray:'Telegram',wa_gray:'WhatsApp',viber:'Viber',email:'E-mail',import:'Импорт',meta_api:'Meta API',landing:'Лендинг',ad_comment:'Коммент рекламы',broker_card:'От брокера'};
+const LSRCNAME=k=>LSRC[k]||k;
+function lfCount(){return ['date','vendor','broker','geo','source','flag'].filter(k=>LFILTER[k]&&LFILTER[k]!=='all').length}
+function leadFilterPass(l){const f=LFILTER;
+  if(f.vendor&&(l.vendorId||'')!==f.vendor)return false;
+  if(f.broker&&String(l.broker||'')!==f.broker)return false;
+  if(f.geo&&(l.geoKey||l.geo||'')!==f.geo)return false;
+  if(f.source&&(l.source||'')!==f.source)return false;
+  if(f.flag==='needs'&&!l.needsMe)return false;
+  if(f.flag==='ai'&&!l.aiOn)return false;
+  if(f.flag==='hot'&&!((l.score||0)>=70))return false;
+  if(f.date&&f.date!=='all'){const d=l.createdAt||0;const day=864e5;const start=f.date==='today'?new Date().setHours(0,0,0,0):f.date==='7d'?Date.now()-7*day:f.date==='30d'?Date.now()-30*day:0;if(start&&d<start)return false;}
+  return true;
+}
+function leadViewToggle(){
+  const n=lfCount();
+  return '<div class="lead-ctl"><div class="lead-vtog"><button class="'+(window._leadView!=='kanban'?'on':'')+'" data-lv="list">Список</button><button class="'+(window._leadView==='kanban'?'on':'')+'" data-lv="kanban">Доска</button></div>'+
+    '<button class="lead-filt'+(n?' on':'')+'" data-act="lfopen">'+svg('gear')+'<span>Фильтры</span>'+(n?'<i class="lf-b">'+n+'</i>':'')+'</button></div>';
+}
+function wireLeadTog(){
+  $('#leads').querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const v=b.dataset.lv;if(window._leadView===v)return;window._leadView=v;hap();renderLeads()});
+  const fb=$('#leads').querySelector('[data-act="lfopen"]'); if(fb)fb.onclick=openLeadFilters;
+}
+function openLeadFilters(){
+  let sh=$('#lfsheet');if(!sh){sh=document.createElement('div');sh.id='lfsheet';sh.className='sheet';document.body.appendChild(sh)}
+  const uniq=(key,nameKey)=>{const m={};LEADS.forEach(l=>{const v=l[key];if(v)m[v]=(nameKey?l[nameKey]:'')||v});return Object.entries(m)};
+  const vendors=uniq('vendorId','vendorName'), brokers=uniq('broker','brokerName');
+  const geos=[...new Set(LEADS.map(l=>l.geoKey||l.geo).filter(Boolean))];
+  const sources=[...new Set(LEADS.map(l=>l.source).filter(Boolean))];
+  const chip=(k,val,label,active)=>'<button class="lf-chip'+(active?' on':'')+'" data-lfk="'+k+'" data-lfv="'+esc(String(val))+'">'+esc(label)+'</button>';
+  const grp=(title,k,opts,allLabel)=>{const cur=LFILTER[k]||(k==='date'?'all':'');return '<div class="lf-grp"><div class="lf-gt">'+title+'</div><div class="lf-chips">'+
+    chip(k,(k==='date'?'all':''),allLabel||'Все',cur===(k==='date'?'all':''))+opts.map(o=>chip(k,o[0],o[1],String(cur)===String(o[0]))).join('')+'</div></div>'};
+  sh.innerHTML='<div class="sheet-bg" data-close></div><div class="sheet-card">'+
+    '<div class="sheet-h">Фильтры лидов'+(lfCount()?' · '+lfCount():'')+'<button class="lf-reset" data-reset>Сбросить</button></div>'+
+    grp('Дата создания','date',[['today','Сегодня'],['7d','7 дней'],['30d','30 дней']])+
+    (vendors.length?grp('Таргетолог','vendor',vendors.map(v=>[v[0],v[1]])):'')+
+    (brokers.length>1?grp('Брокер','broker',brokers.map(b=>[b[0],b[1]])):'')+
+    (geos.length>1?grp('Направление','geo',geos.map(g=>[g,g])):'')+
+    (sources.length>1?grp('Источник','source',sources.map(s=>[s,LSRCNAME(s)])):'')+
+    grp('Статус','flag',[['needs','Ждут меня'],['ai','ИИ ведёт'],['hot','Высокий скоринг']])+
+    '<button class="la-btn la-primary" data-apply style="width:100%;margin-top:6px">Показать</button></div>';
+  sh.classList.add('on');paintIcons(sh);
+  const close=()=>sh.classList.remove('on');
+  sh.querySelector('[data-close]').onclick=close;
+  sh.querySelector('[data-apply]').onclick=()=>{close();renderLeads()};
+  sh.querySelector('[data-reset]').onclick=()=>{LFILTER={date:'all',vendor:'',broker:'',geo:'',source:'',flag:''};openLeadFilters();renderLeads()};
+  sh.querySelectorAll('[data-lfk]').forEach(b=>b.onclick=()=>{const k=b.dataset.lfk,v=b.dataset.lfv;LFILTER[k]=(k==='date'?v:(LFILTER[k]===v?'':v));hap();openLeadFilters()});
+}
 </script>
 </body>
 </html>
