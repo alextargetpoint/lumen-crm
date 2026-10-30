@@ -122,14 +122,18 @@
     var sentJson = S.pres.kind === 'collection' ? JSON.stringify(S.pres.orderedSections) : null;
     api('PATCH', '/' + ID, { expectedRevision: S.pres.draftRevision, changes: changes }).then(function (r) {
       if (r.status === 200) {
-        S.pres.draftRevision = r.json.revision; setSave('saved');
+        S._409tries = 0; S.pres.draftRevision = r.json.revision; setSave('saved');
         /* сервер пересобрал «соединяющие» (сменилась видимость/состав) → синхронизируем канву редактора,
            но ТОЛЬКО если за время запроса не началась новая правка (иначе затрём ввод) и состав реально изменился */
         if (!S._pending && r.json.orderedSections && JSON.stringify(r.json.orderedSections) !== sentJson) {
           S.pres.orderedSections = r.json.orderedSections; render(); revalidate();
         }
       }
-      else if (r.status === 409) { setSave('err'); S.pres.draftRevision = r.json.currentRevision; /* retry once with new rev */ setTimeout(save, 400); }
+      else if (r.status === 409) {
+        /* конфликт версий: РОВНО одна тихая попытка с новой ревизией; дальше — не долбим сервер, тянем свежую версию */
+        if ((S._409tries || 0) >= 1 || r.json.currentRevision == null) { S._409tries = 0; setSave('err'); toast('Документ изменён в другом месте', 'Подтянул актуальную версию — проверьте правки', true); reloadPres(); return; }
+        S._409tries = (S._409tries || 0) + 1; S.pres.draftRevision = r.json.currentRevision; setTimeout(save, 400);
+      }
       else setSave('err');
     }).catch(function () { setSave('err'); });
   }
@@ -312,6 +316,32 @@
   }
   // целостность подборки: новая/копируемая страница наследует префикс o{k}_ объекта (иначе сирота в «Вступлении»)
   function objPrefixOf(sec) { var m = sec && String(sec.id || '').match(/^o(\d+)_/); return m ? ('o' + m[1] + '_') : ''; }
+  // пул фото для пикера/галереи: в подборке — ассеты ТЕКУЩЕГО объекта из S.assets (ключи o{k}_img*),
+  // в одиночной презентации — из S.source. Возвращает [{id, url}], где id — ПОЛНЫЙ assetId (с префиксом).
+  function photoPoolFor(section) {
+    if (S.pres && S.pres.kind === 'collection') {
+      var pfx = objPrefixOf(section), imgsL = [], plansL = [];
+      Object.keys(S.assets || {}).forEach(function (key) {
+        if (pfx && key.indexOf(pfx) !== 0) return;
+        var bare = pfx ? key.slice(pfx.length) : key;
+        var url = absU((S.assets[key] || {}).url); if (!url) return;
+        if (/^img\d+$/.test(bare)) imgsL.push({ id: key, url: url });
+        else if (/^plan\d+$/.test(bare)) plansL.push({ id: key, url: url });
+      });
+      imgsL.sort(function (a, b) { return a.id.localeCompare(b.id, undefined, { numeric: true }); });
+      return imgsL.concat(plansL);
+    }
+    var out = [];
+    (S.source.images || []).forEach(function (u, i) { out.push({ id: 'img' + i, url: absU(u) }); });
+    (S.source.layouts || []).forEach(function (l, i) { out.push({ id: 'plan' + i, url: absU(l.url) }); });
+    return out.filter(function (x) { return x.url; });
+  }
+  // projectId объекта под секцией (для веб-поиска/анализа фото в подборке — там S.pres.projectId=null)
+  function sectionProjectId(section) {
+    if (!S.pres || S.pres.kind !== 'collection') return S.pres && S.pres.projectId;
+    var m = String((section || {}).id || '').match(/^o(\d+)_/);
+    return m ? (S.pres.projectIds || [])[+m[1]] : null;
+  }
   function newSecId(pfx) { return (pfx || '') + 's' + Math.random().toString(16).slice(2, 8); }
   function isObjHero(sec) { return S.isColl && sec && sec.family === 'hero' && /^o\d+_/.test(String(sec.id || '')); }
   function insertBlock(fam) {
@@ -601,10 +631,10 @@
       '<button class="pe-btn" style="width:100%;justify-content:center;height:36px;font-size:13px;margin-top:6px" data-act="enhance" data-idx="' + idx + '"' + (url ? '' : ' disabled') + '>' + ic('sparkle') + 'Улучшить фото' + (ref && ref.enhance ? ' · вкл' : '') + '</button></div>';
   }
   function galleryPicker(s) {
-    var imgs = (S.source.images || []);
+    var pool = photoPoolFor(s);
     var chosen = (s.assetRefs || []).map(function (r) { return r.assetId; });
     return '<div class="pe-field"><label>Фотографии</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">' +
-      imgs.map(function (u, i) { var id = 'img' + i; var on = chosen.indexOf(id) >= 0; return '<div data-act="galtoggle" data-gid="' + id + '" style="aspect-ratio:1;border-radius:7px;overflow:hidden;cursor:pointer;outline:' + (on ? '2px solid var(--pe-sel)' : '1px solid var(--pe-line)') + ';outline-offset:-1px;position:relative"><img src="' + esc(absU(u)) + '" style="width:100%;height:100%;object-fit:cover">' + (on ? '<span style="position:absolute;top:3px;right:3px;background:var(--pe-sel);color:#fff;border-radius:50%;width:16px;height:16px;font-size:11px;display:flex;align-items:center;justify-content:center">✓</span>' : '') + '</div>'; }).join('') +
+      pool.map(function (p) { var on = chosen.indexOf(p.id) >= 0; return '<div data-act="galtoggle" data-gid="' + esc(p.id) + '" style="aspect-ratio:1;border-radius:7px;overflow:hidden;cursor:pointer;outline:' + (on ? '2px solid var(--pe-sel)' : '1px solid var(--pe-line)') + ';outline-offset:-1px;position:relative"><img src="' + esc(p.url) + '" style="width:100%;height:100%;object-fit:cover">' + (on ? '<span style="position:absolute;top:3px;right:3px;background:var(--pe-sel);color:#fff;border-radius:50%;width:16px;height:16px;font-size:11px;display:flex;align-items:center;justify-content:center">✓</span>' : '') + '</div>'; }).join('') +
       '</div><div class="hint">Выбрано: ' + chosen.length + '</div></div>';
   }
   function absU(u) { return (u && /^assets\//.test(u)) ? '/' + u : u; }
@@ -1513,10 +1543,10 @@
   var QUAL = { suitable: ['Подходит', 'ok'], needs_review: ['Нужна проверка', 'warn'], not_for_cover: ['Низкое разрешение', 'bad'], error: ['Ошибка', 'bad'] };
   function openPhotoBrowser(s, idx) {
     if (document.querySelector('.pb-modal')) return;   /* не открывать повторно */
-    var imgs = (S.source.images || []).map(function (u, i) { return { id: 'img' + i, url: absU(u) }; });
-    (S.source.layouts || []).forEach(function (l, i) { imgs.push({ id: 'plan' + i, url: absU(l.url) }); });
+    var imgs = photoPoolFor(s);
     photoBrowserModal(s, idx, imgs);
-    if (S.pres.projectId) apiRaw('POST', '/api/media/analyze-property', { propertyId: S.pres.projectId, format: S.fmt, slot: 'cover' }).then(function (r) {
+    var _pid = sectionProjectId(s);
+    if (_pid) apiRaw('POST', '/api/media/analyze-property', { propertyId: _pid, format: S.fmt, slot: 'cover' }).then(function (r) {
       if (r.status === 200 && r.json.photos) { window.__pbQual = {}; r.json.photos.forEach(function (ph) { window.__pbQual[ph.url] = ph; }); var box = document.querySelector('.pb-modal'); if (box) box.dispatchEvent(new Event('pbqual')); }
     }).catch(function () {});
   }
@@ -1531,9 +1561,10 @@
       return '<span class="pb-cat">' + esc(mat) + '</span>' + (ql[0] ? '<span class="pb-q pb-q-' + ql[1] + '">' + esc(ql[0]) + (q.width ? ' · ' + q.width + '×' + q.height : '') + '</span>' : '');
     }
     function searchWeb() {
-      if (web.loading || web.done || !S.pres.projectId) return;
+      var pid = sectionProjectId(s);
+      if (web.loading || web.done || !pid) return;
       web.loading = true; paint();
-      apiRaw('POST', '/api/media/search-photos', { propertyId: S.pres.projectId }).then(function (r) {
+      apiRaw('POST', '/api/media/search-photos', { propertyId: pid }).then(function (r) {
         web.loading = false; web.done = true;
         if (r.status === 200) { web.enabled = r.json.enabled !== false; web.note = r.json.note || ''; web.items = r.json.candidates || []; }
         else web.note = (r.json && r.json.error) || 'ошибка поиска';
@@ -1642,7 +1673,7 @@
     function paint() {
       paintMain();
       ov.querySelectorAll('[data-cfmode]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-cfmode') === mode); });
-      ov.querySelector('.cf-prevs').innerHTML = fmtPrev('portrait_a4') + fmtPrev('landscape_16_9');
+      ov.querySelector('.cf-prevs').innerHTML = [S.fmt].concat(['portrait_a4','landscape_16_9','portrait_9_16','landscape_a4'].filter(function(f){return f!==S.fmt;})).slice(0,3).map(fmtPrev).join('');
       ov.querySelector('.cf-warnbox').innerHTML = warnBox();
     }
     var modes = [['fill', 'Заполнить область', 'Приоритет на крупный план, часть фото может быть обрезана'], ['fit', 'Сохранить объект целиком', 'На фото останется весь объект, без обрезки важных элементов']];
@@ -1668,7 +1699,7 @@
       e.preventDefault();
       var rect = mainImg.getBoundingClientRect(); var sx = e.clientX, sy = e.clientY; var f0 = { x: focal.x, y: focal.y };
       function mv(ev) { focal.x = clamp01(f0.x - (ev.clientX - sx) / rect.width); focal.y = clamp01(f0.y - (ev.clientY - sy) / rect.height); paintMain(); }
-      function up() { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); ov.querySelector('.cf-prevs').innerHTML = fmtPrev('portrait_a4') + fmtPrev('landscape_16_9'); }
+      function up() { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); ov.querySelector('.cf-prevs').innerHTML = [S.fmt].concat(['portrait_a4','landscape_16_9','portrait_9_16','landscape_a4'].filter(function(f){return f!==S.fmt;})).slice(0,3).map(fmtPrev).join(''); }
       document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
     });
     ov.querySelector('[data-cfapply]').addEventListener('click', function () {
