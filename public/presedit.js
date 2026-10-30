@@ -18,7 +18,7 @@
   }
   var esc = T.esc;
   var FAM_LABEL = { hero: 'Обложка', editorial: 'О проекте', metrics: 'Показатели', gallery: 'Галерея',
-    location: 'Локация', floorplan: 'Планировка', payment: 'План оплаты', comparison: 'Сравнение',
+    location: 'Локация', floorplan: 'Планировка', units: 'Квартиры и цены', payment: 'План оплаты', comparison: 'Сравнение',
     benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная', contents: 'Содержание', recommendation: 'Рекомендация брокера' };
   /* библиотека блоков (макет «Добавить блок») — key уникален, f = family движка */
   var BLOCK_TYPES = [
@@ -28,6 +28,7 @@
     { key: 'metrics', f: 'metrics', label: 'Характеристики', ic: 'grid' },
     { key: 'benefits', f: 'benefits', label: 'Преимущества', ic: 'grid' },
     { key: 'floorplan', f: 'floorplan', label: 'Планировка', ic: 'crop' },
+    { key: 'units', f: 'units', label: 'Квартиры и цены', ic: 'grid' },
     { key: 'payment', f: 'payment', label: 'Условия оплаты', ic: 'doc' },
     { key: 'location', f: 'location', label: 'Расположение', ic: 'pin' },
     { key: 'broker', f: 'broker', label: 'Контакты', ic: 'phone' },
@@ -91,10 +92,10 @@
   }
 
   /* ---------- mutation + autosave + undo ---------- */
-  function snapshotState() { return JSON.stringify({ o: S.pres.orderedSections, t: S.pres.theme, f: S.pres.defaultFormat, a: S.pres.brokerAppendix, i: S.pres.projectIds, ca: S.pres.collectionAssets, ro: S.pres.reusedObjectPres, cn: S.pres.clientName, sc: S.pres.showClientName }); }
+  function snapshotState() { return JSON.stringify({ o: S.pres.orderedSections, t: S.pres.theme, f: S.pres.defaultFormat, a: S.pres.brokerAppendix, i: S.pres.projectIds, ca: S.pres.collectionAssets, ro: S.pres.reusedObjectPres, cn: S.pres.clientName, sc: S.pres.showClientName, b: S.pres.brokerId }); }
   function pushUndo() { S.undo.push(snapshotState()); if (S.undo.length > 50) S.undo.shift(); S.redo = []; }
   // откатываем ВЕСЬ связанный стейт подборки вместе (иначе old orderedSections ложатся на new projectIds → рассинхрон)
-  function restore(str) { var o = JSON.parse(str); S.pres.orderedSections = o.o; S.pres.theme = o.t; S.pres.defaultFormat = o.f; S.pres.brokerAppendix = o.a; if ('i' in o) S.pres.projectIds = o.i; if ('ca' in o) S.pres.collectionAssets = o.ca; if ('ro' in o) S.pres.reusedObjectPres = o.ro; if ('cn' in o) S.pres.clientName = o.cn; if ('sc' in o) S.pres.showClientName = o.sc; }
+  function restore(str) { var o = JSON.parse(str); S.pres.orderedSections = o.o; S.pres.theme = o.t; S.pres.defaultFormat = o.f; S.pres.brokerAppendix = o.a; if ('i' in o) S.pres.projectIds = o.i; if ('ca' in o) S.pres.collectionAssets = o.ca; if ('ro' in o) S.pres.reusedObjectPres = o.ro; if ('cn' in o) S.pres.clientName = o.cn; if ('sc' in o) S.pres.showClientName = o.sc; if ('b' in o) S.pres.brokerId = o.b; }
   function mutate(fn, opts) { pushUndo(); fn(); scheduleSave(); if (!opts || opts.render !== false) render(); revalidate(); }
   /* переупорядочивание страниц (drag в навигаторе): сдвигаем секцию from→to (до/после), селект следует */
   function reorderPages(from, to, after) {
@@ -112,7 +113,15 @@
   }
   function doUndo() { if (!S.undo.length) return; S.redo.push(snapshotState()); restore(S.undo.pop()); scheduleSave(); render(); revalidate(); }
   function doRedo() { if (!S.redo.length) return; S.undo.push(snapshotState()); restore(S.redo.pop()); scheduleSave(); render(); revalidate(); }
-  function onKey(e) { if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); } else if (e.key === 'Escape') { if (typeof ceCloseCtx === 'function') ceCloseCtx(); } }
+  function onKey(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
+    if (e.key === 'Escape') { if (typeof ceCloseCtx === 'function') ceCloseCtx(); return; }
+    // навигация по страницам стрелками — только когда не печатаем в поле/на холсте
+    var t = e.target || {}; if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || t.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
+    var n = sections().length;
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowRight') && S.pageIdx < n - 1) { e.preventDefault(); S.pageIdx++; render(); }
+    else if ((e.key === 'ArrowUp' || e.key === 'ArrowLeft') && S.pageIdx > 0) { e.preventDefault(); S.pageIdx--; render(); }
+  }
 
   function scheduleSave() { setSave('saving'); S._pending = true; clearTimeout(S._saveT); S._saveT = setTimeout(save, 800); }
   function save() {
@@ -573,7 +582,7 @@
   function sel2Dispatch(kind) {
     var s = curSection();
     if (kind === 'font') return { items: TOK.FONT_PAIRS.map(function (f) { return { v: f.id, t: f.heading.family + ' + ' + f.body.family }; }), cur: S.pres.theme.fontPairId, apply: function (v) { mutate(function () { S.pres.theme.fontPairId = v; }); } };
-    if (kind === 'pagetype') { var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'payment', 'benefits', 'broker']; return { items: types.map(function (f) { return { v: f, t: FAM_LABEL[f] || f }; }), cur: (s || {}).family, apply: function (v) { var c = curSection(); if (c && { contents: 1, comparison: 1, recommendation: 1, broker: 1 }[c.family]) return; mutate(function () { curSection().family = v; }); } }; }
+    if (kind === 'pagetype') { var types = ['hero', 'editorial', 'metrics', 'gallery', 'location', 'floorplan', 'units', 'payment', 'benefits']; return { items: types.map(function (f) { return { v: f, t: FAM_LABEL[f] || f }; }), cur: (s || {}).family, apply: function (v) { var c = curSection(); if (c && { contents: 1, comparison: 1, recommendation: 1, broker: 1 }[c.family]) return; mutate(function () { curSection().family = v; }); } }; }
     if (kind === 'broker') return { items: S.brokers.map(function (b) { return { v: b.id, t: b.name }; }), cur: S.pres.brokerId, apply: function (v) { S.pres.brokerId = v; S.pres.brokerAppendix = S.pres.brokerAppendix || {}; S.pres.brokerAppendix.enabled = true; scheduleSave(); render(); } };
     if (kind === 'pricekind') return { items: [['from', 'от'], ['exact', 'точная'], ['range', 'диапазон'], ['on_request', 'по запросу']].map(function (o) { return { v: o[0], t: o[1] }; }), cur: (cval(s, 'price') || {}).kind || 'from', apply: function (v) { var p = cval(s, 'price') || { currency: 'USD' }; p.kind = v; setOverride(s, 'price', Object.assign({}, p)); var ib = document.getElementById('peInsp'); if (ib) { ib.innerHTML = inspBody(); wireInsp(); } liveCanvas(); scheduleSave(); } };
     if (kind.indexOf('cur:') === 0) {
@@ -635,7 +644,17 @@
     var chosen = (s.assetRefs || []).map(function (r) { return r.assetId; });
     return '<div class="pe-field"><label>Фотографии</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">' +
       pool.map(function (p) { var on = chosen.indexOf(p.id) >= 0; return '<div data-act="galtoggle" data-gid="' + esc(p.id) + '" style="aspect-ratio:1;border-radius:7px;overflow:hidden;cursor:pointer;outline:' + (on ? '2px solid var(--pe-sel)' : '1px solid var(--pe-line)') + ';outline-offset:-1px;position:relative"><img src="' + esc(p.url) + '" style="width:100%;height:100%;object-fit:cover">' + (on ? '<span style="position:absolute;top:3px;right:3px;background:var(--pe-sel);color:#fff;border-radius:50%;width:16px;height:16px;font-size:11px;display:flex;align-items:center;justify-content:center">✓</span>' : '') + '</div>'; }).join('') +
-      '</div><div class="hint">Выбрано: ' + chosen.length + '</div></div>';
+      '</div><div class="hint">Выбрано: ' + chosen.length + '</div>' +
+      (chosen.length >= 2 ? '<div class="hint" style="margin-top:9px">Порядок (первое — крупное). Перемещайте ‹ ›, ★ — сделать главным:</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">' +
+        (s.assetRefs || []).map(function (r, i) { var u = (S.assets[r.assetId] || {}).url || r.url; var last = i === (s.assetRefs.length - 1); return '<div style="position:relative;width:54px;height:54px;border-radius:6px;overflow:hidden;outline:' + (i === 0 ? '2px solid var(--pe-sel)' : '1px solid var(--pe-line)') + ';outline-offset:-1px">' +
+          '<img src="' + esc(absU(u)) + '" style="width:100%;height:100%;object-fit:cover">' +
+          '<div style="position:absolute;left:0;right:0;bottom:0;display:flex;background:rgba(18,20,24,.74)">' +
+            '<button class="pe-galctl" data-act="galmove" data-i="' + i + '" data-d="-1" title="Левее"' + (i === 0 ? ' disabled' : '') + '>‹</button>' +
+            '<button class="pe-galctl" data-act="galmain" data-i="' + i + '" title="Сделать главным" style="color:' + (i === 0 ? 'var(--pe-sel)' : '#fff') + '">★</button>' +
+            '<button class="pe-galctl" data-act="galmove" data-i="' + i + '" data-d="1" title="Правее"' + (last ? ' disabled' : '') + '>›</button>' +
+          '</div></div>'; }).join('') + '</div>' : '') +
+      '</div>';
   }
   function absU(u) { return (u && /^assets\//.test(u)) ? '/' + u : u; }
 
@@ -955,6 +974,8 @@
       case 'focal': setFocal(s, +el.getAttribute('data-idx'), e); break;
       case 'focalHint': toast('Кликните по фото, чтобы задать точку фокуса'); break;
       case 'galtoggle': galToggle(s, el.getAttribute('data-gid')); break;
+      case 'galmove': { var gi = +el.getAttribute('data-i'), gd = +el.getAttribute('data-d'), gj = gi + gd; mutate(function () { var arr = s.assetRefs || []; if (gj < 0 || gj >= arr.length) return; var t = arr[gi]; arr[gi] = arr[gj]; arr[gj] = t; }); break; }
+      case 'galmain': { var mi = +el.getAttribute('data-i'); mutate(function () { var arr = s.assetRefs || []; if (mi <= 0 || mi >= arr.length) return; var m = arr.splice(mi, 1)[0]; arr.unshift(m); }); break; }
       case 'setFamily': mutate(function () { s.family = el.getAttribute('data-fam'); }); break;
       case 'setType': mutate(function () { s.family = el.value; }); break;
       case 'setCover': mutate(function () { s.coverLayout = el.getAttribute('data-cover'); }); break;
@@ -1978,7 +1999,6 @@
           '<div class="pe-hd">Способ экспорта</div>' +
             '<div class="pe-radio' + (method === 'pdf' ? ' on' : '') + '" data-method="pdf"><div class="r"></div><div><b>PDF</b><span>Готовый файл для скачивания</span></div></div>' +
             '<div class="pe-radio' + (method === 'link' ? ' on' : '') + '" data-method="link"><div class="r"></div><div><b>Веб-ссылка</b><span>Ссылка для быстрого просмотра</span></div></div>' +
-          '<div class="pe-hd">Качество изображений</div><div class="pe-qual"><button class="' + (quality === 'standard' ? 'on' : '') + '" data-q="standard"><b>Стандарт</b><span>оптимальный размер</span></button><button class="' + (quality === 'high' ? 'on' : '') + '" data-q="high"><b>Высокое</b><span>макс. качество</span></button></div>' +
           (method === 'pdf' ?
             '<button class="pe-btn pe-btn-primary" style="width:100%;justify-content:center" data-dl>' + ic('download') + 'Скачать PDF</button>' :
             '<button class="pe-btn pe-btn-primary" style="width:100%;justify-content:center" data-link>' + ic('link') + 'Создать ссылку</button>') +

@@ -18,6 +18,8 @@
      Только пробелы/табы ([ \t]), НЕ \s — иначе съели бы \n до nl2br. */
   const nbsp = (s) => s.replace(/(^|[ \t(—–-])([А-Яа-яA-Za-zЁё]{1,2})[ \t]+/g, (m, a, b) => a + b + NB);
   const nl2br = (s) => nbsp(esc(s)).replace(/\n/g, '<br>');
+  /* число↔единица не разрывается («800 м» не ломается переносом) */
+  const vnb = (v) => esc(v).replace(/(\d)[ \t]+(?=[^\d\s])/g, (m, d) => d + NB);
   const NB = ' '; // non-breaking space
   const caps = (s) => esc(s); // eyebrow rendered caps via CSS letter-spacing
 
@@ -139,7 +141,7 @@
   }
   function bgStyle(ref, assets, fmtId) {
     const url = assetUrl(ref, assets);
-    if (!url) return 'background:var(--surface)';
+    if (!url) return 'background:linear-gradient(135deg,#3a352f 0%,#241f19 100%)';   /* пустой фон тёмный — белый текст обложки читается, пока фото не подобрано */
     const fp = ref && ref.focalPoint ? `${Math.round(ref.focalPoint.x*100)}% ${Math.round(ref.focalPoint.y*100)}%` : '50% 50%';
     const fit = (ref && ref.fit) || 'cover';
     const filt = enhanceFilter(ref);   /* «Улучшить фото» теперь работает и на фоновых фото (обложка/сплит) */
@@ -184,7 +186,7 @@
   const metricCell = (m) => `
     <div class="lp-metric">
       <span class="lp-metric-ic">${icon(m.icon || guessIcon(m.label))}</span>
-      <div class="lp-metric-tx"><b>${esc(m.value)}</b><span>${esc(m.label||'')}</span></div>
+      <div class="lp-metric-tx"><b>${vnb(m.value)}</b><span>${esc(m.label||'')}</span></div>
     </div>`;
 
   /* ===================================================================
@@ -292,7 +294,7 @@
     const max = fmt.orient === 'portrait' ? 4 : 6;
     const metrics = (Array.isArray(c.metrics) ? c.metrics : []).slice(0, max);
     const grid = `<div class="lp-metrics-grid cols${Math.min(metrics.length,2)}">${metrics.map(m=>`
-      <div class="lp-metric-lg"><span class="lp-metric-ic">${icon(m.icon||guessIcon(m.label))}</span><b>${esc(m.value)}</b><span>${esc(m.label||'')}</span></div>`).join('')}</div>`;
+      <div class="lp-metric-lg"><span class="lp-metric-ic">${icon(m.icon||guessIcon(m.label))}</span><b>${vnb(m.value)}</b><span>${esc(m.label||'')}</span></div>`).join('')}</div>`;
     if (fmt.orient === 'landscape') {
       return [`<div class="lp-safe lp-metrics-land">
         <div class="lp-metrics-photo">${imgTag(img, ctx.assets,'lp-cover',c.title)}</div>
@@ -317,8 +319,8 @@
       const head = i === 0 ? `${eyebrow(c.eyebrow)}<h2 class="lp-h2">${nl2br(c.title||'Галерея')}</h2>` : `<div class="lp-cont-mark">${esc(c.title||'Галерея')} · продолжение</div>`;
       const big = slice[0], rest = slice.slice(1);
       const grid = `<div class="lp-gal lp-gal-${slice.length}">
-        <div class="lp-gal-big">${imgTag(big, ctx.assets,'lp-cover',c.title)}</div>
-        ${rest.map(r=>`<div class="lp-gal-sm">${imgTag(r, ctx.assets,'lp-cover',c.title)}</div>`).join('')}
+        <div class="lp-gal-big">${imgTag(big, ctx.assets,'lp-cover','')}</div>
+        ${rest.map((r,ri)=>`<div class="lp-gal-sm">${imgTag(r, ctx.assets,'lp-cover','')}</div>`).join('')}
       </div>`;
       pages.push(`<div class="lp-safe lp-gal-wrap">${head}${grid}</div>`);
     }
@@ -377,30 +379,36 @@
     return pages.length ? pages : [`<div class="lp-safe lp-pay-wrap">${head}<div class="lp-empty">Добавьте этапы оплаты</div></div>`];
   };
 
-  // ---- COMPARISON (collection-level) ----
-  F.comparison = (ctx) => {
+  // ---- UNITS (типы квартир / прайс-лист объекта) ----
+  F.units = (ctx) => {
     const { c, fmt } = ctx;
-    const cols = Array.isArray(c.projects) ? c.projects.slice(0,3) : [];
-    const rows = Array.isArray(c.rows) ? c.rows.slice(0,8) : [];
-    const head = `${eyebrow(c.eyebrow)}<h2 class="lp-h2">${nl2br(c.title||'Сравнение проектов')}</h2>`;
-    const cell = (v) => esc(v==null||v===''?'Не указано':v);
-    const table = (projs) => `<table class="lp-cmp"><thead><tr><th></th>${projs.map(p=>`<th>${esc(p.name)}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map(r=>`<tr><td class="lp-cmp-k">${esc(r.label)}</td>${projs.map(p=>`<td>${cell(p.values&&p.values[r.key])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    if (fmt.orient === 'portrait' && cols.length === 3) {
-      // split 3 projects into two sequential tables with repeated headers (TZ §11)
-      return [
-        `<div class="lp-safe lp-cmp-wrap">${head}${table(cols.slice(0,2))}</div>`,
-        `<div class="lp-safe lp-cmp-wrap"><div class="lp-cont-mark">${esc(c.title||'Сравнение')} · продолжение</div>${table(cols.slice(2))}</div>`,
-      ];
+    const units = Array.isArray(c.units) ? c.units : [];
+    const head = `${eyebrow(c.eyebrow)}<h2 class="lp-h2">${nl2br(c.title||'Квартиры и цены')}</h2>${c.subtitle?`<p class="lp-sub">${nl2br(c.subtitle)}</p>`:''}`;
+    const statusChip = (st) => { const k = String(st||'').toLowerCase(); const m = /sold|прод/.test(k)&&!/в\s*прод/.test(k) ? ['Продано','sold'] : /reserv|бронь|резерв/.test(k) ? ['Бронь','res'] : /avail|прод|свобод|доступ/.test(k) ? ['В продаже','ok'] : st ? [String(st),''] : null; return m ? `<span class="lp-unit-st ${m[1]}">${esc(m[0])}</span>` : ''; };
+    const perPage = fmt.orient === 'portrait' ? 7 : 10;
+    const pages = [];
+    for (let i = 0; i < units.length; i += perPage) {
+      const slice = units.slice(i, i + perPage);
+      const cont = i > 0;
+      const rows = slice.map(u => `
+        <div class="lp-unit-row">
+          <div class="lp-unit-plan"><b>${esc(u.plan || u.type || '—')}</b>${u.beds!=null?`<span>${esc(u.beds)}</span>`:(u.floor?`<span>эт. ${esc(u.floor)}</span>`:'')}</div>
+          <div class="lp-unit-area">${u.area?vnb(u.area):''}</div>
+          <div class="lp-unit-price">${u.price?`<b>${vnb(u.price)}</b>`:''}</div>
+          <div class="lp-unit-status">${statusChip(u.status)}</div>
+        </div>`).join('');
+      pages.push(`<div class="lp-safe lp-units-wrap">${cont?`<div class="lp-cont-mark">${esc(c.title||'Квартиры')} · продолжение</div>`:head}
+        <div class="lp-units-head"><span>Тип</span><span>Площадь</span><span>Цена</span><span></span></div>
+        <div class="lp-units-list">${rows}</div></div>`);
     }
-    return [`<div class="lp-safe lp-cmp-wrap">${head}${table(cols)}</div>`];
+    return pages.length ? pages : [`<div class="lp-safe lp-units-wrap">${head}<div class="lp-empty">Добавьте типы квартир</div></div>`];
   };
 
   // ---- BENEFITS ----
   F.benefits = (ctx) => {
     const { c, fmt } = ctx;
     const img = (ctx.section.assetRefs || [])[0];
-    const items = (Array.isArray(c.items) ? c.items : []).slice(0,5);
+    const items = (Array.isArray(c.items) ? c.items : []).slice(0,8);
     const list = `<ol class="lp-benefits">${items.map((it,i)=>`<li><span class="lp-ben-n">${it.icon?icon(it.icon):String(i+1)}</span><div><b>${esc(it.title)}</b>${it.desc?`<p>${esc(it.desc)}</p>`:''}</div></li>`).join('')}</ol>`;
     const head = `${eyebrow(c.eyebrow)}<h2 class="lp-h2">${nl2br(c.title||'Преимущества')}</h2>`;
     const photo = `<div class="lp-ben-photo">${imgTag(img, ctx.assets,'lp-cover',c.title)}</div>`;

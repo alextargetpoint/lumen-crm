@@ -20256,7 +20256,9 @@ function asstAllList() {
   p.innerHTML = '<div class="la-hd"><b>Все подсказки</b><span class="la-pos">' + ASST.items.length + '</span><button class="la-x" aria-label="Закрыть">✕</button></div>' +
     '<div class="la-list">' + ASST.items.map((r, i) => '<button class="la-li" data-i="' + i + '"><b>' + esc(r.leadName || 'Клиент') + '</b><span>' + esc({ qualify: 'Квалифицировать', assign_broker: 'Передать', clarify_information: 'Уточнить' }[r.type] || '') + '</span></button>').join('') + '</div>';
   p.querySelector('.la-x').onclick = asstClose;
-  p.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { ASST.idx = +b.dataset.i; ASST.expanded = false; ASST.pickBroker = false; asstRender(); });
+  // ВАЖНО: data-i — индекс в ASST.items; asstRender читает из asstFiltered(). Сбрасываем сегмент на «Все»,
+  // иначе при активном сегменте индекс не совпадёт с отфильтрованным списком и карточка уедет/опустеет.
+  p.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { ASST.seg = ''; ASST.idx = +b.dataset.i; ASST.expanded = false; ASST.pickBroker = false; asstRender(); });
 }
 function asstLaterMenu(e, r) { e.stopPropagation(); const H = 36e5; const opts = [['Через час', Date.now() + H], ['Завтра', Date.now() + 24 * H]]; simpleMenu(e.currentTarget, opts.map(o => ({ t: o[0], fn: () => asstSnooze(r, o[1]) }))); }
 function asstMoreMenu(e, r) { e.stopPropagation(); simpleMenu(e.currentTarget, [{ t: 'Неактуально', fn: () => asstDismiss(r) }]); }

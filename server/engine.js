@@ -1305,8 +1305,13 @@ function simulateComment(db) {
 }
 
 /* ---------- единая обработка входящего (вебхук / симулятор / демо-кнопка) ---------- */
+/* Системный шум моста/подключения — это НЕ сообщение клиента. Записываем (брокер видит, что случилось),
+   но ИИ не отвечает («Вижу, произошёл сбой…») и спящий лид не будит в диалог. */
+const SYSTEM_NOISE_RE = /(подключени[ияе][^.]{0,50}(не найден|используется в другом чат)|^❌?\s*код не найден|используется в другом чат|session (expired|not found)|(bot|webhook)[^.]{0,30}(not found|invalid|expired))/i;
 function inbound(db, lead, text, opts = {}) {
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'in', via: null, text, at: Date.now(), status: 'received' };
+  const noise = SYSTEM_NOISE_RE.test(String(text || '').trim());
+  if (noise) m.system = true;
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120) };
   /* ⚠️ КАНАЛ ВХОДЯЩЕГО: тегируем сообщение и делаем его каналом ДИАЛОГА (activeChannel). Клиент написал в
      Telegram → переписка переключается на Telegram (и в UI плашка, и для ответов ИИ/менеджера), а не висит
@@ -1346,13 +1351,13 @@ function inbound(db, lead, text, opts = {}) {
   }
   /* пересылка входящего клиента назначенному брокеру в Telegram (мост) — если подключён */
   if (module.exports.onInboundMessage) { try { const r = module.exports.onInboundMessage(db, lead, m); if (r && r.catch) r.catch(() => {}); } catch (_) {} }
-  const wasWake = (lead.tags || []).includes('реанимация') && lead.stage === 'sleeping';
-  if (lead.stage === 'sleeping') lead.stage = 'dialog';
+  const wasWake = !noise && (lead.tags || []).includes('реанимация') && lead.stage === 'sleeping';
+  if (!noise && lead.stage === 'sleeping') lead.stage = 'dialog';
   if (wasWake) {
     for (const cmp of db.campaigns) if (cmp.recipients.includes(lead.id)) cmp.stats.replied += 1;
   }
   const wasQualified = ['qualified', 'handover', 'viewing', 'deal'].includes(lead.stage);
-  const { reply } = ai.onInbound(db, lead, text);
+  const { reply } = noise ? {} : ai.onInbound(db, lead, text);
   if (!wasQualified && lead.stage === 'qualified') {
     if (module.exports.onQualified) module.exports.onQualified(db, lead);
     if ((db.settings.automations || {}).autoHandover) handover(db, lead); // авто-распределение на брокера

@@ -196,7 +196,7 @@ ${PRES_FAVICON}
 <link rel="stylesheet" href="/pres-styles.css?v=16"><link rel="stylesheet" href="/presedit.css?v=36">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=19"></script><script src="/presedit.js?v=51"></script>
+<script src="/pres-tokens.js?v=13"></script><script src="/pres-templates.js?v=19"></script><script src="/presedit.js?v=51"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */

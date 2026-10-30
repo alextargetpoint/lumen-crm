@@ -138,6 +138,18 @@ function draftFromProperty(db, pr, broker, opts) {
     },
   }));
 
+  // units — таблица типов квартир с ценами (раньше units сводились к одному параметру планировки)
+  if (units.length >= 2) sections.push({
+    id: sid(), family: 'units', enabled: true,
+    contentBindings: {
+      eyebrow: ov('Квартирография'), title: ov('Квартиры и цены'),
+      units: ov(units.map(u => ({
+        plan: u.plan || u.type || u.name || '', area: u.area || '', price: u.price || '',
+        status: u.status || '', beds: u.beds, floor: u.floor, view: u.view,
+      }))),
+    },
+  });
+
   // payment — из paymentRows, иначе разбор строки pr.payment (раньше строка игнорировалась)
   const payStages = paymentStages(pr);
   if (payStages.length) sections.push({

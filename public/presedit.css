@@ -664,3 +664,8 @@ button{font-family:inherit;cursor:pointer}
 .pe-thumb{transition:border-color .16s cubic-bezier(.22,1,.36,1),box-shadow .16s,transform .16s cubic-bezier(.22,1,.36,1)}
 .pe-thumb.active{transform:translateY(-1px)}
 @media (prefers-reduced-motion:reduce){#peStage .lp-page.pe-cp-anim{animation:none}.pe-thumb{transition:border-color .12s}.pe-thumb.active{transform:none}}
+
+/* контролы переупорядочивания фото в галерее */
+.pe-galctl{flex:1;border:0;background:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:3px 0;font-family:inherit;transition:background .12s}
+.pe-galctl:hover{background:rgba(255,255,255,.16)}
+.pe-galctl:disabled{opacity:.3;cursor:default}

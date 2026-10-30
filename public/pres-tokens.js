@@ -66,7 +66,7 @@
   const CONTRAST = { normalTextMin:4.5, largeTextMin:3 };
 
   // 10 section families (TZ §10–§11) + neutral custom
-  const FAMILIES = ['hero','editorial','metrics','gallery','location','floorplan','payment','comparison','benefits','broker','custom'];
+  const FAMILIES = ['hero','editorial','metrics','gallery','location','floorplan','units','payment','comparison','benefits','broker','custom'];
 
   /* ---- helpers ---- */
   const byId = (arr, id) => arr.find(x => x.id === id);

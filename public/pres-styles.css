@@ -33,7 +33,7 @@
 .lp-body{ color:var(--text); line-height:1.5; max-width:62ch; overflow-wrap:break-word; hyphens:auto; text-wrap:pretty; orphans:2; widows:2; }
 .lp-body + .lp-body, .lp-body p{ margin:.6em 0 0; }
 .lp-sub{ color:var(--muted); line-height:1.45; margin:.3em 0 0; }
-.lp-eyebrow{ display:flex; flex-wrap:wrap; align-items:center; gap:.5em; text-transform:uppercase; letter-spacing:.16em; color:var(--accent); font-weight:600; margin-bottom:1.1em; }
+.lp-eyebrow{ display:flex; flex-wrap:wrap; align-items:center; gap:.5em; text-transform:uppercase; letter-spacing:.16em; color:var(--accent); font-weight:700; margin-bottom:1.1em; }
 .lp-eyebrow i{ opacity:.5; font-style:normal; }
 .lp-eyebrow span{ white-space:nowrap; }
 .lp-brandmark{ font-family:var(--font-head); font-weight:var(--head-weight); letter-spacing:.22em; text-transform:uppercase; margin-bottom:1em; }
@@ -143,6 +143,21 @@
 .lp-pay-total{ display:flex; justify-content:space-between; align-items:baseline; margin-top:26px; padding-top:22px; border-top:2px solid var(--text); }
 .lp-pay-total span{ text-transform:uppercase; letter-spacing:.1em; font-weight:600; } .lp-pay-total i{ font-style:normal; color:var(--muted); text-transform:none; letter-spacing:0; font-weight:400; }
 .lp-pay-total b{ font-family:var(--font-head); font-weight:var(--head-weight); font-size:1.9em; }
+
+/* ====== UNITS (квартирография / прайс-лист) ====== */
+.lp-units-wrap{ justify-content:flex-start; }
+.lp-units-head{ display:grid; grid-template-columns:1.4fr .9fr 1fr auto; gap:18px; margin-top:24px; padding-bottom:10px; border-bottom:2px solid var(--text); text-transform:uppercase; letter-spacing:.1em; font-size:.74em; font-weight:600; color:var(--muted); }
+.lp-units-head span:nth-child(3){ text-align:right; }
+.lp-units-list{ display:flex; flex-direction:column; }
+.lp-unit-row{ display:grid; grid-template-columns:1.4fr .9fr 1fr auto; gap:18px; align-items:center; padding:16px 0; border-bottom:1px solid var(--line); }
+.lp-unit-plan b{ font-weight:600; font-size:1.08em; display:block; } .lp-unit-plan span{ color:var(--muted); font-size:.86em; display:block; margin-top:.15em; }
+.lp-unit-area{ color:var(--muted); font-size:.98em; }
+.lp-unit-price{ text-align:right; } .lp-unit-price b{ font-family:var(--font-head); font-weight:var(--head-weight); font-size:1.32em; color:var(--accent); }
+.lp-unit-status{ display:flex; justify-content:flex-end; }
+.lp-unit-st{ font-size:.72em; font-weight:600; letter-spacing:.04em; padding:3px 9px; border-radius:100px; background:var(--surface); color:var(--muted); white-space:nowrap; }
+.lp-unit-st.ok{ background:color-mix(in srgb,#2e7d46 14%,transparent); color:#2e7d46; }
+.lp-unit-st.sold{ background:color-mix(in srgb,#b23b3b 12%,transparent); color:#b23b3b; }
+.lp-unit-st.res{ background:color-mix(in srgb,#b8872e 14%,transparent); color:#9a6f1e; }
 
 /* ====== COMPARISON ====== */
 .lp-cmp-wrap{ justify-content:flex-start; }
@@ -342,12 +357,29 @@
 .lp-preset-terracotta.lp-fam-broker{ background:#A6533D; --text:#FFF9F2; --muted:rgba(255,249,242,.8); --accent:#FFF9F2; --line:rgba(255,249,242,.3); --surface:#B5634D; }
 /* Terracotta split-обложка: панель 42% (терракота) + фото 58% */
 .lp-hero-split{ position:absolute; inset:0; z-index:2; display:grid; grid-template-columns:42% 58%; }
-.lp-hero-split-txt{ background:#A6533D; color:#FFF9F2; padding:52px 44px; display:flex; flex-direction:column; justify-content:center; }
-.lp-hero-split-txt .lp-h1{ color:#FFF9F2; margin-top:.15em; } .lp-hero-split-txt .lp-brandmark{ color:#FFF9F2; position:absolute; top:52px; left:44px; margin:0; }
+/* сплит-обложка следует теме пресета (было жёстко терракотовым на любом пресете) */
+.lp-hero-split-txt{ background:var(--text); color:var(--bg); padding:52px 44px; display:flex; flex-direction:column; justify-content:center; }
+.lp-hero-split-txt .lp-h1{ color:var(--bg); margin-top:.15em; } .lp-hero-split-txt .lp-brandmark{ color:var(--bg); position:absolute; top:52px; left:44px; margin:0; }
 .lp-hero-split{ position:absolute; } .lp-hero-split-txt{ position:relative; }
-.lp-hero-split-txt .lp-eyebrow{ color:rgba(255,249,242,.82); }
-.lp-hero-split-txt .lp-hero-sub{ color:rgba(255,249,242,.92); text-shadow:none; margin-top:.7em; }
-.lp-hero-split-txt .lp-hero-price{ color:#FFF9F2; margin-top:22px; }
+.lp-hero-split-txt .lp-eyebrow{ color:color-mix(in srgb,var(--bg) 82%,transparent); }
+.lp-hero-split-txt .lp-hero-sub{ color:color-mix(in srgb,var(--bg) 92%,transparent); text-shadow:none; margin-top:.7em; }
+.lp-hero-split-txt .lp-hero-price{ color:var(--bg); margin-top:22px; }
 .lp-hero-split-metrics{ display:flex; flex-wrap:wrap; gap:20px 28px; margin-top:26px; }
-.lp-hero-split-txt .lp-metric-ic{ color:#FFF9F2; } .lp-hero-split-txt .lp-metric-tx span{ color:rgba(255,249,242,.78); }
+.lp-hero-split-txt .lp-metric-ic{ color:var(--bg); } .lp-hero-split-txt .lp-metric-tx span{ color:color-mix(in srgb,var(--bg) 78%,transparent); }
+/* терракота сохраняет фирменный тёплый вид */
+.lp-preset-terracotta .lp-hero-split-txt{ background:#A6533D; color:#FFF9F2; }
+.lp-preset-terracotta .lp-hero-split-txt .lp-h1, .lp-preset-terracotta .lp-hero-split-txt .lp-brandmark, .lp-preset-terracotta .lp-hero-split-txt .lp-hero-price, .lp-preset-terracotta .lp-hero-split-txt .lp-metric-ic{ color:#FFF9F2; }
 .lp-hero-split-photo{ background:var(--surface) center/cover no-repeat; }
+
+/* ═══ полировка (аудит 10.2026): устойчивость к данным, консистентность, a11y ═══ */
+/* длинный заголовок обложки не ломает страницу */
+.lp-hero-panel{ max-height:calc(100% - 64px); overflow:hidden; }
+.lp-hero-land .lp-h1, .lp-hero-port .lp-hero-top .lp-h1{ display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.lp-hero-ug .lp-h1, .lp-hero-gw-head .lp-h1{ display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden; }
+/* консистентность углов: острые пресеты обнуляют радиус и у панелей/карточек метрик */
+.lp-preset-gallerywhite .lp-hero-foot, .lp-preset-gallerywhite .lp-hero-panel, .lp-preset-gallerywhite .lp-metrics-grid .lp-metric-lg, .lp-preset-gallerywhite .lp-metric-lg,
+.lp-preset-graphite .lp-hero-foot, .lp-preset-graphite .lp-hero-panel, .lp-preset-graphite .lp-metrics-grid .lp-metric-lg, .lp-preset-graphite .lp-metric-lg{ border-radius:0; }
+/* терракота: тёплый тон виден и на 2-колоночных разворотах (красим текстовую колонку, не только корень) */
+.lp-preset-terracotta.lp-alt-tint .lp-edit-text, .lp-preset-terracotta.lp-alt-tint .lp-metrics-side, .lp-preset-terracotta.lp-alt-tint .lp-ben-text, .lp-preset-terracotta.lp-alt-tint .lp-loc-list{ background:#F3E4DA; }
+/* a11y: видимый фокус на кликабельных каналах публичной веб-версии */
+.lp-ch:focus-visible, .lp-contact-line a:focus-visible, .lp-cta:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
