@@ -73,7 +73,7 @@ function draftFromProperty(db, pr, broker, opts) {
   const imgs = (pr.images || []);
   const units = (pr.units || []);
   const areas = units.map(u => +u.area).filter(Boolean);
-  const areaRange = areas.length ? { from: Math.min(...areas), to: Math.max(...areas), unit: 'm2' } : null;
+  const areaRange = areas.length ? { from: Math.min(...areas), to: Math.max(...areas), unit: 'm2' } : sizeRange(pr);
 
   const sections = [];
   const sid = () => 's' + hex(3);
@@ -103,12 +103,17 @@ function draftFromProperty(db, pr, broker, opts) {
     },
   });
 
-  // gallery — if ≥2 photos
-  if (imgs.length >= 2) sections.push({
-    id: sid(), family: 'gallery', enabled: true,
-    assetRefs: imgs.slice(0, TOK.LIMITS.assetsPerSection).map((_, i) => ({ assetId: 'img' + i })),
-    contentBindings: { eyebrow: ov('Галерея'), title: ov('Интерьеры и территория') },
-  });
+  // gallery — фото, кроме уже показанных на обложке/в тексте/локации/преимуществах (без дублей)
+  if (imgs.length >= 2) {
+    const usedElsewhere = new Set([0, 1, 2, 3]);   // img0 hero, img1 editorial, img2 location, img3 benefits
+    let galIdx = imgs.map((_, i) => i).filter(i => !usedElsewhere.has(i));
+    if (galIdx.length < 2) galIdx = imgs.map((_, i) => i);   // мало уникальных — показываем все
+    sections.push({
+      id: sid(), family: 'gallery', enabled: true,
+      assetRefs: galIdx.slice(0, TOK.LIMITS.assetsPerSection).map(i => ({ assetId: 'img' + i })),
+      contentBindings: { eyebrow: ov('Галерея'), title: ov('Интерьеры и территория') },
+    });
+  }
 
   // location — if district with places
   /* ⚠️ «0 мин» не выводим: 0/пусто = время не определено → скрываем (показывали «0 мин» рядом с «350 м»). */
@@ -123,28 +128,39 @@ function draftFromProperty(db, pr, broker, opts) {
     },
   });
 
-  // floorplan — if a layout/plan exists
-  const plan0 = (pr.layouts || [])[0];
-  if (plan0) sections.push({
+  // floorplan — одна страница на КАЖДУЮ планировку (раньше терялись все, кроме первой)
+  (pr.layouts || []).slice(0, 6).forEach((pl, i) => sections.push({
     id: sid(), family: 'floorplan', enabled: true,
-    assetRefs: [{ assetId: 'plan0', fit: 'contain' }],
+    assetRefs: [{ assetId: 'plan' + i, fit: 'contain' }],
     contentBindings: {
-      eyebrow: ov('Планировка'), title: ov(plan0.label || 'Планировка'),
-      params: ov(planParams(units[0], pr)),
+      eyebrow: ov('Планировка'), title: ov(pl.label || 'Планировка'),
+      params: ov(planParams(units[i] || units[0], pr)),
     },
-  });
+  }));
 
-  // payment — from paymentRows
-  const rows = Array.isArray(pr.paymentRows) ? pr.paymentRows.filter(r => r && r.pct != null) : [];
-  if (rows.length) sections.push({
+  // payment — из paymentRows, иначе разбор строки pr.payment (раньше строка игнорировалась)
+  const payStages = paymentStages(pr);
+  if (payStages.length) sections.push({
     id: sid(), family: 'payment', enabled: true,
     contentBindings: {
       eyebrow: ov('Условия'), title: ov('План оплаты'),
       plan: ov({
         kind: 'full',
         basePrice: pr.priceFrom ? { amount: pr.priceFrom, currency } : null,
-        stages: rows.map(r => ({ name: r.label || '', percent: String(r.pct), amountMode: 'calculated' })),
+        stages: payStages,
       }),
+    },
+  });
+
+  // infrastructure — отдельная страница из amenities, когда преимущества заняты whyRent
+  // (раньше при наличии whyRent все удобства терялись; без whyRent они идут в benefits ниже)
+  const amen = Array.isArray(pr.amenities) ? pr.amenities.filter(Boolean) : [];
+  if (amen.length >= 4 && Array.isArray(pr.whyRent) && pr.whyRent.length) sections.push({
+    id: sid(), family: 'benefits', enabled: true,
+    assetRefs: imgs[4] ? [{ assetId: 'img4', fit: 'cover' }] : [],
+    contentBindings: {
+      eyebrow: ov('Инфраструктура'), title: ov('Что внутри'),
+      items: ov(amen.slice(0, 8).map(a => ({ title: typeof a === 'string' ? a : (a.name || '') }))),
     },
   });
 
@@ -616,6 +632,7 @@ function heroMetrics(pr, areaRange) {
   const out = [];
   if (pr.beds != null) out.push(bedsMetric(pr.beds, 'спальни'));
   if (areaRange) out.push({ value: T.fmtArea(areaRange), label: 'площадь', icon: 'area' });
+  if (pr.roi) out.push({ value: roiVal(pr.roi), label: 'доходность', icon: 'tag' });   // инвест-аргумент выше застройщика
   if (pr.handover) out.push({ value: String(pr.handover), label: 'сдача', icon: 'calendar' });
   if (pr.developer) out.push({ value: pr.developer, label: 'застройщик', icon: 'shield' });
   return out.slice(0, 4);
@@ -623,6 +640,7 @@ function heroMetrics(pr, areaRange) {
 function keyMetrics(pr, areaRange, currency) {
   const out = [];
   if (pr.priceFrom) out.push({ value: T.fmtPrice({ kind: 'from', amount: pr.priceFrom, currency }), label: 'стоимость', icon: 'tag' });
+  if (pr.roi) out.push({ value: roiVal(pr.roi), label: 'доходность', icon: 'trend' });
   if (areaRange) out.push({ value: T.fmtArea(areaRange), label: 'площадь', icon: 'area' });
   if (pr.beds != null) out.push(bedsMetric(pr.beds, 'варианты планировок'));
   if (pr.handover) out.push({ value: String(pr.handover), label: 'планируемая сдача', icon: 'calendar' });
@@ -642,9 +660,28 @@ function planParams(unit, pr) {
   return p;
 }
 function benefitItems(pr) {
-  if (Array.isArray(pr.whyRent) && pr.whyRent.length) return pr.whyRent.slice(0, 5).map(w => typeof w === 'string' ? { title: w } : { title: w.title || w.label || '', desc: w.desc || '' });
-  if (Array.isArray(pr.amenities) && pr.amenities.length) return pr.amenities.slice(0, 5).map(a => ({ title: typeof a === 'string' ? a : (a.name || '') }));
+  if (Array.isArray(pr.whyRent) && pr.whyRent.length) return pr.whyRent.slice(0, 6).map(w => typeof w === 'string' ? { title: w } : { title: w.title || w.label || '', desc: w.desc || '' });
+  if (Array.isArray(pr.amenities) && pr.amenities.length) return pr.amenities.slice(0, 8).map(a => ({ title: typeof a === 'string' ? a : (a.name || '') }));
   return [];
+}
+/* площадь из pr.size/pr.area, если нет юнитов (иначе метрика площади пропадала) */
+function sizeRange(pr) {
+  const nums = String(pr.size || pr.area || '').match(/\d+(?:[.,]\d+)?/g);
+  if (!nums) return null;
+  const a = nums.map(x => +x.replace(',', '.')).filter(x => x > 5 && x < 5000);
+  if (!a.length) return null;
+  return { from: Math.min(...a), to: Math.max(...a), unit: 'm2' };
+}
+/* короткое значение доходности из строки roi («7-8% net …» → «7-8%») */
+function roiVal(r) { const m = String(r || '').match(/[\d.,]+\s*[-–]?\s*[\d.,]*\s*%/); return m ? m[0].replace(/\s/g, '') : String(r || '').slice(0, 10); }
+/* стадии оплаты: из paymentRows, иначе разбор строки pr.payment («30% первый взнос, 70% до сдачи») */
+function paymentStages(pr) {
+  const rows = Array.isArray(pr.paymentRows) ? pr.paymentRows.filter(r => r && r.pct != null) : [];
+  if (rows.length) return rows.map(r => ({ name: r.label || '', percent: String(r.pct), amountMode: 'calculated' }));
+  const s = String(pr.payment || '').trim(); if (!s) return [];
+  const m = [...s.matchAll(/(\d{1,3})\s*%\s*([А-Яа-яA-Za-z][^,;.0-9]{0,36})?/g)];
+  if (m.length) return m.map(x => ({ name: (x[2] || '').trim() || 'Платёж', percent: x[1], amountMode: 'calculated' }));
+  return [];   // не распарсили — покажем строкой в subtitle
 }
 
 /* ---------- render context + pages ---------- */
@@ -717,7 +754,7 @@ function documentHTML(db, pres, broker, opts) {
 ${opts.noindex !== false ? '<meta name="robots" content="noindex,nofollow">' : ''}
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a1712'/%3E%3Cpath%20d='M16%204.4L18.7%2013.3L27.6%2016L18.7%2018.7L16%2027.6L13.3%2018.7L4.4%2016L13.3%2013.3Z'%20fill='%23ffffff'/%3E%3C/svg%3E"><link rel="stylesheet" href="/pres-styles.css">
 <style>${stageCss}</style>
-</head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script></body></html>`;
+</head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script>${opts.print ? '<script>window.addEventListener("load",function(){var go=function(){setTimeout(function(){window.print()},250)};document.fonts&&document.fonts.ready?document.fonts.ready.then(go):go()})</script>' : ''}</body></html>`;
 }
 function titleOf(db, pres) {
   if (pres && pres.kind === 'collection') return pres.title || 'Подборка объектов';
@@ -823,7 +860,7 @@ function documentFromSnapshot(snap, opts) {
     @media print{html,body{background:#fff}.lp-doc{gap:0;padding:0}.lp-stage{max-width:none}.lp-fit{transform:none!important;width:${f.cssW}px;height:${f.cssH}px}@page{size:${pageCssSize(snap.format)};margin:0}}`;
   const scaleScript = `(function(){function fit(){var W=document.querySelector('.lp-doc').clientWidth-20;document.querySelectorAll('.lp-stage').forEach(function(st){var s=Math.min(1,Math.min(W,${f.cssW})/${f.cssW});st.firstElementChild.style.transform='scale('+s+')';st.style.height=(${f.cssH}*s)+'px';});}window.addEventListener('resize',fit);window.addEventListener('load',fit);document.fonts&&document.fonts.ready.then(fit);fit();})();`;
   const body = pages.map(p => `<div class="lp-stage"><div class="lp-fit">${p.html}</div></div>`).join('');
-  return `<!doctype html><html lang="${(snap.locale||'ru').slice(0,2)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(opts.title||'Презентация')}</title><meta name="robots" content="noindex,nofollow"><link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a1712'/%3E%3Cpath%20d='M16%204.4L18.7%2013.3L27.6%2016L18.7%2018.7L16%2027.6L13.3%2018.7L4.4%2016L13.3%2013.3Z'%20fill='%23ffffff'/%3E%3C/svg%3E"><link rel="stylesheet" href="/pres-styles.css"><style>${stageCss}</style></head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script></body></html>`;
+  return `<!doctype html><html lang="${(snap.locale||'ru').slice(0,2)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(opts.title||'Презентация')}</title><meta name="robots" content="noindex,nofollow"><link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a1712'/%3E%3Cpath%20d='M16%204.4L18.7%2013.3L27.6%2016L18.7%2018.7L16%2027.6L13.3%2018.7L4.4%2016L13.3%2013.3Z'%20fill='%23ffffff'/%3E%3C/svg%3E"><link rel="stylesheet" href="/pres-styles.css"><style>${stageCss}</style></head><body><div class="lp-doc">${body}</div><script>${scaleScript}</script>${opts.print ? '<script>window.addEventListener("load",function(){var go=function(){setTimeout(function(){window.print()},250)};document.fonts&&document.fonts.ready?document.fonts.ready.then(go):go()})</script>' : ''}</body></html>`;
 }
 
 /* ---------- public projection (TZ §2 — strip private fields) ---------- */

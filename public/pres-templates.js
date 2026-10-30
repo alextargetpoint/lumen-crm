@@ -14,7 +14,10 @@
 
   /* ---------------- escaping & text ---------------- */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-  const nl2br = (s) => esc(s).replace(/\n/g, '<br>');
+  /* типографика: короткие предлоги/союзы (в, на, и, с, к…) не висят в конце строки.
+     Только пробелы/табы ([ \t]), НЕ \s — иначе съели бы \n до nl2br. */
+  const nbsp = (s) => s.replace(/(^|[ \t(—–-])([А-Яа-яA-Za-zЁё]{1,2})[ \t]+/g, (m, a, b) => a + b + NB);
+  const nl2br = (s) => nbsp(esc(s)).replace(/\n/g, '<br>');
   const NB = ' '; // non-breaking space
   const caps = (s) => esc(s); // eyebrow rendered caps via CSS letter-spacing
 
@@ -130,12 +133,17 @@
     const a = (assets || {})[ref.assetId] || {};
     return a.url || ref.url || '';
   }
+  function enhanceFilter(ref) {
+    const e = ref && ref.enhance; if (!e) return '';
+    return `filter:brightness(${e.exposure || 1}) contrast(${e.contrast || 1}) saturate(${e.saturation || 1})${e.warmth ? ' sepia(' + e.warmth + ')' : ''}`;
+  }
   function bgStyle(ref, assets, fmtId) {
     const url = assetUrl(ref, assets);
     if (!url) return 'background:var(--surface)';
     const fp = ref && ref.focalPoint ? `${Math.round(ref.focalPoint.x*100)}% ${Math.round(ref.focalPoint.y*100)}%` : '50% 50%';
     const fit = (ref && ref.fit) || 'cover';
-    return `background-image:url('${esc(url)}');background-size:${fit==='contain'?'contain':'cover'};background-position:${fp};background-repeat:no-repeat`;
+    const filt = enhanceFilter(ref);   /* «Улучшить фото» теперь работает и на фоновых фото (обложка/сплит) */
+    return `background-image:url('${esc(url)}');background-size:${fit==='contain'?'contain':'cover'};background-position:${fp};background-repeat:no-repeat${filt?';'+filt:''}`;
   }
   function imgTag(ref, assets, cls, alt) {
     const url = assetUrl(ref, assets);
@@ -209,7 +217,9 @@
     const cover = ctx.section.coverLayout || (presetId === 'gallerywhite' ? 'bottom' : presetId === 'terracotta' ? 'right' : 'full');
     if (fmt.orient === 'portrait') {
       if (cover === 'bottom') return [`<div class="lp-safe lp-hero-gw">
-        <div class="lp-hero-gw-head">${brandMark}${loc}${title}${sub}</div>
+        <div class="lp-hero-gw-head">${brandMark}${loc}${title}${sub}
+          ${metrics.length ? `<div class="lp-hero-metrics" style="margin-top:14px">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}${price}
+        </div>
         <div class="lp-hero-gw-photo" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
       </div>`];
       if (cover === 'right') return [`
@@ -228,7 +238,7 @@
       return [`
         <div class="lp-bleed" style="${bgStyle(img, ctx.assets, fmt.id)}"></div>
         <div class="lp-hero-ug">${brandMark}${loc}${title}${sub}
-          ${metrics.length ? `<div class="lp-hero-ug-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}
+          ${metrics.length ? `<div class="lp-hero-ug-metrics">${metrics.slice(0, 3).map(metricCell).join('')}</div>` : ''}${price}
         </div>`];
     }
 

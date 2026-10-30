@@ -28,9 +28,9 @@
   repeating-linear-gradient(135deg, color-mix(in srgb,var(--surface) 86%, #000 3%) 0 12px, var(--surface) 12px 24px); }
 
 /* ---------- typography ---------- */
-.lp-h1{ font-family:var(--font-head); font-weight:var(--head-weight); margin:0; line-height:1.06; letter-spacing:.002em; }
-.lp-h2{ font-family:var(--font-head); font-weight:var(--head-weight); margin:0 0 .4em; line-height:1.1; }
-.lp-body{ color:var(--text); line-height:1.5; max-width:62ch; }
+.lp-h1{ font-family:var(--font-head); font-weight:var(--head-weight); margin:0; line-height:1.06; letter-spacing:.002em; overflow-wrap:break-word; hyphens:auto; text-wrap:balance; }
+.lp-h2{ font-family:var(--font-head); font-weight:var(--head-weight); margin:0 0 .4em; line-height:1.1; overflow-wrap:break-word; text-wrap:balance; }
+.lp-body{ color:var(--text); line-height:1.5; max-width:62ch; overflow-wrap:break-word; hyphens:auto; text-wrap:pretty; orphans:2; widows:2; }
 .lp-body + .lp-body, .lp-body p{ margin:.6em 0 0; }
 .lp-sub{ color:var(--muted); line-height:1.45; margin:.3em 0 0; }
 .lp-eyebrow{ display:flex; flex-wrap:wrap; align-items:center; gap:.5em; text-transform:uppercase; letter-spacing:.16em; color:var(--accent); font-weight:600; margin-bottom:1.1em; }
@@ -96,6 +96,7 @@
 .lp-metrics-land .lp-metrics-side{ padding:56px 48px; display:flex; flex-direction:column; justify-content:center; }
 .lp-metrics-port .lp-metrics-photo{ height:34%; min-height:260px; border-radius:14px; overflow:hidden; margin-bottom:26px; }
 .lp-metrics-grid{ display:grid; grid-template-columns:1fr 1fr; gap:26px 32px; margin-top:24px; }
+.lp-metrics-grid.cols1{ grid-template-columns:1fr; }   /* одна метрика не висит половиной сетки */
 .lp-metrics-grid .lp-metric-lg{ background:var(--surface); border-radius:14px; padding:22px 24px; }
 
 /* ====== GALLERY ====== */

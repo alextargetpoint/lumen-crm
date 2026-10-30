@@ -656,3 +656,11 @@ button{font-family:inherit;cursor:pointer}
 .pe-guide{position:absolute;z-index:46;pointer-events:none;background:var(--pe-sel);display:none;box-shadow:0 0 0 .5px rgba(45,108,223,.4)}
 .pe-guide-v{top:0;bottom:0;width:1px}
 .pe-guide-h{left:0;right:0;height:1px}
+
+/* ===== плавный люкс-переход между страницами на холсте (ease-out, направленный) ===== */
+@keyframes peCanvasIn{from{opacity:0;transform:translate(var(--pe-cp-dx,0),10px)}to{opacity:1;transform:translate(0,0)}}
+#peStage .lp-page.pe-cp-anim{animation:peCanvasIn .44s cubic-bezier(.22,1,.36,1) both;will-change:opacity,transform}
+/* активная миниатюра — мягкое всплытие */
+.pe-thumb{transition:border-color .16s cubic-bezier(.22,1,.36,1),box-shadow .16s,transform .16s cubic-bezier(.22,1,.36,1)}
+.pe-thumb.active{transform:translateY(-1px)}
+@media (prefers-reduced-motion:reduce){#peStage .lp-page.pe-cp-anim{animation:none}.pe-thumb{transition:border-color .12s}.pe-thumb.active{transform:none}}

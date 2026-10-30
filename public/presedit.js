@@ -1007,6 +1007,17 @@
     stage.innerHTML = pages.map(function (html) { return html; }).join('');
     fitCanvas();
     wireCanvasEditingOnce(); markCanvasEditable();
+    // люкс-переход ТОЛЬКО при реальной смене страницы (не на каждой правке/ре-рендере)
+    if (S._animPage !== S.pageIdx) {
+      var dir = (S._animPage == null) ? 0 : (S.pageIdx > S._animPage ? 1 : S.pageIdx < S._animPage ? -1 : 0);
+      S._animPage = S.pageIdx;
+      if (dir !== 0) stage.querySelectorAll('.lp-page').forEach(function (pg) {
+        pg.style.setProperty('--pe-cp-dx', (dir > 0 ? 28 : -28) + 'px');
+        pg.classList.remove('pe-cp-anim'); void pg.offsetWidth;   // рестарт анимации
+        pg.classList.add('pe-cp-anim');
+        pg.addEventListener('animationend', function () { pg.classList.remove('pe-cp-anim'); pg.style.removeProperty('--pe-cp-dx'); }, { once: true });
+      });
+    }
   }
   function wrapPage(html, f) { return html; }
   function withMirror(s) { if (s.styleOverrides && s.styleOverrides.mirror) { /* mirror handled via class later; pass through */ } return s; }
@@ -1999,7 +2010,7 @@
       ov.querySelectorAll('[data-x]').forEach(function (b) { b.onclick = function () { ov.remove(); }; });
       ov.querySelectorAll('[data-method]').forEach(function (m) { m.onclick = function () { method = m.getAttribute('data-method'); refresh(); }; });
       ov.querySelectorAll('[data-q]').forEach(function (q) { q.onclick = function () { quality = q.getAttribute('data-q'); refresh(); }; });
-      var dl = ov.querySelector('[data-dl]'); if (dl) dl.onclick = function () { window.open('/pres/' + ID + '/print?format=' + fmt + '&q=' + quality, '_blank'); };
+      var dl = ov.querySelector('[data-dl]'); if (dl) dl.onclick = function () { window.open('/pres/' + ID + '/print?format=' + fmt + '&q=' + quality + '&dl=1', '_blank'); };
       var lk = ov.querySelector('[data-link]'); if (lk) lk.onclick = function () { lk.textContent = 'Публикуем…'; api('POST', '/' + ID + '/publish', { format: fmt }).then(function (r) { if (r.status === 200) { published = r.json.url; refresh(); } else { toast(r.json && r.json.error === 'PREFLIGHT_FAILED' ? 'Исправьте ошибки перед публикацией' : 'Ошибка публикации'); refresh(); } }); };
       var cp = ov.querySelector('[data-copy]'); if (cp) cp.onclick = function () { navigator.clipboard && navigator.clipboard.writeText(published); cp.textContent = 'Скопировано'; };
       var pb = ov.querySelector('[data-pub]'); if (pb) pb.onclick = function () {
