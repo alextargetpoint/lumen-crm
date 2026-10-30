@@ -350,19 +350,33 @@
       return '<button class="pe-ov-opt' + (o[0] === opt ? ' on' : '') + '" data-act="ovopt" data-ovopt="' + o[0] + '">' +
         '<span class="pe-ov-radio"></span><span class="pe-ov-tx"><b>' + esc(o[1]) + (o[3] ? '<em>Рекомендуется</em>' : '') + '</b><span>' + esc(o[2]) + '</span></span></button>';
     }).join('');
+    var applyLabel = opt === 'shorten' ? 'Сократить с ИИ' : opt === 'layout' ? 'Открыть макеты' : 'Перенести текст';
+    var prev = opt === 'continue'
+      ? '<div class="pe-ov-prev"><div class="pe-ov-pg">Стр. ' + (S.pageIdx + 1) + '<span>сейчас</span></div><i>→</i><div class="pe-ov-pg">Стр. ' + (S.pageIdx + 1) + '<span>после</span></div><div class="pe-ov-pg new">Стр. ' + (S.pageIdx + 2) + '<span>новая</span></div></div>'
+      : '';
+    var note = opt === 'shorten' ? ic('warn') + 'ИИ сократит текст — проверьте факты и цифры' : ic('check') + 'Текст будет сохранён полностью';
     return '<div class="pe-add-hd"><b>Текст не помещается</b><button class="pe-x" data-act="ovclose">' + ic('x') + '</button></div>' +
       '<div class="pe-ov-sub">На странице закончилось место для текста. Нужно перенести ' + info.over + ' ' + plural(info.over, 'абзац', 'абзаца', 'абзацев') + '.</div>' +
       '<div class="pe-ov-opts">' + rows + '</div>' +
-      '<div class="pe-ov-prev"><div class="pe-ov-pg">Стр. ' + (S.pageIdx + 1) + '<span>сейчас</span></div><i>→</i><div class="pe-ov-pg">Стр. ' + (S.pageIdx + 1) + '<span>после</span></div><div class="pe-ov-pg new">Стр. ' + (S.pageIdx + 2) + '<span>новая</span></div></div>' +
-      '<div class="pe-ov-foot"><button class="pe-btn pe-btn-primary" data-act="ovapply" data-ovopt="' + opt + '">Перенести текст</button><button class="pe-btn pe-btn-ghost" data-act="ovclose">Отмена</button></div>' +
-      '<div class="pe-ov-note">' + ic('check') + 'Текст будет сохранён полностью</div>';
+      prev +
+      '<div class="pe-ov-foot"><button class="pe-btn pe-btn-primary" data-act="ovapply" data-ovopt="' + opt + '">' + applyLabel + '</button><button class="pe-btn pe-btn-ghost" data-act="ovclose">Отмена</button></div>' +
+      '<div class="pe-ov-note">' + note + '</div>';
   }
   function plural(n, a, b, c) { n = Math.abs(n) % 100; var n1 = n % 10; if (n > 10 && n < 20) return c; if (n1 > 1 && n1 < 5) return b; if (n1 === 1) return a; return c; }
   function applyOverflow(opt) {
     var s = curSection(); var info = overflowInfo(s);
     if (!info) { S.ovMode = false; render(); return; }
-    if (opt === 'layout') { toast('Подбор макета с бо́льшим текстовым полем — в разработке'); S.ovMode = false; render(); return; }
-    if (opt === 'shorten') { toast('AI-сокращение — отдельная операция с подтверждением «До / После»'); S.ovMode = false; render(); return; }
+    if (opt === 'layout') { S.ovMode = false; S.tab = 'composition'; render(); toast('Выберите макет', 'Во вкладке «Макет страницы» — композиции с бо́льшим полем под текст.', true); return; }
+    if (opt === 'shorten') {
+      var body = cval(s, 'body'); S.ovMode = false; render();
+      if (!body || !String(body).trim()) return;
+      toast('ИИ сокращает текст…', 'Подождите пару секунд', true);
+      apiRaw('POST', '/api/ai/text', { text: String(body), mode: 'shorter', ctx: 'абзац в презентации объекта недвижимости — сократи, чтобы помещалось на странице; СТРОГО сохрани факты, цифры, условия и язык' }).then(function (r) {
+        if (r.status === 200 && r.json && r.json.text) { mutate(function () { setOverride(s, 'body', r.json.text); }); toast('Текст сокращён ИИ', 'Смысл и цифры сохранены — проверьте результат', true); }
+        else toast('Не удалось сократить', (r.json && r.json.error) || 'проверьте, что подключён ключ ИИ в настройках');
+      }).catch(function () { toast('Ошибка сети при сокращении'); });
+      return;
+    }
     mutate(function () {
       var keep = info.paras.slice(0, info.fit).join('\n\n');
       var rest = info.paras.slice(info.fit).join('\n\n');
