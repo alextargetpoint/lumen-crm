@@ -510,6 +510,9 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .lf-chip{padding:7px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);font-size:12.5px;cursor:pointer;transition:.12s}
   .lf-chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .lf-reset{margin-left:auto;background:none;border:0;color:var(--acc);font-size:12.5px;font-weight:600;cursor:pointer}
+  .lf-dates{display:flex;gap:8px;margin:-6px 0 14px}
+  .lf-dates label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ink);opacity:.6}
+  .lf-dates input{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);font-size:13px;color-scheme:dark}
   /* ── переключатель вида лидов (Список/Доска) ── */
   .lead-vtog{flex:1;display:flex;gap:4px;padding:4px;margin:0;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:13px}
   .lead-vtog button{flex:1;padding:8px;border:0;border-radius:10px;background:transparent;color:var(--ink);opacity:.55;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
@@ -1571,7 +1574,7 @@ function wireKanban(box){box.querySelectorAll('.kcard').forEach(card=>{
   card.addEventListener('mousedown',e=>{if(e.button)return;start(e);const mm=ev=>move(ev),mu=ev=>{end(ev);document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu)};document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu)});
 })}
 /* ── фильтры лидов (как в десктопе: дата создания, таргетолог, брокер, направление, источник, статус) ── */
-let LFILTER={date:'all',vendor:'',broker:'',geo:'',source:'',flag:''};
+let LFILTER={date:'all',dateFrom:'',dateTo:'',vendor:'',broker:'',geo:'',source:'',flag:''};
 const LSRC={meta_form:'Lead Form',ctwa:'CTWA',site:'Сайт',manual:'Вручную',wa_inbound:'Входящий WA',ig_direct:'Instagram',tg_gray:'Telegram',wa_gray:'WhatsApp',viber:'Viber',email:'E-mail',import:'Импорт',meta_api:'Meta API',landing:'Лендинг',ad_comment:'Коммент рекламы',broker_card:'От брокера'};
 const LSRCNAME=k=>LSRC[k]||k;
 function lfCount(){return ['date','vendor','broker','geo','source','flag'].filter(k=>LFILTER[k]&&LFILTER[k]!=='all').length}
@@ -1583,7 +1586,8 @@ function leadFilterPass(l){const f=LFILTER;
   if(f.flag==='needs'&&!l.needsMe)return false;
   if(f.flag==='ai'&&!l.aiOn)return false;
   if(f.flag==='hot'&&!((l.score||0)>=70))return false;
-  if(f.date&&f.date!=='all'){const d=l.createdAt||0;const day=864e5;const start=f.date==='today'?new Date().setHours(0,0,0,0):f.date==='7d'?Date.now()-7*day:f.date==='30d'?Date.now()-30*day:0;if(start&&d<start)return false;}
+  if(f.date==='custom'){const d=l.createdAt||0;if(f.dateFrom){const s=new Date(f.dateFrom+'T00:00:00').getTime();if(isFinite(s)&&d<s)return false}if(f.dateTo){const e=new Date(f.dateTo+'T23:59:59').getTime();if(isFinite(e)&&d>e)return false}}
+  else if(f.date&&f.date!=='all'){const d=l.createdAt||0;const day=864e5;const start=f.date==='today'?new Date().setHours(0,0,0,0):f.date==='7d'?Date.now()-7*day:f.date==='30d'?Date.now()-30*day:0;if(start&&d<start)return false;}
   return true;
 }
 function leadViewToggle(){
@@ -1606,7 +1610,8 @@ function openLeadFilters(){
     chip(k,(k==='date'?'all':''),allLabel||'Все',cur===(k==='date'?'all':''))+opts.map(o=>chip(k,o[0],o[1],String(cur)===String(o[0]))).join('')+'</div></div>'};
   sh.innerHTML='<div class="sheet-bg" data-close></div><div class="sheet-card">'+
     '<div class="sheet-h">Фильтры лидов'+(lfCount()?' · '+lfCount():'')+'<button class="lf-reset" data-reset>Сбросить</button></div>'+
-    grp('Дата создания','date',[['today','Сегодня'],['7d','7 дней'],['30d','30 дней']])+
+    grp('Дата создания','date',[['today','Сегодня'],['7d','7 дней'],['30d','30 дней'],['custom','Период']])+
+    (LFILTER.date==='custom'?'<div class="lf-dates"><label>с<input type="date" data-lfd="from" value="'+esc(LFILTER.dateFrom||'')+'"></label><label>по<input type="date" data-lfd="to" value="'+esc(LFILTER.dateTo||'')+'"></label></div>':'')+
     (vendors.length?grp('Таргетолог','vendor',vendors.map(v=>[v[0],v[1]])):'')+
     (brokers.length>1?grp('Брокер','broker',brokers.map(b=>[b[0],b[1]])):'')+
     (geos.length>1?grp('Направление','geo',geos.map(g=>[g,g])):'')+
@@ -1617,8 +1622,9 @@ function openLeadFilters(){
   const close=()=>sh.classList.remove('on');
   sh.querySelector('[data-close]').onclick=close;
   sh.querySelector('[data-apply]').onclick=()=>{close();renderLeads()};
-  sh.querySelector('[data-reset]').onclick=()=>{LFILTER={date:'all',vendor:'',broker:'',geo:'',source:'',flag:''};openLeadFilters();renderLeads()};
+  sh.querySelector('[data-reset]').onclick=()=>{LFILTER={date:'all',dateFrom:'',dateTo:'',vendor:'',broker:'',geo:'',source:'',flag:''};openLeadFilters();renderLeads()};
   sh.querySelectorAll('[data-lfk]').forEach(b=>b.onclick=()=>{const k=b.dataset.lfk,v=b.dataset.lfv;LFILTER[k]=(k==='date'?v:(LFILTER[k]===v?'':v));hap();openLeadFilters()});
+  sh.querySelectorAll('[data-lfd]').forEach(i=>i.onchange=()=>{LFILTER[i.dataset.lfd==='from'?'dateFrom':'dateTo']=i.value});
 }
 </script>
 </body>
