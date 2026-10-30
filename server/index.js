@@ -8704,6 +8704,7 @@ const server = http.createServer(async (req, res) => {
           currentStage: l.stage, expectedStage: r.expectedStageId || null,
           expectedAssignee: r.expectedAssigneeId ? ((db.brokers.find(b => b.id === r.expectedAssigneeId) || {}).name || null) : null,
           needsBroker: !!r.needsBroker, version: r.version || 1, createdAt: r.createdAt, snoozedUntil: r.snoozedUntil || null,
+          leadScore: l.score || 0, leadSource: l.source || '', leadCreatedAt: l.createdAt || 0, leadLastMsgAt: l.lastMsgAt || l.createdAt || 0,   /* мета лида для богатой карточки */
           can: { qualify: true, assign: canAssign },   /* какие действия доступны этому пользователю */
         };
       };

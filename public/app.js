@@ -20144,11 +20144,16 @@ function watchVersion() {
 
 /* ---------- «Помощник брокера»: плавающее окно подсказок над воронкой ---------- */
 const ASST_STAGE = { new: 'Новые', touch: 'Первое касание', dialog: 'В диалоге с ИИ', qualified: 'Квалифицирован', handover: 'У брокера', viewing: 'Показ', deal: 'Сделка', sleeping: 'Спящие', lost: 'Закрыт' };
-let ASST = { count: 0, items: [], idx: 0, open: false, expanded: false, pickBroker: false, busy: false, applied: null, loaded: false, err: '' };
+const ASST_TYPE = {
+  qualify: { ic: 'check', label: 'Квалификация', cls: 'qf' },
+  assign_broker: { ic: 'user', label: 'Передача', cls: 'as' },
+  clarify_information: { ic: 'doc', label: 'Уточнение', cls: 'cl' },
+};
+let ASST = { count: 0, items: [], idx: 0, seg: '', dir: 0, open: false, expanded: false, pickBroker: false, busy: false, applied: null, loaded: false, err: '' };
 function mountAssistant() {
   if (document.getElementById('lasst')) return;
   const wrap = el('<div id="lasst" class="lasst" hidden><div class="lasst-panel" id="lasstPanel" role="dialog" aria-label="Помощник брокера" hidden></div>' +
-    '<button class="lasst-pill" id="lasstPill" aria-label="Помощник"><span class="lasst-ic">' + ic(I.spark) + '</span><span class="lasst-tx">Помощник</span><span class="lasst-badge" id="lasstBadge" hidden>0</span></button></div>');
+    '<button class="lasst-pill" id="lasstPill" aria-label="Помощник"><span class="lasst-orb"></span><span class="lasst-ic">' + asstSpark() + '</span><span class="lasst-tx">Помощник</span><span class="lasst-badge" id="lasstBadge" hidden>0</span></button></div>');
   document.body.appendChild(wrap);
   $('#lasstPill', wrap).addEventListener('click', () => { ASST.open ? asstClose() : asstOpen(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ASST.open) asstClose(); });
@@ -20156,62 +20161,95 @@ function mountAssistant() {
   asstVisibility(); asstPoll();
   setInterval(asstPoll, 45000);
 }
+function asstSpark() { return '<svg viewBox="0 0 24 24" fill="currentColor"><path class="sp-a" d="M12 2.5l1.7 4.9 4.9 1.7-4.9 1.7L12 15.7l-1.7-4.9L5.4 9.1l4.9-1.7z"/><path class="sp-b" d="M18.5 14l.8 2.3 2.3.8-2.3.8-.8 2.3-.8-2.3-2.3-.8 2.3-.8z"/></svg>'; }
 function asstVisibility() { const w = $('#lasst'); if (!w) return; const show = (CUR === 'funnel'); w.hidden = !show; if (!show && ASST.open) asstClose(); }
-async function asstPoll() { if (CUR !== 'funnel') { asstVisibility(); return; } try { const r = await api.get('/assistant/summary'); ASST.count = r.count || 0; asstPaintBadge(); } catch (_) {} }
-function asstPaintBadge() { const b = $('#lasstBadge'); if (!b) return; b.hidden = !ASST.count; b.textContent = ASST.count > 99 ? '99+' : ASST.count; const pill = $('#lasstPill'); if (pill) pill.classList.toggle('has', !!ASST.count); }
+async function asstPoll() { if (CUR !== 'funnel') { asstVisibility(); return; } try { const r = await api.get('/assistant/summary'); const was = ASST.count; ASST.count = r.count || 0; asstPaintBadge(was); } catch (_) {} }
+function asstPaintBadge(was) { const b = $('#lasstBadge'); if (!b) return; b.hidden = !ASST.count; b.textContent = ASST.count > 99 ? '99+' : ASST.count; const pill = $('#lasstPill'); if (pill) { pill.classList.toggle('has', !!ASST.count); if (was != null && ASST.count !== was) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); } } }
 async function asstOpen() {
-  ASST.open = true; ASST.expanded = false; ASST.pickBroker = false; ASST.applied = null; ASST.err = '';
-  const p = $('#lasstPanel'); p.hidden = false; $('#lasst').classList.add('open');
+  ASST.open = true; ASST.expanded = false; ASST.pickBroker = false; ASST.applied = null; ASST.err = ''; ASST.dir = 0;
+  const p = $('#lasstPanel'); p.hidden = false; const w = $('#lasst'); w.classList.add('open'); w.classList.remove('pop'); void w.offsetWidth; w.classList.add('pop');
   asstRender();   /* сразу скелет */
-  try { const r = await api.get('/assistant/recommendations?limit=30'); ASST.items = r.items || []; ASST.count = r.total || ASST.items.length; ASST.idx = Math.min(ASST.idx, Math.max(0, ASST.items.length - 1)); ASST.loaded = true; asstPaintBadge(); }
+  try { const r = await api.get('/assistant/recommendations?limit=30'); ASST.items = r.items || []; ASST.count = r.total || ASST.items.length; const fl = asstFiltered().length; ASST.idx = Math.min(ASST.idx, Math.max(0, fl - 1)); ASST.loaded = true; asstPaintBadge(); }
   catch (e) { ASST.err = e.message || 'ошибка'; }
   asstRender();
 }
-function asstClose() { ASST.open = false; const p = $('#lasstPanel'); if (p) p.hidden = true; const w = $('#lasst'); if (w) w.classList.remove('open'); }
-function asstCur() { return ASST.items[ASST.idx] || null; }
+function asstClose() { ASST.open = false; const p = $('#lasstPanel'); if (p) p.hidden = true; const w = $('#lasst'); if (w) w.classList.remove('open', 'pop'); }
+function asstFiltered() { return ASST.seg ? ASST.items.filter(r => r.type === ASST.seg) : ASST.items; }
+function asstCur() { return asstFiltered()[ASST.idx] || null; }
+function asstGoto(i) { const fl = asstFiltered().length; const ni = Math.max(0, Math.min(fl - 1, i)); ASST.dir = ni > ASST.idx ? 1 : ni < ASST.idx ? -1 : 0; ASST.idx = ni; ASST.expanded = false; ASST.pickBroker = false; asstRender(); }
+function asstAgeChip(r) { const t = r.leadLastMsgAt || r.leadCreatedAt || r.createdAt || 0; if (!t) return ''; const d = Math.floor((Date.now() - t) / 864e5); const txt = d <= 0 ? 'сегодня' : d === 1 ? '1 день' : d < 5 ? d + ' дня' : d + ' дн.'; const warn = d >= 3; return '<span class="la-age' + (warn ? ' warn' : '') + '">' + ic(I.clock || I.spark) + 'ждёт ' + txt + '</span>'; }
+function asstAvaHue(s) { let h = 0; const str = String(s || '?'); for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360; return h; }
+function asstSrcName(k) { return ({ meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA', ig_direct: 'Instagram', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт', meta_api: 'Meta API', landing: 'Лендинг' })[k] || k; }
 function asstRender() {
   const p = $('#lasstPanel'); if (!p) return;
-  const hd = (body) => '<div class="la-hd"><b>Помощник</b><span class="la-pos">' + (ASST.items.length ? (ASST.idx + 1) + ' из ' + ASST.items.length : '') + '</span><button class="la-x" aria-label="Закрыть">✕</button></div>' + body;
+  const fl = asstFiltered();
+  function wireClose(root) { const x = root.querySelector('.la-x'); if (x) x.onclick = asstClose; }
+  function wireSegs(root) { root.querySelectorAll('[data-seg]').forEach(b => b.onclick = () => { ASST.seg = b.dataset.seg; ASST.idx = 0; ASST.dir = 0; ASST.expanded = false; asstRender(); }); }
+  const segHtml = () => {
+    if (!ASST.items.length) return '';
+    const counts = { '': ASST.items.length }; ASST.items.forEach(r => counts[r.type] = (counts[r.type] || 0) + 1);
+    const segs = [['', 'Все']].concat(Object.keys(ASST_TYPE).filter(t => counts[t]).map(t => [t, ASST_TYPE[t].label]));
+    if (segs.length <= 2) return '';
+    return '<div class="la-segs">' + segs.map(s => '<button class="la-seg' + (ASST.seg === s[0] ? ' on' : '') + (s[0] ? ' ' + (ASST_TYPE[s[0]] || {}).cls : '') + '" data-seg="' + s[0] + '">' + esc(s[1]) + '<i>' + (counts[s[0]] || 0) + '</i></button>').join('') + '</div>';
+  };
+  const hd = (body, withSeg) => '<div class="la-hd"><span class="la-hd-ic">' + asstSpark() + '</span><b>Помощник</b><span class="la-pos">' + (fl.length ? (ASST.idx + 1) + '/' + fl.length : '') + '</span><button class="la-x" aria-label="Закрыть">✕</button></div>' + (withSeg ? segHtml() : '') + body;
+
   if (!ASST.loaded && !ASST.err) { p.innerHTML = hd('<div class="la-skel"><i></i><i></i><i></i></div>'); wireClose(p); return; }
   if (ASST.err) { p.innerHTML = hd('<div class="la-empty">' + esc(ASST.err) + '<button class="la-btn la-ghost" id="laRetry">Повторить</button></div>'); wireClose(p); const rb = $('#laRetry', p); if (rb) rb.onclick = asstOpen; return; }
-  if (ASST.applied) { const a = ASST.applied; p.innerHTML = hd('<div class="la-done"><div class="la-done-t">' + ic(I.check) + ' ' + esc(a.text) + '</div><div class="la-row">' + (a.actionId ? '<button class="la-btn la-ghost" id="laUndo">Отменить</button>' : '') + '<button class="la-btn la-primary" id="laNext">' + (ASST.items.length ? 'Следующая подсказка' : 'Готово') + '</button></div></div>'); wireClose(p);
-    const u = $('#laUndo', p); if (u) u.onclick = () => asstUndo(a.actionId); $('#laNext', p).onclick = () => { ASST.applied = null; if (!ASST.items.length) asstClose(); else asstRender(); }; return; }
+  if (ASST.applied) {
+    const a = ASST.applied;
+    p.innerHTML = hd('<div class="la-done"><div class="la-celebrate"><svg class="la-ckmk" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27l7.5 7.5L38 18"/></svg><b class="la-spk s1"></b><b class="la-spk s2"></b><b class="la-spk s3"></b><b class="la-spk s4"></b><b class="la-spk s5"></b></div><div class="la-done-t">' + esc(a.text) + '</div><div class="la-row">' + (a.actionId ? '<button class="la-btn la-ghost" id="laUndo">Отменить</button>' : '') + '<button class="la-btn la-primary" id="laNext">' + (asstFiltered().length ? 'Следующая' : 'Готово') + '</button></div></div>');
+    wireClose(p);
+    const u = $('#laUndo', p); if (u) u.onclick = () => asstUndo(a.actionId);
+    $('#laNext', p).onclick = () => { ASST.applied = null; const n = asstFiltered(); if (!n.length) asstClose(); else { ASST.idx = Math.min(ASST.idx, n.length - 1); ASST.dir = 0; asstRender(); } };
+    return;
+  }
   const r = asstCur();
-  if (!r) { p.innerHTML = hd('<div class="la-empty">Всё разобрано. Новые подсказки появятся после обновления диалогов 👌</div>'); wireClose(p); return; }
-  const title = { qualify: 'Готова к квалификации', assign_broker: (r.needsBroker ? 'Передать заявку брокеру' : 'Подтвердить передачу'), clarify_information: 'Уточнить информацию' }[r.type] || r.summary;
-  const stageLine = r.expectedStage ? '<div class="la-stage"><span>' + esc(ASST_STAGE[r.currentStage] || r.currentStage) + '</span>' + ic(I.chev || I.arrow) + '<span class="la-stage-to">' + esc(ASST_STAGE[r.expectedStage] || r.expectedStage) + '</span></div>' : '';
-  const why = ASST.expanded ? '<div class="la-why-body">' + (r.criteria || []).map(c => {
+  if (!r) { p.innerHTML = hd('<div class="la-empty"><div class="la-empty-ic">' + asstSpark() + '</div>Всё разобрано.<span>Новые подсказки появятся после обновления диалогов.</span></div>', true); wireClose(p); wireSegs(p); return; }
+  const tm = ASST_TYPE[r.type] || { ic: 'spark', label: '', cls: '' };
+  const title = ({ qualify: 'Готова к квалификации', assign_broker: (r.needsBroker ? 'Передать заявку брокеру' : 'Подтвердить передачу'), clarify_information: /Проверьте/.test(r.summary) ? 'Проверить данные' : 'Уточнить информацию' })[r.type] || r.summary;
+  const hue = asstAvaHue(r.leadName), ini2 = String(r.leadName || '?').trim().slice(0, 1).toUpperCase();
+  const scoreChip = r.leadScore ? '<span class="la-score" title="скоринг">' + r.leadScore + '</span>' : '';
+  const stageLine = r.expectedStage ? '<div class="la-stage"><span class="la-sp from">' + esc(ASST_STAGE[r.currentStage] || r.currentStage) + '</span><span class="la-arr">' + ic(I.arrow || I.chev) + '</span><span class="la-sp to">' + esc(ASST_STAGE[r.expectedStage] || r.expectedStage) + '</span></div>' : '';
+  const crit = r.criteria || [];
+  const conf = crit.length ? (() => { const ok = crit.filter(c => c.status === 'confirmed').length; const pct = Math.round(ok / crit.length * 100); return '<div class="la-conf"><div class="la-conf-h"><span>Критерии</span><b>' + ok + ' из ' + crit.length + '</b></div><div class="la-conf-bar"><i style="width:' + pct + '%"></i></div></div>'; })() : '';
+  const why = ASST.expanded ? '<div class="la-why-body">' + crit.map((c, i) => {
     const st = c.status === 'confirmed' ? 'ok' : c.status === 'contradictory' ? 'warn' : 'miss';
-    const lbl = { interest: 'Интерес', contact: 'Контакт', down_payment: 'Первый взнос', budget: 'Бюджет', geo: 'География', type: 'Тип', timeline: 'Срок' }[c.key] || c.key;
+    const lbl = ({ interest: 'Интерес', contact: 'Контакт', down_payment: 'Первый взнос', budget: 'Бюджет', geo: 'География', type: 'Тип', timeline: 'Срок' })[c.key] || c.key;
     const ev = (c.evidence || [])[0];
-    return '<div class="la-cr ' + st + '"><span class="la-cr-d"></span><div><b>' + esc(lbl) + '</b>' + (ev && ev.quote ? '<i>«' + esc(ev.quote) + '»</i>' : '') + '</div></div>';
+    return '<div class="la-cr ' + st + '" style="--i:' + i + '"><span class="la-cr-d"></span><div><b>' + esc(lbl) + '</b>' + (ev && ev.quote ? '<i>«' + esc(ev.quote) + '»</i>' : '') + '</div></div>';
   }).join('') + '</div>' : '';
   let actions;
   if (r.type === 'assign_broker' && ASST.pickBroker) {
     const brs = (STATE.brokers || []).filter(b => b.active !== false);
-    actions = '<div class="la-brokers">' + brs.map(b => '<button class="la-brk" data-brk="' + esc(b.id) + '">' + esc(b.name) + '</button>').join('') + (brs.length ? '' : '<div class="la-empty2">Нет брокеров</div>') + '</div>';
+    actions = '<div class="la-brokers">' + brs.map(b => '<button class="la-brk" data-brk="' + esc(b.id) + '"><span class="la-brk-a" style="--h:' + asstAvaHue(b.name) + '">' + esc(String(b.name || '?').slice(0, 1).toUpperCase()) + '</span>' + esc(b.name) + '</button>').join('') + (brs.length ? '' : '<div class="la-empty2">Нет брокеров</div>') + '<button class="la-btn la-ghost" id="laBack">Назад</button></div>';
   } else {
-    const primLbl = { qualify: 'Квалифицировать', assign_broker: (r.needsBroker ? 'Выбрать брокера' : 'Подтвердить передачу'), clarify_information: 'Создать задачу' }[r.type];
+    const primLbl = ({ qualify: 'Квалифицировать', assign_broker: (r.needsBroker ? 'Выбрать брокера' : 'Подтвердить передачу'), clarify_information: 'Создать задачу' })[r.type];
     const canDo = r.type !== 'assign_broker' || (r.can && r.can.assign);
-    actions = '<div class="la-row">' + (canDo ? '<button class="la-btn la-primary" id="laDo"' + (ASST.busy ? ' disabled' : '') + '>' + esc(primLbl) + '</button>' : '<span class="la-noperm">Передача — у руководителя</span>') +
+    actions = '<div class="la-row">' + (canDo ? '<button class="la-btn la-primary" id="laDo"' + (ASST.busy ? ' disabled' : '') + '>' + (ASST.busy ? '<span class="la-spin"></span>' : ic(tm.ic)) + esc(primLbl) + '</button>' : '<span class="la-noperm">Передача — у руководителя</span>') +
       '<button class="la-btn la-ghost" id="laLater">Позже</button><button class="la-btn la-icon" id="laMore" aria-label="Ещё">…</button></div>';
   }
-  const body = '<div class="la-lead" id="laLead">' + esc(r.leadName || 'Клиент') + '</div>' +
+  const nav = fl.length > 1 ? '<div class="la-nav"><button class="la-navb" id="laPrev"' + (ASST.idx <= 0 ? ' disabled' : '') + '>' + ic(I.chev || I.arrow) + '</button><div class="la-dots">' + fl.map((_, i) => '<span class="la-dot' + (i === ASST.idx ? ' on' : '') + '" data-dot="' + i + '"></span>').join('') + '</div><button class="la-navb" id="laNextC"' + (ASST.idx >= fl.length - 1 ? ' disabled' : '') + '>' + ic(I.chev || I.arrow) + '</button></div>' : '';
+  const body = '<div class="la-card ' + (ASST.dir > 0 ? 'slide-l' : ASST.dir < 0 ? 'slide-r' : 'fadein') + ' t-' + tm.cls + '">' +
+    '<div class="la-top"><span class="la-ava" style="--h:' + hue + '">' + esc(ini2) + '</span><div class="la-top-m"><div class="la-lead" id="laLead">' + esc(r.leadName || 'Клиент') + '</div><div class="la-meta">' + asstAgeChip(r) + (r.leadSource ? '<span class="la-src">' + esc(asstSrcName(r.leadSource)) + '</span>' : '') + '</div></div>' + scoreChip + '</div>' +
+    '<div class="la-tbadge ' + tm.cls + '">' + ic(tm.ic) + esc(tm.label) + '</div>' +
     '<div class="la-title">' + esc(title) + '</div>' +
-    '<div class="la-reason">' + esc(r.summary) + '</div>' + stageLine +
-    (r.criteria && r.criteria.length ? '<button class="la-why" id="laWhy">' + (ASST.expanded ? 'Скрыть' : 'Почему рекомендуем') + '</button>' + why : '') +
-    actions +
-    (ASST.count > ASST.items.length ? '' : '') +
+    '<div class="la-reason">' + esc(r.summary) + '</div>' + stageLine + conf +
+    (crit.length ? '<button class="la-why" id="laWhy">' + (ASST.expanded ? 'Скрыть основания' : 'Почему рекомендуем') + ic(I.chev) + '</button>' + why : '') +
+    actions + '</div>' + nav +
     '<button class="la-all" id="laAll">Все подсказки · ' + ASST.items.length + '</button>';
-  p.innerHTML = hd(body); wireClose(p);
+  p.innerHTML = hd(body, true); wireClose(p); wireSegs(p);
   const lead = $('#laLead', p); if (lead) lead.onclick = () => { asstClose(); if (typeof openLeadModal === 'function') openLeadModal(r.leadId, 'funnel'); };
   const why1 = $('#laWhy', p); if (why1) why1.onclick = () => { ASST.expanded = !ASST.expanded; asstRender(); };
   const doB = $('#laDo', p); if (doB) doB.onclick = () => { if (r.type === 'assign_broker' && r.needsBroker) { ASST.pickBroker = true; asstRender(); } else asstApply(r); };
+  const back = $('#laBack', p); if (back) back.onclick = () => { ASST.pickBroker = false; asstRender(); };
   const later = $('#laLater', p); if (later) later.onclick = (e) => asstLaterMenu(e, r);
   const more = $('#laMore', p); if (more) more.onclick = (e) => asstMoreMenu(e, r);
   const all = $('#laAll', p); if (all) all.onclick = () => asstAllList();
+  const pv = $('#laPrev', p); if (pv) pv.onclick = () => asstGoto(ASST.idx - 1);
+  const nx = $('#laNextC', p); if (nx) nx.onclick = () => asstGoto(ASST.idx + 1);
+  p.querySelectorAll('[data-dot]').forEach(d => d.onclick = () => asstGoto(+d.dataset.dot));
   p.querySelectorAll('[data-brk]').forEach(b => b.onclick = () => asstApply(r, b.dataset.brk));
-  function wireClose(root) { const x = root.querySelector('.la-x'); if (x) x.onclick = asstClose; }
 }
 function asstAllList() {
   const p = $('#lasstPanel'); if (!p) return;
