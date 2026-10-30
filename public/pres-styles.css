@@ -79,6 +79,9 @@
 .lp-hero-land .lp-hero-price{ margin-top:18px; color:var(--accent); }
 
 /* ====== EDITORIAL ====== */
+/* зеркальный макет: direction:rtl разворачивает размещение колонок 2-колоночных land-раскладок (ширины следуют за своими элементами), контент внутри — обратно ltr */
+.lp-mirror .lp-edit-land, .lp-mirror .lp-metrics-land, .lp-mirror .lp-ben-land{ direction:rtl; }
+.lp-mirror .lp-edit-land > *, .lp-mirror .lp-metrics-land > *, .lp-mirror .lp-ben-land > *{ direction:ltr; }
 .lp-edit-land{ display:grid; grid-template-columns:42% 58%; gap:0; align-items:stretch; padding:0 !important; }
 .lp-edit-land .lp-edit-text{ padding:56px 48px; display:flex; flex-direction:column; justify-content:center; }
 .lp-edit-land .lp-edit-photo{ overflow:hidden; }

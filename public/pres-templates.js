@@ -535,8 +535,22 @@
     </div>`];
   };
 
-  function renderSection(section, ctx0) {
+  /* per-format кроп: если у assetRef есть cropsByFormat[fmt], применяем ЕГО focalPoint/fit (иначе — общий).
+     Клонируем секцию (не мутируем хранимое), чтобы каждый формат держал свой кадр независимо. */
+  function applyFormatCrops(section, fmtId) {
+    const refs = section && section.assetRefs;
+    if (!refs || !refs.length || !refs.some(r => r && r.cropsByFormat && r.cropsByFormat[fmtId])) return section;
+    return Object.assign({}, section, { assetRefs: refs.map(r => {
+      const cf = r && r.cropsByFormat && r.cropsByFormat[fmtId]; if (!cf) return r;
+      return Object.assign({}, r, {
+        focalPoint: cf.focalPoint || r.focalPoint,
+        fit: cf.mode === 'fit' ? 'contain' : (cf.mode === 'fill' ? 'cover' : r.fit),
+      });
+    }) });
+  }
+  function renderSection(section0, ctx0) {
     const fmt = TOK.format(ctx0.format || (ctx0.fmt && ctx0.fmt.id));
+    const section = applyFormatCrops(section0, fmt.id);
     const theme = ctx0.theme || {};
     const source = ctx0.source || {};
     const ctx = {
@@ -551,8 +565,9 @@
     try { inners = fn(ctx); } catch (e) { inners = [`<div class="lp-safe lp-empty">Ошибка макета: ${esc(e.message)}</div>`]; }
     const footHtml = ctx.brand.footer || (ctx.brand.logoText ? `<span>${esc(ctx.brand.logoText)}</span>` : '');
     const mstyle = moveStyleFor(section.id, section.elMove);
+    const mir = section.styleOverrides && section.styleOverrides.mirror ? ' lp-mirror' : '';   /* зеркальный макет «фото слева/справа» (CSS разворачивает 2-колоночные land-раскладки) */
     return inners.map((inner, i) => pageShell(fmt, theme, mstyle + inner, {
-      cls: `lp-fam-${section.family}` + (ctx0.altTint ? ' lp-alt-tint' : '') + (i>0?' lp-continuation':''),
+      cls: `lp-fam-${section.family}` + (ctx0.altTint ? ' lp-alt-tint' : '') + (i>0?' lp-continuation':'') + mir,
       footer: section.family==='hero' ? false : (ctx.brand.footer!==undefined||ctx.brand.logoText?true:false),
       footerHtml: footHtml,
       sid: section.id,

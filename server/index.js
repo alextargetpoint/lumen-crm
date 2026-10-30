@@ -192,10 +192,10 @@ function presEditorShell(id, title) {
   В iframe (window.self!==window.top) не срабатывает — так встраивается в CRM. */
 try{if(window.self===window.top){location.replace('/#pres/'+${JSON.stringify(id)});}}catch(_){}</script>
 ${PRES_FAVICON}
-<link rel="stylesheet" href="/pres-styles.css?v=14"><link rel="stylesheet" href="/presedit.css?v=35">
+<link rel="stylesheet" href="/pres-styles.css?v=15"><link rel="stylesheet" href="/presedit.css?v=35">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=17"></script><script src="/presedit.js?v=50"></script>
+<script src="/pres-tokens.js?v=12"></script><script src="/pres-templates.js?v=18"></script><script src="/presedit.js?v=50"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
