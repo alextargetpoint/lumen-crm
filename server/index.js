@@ -193,7 +193,7 @@ function presEditorShell(id, title) {
   В iframe (window.self!==window.top) не срабатывает — так встраивается в CRM. */
 try{if(window.self===window.top){location.replace('/#pres/'+${JSON.stringify(id)});}}catch(_){}</script>
 ${PRES_FAVICON}
-<link rel="stylesheet" href="/pres-styles.css?v=16"><link rel="stylesheet" href="/presedit.css?v=36">
+<link rel="stylesheet" href="/pres-styles.css?v=16"><link rel="stylesheet" href="/presedit.css?v=37">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
 <script src="/pres-tokens.js?v=13"></script><script src="/pres-templates.js?v=19"></script><script src="/presedit.js?v=51"></script>

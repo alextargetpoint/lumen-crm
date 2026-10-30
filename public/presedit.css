@@ -669,3 +669,7 @@ button{font-family:inherit;cursor:pointer}
 .pe-galctl{flex:1;border:0;background:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:3px 0;font-family:inherit;transition:background .12s}
 .pe-galctl:hover{background:rgba(255,255,255,.16)}
 .pe-galctl:disabled{opacity:.3;cursor:default}
+
+/* фото на холсте: явная подсказка, что перетаскиванием двигается ВИДИМАЯ область кадра */
+.pe-ced-photo{cursor:grab}
+.pe-ced-photo.pe-panning{cursor:grabbing}

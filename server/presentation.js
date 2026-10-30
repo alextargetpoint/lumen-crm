@@ -86,7 +86,7 @@ function draftFromProperty(db, pr, broker, opts) {
       title: srcBind('name', pr.name),
       subtitle: pr.hookTitle ? ov(pr.hookTitle) : ov(''),
       locationLabel: ov([gi.region, gi.country].filter(Boolean)),
-      price: pr.priceFrom ? ov({ kind: 'from', amount: pr.priceFrom, currency }) : undefined,
+      price: ov(priceBinding(pr, currency)),
       metrics: ov(heroMetrics(pr, areaRange)),
     },
   });
@@ -651,7 +651,7 @@ function heroMetrics(pr, areaRange) {
 }
 function keyMetrics(pr, areaRange, currency) {
   const out = [];
-  if (pr.priceFrom) out.push({ value: T.fmtPrice({ kind: 'from', amount: pr.priceFrom, currency }), label: 'стоимость', icon: 'tag' });
+  out.push({ value: T.fmtPrice(priceBinding(pr, currency)), label: 'стоимость', icon: 'tag' });
   if (pr.roi) out.push({ value: roiVal(pr.roi), label: 'доходность', icon: 'trend' });
   if (areaRange) out.push({ value: T.fmtArea(areaRange), label: 'площадь', icon: 'area' });
   if (pr.beds != null) out.push(bedsMetric(pr.beds, 'варианты планировок'));
@@ -683,6 +683,13 @@ function sizeRange(pr) {
   const a = nums.map(x => +x.replace(',', '.')).filter(x => x > 5 && x < 5000);
   if (!a.length) return null;
   return { from: Math.min(...a), to: Math.max(...a), unit: 'm2' };
+}
+/* цена: диапазон (от/до), «от X», либо «по запросу» — раньше всегда «от X», а без цены блок пропадал */
+function priceBinding(pr, currency) {
+  const from = +pr.priceFrom || 0, to = +pr.priceTo || 0;
+  if (from && to && to > from) return { kind: 'range', amount: from, to: to, currency };
+  if (from) return { kind: 'from', amount: from, currency };
+  return { kind: 'on_request' };
 }
 /* короткое значение доходности из строки roi («7-8% net …» → «7-8%») */
 function roiVal(r) { const m = String(r || '').match(/[\d.,]+\s*[-–]?\s*[\d.,]*\s*%/); return m ? m[0].replace(/\s/g, '') : String(r || '').slice(0, 10); }
