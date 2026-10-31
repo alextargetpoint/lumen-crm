@@ -815,6 +815,20 @@ function guardCfg(db) {
     maxSilenceDays: Math.max(0, Math.min(365, g.maxSilenceDays != null ? +g.maxSilenceDays : 0)),  /* 0 = выкл; жёсткий стоп: клиент молчит > N дней → Спящие */
   };
 }
+/* ⭐CIRCUIT BREAKER НОМЕРА (анти-бан): 7-дн бакеты холодных касаний (cold) и ответивших лидов (rep) на номер.
+   Низкий answer-rate при объёме = спам-сигнал → номер выводим из холода (index.js pickGrayNumber), сам восстановится,
+   когда старые бакеты устареют (отдых → повторная попытка). cold кредитуем на первом касании, rep — на первом ответе лида. */
+function creditNumberStat(n, field) {
+  if (!n) return; const d = new Date().toISOString().slice(0, 10);
+  n._stat = n._stat || {}; n._stat[d] = n._stat[d] || { cold: 0, rep: 0 }; n._stat[d][field] = (n._stat[d][field] || 0) + 1;
+  const keys = Object.keys(n._stat).sort(); while (keys.length > 7) delete n._stat[keys.shift()];
+}
+function numberHealth(n) {
+  const st = (n && n._stat) || {}; let cold = 0, rep = 0;
+  const cut = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  for (const d of Object.keys(st)) if (d >= cut) { cold += st[d].cold || 0; rep += st[d].rep || 0; }
+  return { cold, rep, rate: cold > 0 ? rep / cold : 1 };
+}
 /* последнее исходящее не ушло (номер разлогинен/офлайн)? → проактивные касания ставим на паузу,
    иначе движок прожигает шаги в мёртвый номер (сообщения не доходят, но негатив копится при переподключении). */
 function lastOutFailed(db, lead) {
@@ -1331,6 +1345,11 @@ function inbound(db, lead, text, opts = {}) {
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'in', via: null, text, at: Date.now(), status: 'received' };
   const noise = SYSTEM_NOISE_RE.test(String(text || '').trim());
   if (noise) m.system = true;
+  /* первый НАСТОЯЩИЙ ответ лида → кредит answer-rate тому серому номеру, что его касался (circuit breaker) */
+  if (!noise && lead.grayPhone && !(db.messages || []).some(x => x.leadId === lead.id && x.dir === 'in' && !x.system)) {
+    const nrec = ((db.settings.waGray || {}).numbers || []).find(nn => nn.phone === lead.grayPhone);
+    if (nrec) creditNumberStat(nrec, 'rep');
+  }
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120) };
   /* ⚠️ КАНАЛ ВХОДЯЩЕГО: тегируем сообщение и делаем его каналом ДИАЛОГА (activeChannel). Клиент написал в
      Telegram → переписка переключается на Telegram (и в UI плашка, и для ответов ИИ/менеджера), а не висит
@@ -1714,4 +1733,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue, guardCfg, declineMatch, lastOutFailed };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue, guardCfg, declineMatch, lastOutFailed, creditNumberStat, numberHealth };

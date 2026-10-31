@@ -6745,7 +6745,9 @@ async function openLeadModal(id, backScope) {
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <span class="badge">${l.grayPhone ? ((l.grayPhoneForce && l.grayPhoneForce !== l.grayPhone) ? 'временно +' + esc(l.grayPhoneForce) : '+' + esc(l.grayPhone)) : 'назначится при первом касании'}</span>
                 <button class="btn btn-sm" id="lcGrayMove">${ic(I.chat)}Перевести на другой номер</button>
+                ${l.grayPhone ? `<button class="btn btn-sm" id="lcMigrateClean" title="Перевести диалог на чистый/брокерский номер: клиенту уйдёт связка «передаю вас…» со старого номера и интро с нового с напоминанием вашей переписки (анти-бан + анти-мошенник)">${ic(I.shield)}На чистый номер</button>` : ''}
               </div>
+              ${l.grayPhone ? '<div class="muted" style="font-size:11px;margin-top:6px;line-height:1.5">«На чистый номер» — когда контакт установлен: диалог продолжит брокер со своего (или «только для диалогов») номера, который не делает рассылок. Клиенту уйдёт честная связка со старого номера + интро с рекапом переписки, чтобы он не принял за мошенников.</div>' : ''}
             </div>` : ''}`,
     { open: !l.phone, icon: I.phone, count: (l.contacts || []).length || null })}
           ${coll('Встречи', `<div style="margin-top:6px">${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}
@@ -7034,6 +7036,13 @@ async function openLeadModal(id, backScope) {
     setTimeout(() => { $$('.lc-mvpick').forEach(b => b.addEventListener('click', async () => {
       try { await api.post('/leads/' + id + '/gray-move', { phone: b.dataset.mv }); toast('Диалог переведён', 'Следующее сообщение уйдёт с нового номера', true); closeModal(); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); }
     })); }, 40);
+  });
+  $('#lcMigrateClean', bd)?.addEventListener('click', async () => {
+    const broker = (STATE.brokers || []).find(b => b.id === l.broker);
+    const who = broker ? ('брокеру ' + esc(broker.name.split(' ')[0]) + ' (на его номер)') : 'на чистый номер (помеченный «только для диалогов»)';
+    if (!await uiConfirm('Перевести на чистый номер?', `Клиенту уйдёт со старого номера связка «передаю вас…», а с нового (${who}) — интро с напоминанием вашей переписки, чтобы он не принял за мошенников. Диалог продолжится с нового номера, который не делает рассылок. Отправить?`, { ok: 'Перевести', cancel: 'Отмена' })) return;
+    try { const r = await api.post('/leads/' + id + '/migrate-number', {}); toast('Переведено', 'Бридж + интро с рекапом отправлены' + (r.to ? ' · +' + r.to : ''), true); closeModal(); openLeadModal(id); }
+    catch (e) { toast('Не вышло', (e && e.message) || 'нет подходящего чистого номера — назначьте брокеру номер или пометьте номер «только для диалогов»'); }
   });
   $('#lcCallBtn', bd).addEventListener('click', () => $('#lcCallFile', bd).click());
   $('#lcDial', bd)?.addEventListener('click', async () => {

@@ -1235,7 +1235,7 @@ engine.reportExtras = (db, period) => {
   } catch (e) { console.error('[report-extras]', e.message); return ''; }
 };
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
-engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
+engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); if ((db.settings.waGray || {}).migrateOnHandover && lead.grayPhone) { migrateLeadToClean(db, lead).catch(() => {}); } };   /* авто-перевод на чистый/брокерский номер при передаче (если включено) */
 /* Отчёты/мгновенные уведомления ОСНОВАТЕЛЮ через центральный бот-мост. engine.sendReport умеет только
    легаси пер-тенантный бот отчётов (channels.tg.botToken) — в SaaS его нет, основатель привязан к общему
    боту по ownerTgChatId. Шлём туда (+ доп. аккаунты владельца). true = есть куда слать и мост готов. */
@@ -3903,6 +3903,9 @@ function grayDailyCap(db, n) {
   return Math.round(c.startCap + (c.base - c.startCap) * (ageDays / c.warmupDays));
 }
 function graySentToday(n) { const today = new Date().toISOString().slice(0, 10); return n._sentDay === today ? (n._sentToday || 0) : 0; }
+/* circuit breaker: номер с низким answer-rate при объёме = спам-сигнал → вывести из холода (сам вернётся после отдыха) */
+function grayBreakerCfg(db) { const g = db.settings.waGray || {}; return { floor: (g.replyRateFloor != null ? +g.replyRateFloor : 0.05), minVol: (g.minVolumeForBreaker != null ? +g.minVolumeForBreaker : 40) }; }
+function grayUnhealthy(db, n) { const c = grayBreakerCfg(db); const h = engine.numberHealth(n); return h.cold >= c.minVol && h.rate < c.floor; }
 /* номер «деградировал»: получатели не расшифровывают наши сообщения (retryIn↑) ИЛИ сам не читает входящие (decFails↑)
    в последние 20 мин. ⚠️ Используется ТОЛЬКО для АЛЕРТА «пересканируйте номер» — НЕ для смены номера.
    Диалоги с такого номера НЕ переводятся на другие номера (лечение — форс-рефреш сессии в воркере, см. pickGrayNumber). */
@@ -3936,6 +3939,12 @@ function pickGrayNumber(db, lead, live) {
      они не копят бан-риск и защищают активные разговоры. Если все номера клин — не блокируем (фолбэк). */
   let scope = connected.filter(n => !n.roles || n.roles.outreach !== false);
   if (!scope.length) scope = connected;
+  /* ⭐CIRCUIT BREAKER: номера с низким answer-rate при объёме выводим из холода (сами вернутся, когда бакеты устареют) + алерт раз/день */
+  { const today = new Date().toISOString().slice(0, 10);
+    const healthy = scope.filter(n => {
+      if (grayUnhealthy(db, n)) { if (n._breakerWarnDay !== today) { n._breakerWarnDay = today; const h = engine.numberHealth(n); ai.pushEvent(db, { type: 'note', text: `⚠️ Номер +${n.realPhone || n.phone} выведен из холодных касаний: низкий отклик (${Math.round(h.rate * 100)}% на ${h.cold} касаний / 7 дн). Отдохнёт — вернётся сам. Проверьте базу и первое сообщение.` }); } return false; }
+      return true; });
+    if (healthy.length) scope = healthy; }
   /* РАСПРЕДЕЛЕНИЕ по номерам БРОКЕРА: если за брокером закреплено НЕСКОЛЬКО номеров — раскидываем первые
      касания по кругу, а не шлём всё с одного. Так номера греются равномерно, отвал одного рвёт связь лишь с частью. */
   if (lead.broker) { const mine = scope.filter(n => n.brokerId === lead.broker); if (mine.length) scope = mine; }
@@ -3972,7 +3981,15 @@ engine.setGraySender((db, lead, m, _opts) => {
   let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { m.status = 'failed'; m.failReason = 'WhatsApp-воркер сейчас недоступен — попробуйте ещё раз через минуту'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): WA-воркер недоступен (${e.message})` }); store.save(); return; }
   const wasNew = !lead.grayPhone;
   delete lead._grayDefer;                       /* сбрасываем до выбора — флаг выставит только текущий расчёт бюджета */
-  const num = pickGrayNumber(db, lead, live);
+  let num;
+  if (_opts && _opts.fromPhone) {               /* ПЕРЕВОД/бридж: сообщение жёстко с указанного номера (минуя выбор) */
+    const want = String(_opts.fromPhone).replace(/\D/g, '');
+    num = ((g.numbers || []).find(n => n.phone === want)) || null;
+    const s = num && live[waGraySid(num.phone)];
+    if (!num || !s || s.status !== 'connected') { m.status = 'failed'; m.failReason = `Номер +${want} для перевода не на связи`; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Перевод не ушёл (${lead.name}): номер +${want} не на связи` }); store.save(); return; }
+  } else {
+    num = pickGrayNumber(db, lead, live);
+  }
   if (!num && lead._grayDefer) {   /* ⭐анти-бан: все серые номера исчерпали суточный лимит — НЕ провал, а ОТКЛАДЫВАЕМ касание */
     delete lead._grayDefer;
     lead.ai = lead.ai || {};
@@ -4013,6 +4030,7 @@ engine.setGraySender((db, lead, m, _opts) => {
     const today = new Date().toISOString().slice(0, 10);
     if (num._newLeadDay !== today) { num._newLeadDay = today; num._newLeadsToday = 0; }
     num._newLeadsToday = (num._newLeadsToday || 0) + 1;   /* учёт первого касания новому лиду */
+    engine.creditNumberStat(num, 'cold');                 /* answer-rate: +1 холодное касание на номер (circuit breaker) */
     /* МЯГКИЙ потолок: шлём в любом случае, но если превысили — френдли-предупреждение (не блок) */
     const cap = grayNewLeadCap(db);
     if (num._newLeadsToday > cap && !num._capWarnedDay) { num._capWarnedDay = today; ai.pushEvent(db, { type: 'note', text: `⚠️ Осторожно: с номера +${num.realPhone || num.phone} сегодня уже ${num._newLeadsToday} первых касаний новым лидам (реком. ≤${cap}). Много первых касаний с одного серого номера повышает риск бана — распределите новых лидов на другие номера или добавьте номер.` }); }
@@ -4032,6 +4050,47 @@ engine.setGraySender((db, lead, m, _opts) => {
   _graySeq[lead.id] = _p.catch(() => {});   /* цепочка продолжается, даже если это сообщение упало */
   return _p;
 });
+
+/* ⭐ПЕРЕВОД ЛИДА НА ЧИСТЫЙ/БРОКЕРСКИЙ НОМЕР (анти-бан + анти-«мошенник»).
+   Выбор цели: собственный номер брокера → явный клин-номер (roles.outreach:false) → любой подключённый ≠ текущего.
+   WhatsApp-тред НЕЛЬЗЯ физически перенести, поэтому: (1) бридж со СТАРОГО номера «передаю вас…, напишет с {target}»,
+   (2) закрепляем новый номер, (3) интро с НОВОГО номера + РЕКАП последней реплики клиента — это и есть доказательство
+   легитимности (новый номер дословно знает вашу переписку → не мошенник). Диалоги идут мимо дневного потолка. */
+function waGrayLiveSessions(db) { return waGrayApi(db, 'GET', '/sessions').then(r => (r && r.sessions) || {}).catch(() => ({})); }
+function cleanNumberFor(db, lead, live) {
+  const g = db.settings.waGray || {};
+  const conn = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected' && (!n.roles || n.roles.send !== false) && n.phone !== lead.grayPhone; });
+  if (!conn.length) return null;
+  if (lead.broker) { const b = conn.find(n => n.brokerId === lead.broker); if (b) return b; }          /* личный номер брокера */
+  const clean = conn.find(n => n.roles && n.roles.outreach === false);                                   /* явный клин-номер */
+  return clean || null;
+}
+async function migrateLeadToClean(db, lead, targetPhone, opts = {}) {
+  const live = await waGrayLiveSessions(db);
+  const g = db.settings.waGray || {};
+  let target = null;
+  if (targetPhone) { const want = String(targetPhone).replace(/\D/g, ''); const s = live[waGraySid(want)]; if (s && s.status === 'connected') target = (g.numbers || []).find(n => n.phone === want) || { phone: want }; }
+  if (!target) target = cleanNumberFor(db, lead, live);
+  if (!target) return { ok: false, error: 'нет подходящего чистого номера на связи — назначьте брокеру его номер или пометьте номер «только для диалогов»' };
+  if (target.phone === lead.grayPhone) return { ok: false, error: 'лид уже на этом номере' };
+  const from = lead.grayPhone;
+  const broker = lead.broker ? (db.brokers || []).find(b => b.id === lead.broker) : null;
+  const agency = db.settings.agencyName || db.settings.brandName || (db.settings.brand && db.settings.brand.name) || 'агентство';
+  const vars = (s) => String(s || '').replace(/\{name\}/g, lead.name || '').replace(/\{broker\}/g, (broker && broker.name) || 'ваш менеджер').replace(/\{agency\}/g, agency).replace(/\{target\}/g, '+' + target.phone).replace(/\{from\}/g, from ? '+' + from : '');
+  if (from && from !== target.phone) {   /* бридж со старого номера — анти-«мошенник» */
+    const bridge = vars(g.migrateBridge || 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет вам с номера {target} — это мы, сохраните, пожалуйста 🙌');
+    engine.send(db, lead, bridge, 'human', { channel: 'wa', fromPhone: from, allowDup: true });
+  }
+  lead.grayPhone = target.phone; lead.grayMigrated = Date.now();
+  const lastIn = [...(db.messages || [])].reverse().find(x => x.leadId === lead.id && x.dir === 'in' && !x.system && x.text);
+  const recap = lastIn ? (vars(g.migrateRecap || 'Напомню, мы остановились на: «{quote}». Продолжаю отсюда.').replace('{quote}', String(lastIn.text).slice(0, 160))) : '';
+  let intro = vars(g.migrateIntro || 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с моего личного номера.');
+  if (recap) intro += '\n\n' + recap;
+  engine.send(db, lead, intro, 'human', { channel: 'wa', fromPhone: target.phone, allowDup: true, media: opts.media || null });
+  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: диалог переведён ${from ? ('с +' + from) : ''} на чистый номер +${target.phone}${broker ? (' (' + broker.name + ')') : ''} — бридж + интро с рекапом отправлены` });
+  store.save();
+  return { ok: true, from, to: target.phone, broker: broker ? broker.name : null };
+}
 
 /* Серый TELEGRAM: холодное касание с прогретого TG-аккаунта (первое касание/цепочка), когда каскад дошёл до TG.
    Воркер /sessions/:sid/send {to,message} импортит контакт по номеру и шлёт. Лида нет в TG → tg='no', каскад дальше. */
@@ -9146,6 +9205,15 @@ const server = http.createServer(async (req, res) => {
       if (a) { try { fs.unlinkSync(path.join(PUBLIC, a.url.replace(/^\//, ''))); } catch (_) {} }
       lead.attachments = (lead.attachments || []).filter(x => x.id !== m[2]); store.save();
       return json(res, 200, { ok: true });
+    }
+    /* ⭐ПЕРЕВОД лида на чистый/брокерский номер (бридж + интро с рекапом — анти-бан + анти-«мошенник») */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/migrate-number$/)) && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      if (R.role === 'broker' && lead.broker && lead.broker !== R.brokerId) return json(res, 403, { error: 'нет доступа к лиду' });
+      const b = await readBody(req);
+      const r = await migrateLeadToClean(db, lead, b.targetPhone || null, {});
+      return json(res, r.ok ? 200 : 400, r);
     }
     /* голосовые комментарии брокера по лиду: аудио + авто-расшифровка (Whisper) */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/voice$/)) && req.method === 'POST') {
