@@ -623,6 +623,24 @@ function tickChains(db) {
     }
     /* ⭐ЗАЩИТА ОТ ВЫГОРАНИЯ: офлайн-номер → пауза (не прожигаем шаги в мёртвый номер; проба ≤1/6ч, само-восстановление) */
     if (offlinePaused(db, lead, nowT)) { lead.ai.nextTouchAt = nowT + 6 * 3600e3; continue; }
+    /* ⭐АНТИ-БАН СЕРОГО: ≤N холодных касаний в СЕРОМ WhatsApp на лида → уходим с серого номера.
+       Повторный долбёж молчуна с одного серого WA — главный триггер жалоб/блокировок/бана номера.
+       Сначала — безопасный канал (TG/email), которого бан не касается; если каналов нет — в «Спящие»
+       + метка «для-рассылки»: такой лид дальше греем ТОЛЬКО через Cloud API (санкционированная рассылка),
+       а не серым номером. Действует только для активного канала WA (серый). */
+    const _gc = guardCfg(db);
+    if (_gc.enabled && _gc.grayColdTouchCap > 0 && (lead.activeChannel || 'wa') === 'wa' && lead.ai.chainStep >= _gc.grayColdTouchCap) {
+      const nx = nextChannel(db, lead);
+      if (nx && nx !== 'wa') {
+        lead.activeChannel = nx; lead.ai.chainStep = 0; lead.ai.nextTouchAt = nowT + 0.5 * dayMs(db); lead.ai.chainBaseAt = lead.ai.nextTouchAt;
+        ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `${lead.name}: ${_gc.grayColdTouchCap} касаний в WhatsApp без ответа — ухожу с серого номера на ${CH_NAMES[nx] || nx} (анти-бан)` });
+        continue;
+      }
+      lead.stage = 'sleeping';
+      lead.tags = Array.from(new Set([...(lead.tags || []), 'для-рассылки']));
+      ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: ${_gc.grayColdTouchCap} касаний в WhatsApp без ответа, других каналов нет → «Спящие» + метка «для-рассылки» (дальше только Cloud API, безопаснее серого)` });
+      continue;
+    }
     /* потолок касаний без ответа → в «Спящие», бомбить перестаём */
     const _g = guardCfg(db);
     if (_g.enabled && _g.maxTouchesNoReply > 0 && lead.ai.chainStep >= _g.maxTouchesNoReply) {
@@ -792,6 +810,7 @@ function guardCfg(db) {
     softExitText: typeof g.softExitText === 'string' && g.softExitText.trim() ? g.softExitText
       : 'Если тема сейчас не актуальна — просто напишите «нет», и я больше не буду беспокоить. А если интересно, с радостью помогу дальше.',
     maxTouchesNoReply: Math.max(0, Math.min(30, g.maxTouchesNoReply != null ? +g.maxTouchesNoReply : 5)),  /* 0 = без потолка */
+    grayColdTouchCap: Math.max(0, Math.min(20, g.grayColdTouchCap != null ? +g.grayColdTouchCap : 3)),  /* ≤N холодных касаний в СЕРОМ WhatsApp на лида → уходим на безопасный канал/рассылку (анти-бан; 0=выкл) */
     pauseOnOffline: g.pauseOnOffline !== false,                     /* не слать, пока номер не на связи (прошлое не ушло) */
     maxSilenceDays: Math.max(0, Math.min(365, g.maxSilenceDays != null ? +g.maxSilenceDays : 0)),  /* 0 = выкл; жёсткий стоп: клиент молчит > N дней → Спящие */
   };

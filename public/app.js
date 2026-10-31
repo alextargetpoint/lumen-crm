@@ -1578,13 +1578,15 @@ window.openWaPersona = function (phone, n) {
         <div class="form-row" style="flex:1"><label>Брокер за номером</label><select id="wapBroker"><option value="">— пул агентства</option>${(STATE.brokers || []).map(b2 => `<option value="${esc(b2.id)}" ${(n && n.brokerId) === b2.id ? 'selected' : ''}>${esc(b2.name)}</option>`).join('')}</select></div>
       </div>
       <div class="muted" style="font-size:11px;line-height:1.5;margin-top:2px">Шаблонная — номер в общем пуле, первые касания раскидываются по кругу (прогрев + меньше риск). Закреплённая — все касания «своих» лидов идут с этого номера (личный номер брокера).</div>
+      <label class="form-row" style="display:flex;align-items:flex-start;gap:9px;margin-top:10px;cursor:pointer"><input type="checkbox" id="wapClean" ${(n && n.roles && n.roles.outreach === false) ? 'checked' : ''} style="margin-top:3px;flex:0 0 auto"><span style="font-size:12px;line-height:1.45"><b>Только для диалогов</b> (чистый номер) — не делает холодных первых касаний и рассылок, держит только активные разговоры. Почти нулевой риск бана. Сюда переводят клиентов, которые уже ответили.</span></label>
       <div id="wapOut" class="muted" style="font-size:11.5px;margin-top:4px"></div>`,
     actions: [{ label: 'Сохранить и применить', cls: 'btn-accent', onClick: async (b) => {
       const out = $('#wapOut', b); if (out) out.textContent = 'Сохраняю и синкаю в WhatsApp…';
       try {
         const wMode = ($('#wapMode', b) || {}).value || 'qualifier';
         const wBroker = wMode === 'broker' ? (($('#wapBroker', b) || {}).value || null) : null;   /* шаблонная = в пул (brokerId снимаем) */
-        const r = await api.post('/wa/gray/persona', { phone, name: ($('#wapName', b) || {}).value, about: ($('#wapAbout', b) || {}).value, avatar: ($('#wapAvatar', b) || {}).value, mode: wMode, brokerId: wBroker });
+        const wClean = !!(($('#wapClean', b) || {}).checked);
+        const r = await api.post('/wa/gray/persona', { phone, name: ($('#wapName', b) || {}).value, about: ($('#wapAbout', b) || {}).value, avatar: ($('#wapAvatar', b) || {}).value, mode: wMode, brokerId: wBroker, outreach: !wClean });
         const sy = r.sync || {};
         if (sy.error) toast('Сохранено', 'применится после подключения', true);
         else toast('Профиль сохранён и применён к WhatsApp', null, true);

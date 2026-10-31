@@ -3891,6 +3891,18 @@ async function tgGrayApi(db, method, pathx, body) {
    Действующие диалоги (у лида уже есть grayPhone) НЕ считаются и НЕ ограничиваются. */
 function grayNewLeadCap(db) { const g = db.settings.waGray || {}; return g.newLeadCapPerDay || 5; }
 function grayNewToday(n) { const today = new Date().toISOString().slice(0, 10); return n._newLeadDay === today ? (n._newLeadsToday || 0) : 0; }
+/* ⭐АНТИ-БАН: ТВЁРДЫЙ дневной потолок ВСЕХ отправок с номера + ПРОГРЕВ (ramp). Новый серый номер нельзя сразу
+   грузить сотней сообщений — бан. Потолок растёт линейно от warmupStartCap (день 1) до dailySendCapBase
+   (после warmupDays). Без addedAt считаем номер зрелым (base). Диалоги-ответы НЕ ограничиваются (идут мимо, по grayPhone). */
+function grayWarmupCfg(db) { const g = db.settings.waGray || {}; return { base: Math.max(5, +g.dailySendCapBase || 80), startCap: Math.max(1, +g.warmupStartCap || 15), warmupDays: Math.max(1, +g.warmupDays || 14) }; }
+function grayDailyCap(db, n) {
+  const c = grayWarmupCfg(db); const addedAt = n.addedAt || n._firstSendAt || 0;
+  if (!addedAt) return c.base;
+  const ageDays = Math.floor((Date.now() - addedAt) / 864e5);
+  if (ageDays >= c.warmupDays) return c.base;
+  return Math.round(c.startCap + (c.base - c.startCap) * (ageDays / c.warmupDays));
+}
+function graySentToday(n) { const today = new Date().toISOString().slice(0, 10); return n._sentDay === today ? (n._sentToday || 0) : 0; }
 /* номер «деградировал»: получатели не расшифровывают наши сообщения (retryIn↑) ИЛИ сам не читает входящие (decFails↑)
    в последние 20 мин. ⚠️ Используется ТОЛЬКО для АЛЕРТА «пересканируйте номер» — НЕ для смены номера.
    Диалоги с такого номера НЕ переводятся на другие номера (лечение — форс-рефреш сессии в воркере, см. pickGrayNumber). */
@@ -3920,17 +3932,21 @@ function pickGrayNumber(db, lead, live) {
   /* НОВЫЙ лид (первое касание): потолок новых лидов — МЯГКИЙ. Предпочитаем номер под лимитом,
      но НЕ блокируем отправку (только френдли-предупреждение в graySender). */
   const cap = grayNewLeadCap(db);
+  /* КЛИН-НОМЕРА (roles.outreach===false) — «только диалоги»: их НЕ берём на холодные первые касания,
+     они не копят бан-риск и защищают активные разговоры. Если все номера клин — не блокируем (фолбэк). */
+  let scope = connected.filter(n => !n.roles || n.roles.outreach !== false);
+  if (!scope.length) scope = connected;
   /* РАСПРЕДЕЛЕНИЕ по номерам БРОКЕРА: если за брокером закреплено НЕСКОЛЬКО номеров — раскидываем первые
-     касания по кругу (наименее нагруженный новыми лидами сегодня), а не шлём всё с одного. Так все номера
-     брокера греются равномерно, и отвал одного номера рвёт связь лишь с частью лидов, а не со всеми. */
-  let scope = connected;
-  if (lead.broker) { const mine = connected.filter(n => n.brokerId === lead.broker); if (mine.length) scope = mine; }
-  const under = scope.filter(n => grayNewToday(n) < cap);
-  const pool0 = under.length ? under : scope;                                                                   /* под лимитом, иначе — все в scope (мягко) */
-  /* НЕ фильтруем по «деградации»: детект ненадёжен и НЕ должен влиять на выбор номера (иначе рассылка скачет
-     по номерам). Деградация идёт только в АЛЕРТ («пересканируйте номер»). Первое касание нового лида — просто
-     наименее нагруженный номер брокера. Как только номер закрепился за диалогом — он больше не меняется (см. выше). */
-  return pool0.sort((a, b) => grayNewToday(a) - grayNewToday(b))[0];
+     касания по кругу, а не шлём всё с одного. Так номера греются равномерно, отвал одного рвёт связь лишь с частью. */
+  if (lead.broker) { const mine = scope.filter(n => n.brokerId === lead.broker); if (mine.length) scope = mine; }
+  /* ⭐ТВЁРДЫЙ дневной потолок (прогрев): номер, исчерпавший суточный лимит отправок, НЕ берём. Если под лимитом
+     нет ни одного — откладываем касание (анти-бан), а не шлём сверх нормы с перегретого номера. */
+  const withBudget = scope.filter(n => graySentToday(n) < grayDailyCap(db, n));
+  if (!withBudget.length) { lead._grayDefer = true; return null; }
+  const under = withBudget.filter(n => grayNewToday(n) < cap);
+  const pool0 = under.length ? under : withBudget;                                                              /* под мягким лимитом новых, иначе — все с бюджетом */
+  /* сорт по ОБЩЕЙ сегодняшней нагрузке — равномерный прогрев; деградация в выбор НЕ входит (только алерт). */
+  return pool0.sort((a, b) => graySentToday(a) - graySentToday(b))[0];
 }
 
 /* Серый транспорт для engine.send: реальная отправка с прогретого номера брокера через Baileys-воркер.
@@ -3955,7 +3971,16 @@ engine.setGraySender((db, lead, m, _opts) => {
   if (!(g.numbers || []).length || !lead.phone) { m.status = 'failed'; m.failReason = !lead.phone ? 'У лида нет номера телефона' : 'Нет подключённых WhatsApp-номеров — проверьте раздел «Номера»'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): ${m.failReason}` }); store.save(); return; }
   let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { m.status = 'failed'; m.failReason = 'WhatsApp-воркер сейчас недоступен — попробуйте ещё раз через минуту'; ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): WA-воркер недоступен (${e.message})` }); store.save(); return; }
   const wasNew = !lead.grayPhone;
+  delete lead._grayDefer;                       /* сбрасываем до выбора — флаг выставит только текущий расчёт бюджета */
   const num = pickGrayNumber(db, lead, live);
+  if (!num && lead._grayDefer) {   /* ⭐анти-бан: все серые номера исчерпали суточный лимит — НЕ провал, а ОТКЛАДЫВАЕМ касание */
+    delete lead._grayDefer;
+    lead.ai = lead.ai || {};
+    lead.ai.nextTouchAt = Date.now() + 12 * 3600e3;   /* попробуем в следующем окне (пол-суток) */
+    m.status = 'queued'; delete m.failReason;
+    ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: касание отложено — серые номера исчерпали дневной лимит отправок (анти-бан). Продолжу позже; чтобы ускорить — добавьте/прогрейте номер.` });
+    store.save(); return;
+  }
   if (!num) {   /* был мок «delivered» — теперь честный провал. Диалог НЕ переносим на другой номер автоматически. */
     m.status = 'failed';
     m.failReason = lead.grayPhone
@@ -3997,6 +4022,8 @@ engine.setGraySender((db, lead, m, _opts) => {
      Раньше ставили 'delivered' → в CRM «доставлено», хотя у клиента в WhatsApp «Ожидание». Ставим 'sent'
      (отправлено/в пути); 'delivered' выставит реальная квитанция, когда появится grey-receipt-канал. */
   m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'sent'; delete m.failReason;
+  /* ⭐учёт ВСЕХ отправок с номера за день (для твёрдого дневного потолка + прогрева) + стартовая дата прогрева */
+  { const today = new Date().toISOString().slice(0, 10); if (num._sentDay !== today) { num._sentDay = today; num._sentToday = 0; } num._sentToday = (num._sentToday || 0) + 1; if (!num.addedAt && !num._firstSendAt) num._firstSendAt = Date.now(); }
   store.save();
   };
   /* сериализация по лиду: следующее сообщение лида стартует только после завершения предыдущего */
@@ -11696,6 +11723,7 @@ const server = http.createServer(async (req, res) => {
       if (b.avatar != null) rec.persona.avatar = String(b.avatar).slice(0, 500);
       if (b.mode != null) rec.persona.mode = ['qualifier', 'broker', 'neutral'].includes(b.mode) ? b.mode : 'qualifier';   // режим: шаблонная от агентства (qualifier) / закреплена за брокером
       if ('brokerId' in b) rec.brokerId = b.brokerId ? String(b.brokerId) : null;   // закрепление номера за брокером (pickGrayNumber роутит по n.brokerId; пул = null)
+      if ('outreach' in b) { rec.roles = rec.roles || {}; rec.roles.outreach = b.outreach !== false; }   // клин-номер (только диалоги): outreach:false → исключён из холодных первых касаний (анти-бан)
       store.save();
       let sync = null;
       if (waWorkerReady(db)) { try { sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' }); } catch (e) { sync = { error: e.message }; } }
