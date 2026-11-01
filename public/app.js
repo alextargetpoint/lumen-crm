@@ -11037,6 +11037,16 @@ PAGES.automations = async (root) => {
             <div class="cg-row" style="margin:0"><div><b>Пауза при офлайн-номере</b><div class="muted" style="font-size:11px">не слать, пока номер разлогинен (иначе шлём в пустоту)</div></div>${cb('cgPause', gv('pauseOnOffline', true) !== false)}</div>
           </div>
           <hr class="cg-hr">
+          <div class="card-title" style="font-size:13px;margin-bottom:2px">${ic(I.shield || I.spark)}Анти-бан серого WhatsApp<span class="sub">главное против бана номеров</span></div>
+          <div class="muted" style="font-size:11px;margin:0 0 8px">Банит НОМЕР за холодный объём при низком отклике. Прогрев, дневной потолок и выход с серого после N касаний — активны по умолчанию.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
+            <div class="form-row" style="margin:0"><label>Холодных касаний в WhatsApp на лида → уйти на TG/email/рассылку (0 = выкл)</label><input id="cgGrayCold" type="number" min="0" max="20" value="${+gv('grayColdTouchCap', 3)}"></div>
+            <div class="form-row" style="margin:0"><label>Дневной потолок отправок на зрелый номер</label><input id="wgDailyCap" type="number" min="5" max="500" value="${+((s.waGray || {}).dailySendCapBase || 80)}"></div>
+            <div class="form-row" style="margin:0"><label>Прогрев нового номера, дней (лимит растёт)</label><input id="wgWarmDays" type="number" min="1" max="60" value="${+((s.waGray || {}).warmupDays || 14)}"></div>
+            <div class="form-row" style="margin:0"><label>Мин. отклик номера, % (ниже при объёме → из холода)</label><input id="wgReplyFloor" type="number" min="0" max="100" value="${Math.round((((s.waGray || {}).replyRateFloor != null ? (s.waGray || {}).replyRateFloor : 0.05)) * 100)}"></div>
+          </div>
+          <div class="cg-row" style="margin-top:10px"><div><b>Авто-перевод на чистый номер при передаче брокеру</b><div class="muted" style="font-size:11px">при handover диалог переходит на номер брокера/«только для диалогов» — бридж «передаю вас…» + интро с рекапом + скрин переписки. Клиенту уходят 3 сообщения с нового номера.</div></div>${cb('wgMigrate', !!((s.waGray || {}).migrateOnHandover))}</div>
+          <hr class="cg-hr">
           <div class="form-row" style="margin:0"><label>Жёсткий стоп по тишине: клиент молчит больше N дней → Спящие (0 = выключено)</label><input id="cgSilence" type="number" min="0" max="365" value="${+gv('maxSilenceDays', 0)}"></div>
           <div class="muted" style="font-size:11px;margin-top:5px">Верхнеуровневый рубильник: если от клиента нет сообщений дольше N дней (а не отвечал ни разу — от создания), лид принудительно уходит в «Спящие», независимо от цепочки и дожима. Вернётся — ИИ продолжит.</div>
           <button class="btn btn-sm btn-accent" id="cgSave" style="margin-top:12px">Сохранить защиту</button>
@@ -11227,10 +11237,17 @@ PAGES.automations = async (root) => {
       softExitAtTouch: Math.max(1, Math.min(20, +$('#cgSoftAt', root).value || 3)),
       softExitText: ($('#cgSoftText', root).value || '').trim(),
       maxTouchesNoReply: Math.max(0, Math.min(30, +$('#cgMaxTouch', root).value || 0)),
+      grayColdTouchCap: Math.max(0, Math.min(20, +$('#cgGrayCold', root).value || 0)),
       pauseOnOffline: $('#cgPause', root).checked,
       maxSilenceDays: Math.max(0, Math.min(365, +$('#cgSilence', root).value || 0)),
     };
-    try { await saveAuto({ chainGuard: g }); toast('Защита сохранена', 'Правила применятся к цепочкам и дожиму', true); }
+    const wg = {
+      dailySendCapBase: Math.max(5, Math.min(500, +$('#wgDailyCap', root).value || 80)),
+      warmupDays: Math.max(1, Math.min(60, +$('#wgWarmDays', root).value || 14)),
+      replyRateFloor: Math.max(0, Math.min(1, (+$('#wgReplyFloor', root).value || 5) / 100)),
+      migrateOnHandover: $('#wgMigrate', root).checked,
+    };
+    try { await saveAuto({ chainGuard: g }); await api.patch('/settings', { waGray: wg }); loadState(); toast('Защита сохранена', 'Анти-бан и правила применятся к цепочкам и номерам', true); }
     catch (e) { toast('Не сохранилось', e.message); }
   });
   $('#lrSave') && $('#lrSave').addEventListener('click', async () => {

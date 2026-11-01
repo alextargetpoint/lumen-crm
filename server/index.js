@@ -10530,6 +10530,22 @@ const server = http.createServer(async (req, res) => {
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
       if (b.stopWords) db.settings.stopWords = b.stopWords;
+      /* ⭐АНТИ-БАН серого WA: мержим ТОЛЬКО whitelisted скаляры/тексты. numbers[] НИКОГДА не трогаем
+         из этого PATCH (иначе частичный {waGray:{...}} стёр бы все подключённые номера). */
+      if (b.waGray && typeof b.waGray === 'object' && !Array.isArray(b.waGray)) {
+        const wg = db.settings.waGray = db.settings.waGray || {}; const x = b.waGray;
+        if (x.dailySendCapBase != null) wg.dailySendCapBase = Math.max(5, Math.min(500, +x.dailySendCapBase || 80));
+        if (x.warmupDays != null) wg.warmupDays = Math.max(1, Math.min(60, +x.warmupDays || 14));
+        if (x.warmupStartCap != null) wg.warmupStartCap = Math.max(1, Math.min(200, +x.warmupStartCap || 15));
+        if (x.replyRateFloor != null) wg.replyRateFloor = Math.max(0, Math.min(1, +x.replyRateFloor || 0));
+        if (x.minVolumeForBreaker != null) wg.minVolumeForBreaker = Math.max(1, Math.min(1000, +x.minVolumeForBreaker || 40));
+        if (x.newLeadCapPerDay != null) wg.newLeadCapPerDay = Math.max(1, Math.min(200, +x.newLeadCapPerDay || 5));
+        if (x.migrateOnHandover != null) wg.migrateOnHandover = !!x.migrateOnHandover;
+        if (x.migrateBridge != null) wg.migrateBridge = String(x.migrateBridge).slice(0, 600);
+        if (x.migrateIntro != null) wg.migrateIntro = String(x.migrateIntro).slice(0, 600);
+        if (x.migrateRecap != null) wg.migrateRecap = String(x.migrateRecap).slice(0, 400);
+        if (x.migrateProofCaption != null) wg.migrateProofCaption = String(x.migrateProofCaption).slice(0, 400);
+      }
       store.save();
       return json(res, 200, publicSettings(db));
     }
