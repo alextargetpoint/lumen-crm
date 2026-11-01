@@ -13,6 +13,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
     "pdfkit": "^0.20.2",
     "qrcode": "^1.5.4",
     "xlsx": "^0.18.5"

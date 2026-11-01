@@ -4087,7 +4087,21 @@ async function migrateLeadToClean(db, lead, targetPhone, opts = {}) {
   let intro = vars(g.migrateIntro || 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с моего личного номера.');
   if (recap) intro += '\n\n' + recap;
   engine.send(db, lead, intro, 'human', { channel: 'wa', fromPhone: target.phone, allowDup: true, media: opts.media || null });
-  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: диалог переведён ${from ? ('с +' + from) : ''} на чистый номер +${target.phone}${broker ? (' (' + broker.name + ')') : ''} — бридж + интро с рекапом отправлены` });
+  /* 📸 СКРИНШОТ переписки отдельным best-effort сообщением (анти-«мошенник»): клиент видит картинку нашего
+     диалога → убеждается, что новый номер — продолжение, а не мошенник. Любая ошибка рендера → без картинки. */
+  let proofUrl = null;
+  if (from && from !== target.phone && opts.proof !== false) {
+    try {
+      const png = await require('./chatshot').chatPng(db, lead, { count: 6 });
+      const pdir = path.join(UPLOADS_DIR, 'leadfiles'); if (!fs.existsSync(pdir)) fs.mkdirSync(pdir, { recursive: true });
+      const pnm = `${lead.id}-chatproof-${crypto.randomBytes(4).toString('hex')}.png`;
+      fs.writeFileSync(path.join(pdir, pnm), png);
+      proofUrl = '/assets/leadfiles/' + pnm;
+      const cap = vars(g.migrateProofCaption || 'И вот скрин нашей переписки — чтобы вы были спокойны, что это действительно продолжение нашего разговора, а не посторонние 🙌');
+      engine.send(db, lead, cap, 'human', { channel: 'wa', fromPhone: target.phone, allowDup: true, media: { type: 'image', url: proofUrl, name: 'Наша переписка' } });
+    } catch (_) { /* картинка опциональна — текстовый рекап в интро уже ушёл */ }
+  }
+  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: диалог переведён ${from ? ('с +' + from) : ''} на чистый номер +${target.phone}${broker ? (' (' + broker.name + ')') : ''} — бридж + интро с рекапом${proofUrl ? ' + скрин переписки' : ''} отправлены` });
   store.save();
   return { ok: true, from, to: target.phone, broker: broker ? broker.name : null };
 }
