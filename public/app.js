@@ -11448,6 +11448,8 @@ PAGES.automations = async (root) => {
     toast('Цепочка напоминаний сохранена', chain.length ? chain.map(h => h >= 1 ? 'за ' + h + ' ч' : 'за ' + Math.round(h * 60) + ' мин').join(' · ') : 'напоминания выключены', true);
   });
   const stSaveAll = async () => {
+    /* ⭐докидываем НАБРАННУЮ, но не добавленную кнопкой «+» стадию — иначе «ввёл + Сохранить» теряло её */
+    const _pend = $('#stNew', root); if (_pend && _pend.value.trim()) $('#stAdd', root).click();
     const rows = $$('#stList .ch-prio', root);
     const order = rows.map(x => x.dataset.stid);
     const names = {};
@@ -11475,7 +11477,9 @@ PAGES.automations = async (root) => {
     row.querySelector('[data-stdel]').addEventListener('click', () => row.remove());
     $$('[data-stmv]', row).forEach(b2 => b2.addEventListener('click', () => { const sib = +b2.dataset.stmv < 0 ? row.previousElementSibling : row.nextElementSibling; if (sib) (+b2.dataset.stmv < 0 ? sib.before(row) : sib.after(row)); }));
     $('#stNew').value = '';
+    $('#stNew').focus();
   });
+  $('#stNew').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#stAdd', root).click(); } });   /* Enter в поле = добавить стадию */
   $('#cfType').addEventListener('change', (e) => {
     const t = e.target.value;
     $('#cfOptions').style.display = (t === 'select' || t === 'multiselect') ? '' : 'none';
