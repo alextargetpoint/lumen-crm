@@ -559,6 +559,21 @@ function tickChains(db) {
     if (!['new', 'touch'].includes(lead.stage)) continue;
     if (lead.lastDir === 'in') continue;
     if (db.messages.some(m => m.leadId === lead.id && m.dir === 'in')) continue;
+    /* ⭐ЖЁСТКИЙ ПРЕДОХРАНИТЕЛЬ (канало-независимый): сюда попадают ТОЛЬКО лиды без единого ответа (гарантировано
+       строками выше). Если всего РЕАЛЬНО отправлено ≥ N касаний ПО ВСЕМ каналам — «долгосрочный прохладный»,
+       касания прекращаем. Считаем фактические исходящие (НЕ chainStep — он сбрасывается на каскаде, из-за чего
+       суммарно касаний уходило БОЛЬШЕ потолка: 3 в WA + 5 в TG + …). Failed/queued не считаем (не дошли). */
+    const _ct = guardCfg(db);
+    if (_ct.enabled && _ct.maxColdTouchesTotal > 0) {
+      const sentCold = (db.messages || []).filter(m => m.leadId === lead.id && m.dir === 'out' && !m.system && !['failed', 'queued'].includes(m.status)).length;
+      if (sentCold >= _ct.maxColdTouchesTotal) {
+        lead.stage = 'sleeping';
+        lead.tags = Array.from(new Set([...(lead.tags || []), 'долгосрочный прохладный']));
+        if (lead.ai) { lead.ai.reengage = null; delete lead.ai.nextDraft; delete lead.ai._reengageText; }
+        ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: ${sentCold} касаний без единого ответа (по всем каналам) → долгосрочный прохладный, касания прекращены` });
+        continue;
+      }
+    }
     /* гибкий каскад: через N касаний без ответа в текущем канале → следующий мессенджер (settings.channels.cascadeAfterTouches; 0 = только после исчерпания цепочки) */
     const cascadeAfter = +(db.settings.channels && db.settings.channels.cascadeAfterTouches || 0);
     if (cascadeAfter > 0 && lead.ai.chainStep >= cascadeAfter) {
@@ -811,6 +826,7 @@ function guardCfg(db) {
       : 'Если тема сейчас не актуальна — просто напишите «нет», и я больше не буду беспокоить. А если интересно, с радостью помогу дальше.',
     maxTouchesNoReply: Math.max(0, Math.min(30, g.maxTouchesNoReply != null ? +g.maxTouchesNoReply : 5)),  /* 0 = без потолка */
     grayColdTouchCap: Math.max(0, Math.min(20, g.grayColdTouchCap != null ? +g.grayColdTouchCap : 3)),  /* ≤N холодных касаний в СЕРОМ WhatsApp на лида → уходим на безопасный канал/рассылку (анти-бан; 0=выкл) */
+    maxColdTouchesTotal: Math.max(0, Math.min(30, g.maxColdTouchesTotal != null ? +g.maxColdTouchesTotal : 4)),  /* ⭐ЖЁСТКИЙ предохранитель: всего касаний БЕЗ ЕДИНОГО ответа по ВСЕМ каналам → долгосрочный прохладный (Спящие); 0=выкл */
     pauseOnOffline: g.pauseOnOffline !== false,                     /* не слать, пока номер не на связи (прошлое не ушло) */
     maxSilenceDays: Math.max(0, Math.min(365, g.maxSilenceDays != null ? +g.maxSilenceDays : 0)),  /* 0 = выкл; жёсткий стоп: клиент молчит > N дней → Спящие */
   };

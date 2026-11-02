@@ -3610,12 +3610,55 @@ async function yesimBuyNumber(country, subscriptionOption) {
   if (!number) throw new Error('Yesim не вернул номер');
   return { number: String(number), raw: r };
 }
+/* ⭐ПРАВИЛА СТРАН по каналу: WhatsApp — только NL/UK(GB); Telegram — любая, КРОМЕ Украины.
+   Настраивается в реестре platformYesim.{waCountries,tgCountries,tgExclude}; дефолты осмысленные. */
+function yesimCountryCfg(db) {
+  let py = {}; try { py = (store.getRegistry() || {}).platformYesim || {}; } catch (_) {}
+  const norm = a => (Array.isArray(a) ? a : []).map(c => String(c).toUpperCase().slice(0, 2)).filter(Boolean);
+  return {
+    waCountries: norm(py.waCountries).length ? norm(py.waCountries) : ['NL', 'GB'],   /* UK = GB (ISO) */
+    tgCountries: norm(py.tgCountries),                                                 /* пусто = любая из каталога */
+    tgExclude: norm(py.tgExclude).length ? norm(py.tgExclude) : ['UA'],                /* Украину не берём */
+  };
+}
+async function yesimAllowedCodes() {
+  try {
+    const c = await yesimApi('get_allowed_countries');
+    const list = (c && c.data && (c.data.countries || c.data)) || c.countries || [];
+    const NAME2 = { USA: 'US', 'UNITED STATES': 'US', NETHERLANDS: 'NL', HOLLAND: 'NL', CANADA: 'CA', ISRAEL: 'IL', UK: 'GB', 'UNITED KINGDOM': 'GB', 'GREAT BRITAIN': 'GB', UKRAINE: 'UA' };
+    const codes = [];
+    for (const it of (Array.isArray(list) ? list : [])) {
+      let code = '';
+      if (typeof it === 'string') code = NAME2[it.toUpperCase()] || (it.length === 2 ? it.toUpperCase() : '');
+      else code = (String(it.code || it.iso || it.country_code || '').toUpperCase().slice(0, 2)) || NAME2[String(it.name || it.country || it.title || '').toUpperCase()] || '';
+      if (code) codes.push(code);
+    }
+    return [...new Set(codes)];
+  } catch (_) { return []; }
+}
+async function pickYesimCountry(db, service) {
+  const cfg = yesimCountryCfg(db);
+  const allowed = await yesimAllowedCodes();   /* [] если каталог недоступен → работаем по дефолтам */
+  if (service === 'tg') {
+    let pool = cfg.tgCountries.length ? cfg.tgCountries : (allowed.length ? allowed : ['US', 'NL', 'CA', 'IL', 'GB']);
+    pool = pool.filter(c => !cfg.tgExclude.includes(c) && (!allowed.length || allowed.includes(c)));
+    return pool[0] || 'NL';
+  }
+  /* WA: только из разрешённых (NL/GB), равномерно по уже купленным номерам (least-used), пересекая с каталогом */
+  let pool = cfg.waCountries.filter(c => !allowed.length || allowed.includes(c));
+  if (!pool.length) pool = cfg.waCountries;
+  const nums = ((db.settings.waGray || {}).numbers || []);
+  const cnt = c => nums.filter(n => n.country === c || String(n.label || '').toUpperCase().endsWith(c)).length;
+  pool.sort((a, b) => cnt(a) - cnt(b));
+  return pool[0] || 'NL';
+}
 /* АВТОВЫДАЧА byod-заказа: докупает недостающие номера (qty), кладёт в пул серых WA, двигает статус.
    Деньги УЖЕ списаны при заказе ($10/номер) → здесь НЕ списываем повторно. Идемпотентно (доливает до qty).
    Успех всех → status:'ready' («Подключить»); частично/ошибка → остаётся 'pending' + provisionError. */
 async function provisionByodOrder(db, order) {
   let reg = {}; try { reg = store.getRegistry(); } catch (_) {}
-  const country = String(order.country || (reg.platformYesim && reg.platformYesim.defaultCountry) || 'GB').toUpperCase().slice(0, 2);
+  /* WA-номера: страну берём ПО ПРАВИЛУ (NL/UK) автоматически, если оператор не задал явную в заказе */
+  const country = order.country ? String(order.country).toUpperCase().slice(0, 2) : await pickYesimCountry(db, 'wa');
   db.settings.waGray = db.settings.waGray || { numbers: [] };
   db.settings.waGray.numbers = db.settings.waGray.numbers || [];
   order.numbers = Array.isArray(order.numbers) ? order.numbers : [];
@@ -3627,7 +3670,7 @@ async function provisionByodOrder(db, order) {
       const { number } = await yesimBuyNumber(country, 'month');
       const digits = String(number).replace(/[^0-9]/g, '');
       if (digits && !db.settings.waGray.numbers.some(n => n.phone === digits)) {
-        db.settings.waGray.numbers.push({ phone: digits, label: 'Yesim ' + country, source: 'yesim', orderId: order.id, roles: { send: true, call: false }, priceUsd: order.price || 10, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 });
+        db.settings.waGray.numbers.push({ phone: digits, label: 'Yesim ' + country, country, source: 'yesim', orderId: order.id, roles: { send: true, call: false }, priceUsd: order.price || 10, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 });
       }
       if (digits) order.numbers.push('+' + digits);
     } catch (e) { lastErr = (e && e.message) || String(e); break; }
@@ -11439,10 +11482,14 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/gray/yesim/buy' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
       const b = await readBody(req);
-      const country = String(b.country || '').toUpperCase().slice(0, 2);
       const subscriptionOption = ['month', 'year'].includes(b.subscriptionOption) ? b.subscriptionOption : 'month';
       const forSvc = b.for === 'tg' ? 'tg' : 'wa';   /* для какого канала берём номер (TG-номер НЕ должен падать в WA-пул) */
-      if (!country) return json(res, 400, { error: 'нужна страна' });
+      /* СТРАНА ПО ПРАВИЛУ: не задана → авто (WA: NL/UK · TG: любая кроме UA). Задана → валидируем под канал. */
+      const _cc = yesimCountryCfg(db);
+      let country = String(b.country || '').toUpperCase().slice(0, 2);
+      if (!country) country = await pickYesimCountry(db, forSvc);
+      if (forSvc === 'wa' && !_cc.waCountries.includes(country)) return json(res, 400, { error: `Для WhatsApp разрешены только: ${_cc.waCountries.join(', ')} (NL/UK). Страна ${country} не подходит.` });
+      if (forSvc === 'tg' && _cc.tgExclude.includes(country)) return json(res, 400, { error: `Для Telegram страна ${country} исключена (${_cc.tgExclude.join(', ')}). Выберите другую.` });
       /* БАЛАНС-ГЕЙТ: покупка номера = аренда на месяц, списывается с предоплаченного баланса (крипта).
          Нельзя уйти в минус — при нехватке просим пополнить. Цена агентству (с наценкой) = ставка типа. */
       if (!db.settings.billing) db.settings.billing = billing.defBilling();
@@ -11466,7 +11513,7 @@ const server = http.createServer(async (req, res) => {
         let ch = { ok: true, balance: db.settings.billing.balance || 0 };
         if (number) { ch = billing.chargeBalance(db, numPrice, `Аренда номера ${forSvc === 'tg' ? 'Telegram' : 'WhatsApp'} +${number} (месяц)`); }
         /* WA-номер сохраняем в пул серых WhatsApp; TG-номер — НЕ сюда (его добавит /tg/gray/connect в tgGray) */
-        if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, source: 'yesim', roles: { send: true, call: false }, priceUsd: numPrice, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 }); }
+        if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, country, source: 'yesim', roles: { send: true, call: false }, priceUsd: numPrice, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 }); }
         store.save();
         lowBalanceCheck(db);
         return json(res, 200, { ok: true, number, result: r, balance: ch.balance, charged: numPrice });

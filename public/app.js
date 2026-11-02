@@ -1741,7 +1741,16 @@ window.openGrayManager = async function (jumpPhone) {
 window.replaceGrayNumber = async function (phone) {
   if (!phone) return;
   const disp = '+' + String(phone).replace(/[^0-9]/g, '');
-  if (!await uiConfirm('Заменить номер?', `${disp} будет помечен как заблокированный и выведен из работы (переписка с лидами в CRM сохраняется). Новый номер покупается за <b>$10 с вашего баланса</b> — замены за наш счёт не делаются. Купить новый?`, { ok: 'Купить новый за $10', cancel: 'Отмена' })) return;
+  /* ⭐ФИНАЛЬНАЯ ПЕРЕПРОВЕРКА статуса с воркера перед заменой — чтобы не менять рабочий номер зря */
+  let stLine = '';
+  try {
+    const r = await api.get('/wa/gray/list'); const n = (r.numbers || []).find(x => x.phone === phone); const st = n && n.live && n.live.status;
+    if (n && st === 'connected') stLine = '<div style="margin:0 0 11px;padding:9px 11px;border-radius:9px;background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn);font-size:12.5px;line-height:1.5">⚠️ Проверка сейчас: номер <b>НА СВЯЗИ</b> (отвечает воркеру) — похоже, НЕ забанен. Точно заменить?</div>';
+    else if (n && n.banned) stLine = '<div style="margin:0 0 11px;font-size:12.5px;color:var(--bad)">🔴 Проверено: номер помечен заблокированным.</div>';
+    else if (n && n.suspectBanned) stLine = '<div style="margin:0 0 11px;font-size:12.5px;color:var(--warn)">🟠 Проверено: возможно забанен (долго не возвращается после разлогина).</div>';
+    else if (n) stLine = `<div style="margin:0 0 11px;font-size:12.5px;color:var(--muted)">Проверено сейчас: номер не на связи (${esc(st || 'нет данных')}).</div>`;
+  } catch (_) {}
+  if (!await uiConfirm('Заменить номер?', stLine + `${disp} будет помечен как заблокированный и выведен из работы (переписка с лидами в CRM сохраняется). Новый номер покупается за <b>$10 с вашего баланса</b> — замены за наш счёт не делаются. Купить новый?`, { ok: 'Купить новый за $10', cancel: 'Отмена' })) return;
   try {
     const r = await api.post('/numbers/replace', { phone });
     toast('Замена заказана', 'Старый выведен, новый покупаем — подключите по QR в «Мои заказы»', true);
@@ -11039,6 +11048,7 @@ PAGES.automations = async (root) => {
           <hr class="cg-hr">
           <div class="card-title" style="font-size:13px;margin-bottom:2px">${ic(I.shield || I.spark)}Анти-бан серого WhatsApp<span class="sub">главное против бана номеров</span></div>
           <div class="muted" style="font-size:11px;margin:0 0 8px">Банит НОМЕР за холодный объём при низком отклике. Прогрев, дневной потолок и выход с серого после N касаний — активны по умолчанию.</div>
+          <div class="form-row" style="margin:0 0 10px"><label><b>Жёсткий потолок: всего касаний БЕЗ единого ответа (по ВСЕМ каналам) → долгосрочный прохладный</b> (0 = выкл)</label><input id="cgTotalCold" type="number" min="0" max="30" value="${+gv('maxColdTouchesTotal', 4)}"><div class="muted" style="font-size:11px;margin-top:3px">Главный предохранитель: клиент ни разу не отреагировал и уже отправлено столько касаний (WhatsApp + Telegram + email вместе) — прекращаем касания, лид уходит в «долгосрочный прохладный». Считаются реальные отправленные, а не по-канальный счётчик.</div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
             <div class="form-row" style="margin:0"><label>Холодных касаний в WhatsApp на лида → уйти на TG/email/рассылку (0 = выкл)</label><input id="cgGrayCold" type="number" min="0" max="20" value="${+gv('grayColdTouchCap', 3)}"></div>
             <div class="form-row" style="margin:0"><label>Дневной потолок отправок на зрелый номер</label><input id="wgDailyCap" type="number" min="5" max="500" value="${+((s.waGray || {}).dailySendCapBase || 80)}"></div>
@@ -11238,6 +11248,7 @@ PAGES.automations = async (root) => {
       softExitText: ($('#cgSoftText', root).value || '').trim(),
       maxTouchesNoReply: Math.max(0, Math.min(30, +$('#cgMaxTouch', root).value || 0)),
       grayColdTouchCap: Math.max(0, Math.min(20, +$('#cgGrayCold', root).value || 0)),
+      maxColdTouchesTotal: Math.max(0, Math.min(30, +$('#cgTotalCold', root).value || 0)),
       pauseOnOffline: $('#cgPause', root).checked,
       maxSilenceDays: Math.max(0, Math.min(365, +$('#cgSilence', root).value || 0)),
     };
@@ -16164,7 +16175,7 @@ PAGES.numbers = async (root) => {
       ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const w = n.warm || {}; const risk = conn ? (w.score || 0) : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
         <div class="num-head">
           <div><div class="ph">${esc(n.realPhone ? '+' + n.realPhone : n.phone)}</div><div class="lb">${esc(n.label || 'личный номер')}${n.realPhone && n.realPhone !== n.phone ? ' · подключён' : ''} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
-          ${ring(risk)}
+          <div style="display:flex;align-items:center;gap:8px;flex:0 0 auto">${ring(risk)}<button class="btn-ghost num-rm" data-grayrm="${esc(n.phone)}" title="Убрать номер" style="margin:0">${ic(I.x)}</button></div>
         </div>
         <div style="margin:10px 0 6px">${n.banned ? '<span class="badge bad" title="Номер помечен как заблокированный — выведен из работы. Переписка в CRM сохранена. Купите замену.">заблокирован</span>' : grayStatusBadge(n.live)}${n.suspectBanned && !n.banned ? ' <span class="badge warn" title="Долго не возвращается после разлогина — возможно, номер забанен WhatsApp. Если так — замените.">возможно забанен</span>' : ''}${conn ? ` <span class="badge ${w.ready ? 'ok' : 'warn'}" style="font-size:10px" title="Созревание прогревом: возраст + объём переписки + дни активности. Растёт по мере прогрева.">${w.ready ? `прогрет ${w.score}% · готов` : `прогрев ${w.score}% · ${w.activeDays || 0} дн · ${w.warmCount || 0} сообщ.`}</span>` : ''}</div>
         ${n.live && !['connected', 'qr', 'connecting'].includes(n.live.status) ? `<div class="num-otp-warn">${ic(I.shield)}<div><b>Перед перерегистрацией номера по OTP сделайте бэкап WhatsApp</b> (Google Drive / iCloud) и выберите «Восстановить» на шаге кода — иначе нативные чаты на телефоне не вернутся (WhatsApp не хранит историю на сервере). <b>Переписка с лидами в Lumen сохраняется в любом случае.</b> ⚠️ WhatsApp нельзя держать с облачного телефона — только реальный телефон + QR.</div></div>` : ''}
@@ -16175,8 +16186,8 @@ PAGES.numbers = async (root) => {
           ${n.source === 'yesim' ? `<button class="btn btn-sm" data-yact="${esc(n.phone)}" title="Гид активации + приём SMS/OTP">${ic(I.spark)}Активация / коды</button>` : ''}
           <button class="btn btn-sm" data-waprofile="${esc(n.phone)}" title="Аватар/имя/описание → синк в WhatsApp">${ic(I.gear)}Профиль</button>
           ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<button class="btn btn-sm" data-graycheck="${esc(n.phone)}" title="Проверить связь: тест отправки + реальный тест приёма (кросс-пинг с другого номера). Покажет честно, читает ли номер входящие.">${ic(I.shield)}Проверить связь</button><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
+          ${(!conn && (n.suspectBanned || n.banned || (n.live && n.live.status && n.live.status !== 'connected'))) ? `<button class="btn btn-sm" data-graystatus="${esc(n.phone)}" title="Финальная перепроверка статуса: обновляет данные с воркера (реально ли номер не на связи / забанен) — чтобы не заменять рабочий номер зря">${ic(I.shield)}Проверить статус</button>` : ''}
           <button class="btn btn-sm${n.banned || n.suspectBanned ? ' btn-accent' : ''}" data-grayreplace="${esc(n.phone)}" title="Номер заблокирован / не работает → вывести из работы и купить новый за $10 с вашего баланса (замены за наш счёт не делаются)">${ic(I.refresh)}${n.banned ? 'Купить замену' : 'Заменить'}</button>
-          <button class="btn-ghost num-rm" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
         </div>
       </div>`; }).join('')}
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Серых номеров пока нет — нажмите «Подключить по QR» выше.</div>`}
@@ -16768,6 +16779,21 @@ PAGES.numbers = async (root) => {
         await uiConfirm(r.verdict === 'no-worker' ? 'Воркер не настроен' : '🟡 Проверено частично', r.text || '', { ok: 'Понятно', cancel: 'Закрыть' });
       }
     } catch (e) { toast('Проверка не удалась', e.message); }
+    b.disabled = false; b.innerHTML = old;
+  }));
+  $$('[data-graystatus]', root).forEach(b => b.addEventListener('click', async () => {
+    const phone = b.dataset.graystatus; const old = b.innerHTML;
+    b.disabled = true; b.innerHTML = ic(I.spark) + 'Проверяю…';
+    try {
+      const r = await api.get('/wa/gray/list'); const n = (r.numbers || []).find(x => x.phone === phone); const st = n && n.live && n.live.status;
+      if (!n) { toast('Номер не найден'); }
+      else {
+        const verdict = n.banned ? '🔴 помечен заблокированным' : st === 'connected' ? '🟢 на связи (рабочий — заменять рано)' : st === 'qr' ? '🟡 ждёт QR (не подключён)' : st === 'connecting' ? '🟡 подключается' : n.suspectBanned ? '🟠 возможно забанен (долго не возвращается)' : '⚪ не на связи';
+        const hint = st === 'connected' ? 'Номер отвечает воркеру — скорее всего НЕ забанен. Заменять не нужно.' : (n.suspectBanned || n.banned) ? 'Похоже на бан/вывод. Если подтвердилось — «Заменить».' : 'Номер не на связи. Нажмите «Пересканировать» (новый QR): если скан не проходит или номер сразу отваливается — вероятен бан.';
+        await uiConfirm('Статус номера +' + esc(phone), `<b style="font-size:14px">${verdict}</b><br><span class="muted" style="font-size:12px;line-height:1.5">${hint}</span>`, { ok: 'Понятно', cancel: 'Закрыть' });
+        await loadState(); if (PAGES.numbers) PAGES.numbers(root);
+      }
+    } catch (e) { toast('Не удалось проверить', e.message); }
     b.disabled = false; b.innerHTML = old;
   }));
   $$('[data-waprofile]', root).forEach(b => b.addEventListener('click', () => window.openWaPersona && window.openWaPersona(b.dataset.waprofile, grayNums.find(n => n.phone === b.dataset.waprofile))));
