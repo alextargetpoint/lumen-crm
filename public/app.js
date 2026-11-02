@@ -19116,12 +19116,17 @@ window.openNumbersCheckout = async function (edition) {
       <div id="ncOut" class="muted" style="font-size:12px;margin-top:8px"></div>`,
     actions: [
       { label: 'Оплатить с баланса', cls: 'btn-accent', onClick: async (b2) => {
+        /* ⭐ПРЕДОХРАНИТЕЛЬ ОТ ДВОЙНОЙ ПОКУПКИ: покупка уже идёт → ничего не делаем (деньги!) */
+        if (b2._ncBuying) return false;
+        const payBtn = b2.querySelector('.m-actions .btn-accent');
         const cost = priceOf(ed) * qty;
-        if (balance + 1e-9 < cost) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); return; }
-        const out = $('#ncOut', b2); if (out) out.textContent = ed === 'byod' ? 'Оформляю заказ и покупаю номер…' : 'Оформляю…';
+        if (balance + 1e-9 < cost) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); return false; }
+        b2._ncBuying = true;   /* ставим ДО любого await */
+        if (payBtn) { payBtn.disabled = true; payBtn.style.opacity = '.55'; payBtn.style.pointerEvents = 'none'; payBtn.innerHTML = '<span class="nc-spin"></span> Покупаю номер…'; }
+        const out = $('#ncOut', b2); if (out) out.innerHTML = '<b style="color:var(--accent)">⏳ Покупаю номер, подождите… не нажимайте повторно</b>';
         const country = (($('#ncCountry', b2) || {}).value) || 'GB';
-        try { const rr = await api.post('/numbers/order', ed === 'byod' ? { edition: ed, qty, country } : { edition: ed, qty }); const prov = rr && rr.order && rr.order.status === 'ready'; toast(prov ? 'Номер выдан' : 'Заказ принят', prov ? `${(rr.order.numbers || []).join(', ')} — списано ${money(cost)}. Подключите по QR.` : `${qty}× «${labelOf(ed)}» — списано ${money(cost)}. Номера появятся после провижна.`, true); closeModal(); render(); }
-        catch (e) { const msg = (e && e.message) || 'ошибка'; if (/insufficient/.test(msg)) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); } else if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(msg) + '</span>'; }
+        try { const rr = await api.post('/numbers/order', ed === 'byod' ? { edition: ed, qty, country } : { edition: ed, qty }); const prov = rr && rr.order && rr.order.status === 'ready'; toast(prov ? 'Номер выдан' : 'Заказ принят', prov ? `${(rr.order.numbers || []).join(', ')} — списано ${money(cost)}. Подключите по QR.` : `${qty}× «${labelOf(ed)}» — списано ${money(cost)}. Номера появятся после провижна.`, true); closeModal(); render(); return false; }
+        catch (e) { const msg = (e && e.message) || 'ошибка'; b2._ncBuying = false; if (payBtn) { payBtn.disabled = false; payBtn.style.opacity = ''; payBtn.style.pointerEvents = ''; payBtn.textContent = 'Оплатить с баланса'; } if (/insufficient/.test(msg)) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); } else if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(msg) + '</span>'; return false; }
       } },
       { label: 'Пополнить депозит', onClick: () => { openTopupCrypto({ onDone: () => window.openNumbersCheckout(ed) }); } },
       { label: 'Отмена' },

@@ -11556,13 +11556,16 @@ const server = http.createServer(async (req, res) => {
         const digits = x => String(x == null ? '' : x).replace(/[^0-9]/g, '');
         const recipOf = m => digits(m.recipient || m.to || m.number || m.destination || m.did || m.did_number || m.msisdn || m.to_number || m.receiver || '');
         const bodyOf = m => m.text || m.message || m.sms || m.body || m.content || m.msg || '';
-        /* ⭐ЛЕНИВЫЙ фильтр по номеру (последние 8 цифр). Если фильтр ВСЁ отсекает, а сообщения ЕСТЬ —
-           НЕ прячем (показываем все): лучше показать код из общей ленты, чем потерять из-за формата номера. */
+        /* ⭐ФИЛЬТР ПО НОМЕРУ-ПОЛУЧАТЕЛЮ (анти-кросс-контаминация): если у сообщений ЕСТЬ поле получателя —
+           показываем СТРОГО коды этого номера (чужие НИКОГДА). Если поля получателя нет ни у одного — доверяем
+           серверному фильтру Yesim (did_number передан выше) и показываем как есть. Фолбэк «показать все» УБРАН:
+           лучше «ловим…», чем код другого номера. */
         let filtered = list;
         if (num && list.length) {
           const tail = num.slice(-8);
-          const f = list.filter(m => { const to = recipOf(m); return to && (to.endsWith(tail) || to.includes(tail) || num.endsWith(to.slice(-8))); });
-          filtered = f.length ? f : list;
+          const hasRecip = list.some(m => recipOf(m));
+          if (hasRecip) filtered = list.filter(m => { const to = recipOf(m); return to && (to.endsWith(tail) || num.endsWith(to.slice(-8))); });
+          /* hasRecip===false → оставляем list как есть (Yesim отфильтровал по did_number) */
         }
         const norm = filtered.map(m => ({ from: m.sender || m.from || m.source || '', to: recipOf(m), text: bodyOf(m), at: m.date || m.time || m.timestamp || m.created_at || m.received_at || '', code: (String(bodyOf(m)).match(/\b(\d{3}[-\s]?\d{3})\b|\b(\d{4,8})\b/) || [])[0] || '' }));
         const out = { ok: true, sms: norm };

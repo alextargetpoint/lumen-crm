@@ -1051,3 +1051,7 @@ input[type=number] { -moz-appearance: textfield; }
 .la-menu button{text-align:left;padding:9px 11px;border:0;background:transparent;border-radius:9px;font-size:13px;color:var(--ink);cursor:pointer}.la-menu button:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
 @media (max-width:560px){.lasst{right:12px;left:12px;bottom:84px;align-items:stretch}.lasst-panel{width:auto}.lasst-pill{align-self:flex-end}}
 @media (prefers-reduced-motion:reduce){.lasst-panel,.la-card,.la-cr,.la-conf-bar i,.la-sp.to,.la-done,.la-brokers,.la-menu{animation:none!important}.la-ckmk circle,.la-ckmk path{animation-duration:.01s}.la-spk,.la-arr,.lasst-pill.has .lasst-orb,.lasst-ic .sp-a,.lasst-ic .sp-b,.la-hd-ic .sp-a{animation:none}.la-skel i{animation:none}}
+
+/* спиннер на кнопке покупки номера (предохранитель от двойного клика) */
+.nc-spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ncSpin .7s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes ncSpin{to{transform:rotate(360deg)}}
