@@ -615,10 +615,14 @@
     var rows = arr.map(function (m, i) { return '<div class="pe-metric-row" data-mi="' + i + '"><input data-qf="label" value="' + esc(m.label || '') + '" placeholder="Площадь"><input class="v" data-qf="value" value="' + esc(m.value || '') + '" placeholder="84 м²"><button class="pe-mini-del" data-act="delParam" data-mi="' + i + '">×</button></div>'; }).join('');
     return '<div class="pe-field"><label>Параметры</label><div class="pe-metriclist" data-params="1">' + rows + '</div><button class="pe-addrow" data-act="addParam">+ Добавить параметр</button></div>';
   }
+  /* иконка пункта преимуществ: имя из словаря pres-templates → эмодзи для пикера; '' = номер (1/2/3/4) */
+  var BEN_ICONS = [['', '№'], ['pool', '🏊'], ['gym', '🏋️'], ['leaf', '🌿'], ['shield', '🛡️'], ['beach', '🏖️'], ['palm', '🌴'], ['sun', '☀️'], ['home', '🏠'], ['bed', '🛏️'], ['pin', '📍'], ['globe', '🌐'], ['chat', '💬'], ['check', '✓'], ['calendar', '📅'], ['tag', '🏷️'], ['area', '📐']];
+  var BEN_LABEL = { '': '№ номер', pool: '🏊 Бассейн', gym: '🏋️ Фитнес', leaf: '🌿 Зелень / парк', shield: '🛡️ Безопасность', beach: '🏖️ Пляж', palm: '🌴 Пальмы', sun: '☀️ Солнце', home: '🏠 Дом', bed: '🛏️ Спальни', pin: '📍 Локация', globe: '🌐 Инфраструктура', chat: '💬 Сервис', check: '✓ Галочка', calendar: '📅 Сроки', tag: '🏷️ Цена', area: '📐 Площадь' };
+  function benEmoji(n) { var f = BEN_ICONS.filter(function (x) { return x[0] === (n || ''); })[0]; return f ? f[1] : '№'; }
   function itemsField(s) {
     var arr = cval(s, 'items') || [];
-    var rows = arr.map(function (m, i) { return '<div class="pe-metric-row" data-mi="' + i + '" style="flex-direction:column;align-items:stretch;gap:6px"><input data-if="title" value="' + esc(m.title || '') + '" placeholder="Заголовок"><div style="display:flex;gap:6px"><input data-if="desc" value="' + esc(m.desc || '') + '" placeholder="Описание"><button class="pe-mini-del" data-act="delItem" data-mi="' + i + '">×</button></div></div>'; }).join('');
-    return '<div class="pe-field"><label>Преимущества (2–5)</label><div class="pe-metriclist" data-items="1">' + rows + '</div><button class="pe-addrow" data-act="addItem">+ Добавить</button></div>';
+    var rows = arr.map(function (m, i) { return '<div class="pe-metric-row" data-mi="' + i + '" style="flex-direction:column;align-items:stretch;gap:6px"><input data-if="title" value="' + esc(m.title || '') + '" placeholder="Заголовок"><div style="display:flex;gap:6px"><button class="pe-mini" data-act="itemIcon" data-mi="' + i + '" title="Иконка пункта (сейчас: ' + esc(BEN_LABEL[m.icon || ''] || '№') + ')" style="flex:0 0 auto;min-width:34px;font-size:15px">' + benEmoji(m.icon) + '</button><input data-if="desc" value="' + esc(m.desc || '') + '" placeholder="Описание"><button class="pe-mini-del" data-act="delItem" data-mi="' + i + '">×</button></div></div>'; }).join('');
+    return '<div class="pe-field"><label>Преимущества (2–5)</label><div class="pe-metriclist" data-items="1">' + rows + '</div><button class="pe-addrow" data-act="addItem">+ Добавить</button><div class="hint" style="margin-top:5px">Иконку пункта меняйте кнопкой слева от описания — выбор из набора или «№» (номер).</div></div>';
   }
   function stagesField(s, plan) {
     var arr = plan.stages || [];
@@ -965,6 +969,7 @@
       case 'delParam': mutate(function () { var arr = (cval(s, 'params') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'params', arr); }); break;
       case 'addItem': mutate(function () { var arr = (cval(s, 'items') || []).slice(); arr.push({ title: '', desc: '' }); setOverride(s, 'items', arr); }); break;
       case 'delItem': mutate(function () { var arr = (cval(s, 'items') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'items', arr); }); break;
+      case 'itemIcon': { var _mi = +el.getAttribute('data-mi'); menu(el, BEN_ICONS.map(function (o) { return { t: BEN_LABEL[o[0]] || o[1], fn: function () { mutate(function () { var arr = (cval(s, 'items') || []).slice(); var it = Object.assign({}, arr[_mi] || {}); if (o[0]) it.icon = o[0]; else delete it.icon; arr[_mi] = it; setOverride(s, 'items', arr); }); } }; })); break; }
       case 'addStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).concat({ name: '', percent: '' }); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'delStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).slice(); pl.stages.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'replacePhoto': replacePhoto(s, +el.getAttribute('data-idx')); break;
