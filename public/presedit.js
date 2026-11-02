@@ -1104,6 +1104,14 @@
       var gi = 0;
       stage.querySelectorAll('img.lp-cover').forEach(function (el) {
         el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-gallery', '1'); el.setAttribute('data-pe-idx', 'g' + (gi++));
+        /* ⭐DnD-перетаскивание порядка фото галереи прямо на холсте: бросил одно на другое → встаёт на его место
+           (первое = крупное). Переупорядочиваем assetRefs. Листенеры на свежих узлах каждого рендера — не копятся. */
+        el.setAttribute('draggable', 'true');
+        el.addEventListener('dragstart', function (e) { S._galDrag = +el.getAttribute('data-pe-idx').slice(1); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'g'); } catch (_) {} });
+        el.addEventListener('dragover', function (e) { if (S._galDrag != null) { e.preventDefault(); el.classList.add('pe-galdrop'); } });
+        el.addEventListener('dragleave', function () { el.classList.remove('pe-galdrop'); });
+        el.addEventListener('drop', function (e) { e.preventDefault(); el.classList.remove('pe-galdrop'); var to = +el.getAttribute('data-pe-idx').slice(1); var from = S._galDrag; S._galDrag = null; if (from == null || from === to) return; mutate(function () { var arr = (curSection().assetRefs || []); if (from < 0 || from >= arr.length || to < 0 || to >= arr.length) return; var mv = arr.splice(from, 1)[0]; arr.splice(to, 0, mv); }); });
+        el.addEventListener('dragend', function () { S._galDrag = null; stage.querySelectorAll('.pe-galdrop').forEach(function (n) { n.classList.remove('pe-galdrop'); }); });
       });
     } else if (['hero', 'editorial', 'metrics', 'location', 'floorplan', 'benefits'].indexOf(fam) >= 0) {
       /* и ЗАПОЛНЕННОЕ фото (img.lp-cover / .lp-bleed), и ПУСТОЙ плейсхолдер (.lp-ph.lp-cover — напр. карта
