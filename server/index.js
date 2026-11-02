@@ -11895,6 +11895,30 @@ const server = http.createServer(async (req, res) => {
       if (waWorkerReady(db)) { try { sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' }); } catch (e) { sync = { error: e.message }; } }
       return json(res, 200, { ok: true, persona: rec.persona, sync });
     }
+    /* ⭐МАССОВЫЙ ПЕРЕНОС ДИАЛОГОВ на чистый номер (анти-бан: быстро спасти разговоры с забаненных farm-номеров).
+       Гибко: {fromPhone} — перенести диалоги ОДНОГО номера; без fromPhone — ВСЕ диалоги со всех НЕ-чистых номеров.
+       {targetPhone} — явная цель, иначе авто (номер брокера / «только диалоги»). {dryRun} — только посчитать. */
+    if (p === '/api/wa/gray/migrate-bulk' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const from = b.fromPhone ? String(b.fromPhone).replace(/\D/g, '') : null;
+      const cleanPhones = new Set(((db.settings.waGray || {}).numbers || []).filter(n => n.roles && n.roles.outreach === false).map(n => n.phone));
+      const leads = (db.leads || []).filter(l => {
+        if (!l.grayPhone) return false;                 // нет активного диалога на сером WA
+        if (cleanPhones.has(l.grayPhone)) return false; // уже на чистом
+        return from ? (l.grayPhone === from) : true;    // конкретный номер ИЛИ все farm-диалоги
+      });
+      if (b.dryRun) return json(res, 200, { ok: true, count: leads.length });
+      if (!leads.length) return json(res, 200, { ok: true, total: 0, moved: 0, failed: 0, note: 'нет диалогов для переноса' });
+      const wantProof = leads.length <= 15;             // скрин переписки — только для небольших пачек (тяжёлый рендер)
+      let moved = 0, failed = 0, firstErr = '';
+      for (const lead of leads.slice(0, 500)) {
+        try { const r = await migrateLeadToClean(db, lead, b.targetPhone || null, { proof: wantProof }); if (r && r.ok) moved++; else { failed++; if (!firstErr && r && r.error) firstErr = r.error; } }
+        catch (e) { failed++; if (!firstErr) firstErr = (e && e.message) || 'ошибка'; }
+      }
+      ai.pushEvent(db, { type: 'note', text: `Массовый перенос диалогов${from ? (' с +' + from) : ''} на чистый номер: перенесено ${moved}, не вышло ${failed}${firstErr ? (' (' + firstErr + ')') : ''}` });
+      return json(res, 200, { ok: true, total: leads.length, moved, failed, error: failed && !moved ? firstErr : undefined });
+    }
     /* БРОКЕР сам смотрит/редактирует СВОЙ закреплённый WhatsApp-профиль (владелец назначает номер, брокер оформляет).
        Владение проверяется здесь: брокер видит/правит только номер, где brokerId === его id. */
     if (p === '/api/wa/gray/mine' && req.method === 'GET') {

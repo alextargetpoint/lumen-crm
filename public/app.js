@@ -16182,7 +16182,8 @@ PAGES.numbers = async (root) => {
       </div>`, { open: false, icon: I.shield })}</div>
 
     ${grayNums.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
-      <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div></div>
+      <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div>
+      ${(STATE.leads || []).some(l => l.grayPhone && !(((STATE.settings.waGray || {}).numbers) || []).some(x => x.phone === l.grayPhone && x.roles && x.roles.outreach === false)) ? `<button class="btn btn-sm" data-graymigrateall title="Перенести ВСЕ активные диалоги со всех касательных номеров на чистые/брокерские — массово спасти разговоры (напр. после бана и покупки новых номеров)">${ic(I.chat)}Перенести все диалоги на чистый</button>` : ''}</div>
     <details class="glass card mb num-roles-help" style="margin-bottom:14px">
       <summary style="cursor:pointer;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:8px;list-style:none">${ic(I.shield || I.spark)}Как устроены номера и роли — чтобы не было банов<span class="muted" style="font-weight:400;font-size:12px;margin-left:auto">раскрыть</span></summary>
       <div style="margin-top:12px;font-size:13px;line-height:1.6;color:var(--text)">
@@ -16211,6 +16212,7 @@ PAGES.numbers = async (root) => {
           <button class="btn btn-sm" data-waprofile="${esc(n.phone)}" title="Аватар/имя/описание → синк в WhatsApp">${ic(I.gear)}Профиль</button>
           ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<button class="btn btn-sm" data-graycheck="${esc(n.phone)}" title="Проверить связь: тест отправки + реальный тест приёма (кросс-пинг с другого номера). Покажет честно, читает ли номер входящие.">${ic(I.shield)}Проверить связь</button><button class="btn btn-sm" data-grayrescan="${esc(n.phone)}" title="Пере-сканировать: сбросит сессию и покажет новый QR (при проблемах с доставкой/приёмом — не теряя настроек номера)">${ic(I.link)}Пересканировать</button>`}
           ${(!conn && (n.suspectBanned || n.banned || (n.live && n.live.status && n.live.status !== 'connected'))) ? `<button class="btn btn-sm" data-graystatus="${esc(n.phone)}" title="Финальная перепроверка статуса: обновляет данные с воркера (реально ли номер не на связи / забанен) — чтобы не заменять рабочий номер зря">${ic(I.shield)}Проверить статус</button>` : ''}
+          ${(() => { var dlgN = (STATE.leads || []).filter(l => l.grayPhone === n.phone).length; return dlgN ? `<button class="btn btn-sm" data-graymigrate="${esc(n.phone)}" data-dlg="${dlgN}" title="Перенести все ${dlgN} активных диалога этого номера на чистый/брокерский номер — с бриджем «передаю вас…» и рекапом каждому (спасти разговоры при бане)">${ic(I.chat)}Перенести диалоги (${dlgN})</button>` : ''; })()}
           <button class="btn btn-sm${n.banned || n.suspectBanned ? ' btn-accent' : ''}" data-grayreplace="${esc(n.phone)}" title="Номер заблокирован / не работает → вывести из работы и купить новый за $10 с вашего баланса (замены за наш счёт не делаются)">${ic(I.refresh)}${n.banned ? 'Купить замену' : 'Заменить'}</button>
         </div>
       </div>`; }).join('')}
@@ -16790,6 +16792,21 @@ PAGES.numbers = async (root) => {
     } catch (e) { box.innerHTML = '<div class="muted">Не удалось загрузить: ' + esc(e.message) + '</div>'; }
   })();
   $$('[data-grayreplace]', root).forEach(b => b.addEventListener('click', () => replaceGrayNumber(b.dataset.grayreplace)));
+  $$('[data-graymigrate]', root).forEach(b => b.addEventListener('click', async () => {
+    const phone = b.dataset.graymigrate, n = +b.dataset.dlg;
+    if (!await uiConfirm('Перенести диалоги на чистый номер?', `Все <b>${n}</b> активных диалога номера +${esc(phone)} перейдут на чистый/брокерский номер. Каждому клиенту уйдёт «передаю вас…» + интро с рекапом переписки. Делаем?`, { ok: 'Перенести', cancel: 'Отмена' })) return;
+    const old = b.innerHTML; b.disabled = true; b.innerHTML = ic(I.spark) + 'Переношу…';
+    try { const r = await api.post('/wa/gray/migrate-bulk', { fromPhone: phone }); toast(r.moved ? ('Перенесено: ' + r.moved) : 'Не перенеслось', (r.failed ? ('не вышло: ' + r.failed) : '') + (r.error ? ' · ' + r.error : ''), !!r.moved); await loadState(); if (PAGES.numbers) PAGES.numbers(root); }
+    catch (e) { toast('Не вышло', e.message); b.disabled = false; b.innerHTML = old; }
+  }));
+  $$('[data-graymigrateall]', root).forEach(b => b.addEventListener('click', async () => {
+    let n = 0; try { const pre = await api.post('/wa/gray/migrate-bulk', { dryRun: true }); n = pre.count || 0; } catch (_) {}
+    if (!n) { toast('Нет диалогов для переноса'); return; }
+    if (!await uiConfirm('Перенести ВСЕ диалоги на чистый?', `<b>${n}</b> активных диалога со всех касательных номеров перейдут на чистые/брокерские. Каждому — «передаю вас…» + интро с рекапом. Для больших пачек скрин переписки не прикрепляется (только текст-рекап). Делаем?`, { ok: 'Перенести все', cancel: 'Отмена' })) return;
+    const old = b.innerHTML; b.disabled = true; b.innerHTML = ic(I.spark) + 'Переношу…';
+    try { const r = await api.post('/wa/gray/migrate-bulk', {}); toast(r.moved ? ('Перенесено: ' + r.moved) : 'Не перенеслось', (r.failed ? ('не вышло: ' + r.failed) : '') + (r.error ? ' · ' + r.error : ''), !!r.moved); await loadState(); if (PAGES.numbers) PAGES.numbers(root); }
+    catch (e) { toast('Не вышло', e.message); b.disabled = false; b.innerHTML = old; }
+  }));
   $$('[data-graycheck]', root).forEach(b => b.addEventListener('click', async () => {
     const phone = b.dataset.graycheck; const old = b.innerHTML;
     b.disabled = true; b.innerHTML = ic(I.spark) + 'Проверяю связь…';
