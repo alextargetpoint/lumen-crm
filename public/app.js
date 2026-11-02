@@ -1890,6 +1890,13 @@ window.openYesimActivate = async function (phone) {
       if (st === 'qr' && r.session.qr) b2.innerHTML = '<div style="text-align:center"><img src="' + r.session.qr + '" style="width:224px;height:224px;border-radius:12px;background:#fff;padding:8px"><div class="muted" style="font-size:12px;margin-top:7px">WhatsApp → Связанные устройства → Привязать устройство → сканируйте</div></div>';
       else if (st === 'connecting') b2.innerHTML = '<div class="muted" style="text-align:center;padding:22px">Подключаем…</div>';
       else if (st === 'connected') { if (qrTimer) { clearInterval(qrTimer); qrTimer = null; } stop(); b2.innerHTML = '<div class="lc-hint" style="color:var(--ok,#3f7d4f);justify-content:center;padding:18px">' + ic(I.shield) + '<b>Номер подключён!</b> Он в работе — окно можно закрыть.</div>'; const hint2 = $('#yActQrHint', bd); if (hint2) hint2.textContent = '✓ подключён'; toast('Номер подключён', '+' + clean + ' в работе', true); if (typeof refreshNumbersPage === 'function') refreshNumbersPage(); }
+      /* сессия сбросилась / QR протух (Baileys закрывает сокет после нескольких ротаций) — не оставляем мёртвый QR на экране:
+         именно просрочённый QR даёт «не удалось» при сканировании в WhatsApp. Предлагаем свежий. */
+      else if (['close', 'closed', 'error', 'timeout', 'logout', 'conflict', 'disconnected', 'failed', 'restart_required'].includes(st)) {
+        if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+        b2.innerHTML = '<div class="muted" style="text-align:center;padding:10px 6px 12px;line-height:1.5">QR устарел — WhatsApp обновляет его каждые ~20&nbsp;сек. Сгенерируйте свежий и сразу сканируйте.</div><div style="text-align:center"><button class="btn btn-accent btn-sm" id="yActQrFresh">' + ic(I.refresh) + 'Обновить QR</button></div>';
+        const fb = $('#yActQrFresh', bd); if (fb) fb.addEventListener('click', () => { qrStarted = true; startQr(); });
+      }
     }, 2500);
   };
   const bindConnect = () => { const cb = $('#yActConnect', bd); if (cb) cb.addEventListener('click', () => { qrStarted = true; startQr(); }); };
