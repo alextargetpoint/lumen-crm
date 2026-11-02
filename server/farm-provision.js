@@ -91,7 +91,9 @@ function enqueue(deviceId, count, slot) {
   const f = farmSvc.farm();
   const dev = f.devices.find(d => d.id === deviceId);
   if (!dev) return { error: 'устройство не найдено' };
-  const used = f.numbers.filter(n => n.deviceId === deviceId).length;
+  /* забаненные номера мертвы и слот на телефоне не держат — не считаем их занятыми,
+     иначе после бана всех номеров телефон выглядит «полным» и новые номера не привязать */
+  const used = f.numbers.filter(n => n.deviceId === deviceId && n.wa.status !== 'banned' && n.tg.status !== 'banned').length;
   const room = Math.max(0, (dev.capacity || f.settings.maxPerDevice) - used);
   const n = Math.min(+count || 1, room);
   if (n <= 0) return { error: 'нет свободных слотов на устройстве' };

@@ -219,7 +219,7 @@ function economics() {
     ? Math.ceil((c.idleKeepWarm * capacity + amortMo) / (contrib + c.idleKeepWarm)) : 0;
 
   return {
-    counts: { total: nums.length, active, idle, warming, banned, devices: f.devices.length, capacity, free: Math.max(0, capacity - nums.filter(n => n.deviceId).length) },
+    counts: { total: nums.length, active, idle, warming, banned, devices: f.devices.length, capacity, free: Math.max(0, capacity - nums.filter(n => n.deviceId && !isBanned(n)).length) },
     money: { seat, perActiveCogs: perActive, revenue, cogs, cogsActive, cogsIdle, gross, capex, amortMo: +amortMo.toFixed(1), net: +net.toFixed(1), paybackMonths, occupancy, breakevenActive, contribPerActive: contrib },
   };
 }
