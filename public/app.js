@@ -1845,7 +1845,6 @@ window.openYesimActivate = async function (phone) {
       ${[
         ['Откройте WhatsApp на Android', 'На телефоне: WhatsApp (или WhatsApp Business) → «Зарегистрировать» → введите номер <b>+' + esc(clean) + '</b>.'],
         ['Код придёт сюда', 'WhatsApp отправит SMS с кодом — он появится в ленте ниже (ловим на виртуальный номер). Введите его в WhatsApp на телефоне.'],
-        ['Не хватает слотов? — клон', 'Если уже заняты 2 обычных + 2 Business на телефоне — поставьте <b>клон-приложение</b> (Dual Space / Parallel Space / встроенное «Клонирование приложений» на Xiaomi/Samsung) и запустите ещё один WhatsApp в клоне.'],
         ['Подключите к CRM', 'После регистрации: «Номера» → «Подключить свой (QR)» → введите +' + esc(clean) + ' → отсканируйте QR из этого же WhatsApp (Связанные устройства).'],
       ].map((s, i) => `<div class="tgb-step"><span class="tgb-n">${i + 1}</span><div class="tgb-b"><b>${s[0]}</b><i>${s[1]}</i></div></div>`).join('')}
     </div>
