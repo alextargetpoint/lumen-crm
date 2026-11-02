@@ -210,6 +210,7 @@ function buildComparison(db, props) {
     return {
       seq: k + 1,
       name: pr.name || 'Объект',
+      image: (pr.images && pr.images[0]) || null,   /* фото обложки объекта → шапка колонки сравнения */
       values: {
         location: (pr.district && pr.district.name) || gi.region || null,
         type: pr.type || null,
@@ -221,6 +222,22 @@ function buildComparison(db, props) {
     };
   });
   return { criteria, objects };
+}
+/* синхронизация страницы сравнения с составом подборки. Если пользователь РЕДАКТИРОВАЛ таблицу
+   (cmp.cmpEdited) — НЕ затираем его criteria/values, только сверяем колонки по составу + обновляем фото.
+   Иначе — полный ресинк из данных объектов. Раньше ресинк был безусловным → ручные правки съедались. */
+function syncComparison(db, cmp, props) {
+  cmp.contentBindings = cmp.contentBindings || {};
+  const fresh = buildComparison(db, props);
+  if (cmp.cmpEdited !== true) {
+    cmp.contentBindings.criteria = ov(fresh.criteria);
+    cmp.contentBindings.objects = ov(fresh.objects);
+    return;
+  }
+  const curObjs = (cmp.contentBindings.objects && cmp.contentBindings.objects.value) || [];
+  const byName = {}; curObjs.forEach(o => { if (o && o.name) byName[o.name] = o; });
+  const merged = fresh.objects.map(fo => { const ex = byName[fo.name]; return ex ? Object.assign({}, ex, { seq: fo.seq, image: fo.image }) : fo; });
+  cmp.contentBindings.objects = ov(merged);   /* criteria/values пользователя сохраняем как есть */
 }
 
 /* ---------- ADAPTER: несколько объектов → мульти-объектная подборка (ТЗ v3 §9,§10) ----------
@@ -528,7 +545,7 @@ function syncCollectionConnectors(db, coll, opts) {
       if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + M + ' ' + ruPlural(M, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
     }
     order.forEach((k, pos) => tagObjectHeroSeq(objSectionsOf(coll, k), propsByK[k] || {}, pos, M));
-    if (cmp) { const c = buildComparison(db, order.map(k => propsByK[k] || {})); cmp.contentBindings = cmp.contentBindings || {}; cmp.contentBindings.criteria = ov(c.criteria); cmp.contentBindings.objects = ov(c.objects); }
+    if (cmp) syncComparison(db, cmp, order.map(k => propsByK[k] || {}));
   } else {
     // M < 2: оглавление/сравнение/«k из N» бессмысленны для одного объекта → авто-скрываем соединяющие и снимаем пометки.
     // _autoOff помечает, что скрыли МЫ (не пользователь) — чтобы вернуть при росте состава назад до ≥2.

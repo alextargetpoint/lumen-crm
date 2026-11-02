@@ -686,3 +686,12 @@ button{font-family:inherit;cursor:pointer}
 /* DnD порядка фото галереи на холсте */
 #peStage img.lp-cover[data-pe-gallery]{cursor:grab}
 #peStage img.lp-cover.pe-galdrop{outline:3px solid var(--pe-sel);outline-offset:-3px;filter:brightness(.92)}
+
+/* редактор таблицы сравнения (Excel-like) */
+.pe-cmpcols{display:flex;flex-direction:column;gap:5px}
+.pe-cmpcol{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;padding:5px 8px;border:1px solid var(--pe-line);border-radius:7px;background:#fff}
+.pe-cmpcol-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe-cmpcol-acts{flex:0 0 auto;display:flex;gap:3px}
+.pe-cmprow{margin:0 0 9px;padding:0 0 9px;border-bottom:1px solid var(--pe-line)}
+.pe-cmpvals{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.pe-cmpvals input{flex:1;min-width:84px;font-size:12px}

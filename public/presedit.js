@@ -550,7 +550,20 @@
         '<div class="pe-switchrow"><span style="font-size:13px">Добавлять визитку брокера</span><button class="pe-toggle' + ((S.pres.brokerAppendix && S.pres.brokerAppendix.enabled) ? ' on' : '') + '" data-act="toggleBroker"></button></div>' +
         (S.brokers.length ? '<div class="pe-field"><label>Брокер</label>' + sel2('broker', (S.brokers.filter(function (b) { return b.id === S.pres.brokerId; })[0] || {}).name || 'Выберите брокера', 'pe-sel2-field') + '</div>' : '');
     },
-    comparison: function (s) { return '<p class="hint">Сравнение настраивается на уровне подборки.</p>'; },
+    comparison: function (s) {
+      var crit = cval(s, 'criteria') || []; var objs = cval(s, 'objects') || [];
+      var h = '<p class="hint">Таблица правится как Excel: строки-критерии, колонки-объекты, значения в ячейках. Правки сохраняются и НЕ перезатираются при обновлении подборки.</p>';
+      h += fld('Заголовок', inp('title', cval(s, 'title'), 'Сравнение объектов'), s, 'title');
+      h += '<div class="pe-sec-label" style="margin-top:12px">Объекты (колонки) · ' + objs.length + '</div>';
+      h += '<div class="pe-cmpcols">' + objs.map(function (o, j) { return '<div class="pe-cmpcol"><span class="pe-cmpcol-nm">' + (j + 1) + '. ' + esc(o.name || 'Объект') + '</span><span class="pe-cmpcol-acts"><button class="pe-mini" data-act="cmpColMove" data-oi="' + j + '" data-d="-1" title="Левее"' + (j === 0 ? ' disabled' : '') + '>‹</button><button class="pe-mini" data-act="cmpColMove" data-oi="' + j + '" data-d="1" title="Правее"' + (j === objs.length - 1 ? ' disabled' : '') + '>›</button><button class="pe-mini-del" data-act="cmpColDel" data-oi="' + j + '" title="Убрать колонку">×</button></span></div>'; }).join('') + '</div>';
+      h += '<div class="pe-sec-label" style="margin-top:14px">Критерии (строки) · ' + crit.length + '</div>';
+      h += crit.map(function (cr, ci) {
+        var vals = objs.map(function (o, j) { var v = (o.values && o.values[cr.key]) || ''; return '<input data-cmpval data-ci="' + ci + '" data-oi="' + j + '" value="' + esc(v) + '" placeholder="' + esc((o.name || '').slice(0, 12)) + '">'; }).join('');
+        return '<div class="pe-cmprow" data-ci="' + ci + '"><div style="display:flex;gap:6px;align-items:center"><input data-cmpcrit data-ci="' + ci + '" value="' + esc(cr.label || '') + '" placeholder="Критерий" style="flex:1;font-weight:600"><button class="pe-mini" data-act="cmpCritMove" data-ci="' + ci + '" data-d="-1"' + (ci === 0 ? ' disabled' : '') + '>↑</button><button class="pe-mini" data-act="cmpCritMove" data-ci="' + ci + '" data-d="1"' + (ci === crit.length - 1 ? ' disabled' : '') + '>↓</button><button class="pe-mini-del" data-act="cmpCritDel" data-ci="' + ci + '">×</button></div><div class="pe-cmpvals">' + vals + '</div></div>';
+      }).join('');
+      h += '<button class="pe-addrow" data-act="cmpCritAdd">+ Критерий (строку)</button>';
+      return h;
+    },
     contents: function (s) {
       var items = cval(s, 'items') || [];
       var h = '<p class="hint">Карта объектов подборки — «соединяющая» страница между вступлением и объектами. Список формируется автоматически: добавьте или замените объект, и он обновится.</p>';
@@ -837,6 +850,8 @@
     ib.querySelectorAll('[data-if]').forEach(function (el) { el.addEventListener('input', function () { onListInput('items', el); }); });
     ib.querySelectorAll('[data-sf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('stages', el); }); });
     ib.querySelectorAll('[data-uf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('units', el); }); });
+    ib.querySelectorAll('[data-cmpcrit]').forEach(function (el) { el.addEventListener('input', function () { var ci = +el.getAttribute('data-ci'), s = curSection(); var a = (cval(s, 'criteria') || []).slice(); a[ci] = Object.assign({}, a[ci], { label: el.value }); setOverride(s, 'criteria', a); s.cmpEdited = true; liveCanvas(); scheduleSave(); }); });
+    ib.querySelectorAll('[data-cmpval]').forEach(function (el) { el.addEventListener('input', function () { var ci = +el.getAttribute('data-ci'), oi = +el.getAttribute('data-oi'), s = curSection(); var crit = cval(s, 'criteria') || []; var key = crit[ci] && crit[ci].key; if (!key) return; var objs = (cval(s, 'objects') || []).slice(); var o = Object.assign({}, objs[oi]); o.values = Object.assign({}, o.values); o.values[key] = el.value; objs[oi] = o; setOverride(s, 'objects', objs); s.cmpEdited = true; liveCanvas(); scheduleSave(); }); });
     ib.querySelectorAll('[data-pay]').forEach(function (el) { el.addEventListener('input', onPayBase); });
     ib.querySelectorAll('[data-cursel]').forEach(function (el) { el.addEventListener('change', onCur); });
     ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'click', function (e) { handle(a, el, e); }); });
@@ -989,6 +1004,11 @@
       case 'itemIcon': { var _mi = +el.getAttribute('data-mi'); menu(el, BEN_ICONS.map(function (o) { return { t: BEN_LABEL[o[0]] || o[1], fn: function () { mutate(function () { var arr = (cval(s, 'items') || []).slice(); var it = Object.assign({}, arr[_mi] || {}); if (o[0]) it.icon = o[0]; else delete it.icon; arr[_mi] = it; setOverride(s, 'items', arr); }); } }; })); break; }
       case 'addUnit': mutate(function () { var arr = (cval(s, 'units') || []).slice(); arr.push({ plan: '', area: '', price: '', status: '' }); setOverride(s, 'units', arr); }); break;
       case 'delUnit': mutate(function () { var arr = (cval(s, 'units') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'units', arr); }); break;
+      case 'cmpCritAdd': mutate(function () { var a = (cval(s, 'criteria') || []).slice(); a.push({ key: 'c' + Math.random().toString(16).slice(2, 7), label: '' }); setOverride(s, 'criteria', a); s.cmpEdited = true; }); break;
+      case 'cmpCritDel': mutate(function () { var a = (cval(s, 'criteria') || []).slice(); a.splice(+el.getAttribute('data-ci'), 1); setOverride(s, 'criteria', a); s.cmpEdited = true; }); break;
+      case 'cmpCritMove': { var _ci = +el.getAttribute('data-ci'), _d = +el.getAttribute('data-d'); mutate(function () { var a = (cval(s, 'criteria') || []).slice(); var t = _ci + _d; if (t < 0 || t >= a.length) return; var m = a[_ci]; a[_ci] = a[t]; a[t] = m; setOverride(s, 'criteria', a); s.cmpEdited = true; }); break; }
+      case 'cmpColDel': mutate(function () { var a = (cval(s, 'objects') || []).slice(); a.splice(+el.getAttribute('data-oi'), 1); setOverride(s, 'objects', a); s.cmpEdited = true; }); break;
+      case 'cmpColMove': { var _oi = +el.getAttribute('data-oi'), _dd = +el.getAttribute('data-d'); mutate(function () { var a = (cval(s, 'objects') || []).slice(); var t = _oi + _dd; if (t < 0 || t >= a.length) return; var m = a[_oi]; a[_oi] = a[t]; a[t] = m; setOverride(s, 'objects', a); s.cmpEdited = true; }); break; }
       case 'addStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).concat({ name: '', percent: '' }); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'delStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).slice(); pl.stages.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'replacePhoto': replacePhoto(s, +el.getAttribute('data-idx')); break;

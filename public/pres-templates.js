@@ -528,10 +528,10 @@
     if (!chunks.length) chunks.push([]);
     const bd = 'border-bottom:1px solid rgba(128,128,128,.28)';
     return chunks.map((grp, pi) => {
-      const head = `<tr class="lp-cmp-head"><th style="text-align:left;padding:9px 12px;${bd};width:28%"></th>${grp.map(o => `<th class="lp-cmp-th" style="text-align:left;padding:9px 12px;${bd};font-weight:600">${o.seq ? `<span class="lp-cmp-seq">${String(o.seq).padStart(2, '0')}</span>` : ''}${esc(o.name)}</th>`).join('')}</tr>`;
-      const rows = crit.map(cr => `<tr><td style="padding:9px 12px;${bd};font-weight:600;opacity:.72">${esc(cr.label)}</td>${grp.map(o => {
+      const head = `<tr class="lp-cmp-head"><th style="text-align:left;padding:9px 12px;${bd};width:28%;vertical-align:bottom"></th>${grp.map((o, j) => `<th class="lp-cmp-th" data-cmp-obj="${pi * per + j}" style="text-align:left;padding:9px 12px;${bd};font-weight:600;vertical-align:bottom">${o.image ? `<div class="lp-cmp-photo" style="background-image:url('${esc(o.image)}')"></div>` : '<div class="lp-cmp-photo empty"></div>'}${o.seq ? `<span class="lp-cmp-seq">${String(o.seq).padStart(2, '0')}</span>` : ''}${esc(o.name)}</th>`).join('')}</tr>`;
+      const rows = crit.map((cr, ci) => `<tr><td class="lp-cmp-crit" data-cmp-crit="${ci}" style="padding:9px 12px;${bd};font-weight:600;opacity:.72">${esc(cr.label)}</td>${grp.map((o, j) => {
         const v = o.values ? o.values[cr.key] : null;
-        return `<td style="padding:9px 12px;${bd}">${v == null || v === '' ? '<span style="opacity:.45">Не указано</span>' : esc(v)}</td>`;
+        return `<td class="lp-cmp-val" data-cmp-oi="${pi * per + j}" data-cmp-ck="${esc(cr.key)}" style="padding:9px 12px;${bd}">${v == null || v === '' ? '<span style="opacity:.45">Не указано</span>' : esc(v)}</td>`;
       }).join('')}</tr>`).join('');
       return `<div class="lp-safe lp-cmp">
         ${eyebrow(c.eyebrow || 'Сравнение')}
