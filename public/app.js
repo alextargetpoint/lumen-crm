@@ -1833,8 +1833,8 @@ window.openYesimBuy = async function () {
 /* Активация купленного серого номера: гид (регистрация WhatsApp + клон-апп) + живой приём SMS/OTP */
 window.openYesimActivate = async function (phone) {
   const clean = String(phone || '').replace(/[^0-9]/g, '');
-  let pollTimer = null;
-  const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+  let pollTimer = null, qrTimer = null, qrStarted = false;
+  const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } if (qrTimer) { clearInterval(qrTimer); qrTimer = null; } };
   const bd = modal({ title: 'Активация номера +' + esc(clean), sub: 'Регистрация WhatsApp + приём кода (OTP)', wide: true, body: '<div id="yAct"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) stop(); });
   const host = () => $('#yAct', bd);
@@ -1848,8 +1848,10 @@ window.openYesimActivate = async function (phone) {
         ['Подключите к CRM', 'После регистрации: «Номера» → «Подключить свой (QR)» → введите +' + esc(clean) + ' → отсканируйте QR из этого же WhatsApp (Связанные устройства).'],
       ].map((s, i) => `<div class="tgb-step"><span class="tgb-n">${i + 1}</span><div class="tgb-b"><b>${s[0]}</b><i>${s[1]}</i></div></div>`).join('')}
     </div>
-    <div class="yact-feed-hd"><b>Входящие коды (OTP)</b><span class="yact-live"><i></i>живой приём</span><button class="btn-ghost btn-sm" id="yActRefresh" style="margin-left:auto">${ic(I.refresh)}Обновить</button></div>
-    <div id="yActSms" class="yact-feed"></div>`;
+    <div class="yact-feed-hd"><b>1 · Входящие коды (OTP)</b><span class="yact-live"><i></i>живой приём</span><button class="btn-ghost btn-sm" id="yActRefresh" style="margin-left:auto">${ic(I.refresh)}Обновить</button></div>
+    <div id="yActSms" class="yact-feed"></div>
+    <div class="yact-feed-hd" style="margin-top:16px"><b>2 · Подключение к CRM (QR)</b><span class="muted" style="font-size:11px;margin-left:8px" id="yActQrHint">после ввода кода в WhatsApp на телефоне</span></div>
+    <div id="yActQr" class="yact-feed"><button class="btn btn-accent btn-sm" id="yActConnect">${ic(I.link)}Сгенерировать QR и подключить</button><div class="muted" style="font-size:11.5px;margin-top:7px;line-height:1.5">Как зарегистрируете номер в WhatsApp (ввели код выше) — нажмите. Появится QR: в WhatsApp → <b>Связанные устройства</b> → Привязать устройство → сканируйте. Как только подключится — номер готов к работе, окно можно закрыть.</div></div>`;
   const seen = new Set();   /* уже показанные коды — анимируем только НОВЫЕ */
   const scanHtml = `<div class="yact-scan"><div class="yact-scan-rings"><i></i><i></i><i></i></div><div class="yact-scan-core">${ic(I.phone)}</div><div class="yact-scan-tx">Ловим код WhatsApp<span class="yact-dots"><i></i><i></i><i></i></span></div><div class="yact-scan-sub">Отправьте код на <b>+${esc(clean)}</b> в WhatsApp — поймаем его здесь автоматически</div></div>`;
   const loadSms = async () => {
@@ -1868,8 +1870,30 @@ window.openYesimActivate = async function (phone) {
       }).join('');
       arr.forEach(m => { if (m.code) seen.add((m.code || '') + '|' + (m.at || '')); });
       box.querySelectorAll('[data-ycopy]').forEach(b => b.addEventListener('click', () => { try { navigator.clipboard.writeText(b.dataset.ycopy); } catch (_) {} b.classList.add('ok'); const s = b.querySelector('span'); if (s) s.textContent = 'Скопировано'; }));
+      /* пришёл код → сразу готовим QR для подключения (сквозной флоу «OTP → QR») */
+      if (!qrStarted && arr.some(m => m.code)) { qrStarted = true; startQr(); }
     } catch (e) {}
   };
+  /* ⭐ПОДКЛЮЧЕНИЕ по QR прямо в этом окне — сквозной флоу: купил → OTP → QR → подключён, не уходя */
+  const startQr = async () => {
+    if (qrTimer) return;
+    const box = $('#yActQr', bd); if (!box) return;
+    const hint = $('#yActQrHint', bd); if (hint) hint.textContent = 'сканируйте QR в WhatsApp → Связанные устройства';
+    box.innerHTML = '<div class="muted" style="padding:16px;text-align:center">Готовим QR…</div>';
+    try { await api.post('/wa/gray/connect', { phone: clean, label: '' }); }
+    catch (e) { box.innerHTML = '<div style="color:var(--bad,#c0392b);padding:10px">Не вышло: ' + esc(e.message) + '</div><button class="btn btn-sm" id="yActConnect2" style="margin-top:8px">Повторить</button>'; const rb = $('#yActConnect2', bd); if (rb) rb.addEventListener('click', () => { qrStarted = false; startQr(); }); return; }
+    qrTimer = setInterval(async () => {
+      if (!document.body.contains(bd)) { stop(); return; }
+      const b2 = $('#yActQr', bd); if (!b2) { if (qrTimer) { clearInterval(qrTimer); qrTimer = null; } return; }
+      let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(clean)); } catch (_) { return; }
+      const st = r.session && r.session.status;
+      if (st === 'qr' && r.session.qr) b2.innerHTML = '<div style="text-align:center"><img src="' + r.session.qr + '" style="width:224px;height:224px;border-radius:12px;background:#fff;padding:8px"><div class="muted" style="font-size:12px;margin-top:7px">WhatsApp → Связанные устройства → Привязать устройство → сканируйте</div></div>';
+      else if (st === 'connecting') b2.innerHTML = '<div class="muted" style="text-align:center;padding:22px">Подключаем…</div>';
+      else if (st === 'connected') { if (qrTimer) { clearInterval(qrTimer); qrTimer = null; } stop(); b2.innerHTML = '<div class="lc-hint" style="color:var(--ok,#3f7d4f);justify-content:center;padding:18px">' + ic(I.shield) + '<b>Номер подключён!</b> Он в работе — окно можно закрыть.</div>'; const hint2 = $('#yActQrHint', bd); if (hint2) hint2.textContent = '✓ подключён'; toast('Номер подключён', '+' + clean + ' в работе', true); if (typeof refreshNumbersPage === 'function') refreshNumbersPage(); }
+    }, 2500);
+  };
+  const bindConnect = () => { const cb = $('#yActConnect', bd); if (cb) cb.addEventListener('click', () => { qrStarted = true; startQr(); }); };
+  bindConnect();
   $('#yActRefresh', bd).addEventListener('click', loadSms);
   loadSms();
   pollTimer = setInterval(loadSms, 5000);   /* живой приём OTP */
