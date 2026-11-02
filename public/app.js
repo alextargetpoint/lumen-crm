@@ -6534,7 +6534,9 @@ function lcTasksBlock(tasks) {
   </div>`;
 }
 function lcCommentRow(n) {
-  const who = n.by || 'Команда';
+  let who = n.by;
+  if (who && typeof who === 'object') who = who.name || who.title || '';   /* by может прийти объектом {name,phone,email} — берём имя */
+  who = String(who || 'Команда');
   const when = new Date(n.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   return `<div class="lc-cmt"><span class="lc-cmt-ava">${esc((who || '?').slice(0, 1).toUpperCase())}</span><div class="lc-cmt-b"><div class="lc-cmt-meta"><b>${esc(who)}</b><span>${esc(when)}</span></div><div class="lc-cmt-tx">${esc(n.text)}</div></div></div>`;
 }
@@ -6690,8 +6692,10 @@ async function openLeadModal(id, backScope) {
     <div class="lc-note-row">
       <input id="lcNaText" placeholder="например: дожать по подборке" value="${esc((l.nextAction || {}).text || '')}">
       <input id="lcNaDate" type="date" value="${l.nextAction && l.nextAction.at ? (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(l.nextAction.at)) : ''}" style="width:150px;flex:0 0 150px">
-      <button class="btn btn-sm" id="lcNaSave">${ic(I.check)}</button>
+      <button class="btn btn-sm" id="lcNaSave" title="Сохранить следующий шаг">${ic(I.check)}</button>
+      ${(l.nextAction && (l.nextAction.text || l.nextAction.at)) ? `<button class="btn btn-sm" id="lcNaDone" title="Отметить выполненным и снять шаг — красная плашка «просрочено» в воронке пропадёт">${ic(I.check)}Выполнено</button>` : ''}
     </div>
+    ${(l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()) ? `<div class="lc-hint warn" style="margin-top:8px">${ic(I.clock)}Шаг просрочен · ${ago(l.nextAction.at).replace(' назад', '')}. Это та самая красная плашка в воронке — нажмите «Выполнено», чтобы снять её.</div>` : ''}
     ${l.ads && (l.ads.adId || l.ads.campaignName || l.ads.adName) ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${esc([l.ads.adName, l.ads.adsetName, l.ads.campaignName].filter(Boolean).join(' · ') || ('ad_id ' + (l.ads.adId || '—')))}${l.ads.adId && !l.ads.matched ? ' <span>· не в базе (путь из интегратора)</span>' : ''}</div>` : ''}
     <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
     <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>`;
@@ -6706,7 +6710,7 @@ async function openLeadModal(id, backScope) {
       ${l.hint ? `<div class="lc-hint ${l.hint.kind}">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
       ${l.playTip ? `<div class="lc-hint info" style="border-style:dashed">${ic(I.flame)}<span><b>Приём:</b> ${esc(l.playTip.tip)}</span></div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-        ${(l.tags || []).map(t => `<span class="badge">${esc(t)}</span>`).join('')}
+        ${(l.tags || []).map(t => t === 'нужен человек' ? `<span class="badge" data-tagdismiss="нужен человек" title="Снять метку — вы взяли лид на себя (плашка «Нужен человек» в воронке пропадёт)" style="cursor:pointer">${esc(t)}<i style="margin-left:6px;opacity:.6;font-style:normal">✕</i></span>` : `<span class="badge">${esc(t)}</span>`).join('')}
       </div>
       <div class="lc-grid">
         <div class="lc-left">
@@ -6945,6 +6949,26 @@ async function openLeadModal(id, backScope) {
     await api.patch('/leads/' + l.id, { nextAction: { text: $('#lcNaText', bd).value, at: dt ? new Date(dt + 'T10:00').getTime() : null } });
     openLeadModal(id);
   });
+  /* «Выполнено» по следующему шагу: снимаем nextAction (красная плашка «просрочено» в воронке пропадает),
+     фиксируем в комментариях что шаг закрыт — чтобы было видно в истории лида. */
+  $('#lcNaDone', bd)?.addEventListener('click', async () => {
+    const txt = (l.nextAction && l.nextAction.text) || '';
+    try {
+      await api.patch('/leads/' + l.id, { nextAction: null });
+      if (txt) { try { await api.post('/leads/' + l.id + '/note', { text: '✓ Выполнено: ' + txt }); } catch (_) {} }
+      toast('Шаг выполнен', 'Следующий шаг снят — плашка «просрочено» в воронке пропадёт', true);
+      openLeadModal(id);
+    } catch (e) { toast('Не вышло', e.message); }
+  });
+  /* снять актуальную метку (напр. «нужен человек»), когда менеджер взял лид на себя */
+  $$('[data-tagdismiss]', bd).forEach(b => b.addEventListener('click', async () => {
+    const tag = b.dataset.tagdismiss;
+    try {
+      await api.patch('/leads/' + l.id, { tags: (l.tags || []).filter(t => t !== tag) });
+      toast('Метка снята', tag === 'нужен человек' ? 'Лид на вас — плашка «Нужен человек» в воронке пропадёт' : null, true);
+      openLeadModal(id);
+    } catch (e) { toast('Не вышло', e.message); }
+  }));
   /* карточка заявки: просьба клиента → отложенное сообщение / напоминание о звонке / отмена запланированного */
   wireIntakeCard(bd, l, () => openLeadModal(id));
   $('#cfGear', bd)?.addEventListener('click', () => { const ed = $('#cfEditor', bd); ed.style.display = ed.style.display === 'none' ? '' : 'none'; });

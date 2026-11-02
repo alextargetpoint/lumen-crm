@@ -9174,7 +9174,7 @@ const server = http.createServer(async (req, res) => {
         if (text) {
           lead.notes = lead.notes || [];
           const _R = sessionRole(req);
-          const _by = (_R && _R.role === 'broker') ? (((db.brokers || []).find(x => x.id === _R.brokerId) || {}).name || 'Брокер') : (((db.settings.agency || {}).manager) || 'Владелец');
+          const _by = (_R && _R.role === 'broker') ? (((db.brokers || []).find(x => x.id === _R.brokerId) || {}).name || 'Брокер') : (((db.settings.agency || {}).manager || {}).name || 'Владелец');
           lead.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: text.slice(0, 2000), by: _by });
         }
       }
@@ -9195,7 +9195,7 @@ const server = http.createServer(async (req, res) => {
         f.status = 'approved'; f.decidedAt = Date.now();
         lead.notes = lead.notes || [];
         const _R = sessionRole(req);
-        const _by = (_R && _R.role === 'broker') ? (((db.brokers || []).find(x => x.id === _R.brokerId) || {}).name || 'Брокер') : (((db.settings.agency || {}).manager) || 'Владелец');
+        const _by = (_R && _R.role === 'broker') ? (((db.brokers || []).find(x => x.id === _R.brokerId) || {}).name || 'Брокер') : (((db.settings.agency || {}).manager || {}).name || 'Владелец');
         lead.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: `${f.label}: ${f.value}`, by: _by, fromFact: f.id });
         ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `В карточку (из разговора): ${f.label} — ${f.value}` });
       } else if (b.action === 'dismiss') {
