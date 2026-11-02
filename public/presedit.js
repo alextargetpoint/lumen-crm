@@ -696,9 +696,10 @@
     }
     if (s.family === 'editorial' || s.family === 'metrics' || s.family === 'benefits') {
       var m = !!(s.styleOverrides && s.styleOverrides.mirror);
+      var port = (TOK.format(S.fmt).orient === 'portrait');   /* в портрете фото сверху/снизу, в ландшафте — справа/слева */
       return [
-        { key: 'normal', label: 'Фото справа', active: !m, act: 'setMirror', data: 'data-mirror="0"' },
-        { key: 'mirror', label: 'Фото слева', active: m, act: 'setMirror', data: 'data-mirror="1"' },
+        { key: 'normal', label: port ? 'Фото сверху' : 'Фото справа', active: !m, act: 'setMirror', data: 'data-mirror="0"' },
+        { key: 'mirror', label: port ? 'Фото снизу' : 'Фото слева', active: m, act: 'setMirror', data: 'data-mirror="1"' },
       ];
     }
     return [{ key: 'single', label: '', active: true }];
@@ -1072,26 +1073,33 @@
     /* фото: клик → правка в панели. Для одиночного снимка — фото-поле (замена/кадр.);
        для галереи — грид выбора фотографий (data-act=galtoggle). Метим только при наличии поля. */
     var fam = (curSection() || {}).family;
+    /* ⭐Метим кликабельность по СЕМЕЙСТВУ секции, а НЕ по текущему DOM правой панели — иначе на вкладках
+       «Композиция»/«Стиль» фото/списки/цена не кликались (главная жалоба «надо лезть в Содержание»).
+       Клик сам переключит на «Содержание» (cePhotoSelect/ceListSelect зовут ceOpenContentTab). */
     if (fam === 'gallery') {
-      if (document.querySelector('.pe-insp [data-act="galtoggle"]')) {
-        var gi = 0;
-        stage.querySelectorAll('img.lp-cover').forEach(function (el) {
-          el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-gallery', '1'); el.setAttribute('data-pe-idx', 'g' + (gi++));
-        });
-      }
-    } else if (document.querySelector('.pe-insp .pe-photo-prev[data-idx]')) {
+      var gi = 0;
+      stage.querySelectorAll('img.lp-cover').forEach(function (el) {
+        el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-gallery', '1'); el.setAttribute('data-pe-idx', 'g' + (gi++));
+      });
+    } else if (['hero', 'editorial', 'metrics', 'location', 'floorplan', 'benefits'].indexOf(fam) >= 0) {
       /* и ЗАПОЛНЕННОЕ фото (img.lp-cover / .lp-bleed), и ПУСТОЙ плейсхолдер (.lp-ph.lp-cover — напр. карта
          локации без картинки) делаем кликабельными: клик по пустому полю → выбор фото → «Найти фото». */
-      stage.querySelectorAll('.lp-bleed, img.lp-cover, .lp-ph.lp-cover').forEach(function (el) {
+      /* ВСЕ фото-контейнеры секции, включая bg-div обложек (фото снизу/справа) и contain-план —
+         раньше ловили только .lp-bleed/img.lp-cover, поэтому обложки «фото снизу/справа» были некликабельны. */
+      stage.querySelectorAll('.lp-bleed, img.lp-cover, img.lp-contain, .lp-ph.lp-cover, .lp-hero-gw-photo, .lp-hero-split-photo').forEach(function (el) {
+        if (el.classList.contains('pe-ced-photo')) return;
         el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-idx', '0');
-        if (el.classList.contains('lp-ph')) el.classList.add('pe-ced-empty');   /* пустой слот → подсказка «добавить фото» */
+        var empty = el.classList.contains('lp-ph') || (/lp-hero-(gw|split)-photo/.test(el.className) && !/url\(/.test(el.getAttribute('style') || ''));
+        if (empty) el.classList.add('pe-ced-empty');   /* пустой слот → подсказка «добавить фото» + клик сразу открывает picker */
       });
     }
     /* списки (метрики/места/преимущества): клик по пункту → фокус его строки в панели.
        Пункты идут по порядку = индексу строки инспектора (.pe-metric-row[data-mi=i]). Только если
        в панели есть list-редактор. Общий рендерер НЕ трогаем — индекс считаем по позиции в DOM. */
-    if (document.querySelector('.pe-insp .pe-metric-row[data-mi]')) {
-      [['.lp-metric', 1], ['.lp-metric-lg', 1], ['.lp-benefits > li', 1], ['.lp-places > li', 1]].forEach(function (p) {
+    /* ЦЕНА на обложке → клик = подсветка поля цены (составное поле, инлайн не правим) */
+    stage.querySelectorAll('.lp-hero-price').forEach(function (el) { el.classList.add('pe-ced', 'pe-ced-field'); el.setAttribute('data-pe-field', 'price'); });
+    {
+      [['.lp-metric', 1], ['.lp-metric-lg', 1], ['.lp-benefits > li', 1], ['.lp-places > li', 1], ['.lp-pay-row', 1], ['.lp-plan-params dl > div', 1]].forEach(function (p) {
         var items = stage.querySelectorAll(p[0]); if (!items.length) return;
         items.forEach(function (el, i) { if (el.classList.contains('pe-ced')) return; el.classList.add('pe-ced', 'pe-ced-list'); el.setAttribute('data-pe-listidx', i); });
       });
@@ -1110,6 +1118,16 @@
     ceOpenContentTab();
     var f = document.querySelector('.pe-insp [data-f="' + key + '"]');
     if (f) { try { f.focus({ preventScroll: true }); } catch (_) { f.focus(); } if (f.scrollIntoView) f.scrollIntoView({ block: 'center', behavior: 'smooth' }); f.classList.add('pe-f-flash'); setTimeout(function () { f.classList.remove('pe-f-flash'); }, 1000); }
+  }
+  /* клик по составному полю на холсте (цена) → открыть «Содержание» + подсветить блок поля */
+  function ceFieldSelect(field) {
+    ceDeselect(); ceOpenContentTab();
+    var SEL = { price: ['[data-price]', '[data-sel2="pricekind"]'] };
+    var sels = SEL[field]; if (!sels) return;
+    var node = null; for (var i = 0; i < sels.length && !node; i++) node = document.querySelector('.pe-insp ' + sels[i]);
+    var f = node && node.closest('.pe-field'); if (!f) return;
+    if (f.scrollIntoView) f.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    f.classList.add('pe-f-flash'); setTimeout(function () { f.classList.remove('pe-f-flash'); }, 1100);
   }
   function ceSelect(el) {
     var stage = document.getElementById('peStage'); if (stage) stage.querySelectorAll('.pe-sel').forEach(function (n) { n.classList.remove('pe-sel'); });
@@ -1310,6 +1328,7 @@
       e.stopPropagation();
       if (el.classList.contains('pe-ced-list')) ceListSelect(el);
       else if (el.classList.contains('pe-ced-photo')) { cePhotoSelect(el); if (el.classList.contains('pe-ced-empty')) ceFloatAction('replace'); }   /* пустой слот → сразу открыть «Найти фото» */
+      else if (el.classList.contains('pe-ced-field')) ceFieldSelect(el.getAttribute('data-pe-field'));   /* цена и т.п. → фокус поля в панели */
       else ceSelect(el);
     });
     stage.addEventListener('dblclick', function (e) {
