@@ -11455,7 +11455,7 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
       const b = await readBody(req); const token = String(b.token || '').trim(); const user = String(b.user || '').trim();
       if (!token) return json(res, 400, { error: 'нужен токен' });
-      const reg = store.getRegistry(); reg.platformYesim = { user, token, at: Date.now() }; store.saveRegistry();
+      const reg = store.getRegistry(); reg.platformYesim = { ...(reg.platformYesim || {}), user, token, at: Date.now() }; store.saveRegistry();  /* МЕРЖ, не replace: сохраняем waCountries/tgCountries/tgExclude — иначе ре-сейв токена сбрасывал гео-настройки (напр. +66/TH под Пхукет) к дефолтам NL/GB */
       let bal = null; try { bal = await yesimApi('get_balance'); } catch (e) { return json(res, 200, { ok: true, saved: true, warn: 'токен сохранён, но проверка баланса не прошла: ' + e.message }); }
       return json(res, 200, { ok: true, balance: bal });
     }
