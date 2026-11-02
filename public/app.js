@@ -1567,6 +1567,7 @@ window.openWaPersona = function (phone, n) {
         <div class="muted" style="font-size:10.5px;display:inline-flex;align-items:center;gap:5px;opacity:.75">${ic(I.chat)}так профиль увидят в WhatsApp</div>
       </div>
       ${conn ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер не на связи — профиль сохранится и применится после подключения по QR.</span></div>`}
+      <div class="form-row" id="wapTplRow"><label>Шаблон оформления <span class="muted" style="font-weight:400">— применить готовый аватар+имя+«о себе» (напр. после бана)</span></label><div style="display:flex;gap:6px;align-items:center"><select id="wapTplSel" style="flex:1"><option value="">— выберите шаблон —</option></select><button type="button" class="btn btn-sm" id="wapTplApply" title="Применить шаблон к этому номеру">Применить</button><button type="button" class="btn btn-sm" id="wapTplSave" title="Сохранить текущее оформление как шаблон">${ic(I.plus)}В шаблон</button></div></div>
       <div class="form-row"><label>Имя (видит лид, до 25 симв.)</label><input id="wapName" maxlength="25" value="${esc(p.name || '')}" placeholder="напр. Анна · TargetPoint"></div>
       <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><div style="display:flex;gap:6px"><input id="wapAbout" maxlength="139" value="${esc(p.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10–20" style="flex:1"><button type="button" class="btn btn-sm" id="wapGen" title="Сгенерировать через ИИ">${ic(I.spark)}ИИ</button></div></div>
       <div class="form-row"><label>Аватар</label><div style="display:flex;gap:6px"><input id="wapAvatar" value="${esc(p.avatar || '')}" placeholder="URL картинки или загрузите фото →" style="flex:1"><button type="button" class="btn btn-sm" id="wapUpload" title="Загрузить и обрезать фото">${ic(I.image || I.plus)}Фото</button></div></div>
@@ -1579,14 +1580,17 @@ window.openWaPersona = function (phone, n) {
       </div>
       <div class="muted" style="font-size:11px;line-height:1.5;margin-top:2px">Шаблонная — номер в общем пуле, первые касания раскидываются по кругу (прогрев + меньше риск). Закреплённая — все касания «своих» лидов идут с этого номера (личный номер брокера).</div>
       <label class="form-row" style="display:flex;align-items:flex-start;gap:9px;margin-top:10px;cursor:pointer"><input type="checkbox" id="wapClean" ${(n && n.roles && n.roles.outreach === false) ? 'checked' : ''} style="margin-top:3px;flex:0 0 auto"><span style="font-size:12px;line-height:1.45"><b>Только для диалогов</b> (чистый номер) — не делает холодных первых касаний и рассылок, держит только активные разговоры. Почти нулевой риск бана. Сюда переводят клиентов, которые уже ответили.</span></label>
+      <label class="form-row" id="wapMainRow" style="display:flex;align-items:flex-start;gap:9px;margin-top:8px;cursor:pointer"><input type="checkbox" id="wapMain" ${(n && n.roles && n.roles.primary) ? 'checked' : ''} style="margin-top:3px;flex:0 0 auto"><span style="font-size:12px;line-height:1.45"><b>⭐ Основной номер для общения</b> — именно с него уходит разговор с квалифицированным лидом после перевода «на чистый». Основной может быть только один; выбор этого снимет отметку с прежнего.</span></label>
       <div id="wapOut" class="muted" style="font-size:11.5px;margin-top:4px"></div>`,
     actions: [{ label: 'Сохранить и применить', cls: 'btn-accent', onClick: async (b) => {
       const out = $('#wapOut', b); if (out) out.textContent = 'Сохраняю и синкаю в WhatsApp…';
       try {
         const wMode = ($('#wapMode', b) || {}).value || 'qualifier';
         const wBroker = wMode === 'broker' ? (($('#wapBroker', b) || {}).value || null) : null;   /* шаблонная = в пул (brokerId снимаем) */
-        const wClean = !!(($('#wapClean', b) || {}).checked);
-        const r = await api.post('/wa/gray/persona', { phone, name: ($('#wapName', b) || {}).value, about: ($('#wapAbout', b) || {}).value, avatar: ($('#wapAvatar', b) || {}).value, mode: wMode, brokerId: wBroker, outreach: !wClean });
+        let wClean = !!(($('#wapClean', b) || {}).checked);
+        const wMain = !!(($('#wapMain', b) || {}).checked);
+        if (wMain) wClean = true;   /* основной номер = всегда чистый (не делает холодных) */
+        const r = await api.post('/wa/gray/persona', { phone, name: ($('#wapName', b) || {}).value, about: ($('#wapAbout', b) || {}).value, avatar: ($('#wapAvatar', b) || {}).value, mode: wMode, brokerId: wBroker, outreach: !wClean, primary: wMain });
         const sy = r.sync || {};
         if (sy.error) toast('Сохранено', 'применится после подключения', true);
         else toast('Профиль сохранён и применён к WhatsApp', null, true);
@@ -1604,6 +1608,44 @@ window.openWaPersona = function (phone, n) {
   { const g = $('#wapGen', bd); if (g) g.addEventListener('click', () => genWaAbout(($('#wapName', bd) || {}).value, (t) => { const a = $('#wapAbout', bd); if (a) { a.value = t; updWa(); } }, g)); }
   { const u = $('#wapUpload', bd); if (u) u.addEventListener('click', () => avatarPickCropUpload((url) => { const a = $('#wapAvatar', bd); if (a) { a.value = url; updWa(); } })); }
   { const wm = $('#wapMode', bd), wb = $('#wapBroker', bd); const syncWm = () => { if (wb) { const tmpl = (wm || {}).value !== 'broker'; wb.disabled = tmpl; wb.style.opacity = tmpl ? '.5' : '1'; } }; if (wm) wm.addEventListener('change', syncWm); syncWm(); }
+  /* основной номер требует «только диалоги» — ставим зависимость наглядно */
+  { const main = $('#wapMain', bd), clean = $('#wapClean', bd); if (main && clean) main.addEventListener('change', () => { if (main.checked) { clean.checked = true; clean.disabled = true; clean.parentElement.style.opacity = '.6'; } else { clean.disabled = false; clean.parentElement.style.opacity = '1'; } }); if (main && main.checked && clean) { clean.checked = true; clean.disabled = true; clean.parentElement.style.opacity = '.6'; } }
+  /* шаблоны оформления: подгружаем список, применяем к номеру, сохраняем текущее как шаблон */
+  wirePersonaTemplates(bd, phone, 'wa', { nameId: 'wapName', aboutId: 'wapAbout', avatarId: 'wapAvatar', onApplied: updWa });
+};
+/* маленький промпт на одно поле (Promise → строка или null). Нужен для «Сохранить как шаблон». */
+window.promptModal = function (title, def) {
+  return new Promise((resolve) => {
+    let done = false;
+    const bd = modal({ title, wide: false, body: `<div class="form-row"><input id="pmVal" value="${esc(def || '')}" style="width:100%" autofocus></div>`,
+      actions: [
+        { label: 'Сохранить', cls: 'btn-accent', onClick: (b) => { const v = (($('#pmVal', b) || {}).value || '').trim(); done = true; resolve(v || (def || '')); closeModal(); return false; } },
+        { label: 'Отмена', onClick: () => { done = true; resolve(null); } },
+      ] });
+    const inp = $('#pmVal', bd); if (inp) { setTimeout(() => { try { inp.focus(); inp.select(); } catch (_) {} }, 50); inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const v = inp.value.trim(); done = true; resolve(v || (def || '')); closeModal(); } }); }
+  });
+};
+/* общий механизм шаблонов профиля для WA и TG редакторов персоны */
+window.wirePersonaTemplates = async function (bd, phone, channel, ids) {
+  const sel = $('#' + (channel === 'tg' ? 'tgpTplSel' : 'wapTplSel'), bd);
+  const applyBtn = $('#' + (channel === 'tg' ? 'tgpTplApply' : 'wapTplApply'), bd);
+  const saveBtn = $('#' + (channel === 'tg' ? 'tgpTplSave' : 'wapTplSave'), bd);
+  if (!sel) return;
+  let tpls = [];
+  const fill = () => { sel.innerHTML = '<option value="">— выберите шаблон —</option>' + tpls.map(tp => `<option value="${esc(tp.id)}">${esc(tp.title)}${tp.isDefault ? ' ★' : ''}</option>`).join(''); if (typeof enhanceControls === 'function') try { enhanceControls(sel.parentElement); } catch (_) {} };
+  try { const r = await api.get('/profile-templates'); tpls = r.templates || []; fill(); } catch (_) {}
+  if (applyBtn) applyBtn.addEventListener('click', async () => {
+    const id = sel.value; if (!id) { toast('Выберите шаблон', null, false); return; }
+    applyBtn.disabled = true; const t0 = applyBtn.textContent; applyBtn.textContent = 'Применяю…';
+    try { const r = await api.post('/profile-templates/apply', { id, phone, channel }); if (r.ok && r.persona) { const nmEl = $('#' + ids.nameId, bd), abEl = $('#' + ids.aboutId, bd), avEl = $('#' + ids.avatarId, bd); if (nmEl) nmEl.value = r.persona.name || ''; if (abEl) abEl.value = r.persona.about || ''; if (avEl) avEl.value = r.persona.avatar || ''; if (ids.onApplied) ids.onApplied(); toast('Шаблон применён', (r.sync && r.sync.error) ? 'применится после подключения' : 'синхронизирован с профилем', true); } }
+    catch (e) { toast('Ошибка', e.message, false); } finally { applyBtn.disabled = false; applyBtn.textContent = t0; }
+  });
+  if (saveBtn) saveBtn.addEventListener('click', async () => {
+    const nm = ($('#' + ids.nameId, bd) || {}).value || '', ab = ($('#' + ids.aboutId, bd) || {}).value || '', av = ($('#' + ids.avatarId, bd) || {}).value || '';
+    const title = await promptModal('Название шаблона', nm ? (nm + ' · оформление') : 'Моё оформление'); if (title == null) return;
+    try { const r = await api.post('/profile-templates', { title, name: nm, about: ab, avatar: av }); tpls = r.templates || []; fill(); if (r.template) sel.value = r.template.id; if (typeof enhanceControls === 'function') try { enhanceControls(sel.parentElement); } catch (_) {} toast('Шаблон сохранён', 'теперь применяется в один клик на любой номер', true); }
+    catch (e) { toast('Ошибка', e.message, false); }
+  });
 };
 
 /* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */
@@ -1816,7 +1858,7 @@ window.openYesimBuy = async function () {
           <div id="ySms" class="warm-log" style="margin-top:6px"><div class="muted" style="font-size:11.5px;padding:8px">Ждём SMS…</div></div>
           <div class="muted" style="font-size:11px;margin-top:8px">Дальше: «Подключить свой (QR)» → введите +${esc(r.number)} → отсканируйте с телефона, где зарегистрирован WhatsApp этого номера.</div>`;
         btn.textContent = '✓ куплен'; if (typeof CUR !== 'undefined' && CUR === 'numbers') render();
-        const loadSms = async () => { const sb = $('#ySms', bd); if (!sb) return; try { const s = await api.get('/gray/yesim/sms'); const arr = (s.sms && s.sms.sms) || s.sms || []; sb.innerHTML = (Array.isArray(arr) && arr.length) ? arr.slice(0, 10).map(m => `<div class="warm-msg"><b>${esc(m.sender || m.from || '')}</b><span class="warm-txt">${esc(m.text || m.message || m.sms || '')}</span><i>${esc((m.date || m.time || '').toString().slice(0, 16))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт при регистрации WhatsApp.</div>'; } catch (e) {} };
+        const loadSms = async () => { const sb = $('#ySms', bd); if (!sb) return; try { const s = await api.get('/gray/yesim/sms?number=' + encodeURIComponent(r.number)); const arr = (s.sms && s.sms.sms) || s.sms || []; sb.innerHTML = (Array.isArray(arr) && arr.length) ? arr.slice(0, 10).map(m => `<div class="warm-msg"><b>${esc(m.sender || m.from || '')}</b><span class="warm-txt">${esc(m.text || m.message || m.sms || '')}</span><i>${esc((m.date || m.time || '').toString().slice(0, 16))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт при регистрации WhatsApp.</div>'; } catch (e) {} };
         $('#yRefreshSms', bd).addEventListener('click', loadSms); loadSms();
       } catch (e) {
         /* нехватка баланса (402) — предлагаем пополнить криптой прямо отсюда */
@@ -2330,6 +2372,7 @@ window.openTgPersona = function (phone, n) {
         <div class="muted" style="font-size:10.5px;display:inline-flex;align-items:center;gap:5px;opacity:.75">${ic(I.send)}так профиль увидят в Telegram</div>
       </div>
       ${connected ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер ещё не на связи — профиль сохранится и применится к Telegram после подключения по QR.</span></div>`}
+      <div class="form-row"><label>Шаблон оформления <span class="muted" style="font-weight:400">— применить готовый аватар+имя+«о себе»</span></label><div style="display:flex;gap:6px;align-items:center"><select id="tgpTplSel" style="flex:1"><option value="">— выберите шаблон —</option></select><button type="button" class="btn btn-sm" id="tgpTplApply" title="Применить шаблон">Применить</button><button type="button" class="btn btn-sm" id="tgpTplSave" title="Сохранить текущее как шаблон">${ic(I.plus)}В шаблон</button></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-row"><label>Имя (видит лид)</label><input id="tgpName" value="${esc(p.name || '')}" placeholder="напр. Анна"></div>
         <div class="form-row"><label>Фамилия (необязательно)</label><input id="tgpLast" value="${esc(p.lastName || '')}" placeholder="напр. Смирнова"></div>
@@ -2369,6 +2412,7 @@ window.openTgPersona = function (phone, n) {
     if (ava) { let img = ava.querySelector('img'); if (av) { if (!img) { img = document.createElement('img'); img.style.cssText = 'width:100%;height:100%;object-fit:cover'; ava.insertBefore(img, ava.firstChild); } img.onerror = () => { img.style.display = 'none'; if (tx) tx.style.display = ''; }; img.src = av; img.style.display = ''; if (tx) tx.style.display = 'none'; } else { if (img) img.style.display = 'none'; if (tx) tx.style.display = ''; } }
   };
   ['tgpName', 'tgpLast', 'tgpUser', 'tgpAbout', 'tgpAvatar'].forEach(id => { const el = $('#' + id, bd); if (el) el.addEventListener('input', updPrev); });
+  if (typeof wirePersonaTemplates === 'function') wirePersonaTemplates(bd, phone, 'tg', { nameId: 'tgpName', aboutId: 'tgpAbout', avatarId: 'tgpAvatar', onApplied: updPrev });
 };
 /* Lumen-стилевой confirm вместо нативного window.confirm — все подтверждения в едином виде */
 function uiConfirm(title, sub, opts = {}) {
@@ -16121,6 +16165,7 @@ PAGES.numbers = async (root) => {
   /* ⭐РОЛЬ НОМЕРА (знак на карточке + понятно клиенту): пул охвата / брокерский / только диалоги.
      Цвета совпадают со схемой: охват=терракота, брокерский=кобальт, чистый=зелёный. */
   const numRole = (n) => {
+    if (n.roles && n.roles.primary) return { label: 'Основной', ic: '⭐', bg: 'color-mix(in srgb,#2E8257 20%,transparent)', fg: '#2E8257', hint: 'ОСНОВНОЙ номер для общения: именно с него уходит разговор с квалифицированным лидом после перевода «на чистый». Чистый (без холодных касаний), один на агентство.' };
     if (n.roles && n.roles.outreach === false) return { label: 'Только диалоги', ic: '💬', bg: 'color-mix(in srgb,#2E8257 15%,transparent)', fg: '#2E8257', hint: 'Чистый номер: НЕ делает холодных касаний и рассылок, держит только активные разговоры. Почти нулевой риск бана — сюда переводят клиентов, которые уже ответили.' };
     if (n.brokerId) return { label: 'Брокерский', ic: '👤', bg: 'color-mix(in srgb,var(--accent) 15%,transparent)', fg: 'var(--accent)', hint: 'Закреплён за брокером: первые касания и диалоги ЕГО лидов идут с этого номера (личный номер брокера).' };
     return { label: 'Пул охвата', ic: '📣', bg: 'color-mix(in srgb,#B47A1E 16%,transparent)', fg: '#B47A1E', hint: 'Общий пул: холодные первые касания раскидываются по кругу (round-robin), с прогревом и дневным потолком. Расходный — ротируется.' };
@@ -16594,13 +16639,18 @@ PAGES.numbers = async (root) => {
   async function loadNumberOrders() {
     const box = $('#numOrdersBox', root); if (!box) return;
     let d = { orders: [] }; try { d = await api.get('/numbers/orders'); } catch (_) { box.innerHTML = ''; return; }
-    const orders = (d.orders || []).filter(o => (o.stage !== 'done') || (Date.now() - (o.at || 0) < 7 * 864e5));
-    if (!orders.length) { box.innerHTML = ''; return; }
-    const stepper = (o) => { const steps = o.steps || ['Оплачено', 'Готовим', 'Готово']; const cur = o.step || 1; return `<div style="display:flex;gap:5px;align-items:center;margin-top:7px;flex-wrap:wrap">${steps.map((s, i) => { const done = i < cur - 1, now = i === cur - 1; return `<span style="font-size:10px;padding:2px 8px;border-radius:8px;white-space:nowrap;${done ? 'background:var(--accent);color:#fff' : now ? 'background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700' : 'background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink-3,#8a8a8a)'}">${done ? '✓ ' : now ? '● ' : ''}${esc(s)}</span>`; }).join('<span style="color:var(--ink-3,#bbb);font-size:10px">→</span>')}</div>`; };
+    const all = (d.orders || []).filter(o => (o.stage !== 'done') || (Date.now() - (o.fulfilledAt || o.at || 0) < 7 * 864e5));
+    if (!all.length) { box.innerHTML = ''; return; }
+    /* активные (ждут действия) показываем как есть; выполненные («Готово») сворачиваем в <details>, чтобы
+       не держать весь список перед глазами — ровно то, о чём просил клиент. */
+    const active = all.filter(o => o.stage !== 'done');
+    const done = all.filter(o => o.stage === 'done');
+    const stepper = (o) => { const steps = o.steps || ['Оплачено', 'Готовим', 'Готово']; const cur = o.step || 1; return `<div style="display:flex;gap:5px;align-items:center;margin-top:7px;flex-wrap:wrap">${steps.map((s, i) => { const dn = i < cur - 1, now = i === cur - 1; return `<span style="font-size:10px;padding:2px 8px;border-radius:8px;white-space:nowrap;${dn ? 'background:var(--accent);color:#fff' : now ? 'background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700' : 'background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink-3,#8a8a8a)'}">${dn ? '✓ ' : now ? '● ' : ''}${esc(s)}</span>`; }).join('<span style="color:var(--ink-3,#bbb);font-size:10px">→</span>')}</div>`; };
     const isOwner = STATE && STATE.me && STATE.me.role === 'owner';
+    const row = (o) => { const nums = (o.numbers || []); const act = o.stage === 'connect' && nums.length ? `<button class="btn btn-sm btn-accent" data-noconnect="${esc(nums[0])}" style="margin-top:9px">Подключить по QR</button>` : (o.canRetry && isOwner ? `<button class="btn btn-sm btn-ghost" data-noretry="${esc(o.id)}" style="margin-top:9px">${o.provisionError ? 'Повторить выдачу' : 'Выдать номер'}</button>` : ''); return `<div class="set-row" style="align-items:flex-start"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес — <b style="color:var(--accent)">${esc(o.stageLabel || 'в обработке')}</b></div><div class="sd">${esc(o.detail || '')}${o.detail ? ' · ' : ''}${new Date(o.at).toLocaleDateString('ru-RU')}</div>${stepper(o)}${act}</div></div>`; };
     box.innerHTML = `<div style="margin-top:14px;border-top:1px solid var(--stroke);padding-top:12px">
-      <div class="lp-sec" style="margin:0 0 8px">Мои заказы номеров</div>
-      ${orders.map(o => { const nums = (o.numbers || []); const act = o.stage === 'connect' && nums.length ? `<button class="btn btn-sm btn-accent" data-noconnect="${esc(nums[0])}" style="margin-top:9px">Подключить по QR</button>` : (o.canRetry && isOwner ? `<button class="btn btn-sm btn-ghost" data-noretry="${esc(o.id)}" style="margin-top:9px">${o.provisionError ? 'Повторить выдачу' : 'Выдать номер'}</button>` : ''); return `<div class="set-row" style="align-items:flex-start"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес — <b style="color:var(--accent)">${esc(o.stageLabel || 'в обработке')}</b></div><div class="sd">${esc(o.detail || '')}${o.detail ? ' · ' : ''}${new Date(o.at).toLocaleDateString('ru-RU')}</div>${stepper(o)}${act}</div></div>`; }).join('')}
+      ${active.length ? `<div class="lp-sec" style="margin:0 0 8px">Мои заказы номеров</div>${active.map(row).join('')}` : ''}
+      ${done.length ? `<details class="num-done" ${active.length ? '' : 'open'} style="margin-top:${active.length ? '10' : '0'}px"><summary style="cursor:pointer;font-size:12px;color:var(--ink-3,#8a8a8a);user-select:none;list-style:none;display:flex;align-items:center;gap:6px">${ic(I.check)}Подключённые номера · ${done.length} <span style="color:var(--ink-3,#bbb)">— развернуть</span></summary><div style="margin-top:8px;opacity:.82">${done.map(row).join('')}</div></details>` : ''}
     </div>`;
     $$('[data-noconnect]', box).forEach(b => b.addEventListener('click', () => window.openYesimActivate && window.openYesimActivate(b.dataset.noconnect)));
     $$('[data-noretry]', box).forEach(b => b.addEventListener('click', async () => {

@@ -3610,7 +3610,47 @@ async function yesimBuyNumber(country, subscriptionOption) {
   catch (e1) { if (area && /invalid area/i.test(e1.message)) r = await yesimApi('purchase_number', { country, subscriptionOption }); else throw e1; }
   const number = r.number || (r.data && r.data.number) || '';
   if (!number) throw new Error('Yesim не вернул номер');
-  return { number: String(number), raw: r };
+  return { number: String(number), id: yesimPurchaseId(r), raw: r };
+}
+/* ⭐Бэкфилл n.ya для УЖЕ КУПЛЕННЫХ номеров (до того, как мы стали сохранять id): спрашиваем у Yesim
+   список номеров аккаунта и сопоставляем по телефону. Best-effort (имя метода у Yesim плавает) — если
+   ничего не отдало, молча выходим: сработает жёсткий анти-leak гард (покажем «ловим…», не чужой код). */
+let _yaBackfillAt = 0;
+async function yesimBackfillIds(db) {
+  const nums = ((db.settings.waGray || {}).numbers || []).filter(n => n.source === 'yesim' && !n.ya);
+  if (!nums.length) return false;
+  if (_yaBackfillAt && (Date.now() - _yaBackfillAt) < 60000) return false;  /* не долбим API чаще раза в минуту */
+  _yaBackfillAt = Date.now();
+  const digits = x => String(x == null ? '' : x).replace(/[^0-9]/g, '');
+  let listed = [];
+  for (const act of ['get_numbers', 'get_my_numbers', 'my_numbers', 'numbers', 'get_active_numbers', 'get_purchased_numbers']) {
+    try {
+      const r = await yesimApi(act, {});
+      const cand = [r && r.data && r.data.numbers, r && r.data && r.data.items, r && r.data && r.data.list, r && r.numbers, r && r.items, r && r.result, r && r.data, r];
+      for (const c of cand) { if (Array.isArray(c) && c.length) { listed = c; break; } }
+      if (listed.length) break;
+    } catch (_) {}
+  }
+  if (!listed.length) return false;
+  let changed = false;
+  for (const rec of nums) {
+    const tail = digits(rec.phone).slice(-8);
+    const hit = listed.find(x => { const ph = digits(x.number || x.msisdn || x.did || x.did_number || x.phone || ''); return ph && (ph.endsWith(tail) || tail.endsWith(ph.slice(-8))); });
+    if (hit) { const id = yesimPurchaseId(hit); if (id) { rec.ya = id; changed = true; } }
+  }
+  if (changed) { try { store.save(); } catch (_) {} }
+  return changed;
+}
+/* ⭐Вытащить Yesim-ид покупки/аренды номера из ЛЮБОЙ формы ответа — это ЕДИНСТВЕННЫЙ надёжный ключ,
+   по которому get_sms отдаёт SMS именно ЭТОГО номера (сам номер Yesim по did_number фильтрует НЕ всегда,
+   отсюда была кросс-контаминация кодов между номерами). Сохраняем на карточке номера как n.ya. */
+function yesimPurchaseId(r) {
+  if (!r || typeof r !== 'object') return '';
+  const d = r.data && typeof r.data === 'object' ? r.data : {};
+  const v = r.id || d.id || r.order_id || d.order_id || r.purchase_id || d.purchase_id ||
+            r.rent_id || d.rent_id || r.activation_id || d.activation_id || r.number_id || d.number_id ||
+            r.did_id || d.did_id || r.sim_id || d.sim_id || '';
+  return v == null ? '' : String(v);
 }
 /* ⭐ПРАВИЛА СТРАН по каналу: WhatsApp — только NL/UK(GB); Telegram — любая, КРОМЕ Украины.
    Настраивается в реестре platformYesim.{waCountries,tgCountries,tgExclude}; дефолты осмысленные. */
@@ -3669,10 +3709,10 @@ async function provisionByodOrder(db, order) {
   let lastErr = '';
   for (let i = order.numbers.length; i < want; i++) {
     try {
-      const { number } = await yesimBuyNumber(country, 'month');
+      const { number, id: ya } = await yesimBuyNumber(country, 'month');
       const digits = String(number).replace(/[^0-9]/g, '');
       if (digits && !db.settings.waGray.numbers.some(n => n.phone === digits)) {
-        db.settings.waGray.numbers.push({ phone: digits, label: 'Yesim ' + country, country, source: 'yesim', orderId: order.id, roles: { send: true, call: false }, priceUsd: order.price || 10, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 });
+        db.settings.waGray.numbers.push({ phone: digits, label: 'Yesim ' + country, country, source: 'yesim', ya: ya || '', orderId: order.id, roles: { send: true, call: false }, priceUsd: order.price || 10, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 });
       }
       if (digits) order.numbers.push('+' + digits);
     } catch (e) { lastErr = (e && e.message) || String(e); break; }
@@ -4107,8 +4147,9 @@ function cleanNumberFor(db, lead, live) {
   const conn = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected' && (!n.roles || n.roles.send !== false) && n.phone !== lead.grayPhone; });
   if (!conn.length) return null;
   if (lead.broker) { const b = conn.find(n => n.brokerId === lead.broker); if (b) return b; }          /* личный номер брокера */
-  const clean = conn.find(n => n.roles && n.roles.outreach === false);                                   /* явный клин-номер */
-  return clean || null;
+  const cleans = conn.filter(n => n.roles && n.roles.outreach === false);                                /* чистые номера (только диалоги) */
+  const primary = cleans.find(n => n.roles && n.roles.primary);                                          /* ⭐явно назначенный ОСНОВНОЙ номер */
+  return primary || cleans[0] || null;
 }
 async function migrateLeadToClean(db, lead, targetPhone, opts = {}) {
   const live = await waGrayLiveSessions(db);
@@ -8080,8 +8121,17 @@ const server = http.createServer(async (req, res) => {
       bl.numberOrders.unshift(order); if (bl.numberOrders.length > 100) bl.numberOrders.length = 100;
       try { const reg = store.getRegistry(); reg.numberOrders = reg.numberOrders || {}; reg.numberOrders[store.currentTid() + ':' + order.id] = Object.assign({ tid: store.currentTid() }, order); store.saveRegistry(); } catch (_) {}
       try { await provisionByodOrder(db, order); } catch (e) { order.provisionError = (e && e.message) || 'provision error'; }
+      /* ⭐АВТО-ПЕРЕНОС ОФОРМЛЕНИЯ со старого (забаненного) номера на новый: аватар/имя/«о себе»/режим/брокер —
+         чтобы НЕ пришлось заново грузить фото и писать био. Применится само при подключении по QR (apply-profile). */
+      if (old && old.persona && Array.isArray(order.numbers)) {
+        for (const np of order.numbers) {
+          const nd = String(np).replace(/\D/g, '');
+          const nrec = (g.numbers || []).find(n => String(n.phone).replace(/\D/g, '') === nd);
+          if (nrec && !nrec.persona) { nrec.persona = Object.assign({}, old.persona); nrec.brokerId = old.brokerId || nrec.brokerId || null; if (old.roles) nrec.roles = Object.assign({}, nrec.roles || {}, { outreach: old.roles.outreach }); nrec.profileFrom = old.phone; }
+        }
+      }
       const provisioned = order.status === 'ready';
-      notify(db, { type: 'billing', level: 'success', title: 'Заказана замена номера', text: `Старый номер выведен (заблокирован). Новый куплен за $${cost} с баланса${provisioned && order.numbers ? ` — ${order.numbers.join(', ')}, подключите по QR` : ' — покупаем и настраиваем'}.`, email: false });
+      notify(db, { type: 'billing', level: 'success', title: 'Заказана замена номера', text: `Старый номер выведен (заблокирован). Новый куплен за $${cost} с баланса${provisioned && order.numbers ? ` — ${order.numbers.join(', ')} (оформление перенесено со старого), подключите по QR` : ' — покупаем и настраиваем'}.`, email: false });
       store.save();
       return json(res, 200, { ok: true, balance: ch.balance, order });
     }
@@ -8107,6 +8157,17 @@ const server = http.createServer(async (req, res) => {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const bl = db.settings.billing || {};
       const readyCount = (() => { try { return (farmSvc.poolReady() || []).length; } catch (_) { return 0; } })();
+      /* ⭐АВТО-ЗАКРЫТИЕ byod-заказа: если ВСЕ номера заказа уже подключены (connectedAt/live=connected) — заказ
+         переходит в 'fulfilled' и УХОДИТ из активного списка (не надо держать его перед глазами вечно). */
+      const grayNums = ((db.settings.waGray || {}).numbers || []);
+      const numConnected = (phoneStr) => { const d = String(phoneStr).replace(/\D/g, ''); const rec = grayNums.find(n => String(n.phone).replace(/\D/g, '').slice(-9) === d.slice(-9)); return !!(rec && (rec.connectedAt || (rec.live && rec.live.status === 'connected'))); };
+      let _ordersChanged = false;
+      for (const o of (bl.numberOrders || [])) {
+        if (o.edition !== 'managed' && o.status === 'ready' && Array.isArray(o.numbers) && o.numbers.length && o.numbers.every(numConnected)) {
+          o.status = 'fulfilled'; o.fulfilledAt = Date.now(); _ordersChanged = true;
+        }
+      }
+      if (_ordersChanged) store.save();
       /* детальный статус (без чёрного ящика): оплачено → готовим → готово → назначено/подключить */
       const orders = (bl.numberOrders || []).slice(0, 30).map(o => {
         const r = Object.assign({}, o);
@@ -11530,11 +11591,12 @@ const server = http.createServer(async (req, res) => {
         try { r = await yesimApi('purchase_number', area ? { country, subscriptionOption, area } : { country, subscriptionOption }); }
         catch (e1) { if (area && /invalid area/i.test(e1.message)) r = await yesimApi('purchase_number', { country, subscriptionOption }); else throw e1; }
         const number = r.number || (r.data && r.data.number) || '';
+        const ya = yesimPurchaseId(r);   /* ключ для get_sms по этому номеру (анти-кросс-контаминация) */
         /* покупка удалась → списываем с баланса (аренда номера на месяц) + фиксируем цену на номере (для калькулятора «по факту») */
         let ch = { ok: true, balance: db.settings.billing.balance || 0 };
         if (number) { ch = billing.chargeBalance(db, numPrice, `Аренда номера ${forSvc === 'tg' ? 'Telegram' : 'WhatsApp'} +${number} (месяц)`); }
         /* WA-номер сохраняем в пул серых WhatsApp; TG-номер — НЕ сюда (его добавит /tg/gray/connect в tgGray) */
-        if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, country, source: 'yesim', roles: { send: true, call: false }, priceUsd: numPrice, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 }); }
+        if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, country, source: 'yesim', ya: ya || '', roles: { send: true, call: false }, priceUsd: numPrice, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 }); }
         store.save();
         lowBalanceCheck(db);
         return json(res, 200, { ok: true, number, result: r, balance: ch.balance, charged: numPrice });
@@ -11545,31 +11607,41 @@ const server = http.createServer(async (req, res) => {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const num = (u.searchParams.get('number') || '').replace(/[^0-9]/g, '');
       try {
+        const digits = x => String(x == null ? '' : x).replace(/[^0-9]/g, '');
+        /* карточка номера → её Yesim-ид (n.ya): ЕДИНСТВЕННЫЙ надёжный per-number ключ для get_sms.
+           Для старых номеров (куплены до сохранения id) — разовый бэкфилл по списку номеров аккаунта. */
+        let allNums = ((db.settings.waGray || {}).numbers || []);
+        let nrec = num ? allNums.find(n => digits(n.phone).slice(-9) === num.slice(-9) || num.endsWith(digits(n.phone).slice(-8))) : null;
+        if (num && nrec && !nrec.ya) { try { if (await yesimBackfillIds(db)) { allNums = ((db.settings.waGray || {}).numbers || []); nrec = allNums.find(n => digits(n.phone).slice(-9) === num.slice(-9) || num.endsWith(digits(n.phone).slice(-8))); } } catch (_) {} }
+        const ya = nrec && nrec.ya ? String(nrec.ya) : '';
         const params = { offset: parseInt(u.searchParams.get('offset')) || 0 };
-        if (num) { params.did_number = num; params.number = num; }   /* часть методов фильтрует на сервере — передаём и так */
+        if (ya) { params.id = ya; params.order_id = ya; params.purchase_id = ya; params.number_id = ya; params.did_id = ya; }  /* Yesim игнорит неизвестные params[...] — передаём все варианты имени */
+        if (num) { params.did_number = num; params.number = num; }
         const r = await yesimApi('get_sms', params);
         /* ⭐РОБАСТНОЕ извлечение массива SMS из РАЗНЫХ форм ответа Yesim (shape плавает) */
         let list = [];
         const cand = [r && r.data && r.data.sms, r && r.data && r.data.messages, r && r.data && r.data.items, r && r.data && r.data.list, r && r.sms, r && r.messages, r && r.items, r && r.result, r && r.data, r];
         for (const c of cand) { if (Array.isArray(c)) { list = c; break; } if (c && Array.isArray(c.sms)) { list = c.sms; break; } }
         if (!Array.isArray(list)) list = [];
-        const digits = x => String(x == null ? '' : x).replace(/[^0-9]/g, '');
         const recipOf = m => digits(m.recipient || m.to || m.number || m.destination || m.did || m.did_number || m.msisdn || m.to_number || m.receiver || '');
         const bodyOf = m => m.text || m.message || m.sms || m.body || m.content || m.msg || '';
-        /* ⭐ФИЛЬТР ПО НОМЕРУ-ПОЛУЧАТЕЛЮ (анти-кросс-контаминация): если у сообщений ЕСТЬ поле получателя —
-           показываем СТРОГО коды этого номера (чужие НИКОГДА). Если поля получателя нет ни у одного — доверяем
-           серверному фильтру Yesim (did_number передан выше) и показываем как есть. Фолбэк «показать все» УБРАН:
-           лучше «ловим…», чем код другого номера. */
-        let filtered = list;
-        if (num && list.length) {
+        /* ⭐АНТИ-КРОСС-КОНТАМИНАЦИЯ (жёстко). Приоритет атрибуции:
+           (1) Запрос СКОУПЛЕН по n.ya → Yesim вернул SMS именно этого номера → доверяем всему.
+           (2) Иначе фильтруем по полю-получателю, если оно есть у сообщений.
+           (3) Нет ни ya, ни получателя: если в аккаунте БОЛЬШЕ ОДНОГО номера — атрибутировать невозможно,
+               отдаём ПУСТО (_ambiguous), а НЕ весь инбокс. Лучше «ловим код…», чем код чужого номера.
+               Единственный номер в аккаунте → все SMS заведомо его, показываем. */
+        let filtered = list, ambiguous = false;
+        if (num && list.length && !ya) {
           const tail = num.slice(-8);
           const hasRecip = list.some(m => recipOf(m));
           if (hasRecip) filtered = list.filter(m => { const to = recipOf(m); return to && (to.endsWith(tail) || num.endsWith(to.slice(-8))); });
-          /* hasRecip===false → оставляем list как есть (Yesim отфильтровал по did_number) */
+          else if (allNums.length > 1) { filtered = []; ambiguous = true; }
+          /* allNums.length<=1 → оставляем list (все коды заведомо этого единственного номера) */
         }
         const norm = filtered.map(m => ({ from: m.sender || m.from || m.source || '', to: recipOf(m), text: bodyOf(m), at: m.date || m.time || m.timestamp || m.created_at || m.received_at || '', code: (String(bodyOf(m)).match(/\b(\d{3}[-\s]?\d{3})\b|\b(\d{4,8})\b/) || [])[0] || '' }));
-        const out = { ok: true, sms: norm };
-        if (u.searchParams.get('debug') === '1') { out._rawKeys = (r && typeof r === 'object') ? Object.keys(r) : typeof r; out._dataKeys = (r && r.data && typeof r.data === 'object') ? Object.keys(r.data) : null; out._listLen = list.length; out._sampleKeys = list[0] ? Object.keys(list[0]) : null; out._sample = list[0] || null; }
+        const out = { ok: true, sms: norm, scoped: !!ya, ambiguous };
+        if (u.searchParams.get('debug') === '1') { out._ya = ya || null; out._accountNums = allNums.length; out._rawKeys = (r && typeof r === 'object') ? Object.keys(r) : typeof r; out._dataKeys = (r && r.data && typeof r.data === 'object') ? Object.keys(r.data) : null; out._listLen = list.length; out._sampleKeys = list[0] ? Object.keys(list[0]) : null; out._sample = list[0] || null; }
         return json(res, 200, out);
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
@@ -11840,7 +11912,16 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/wa/gray/status' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const phone = String(u.searchParams.get('phone') || '').replace(/[^0-9]/g, '');
-      try { const r = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(phone)); return json(res, 200, { ok: true, session: r.session }); }
+      try {
+        const r = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(phone));
+        /* ⭐ДУРАБЕЛЬНЫЙ сигнал подключения: как только воркер отдал 'connected' — фиксируем на карточке номера
+           connectedAt + live.status. По нему заказ сам доедет до «Готово» и уйдёт из активного списка. */
+        if (r && r.session && r.session.status === 'connected') {
+          const rec = ((db.settings.waGray || {}).numbers || []).find(n => String(n.phone).replace(/\D/g, '') === phone || (n.live && String(n.live.phone || '').replace(/\D/g, '') === phone));
+          if (rec) { if (!rec.connectedAt) rec.connectedAt = Date.now(); rec.live = Object.assign({}, rec.live || {}, { status: 'connected', phone: r.session.phone || (rec.live && rec.live.phone) || null }); store.save(); }
+        }
+        return json(res, 200, { ok: true, session: r.session });
+      }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* отправить сообщение с конкретного номера */
@@ -11909,9 +11990,62 @@ const server = http.createServer(async (req, res) => {
       if (b.mode != null) rec.persona.mode = ['qualifier', 'broker', 'neutral'].includes(b.mode) ? b.mode : 'qualifier';   // режим: шаблонная от агентства (qualifier) / закреплена за брокером
       if ('brokerId' in b) rec.brokerId = b.brokerId ? String(b.brokerId) : null;   // закрепление номера за брокером (pickGrayNumber роутит по n.brokerId; пул = null)
       if ('outreach' in b) { rec.roles = rec.roles || {}; rec.roles.outreach = b.outreach !== false; }   // клин-номер (только диалоги): outreach:false → исключён из холодных первых касаний (анти-бан)
+      if ('primary' in b) {   // ⭐основной номер для общения с квалифицированными: только ОДИН, и он всегда чистый
+        rec.roles = rec.roles || {};
+        if (b.primary) { rec.roles.primary = true; rec.roles.outreach = false; ((db.settings.waGray || {}).numbers || []).forEach(n => { if (n !== rec && n.roles && n.roles.primary) n.roles.primary = false; }); }
+        else rec.roles.primary = false;
+      }
       store.save();
       let sync = null;
       if (waWorkerReady(db)) { try { sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' }); } catch (e) { sync = { error: e.message }; } }
+      return json(res, 200, { ok: true, persona: rec.persona, sync });
+    }
+    /* ⭐ШАБЛОНЫ ОФОРМЛЕНИЯ (аватар+имя+«о себе»): сохранить один раз → применять на любой номер (в т.ч. после бана,
+       чтобы не грузить фото и не писать био заново). Общие для WA/TG; about подрезается под лимит канала при применении. */
+    if (p === '/api/profile-templates' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      return json(res, 200, { ok: true, templates: db.settings.profileTemplates || [] });
+    }
+    if (p === '/api/profile-templates' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      db.settings.profileTemplates = db.settings.profileTemplates || [];
+      const list = db.settings.profileTemplates;
+      const data = { title: String(b.title || '').slice(0, 60) || 'Шаблон', name: String(b.name || '').slice(0, 40), about: String(b.about || '').slice(0, 200), avatar: String(b.avatar || '').slice(0, 500) };
+      let rec;
+      if (b.id && (rec = list.find(x => x.id === b.id))) { Object.assign(rec, data); rec.updatedAt = Date.now(); }
+      else { rec = Object.assign({ id: 'pt_' + crypto.randomBytes(5).toString('hex'), createdAt: Date.now() }, data); list.unshift(rec); }
+      if (b.isDefault != null) { if (b.isDefault) list.forEach(x => x.isDefault = x.id === rec.id); else rec.isDefault = false; }
+      if (list.length > 40) list.length = 40;
+      store.save();
+      return json(res, 200, { ok: true, template: rec, templates: list });
+    }
+    if (p === '/api/profile-templates/delete' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      db.settings.profileTemplates = (db.settings.profileTemplates || []).filter(x => x.id !== b.id);
+      store.save();
+      return json(res, 200, { ok: true, templates: db.settings.profileTemplates });
+    }
+    /* применить шаблон к номеру: копируем в persona и сразу синкаем в живой профиль (WA или TG) */
+    if (p === '/api/profile-templates/apply' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const tpl = (db.settings.profileTemplates || []).find(x => x.id === b.id);
+      if (!tpl) return json(res, 404, { error: 'шаблон не найден' });
+      const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      const ch = b.channel === 'tg' ? 'tg' : 'wa';
+      const pool = ch === 'tg' ? (db.settings.tgGray || {}).numbers : (db.settings.waGray || {}).numbers;
+      const rec = (pool || []).find(n => String(n.phone).replace(/\D/g, '') === phone);
+      if (!rec) return json(res, 404, { error: 'номер не найден' });
+      const aboutLimit = ch === 'tg' ? 70 : 139;
+      rec.persona = Object.assign({}, rec.persona || {}, { name: (tpl.name || '').slice(0, ch === 'tg' ? 64 : 25), about: (tpl.about || '').slice(0, aboutLimit), avatar: tpl.avatar || '' });
+      store.save();
+      let sync = null;
+      try {
+        if (ch === 'wa' && waWorkerReady(db)) sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' });
+        else if (ch === 'tg' && typeof tgGrayApi === 'function' && tgWorkerReady && tgWorkerReady(db)) sync = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/profile', { firstName: rec.persona.name || '', lastName: rec.persona.lastName || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' });
+      } catch (e) { sync = { error: e.message }; }
       return json(res, 200, { ok: true, persona: rec.persona, sync });
     }
     /* ⭐МАССОВЫЙ ПЕРЕНОС ДИАЛОГОВ на чистый номер (анти-бан: быстро спасти разговоры с забаненных farm-номеров).
