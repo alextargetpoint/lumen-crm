@@ -447,6 +447,7 @@
     h += fld('Заголовок', inp('title', cval(s, 'title'), 'Заголовок подборки'), s, 'title');
     h += fld('Приветствие', txt('subtitle', cval(s, 'subtitle'), 'Короткое обращение к клиенту'), s, 'subtitle');
     h += '<div class="pe-switchrow"><span style="font-size:13px">Показать имя клиента</span><button class="pe-toggle' + (showClient ? ' on' : '') + '" data-act="toggleClient"></button></div>';
+    h += photoField(s, 0, 'Фото обложки подборки');   /* ⚠️БАГ: у вступления на холсте есть фото, но в инспекторе не было ни «Найти фото», ни «Кадрировать/Улучшить» → правый клик по фото делал ничего */
     h += '<div class="pe-sec-label" style="margin-top:18px">О подборке</div>';
     h += '<div class="pe-aboutrow">' + ic('doc') + '<span>Объектов в подборке</span><b>' + objCount + '</b></div>';
     h += '<div class="pe-aboutrow">' + ic('doc') + '<span>Страниц в презентации</span><b>' + pageCount + '</b></div>';
