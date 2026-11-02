@@ -16084,6 +16084,14 @@ PAGES.numbers = async (root) => {
       ? ` <span class="badge ok" title="Контроль доставки: номер доставил служебное сообщение другому нашему номеру ${cAgo} мин назад — исходящее реально работает.">✓ доставка проверена</span>`
       : ` <span class="badge bad" title="Контроль доставки НЕ прошёл ${cAgo} мин назад — номер реально не доставляет, нужен рескан.">✕ доставка не прошла</span>`) : '';
     return base + decWarn + retryWarn + canary; };
+  /* ⭐РОЛЬ НОМЕРА (знак на карточке + понятно клиенту): пул охвата / брокерский / только диалоги.
+     Цвета совпадают со схемой: охват=терракота, брокерский=кобальт, чистый=зелёный. */
+  const numRole = (n) => {
+    if (n.roles && n.roles.outreach === false) return { label: 'Только диалоги', ic: '💬', bg: 'color-mix(in srgb,#2E8257 15%,transparent)', fg: '#2E8257', hint: 'Чистый номер: НЕ делает холодных касаний и рассылок, держит только активные разговоры. Почти нулевой риск бана — сюда переводят клиентов, которые уже ответили.' };
+    if (n.brokerId) return { label: 'Брокерский', ic: '👤', bg: 'color-mix(in srgb,var(--accent) 15%,transparent)', fg: 'var(--accent)', hint: 'Закреплён за брокером: первые касания и диалоги ЕГО лидов идут с этого номера (личный номер брокера).' };
+    return { label: 'Пул охвата', ic: '📣', bg: 'color-mix(in srgb,#B47A1E 16%,transparent)', fg: '#B47A1E', hint: 'Общий пул: холодные первые касания раскидываются по кругу (round-robin), с прогревом и дневным потолком. Расходный — ротируется.' };
+  };
+  const roleChip = (n) => { const r = numRole(n); return `<span class="badge" title="${esc(r.hint)}" style="background:${r.bg};color:${r.fg};font-weight:600">${r.ic} ${esc(r.label)}</span>`; };
   const warmLiveHtml = (w) => {
     if (!w || !w.running) return '<div class="muted" style="font-size:11.5px;margin-top:8px">Прогрев выключен. Включите тумблер выше — номера начнут аккуратную переписку между собой (нужно ≥2 на связи).</div>';
     const log = w.log || [];
@@ -16171,13 +16179,25 @@ PAGES.numbers = async (root) => {
 
     ${grayNums.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
       <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div></div>
+    <details class="glass card mb num-roles-help" style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:8px;list-style:none">${ic(I.shield || I.spark)}Как устроены номера и роли — чтобы не было банов<span class="muted" style="font-weight:400;font-size:12px;margin-left:auto">раскрыть</span></summary>
+      <div style="margin-top:12px;font-size:13px;line-height:1.6;color:var(--text)">
+        <div class="muted" style="font-size:12.5px;margin-bottom:12px">Банит НОМЕР за холодный объём при низком отклике. Поэтому номера разделены на роли — у каждой свой знак на карточке:</div>
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:14px">
+          <div style="display:flex;gap:10px;align-items:flex-start"><span class="badge" style="background:color-mix(in srgb,#B47A1E 16%,transparent);color:#B47A1E;font-weight:600;flex:0 0 auto">📣 Пул охвата</span><span>Общие серые номера для холодных первых касаний. Касания раскидываются <b>по кругу</b>, с прогревом (15→80/день за 2 недели) и дневным потолком. Расходные — ротируются. Страны: NL/UK.</span></div>
+          <div style="display:flex;gap:10px;align-items:flex-start"><span class="badge" style="background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);font-weight:600;flex:0 0 auto">👤 Брокерский</span><span>Закреплён за конкретным брокером — первые касания и диалоги <b>его</b> лидов идут с этого номера. Задаётся в профиле номера.</span></div>
+          <div style="display:flex;gap:10px;align-items:flex-start"><span class="badge" style="background:color-mix(in srgb,#2E8257 15%,transparent);color:#2E8257;font-weight:600;flex:0 0 auto">💬 Только диалоги</span><span>«Чистый» номер: <b>не делает холодных касаний и рассылок</b>, держит только активные разговоры. Почти нулевой риск бана — сюда переводят клиента, который уже ответил. Включается в профиле номера (тумблер «Только для диалогов»).</span></div>
+        </div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6"><b style="color:var(--text)">Как это защищает от бана:</b> на 3-м холодном касании в WhatsApp без ответа — уходим на Telegram/email; всего после 4 касаний без единого ответа — лид в «долгосрочный прохладный» (касания прекращаются); номер с низким откликом сам выводится из охвата и отдыхает; ответившего переводим на чистый номер с бриджем «передаю вас…», рекапом переписки и скрином — чтобы клиент не принял за мошенника.</div>
+      </div>
+    </details>
     <div class="num-grid" style="margin-bottom:18px">
       ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const w = n.warm || {}; const risk = conn ? (w.score || 0) : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
         <div class="num-head">
           <div><div class="ph">${esc(n.realPhone ? '+' + n.realPhone : n.phone)}</div><div class="lb">${esc(n.label || 'личный номер')}${n.realPhone && n.realPhone !== n.phone ? ' · подключён' : ''} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
           <div style="display:flex;align-items:center;gap:8px;flex:0 0 auto">${ring(risk)}<button class="btn-ghost num-rm" data-grayrm="${esc(n.phone)}" title="Убрать номер" style="margin:0">${ic(I.x)}</button></div>
         </div>
-        <div style="margin:10px 0 6px">${n.banned ? '<span class="badge bad" title="Номер помечен как заблокированный — выведен из работы. Переписка в CRM сохранена. Купите замену.">заблокирован</span>' : grayStatusBadge(n.live)}${n.suspectBanned && !n.banned ? ' <span class="badge warn" title="Долго не возвращается после разлогина — возможно, номер забанен WhatsApp. Если так — замените.">возможно забанен</span>' : ''}${conn ? ` <span class="badge ${w.ready ? 'ok' : 'warn'}" style="font-size:10px" title="Созревание прогревом: возраст + объём переписки + дни активности. Растёт по мере прогрева.">${w.ready ? `прогрет ${w.score}% · готов` : `прогрев ${w.score}% · ${w.activeDays || 0} дн · ${w.warmCount || 0} сообщ.`}</span>` : ''}</div>
+        <div style="margin:10px 0 6px">${roleChip(n)} ${n.banned ? '<span class="badge bad" title="Номер помечен как заблокированный — выведен из работы. Переписка в CRM сохранена. Купите замену.">заблокирован</span>' : grayStatusBadge(n.live)}${n.suspectBanned && !n.banned ? ' <span class="badge warn" title="Долго не возвращается после разлогина — возможно, номер забанен WhatsApp. Если так — замените.">возможно забанен</span>' : ''}${conn ? ` <span class="badge ${w.ready ? 'ok' : 'warn'}" style="font-size:10px" title="Созревание прогревом: возраст + объём переписки + дни активности. Растёт по мере прогрева.">${w.ready ? `прогрет ${w.score}% · готов` : `прогрев ${w.score}% · ${w.activeDays || 0} дн · ${w.warmCount || 0} сообщ.`}</span>` : ''}</div>
         ${n.live && !['connected', 'qr', 'connecting'].includes(n.live.status) ? `<div class="num-otp-warn">${ic(I.shield)}<div><b>Перед перерегистрацией номера по OTP сделайте бэкап WhatsApp</b> (Google Drive / iCloud) и выберите «Восстановить» на шаге кода — иначе нативные чаты на телефоне не вернутся (WhatsApp не хранит историю на сервере). <b>Переписка с лидами в Lumen сохраняется в любом случае.</b> ⚠️ WhatsApp нельзя держать с облачного телефона — только реальный телефон + QR.</div></div>` : ''}
         ${n.live && n.live.status === 'connected' ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых лидов сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5}${(n.newToday || 0) >= (n.newCap || 5) ? ' ⚠️' : ''} · <span title="Массовые рассылки с личных номеров запрещены (риск бана) — только Cloud API">рассылки запрещены ⛔</span></div>` : ''}
         <div class="form-row" style="margin:2px 0 8px"><label style="font-size:11px">Закреп за брокером</label>
