@@ -10668,9 +10668,13 @@ PAGES.presentations = async (root) => {
 };
 /* Создание клиентской подборки — модалка выбора объектов + пресета → новый редактор /pres/:id */
 async function openCollectionCreate(preselectIds) {
-  let props = [];
-  try { const p = await api.get('/properties'); props = Array.isArray(p) ? p : (p.items || p.properties || []); } catch (e) {}
-  if (props.length < 2) { toast('Нужно ≥2 объекта', 'Добавьте объекты в «Объектах»'); return; }
+  /* ГЕЙТ по РЕАЛЬНОМУ источнику пикера (/presentations/objects), а не /properties — иначе при расхождении
+     (объекты есть, но не в db.properties) кнопка «молча» упиралась в тост и модалка не открывалась. */
+  let objs = [], props = [];
+  try { objs = (await api.get('/presentations/objects')).items || []; } catch (e) {}
+  if (objs.length < 2) { try { const p = await api.get('/properties'); props = Array.isArray(p) ? p : (p.items || p.properties || []); } catch (e) {} }
+  const available = objs.length || props.length;
+  if (available < 2) { toast('Нужно ≥2 объекта', 'Добавьте объекты в «Объектах»'); return; }
   const sel = new Set(preselectIds || []);
   let selPreset = 'gallerywhite';
   const PRESETS_UI = [
@@ -10679,11 +10683,10 @@ async function openCollectionCreate(preselectIds) {
     { id: 'terracotta', name: 'Terracotta Atelier', sw: ['#FBF7F2', '#A6533D', '#392D28'] },
   ];
   const presetBtns = PRESETS_UI.map(p => '<button class="btn coll-preset" data-preset="' + p.id + '" style="flex:1;min-width:140px;justify-content:flex-start;gap:8px' + (p.id === selPreset ? ';background:var(--accent-weak,rgba(120,110,90,.12));border-color:var(--accent,#8a6d3b);font-weight:600' : '') + '"><span style="display:inline-flex;gap:2px">' + p.sw.map(c => '<i style="width:11px;height:14px;border-radius:2px;background:' + c + ';border:1px solid rgba(0,0,0,.12);display:inline-block"></i>').join('') + '</span>' + esc(p.name) + '</button>').join('');
-  /* умный мультивыбор: rich-карточки с превью + живой поиск (pickerItem) */
-  let objs = [];
-  try { objs = (await api.get('/presentations/objects')).items || []; } catch (e) {}
+  /* умный мультивыбор: rich-карточки с превью + живой поиск (pickerItem). objs/props уже получены выше (гейт). */
   if (!objs.length) objs = props.map(p => ({ id: p.id, name: p.name || p.id, image: (p.images || [])[0] || '', region: (p.geoName || ''), type: p.type || '', priceFrom: p.priceFrom, currency: p.currency, photos: (p.images || []).length, search: String((p.name || '') + ' ' + (p.type || '')).toLowerCase() }));
   const curSym = c => ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£' }[c] || '$');
+  const absU = u => (u && /^assets\//.test(u)) ? '/' + u : u;   /* ⚠️БАГ: absU был вне области видимости → objCard бросал ReferenceError → модалка «Создать подборку» не открывалась вовсе */
   const objCard = o => {
     const price = (o.priceFrom != null && o.priceFrom !== '') ? 'от ' + curSym(o.currency) + Number(o.priceFrom).toLocaleString('ru-RU') : '';
     const sub = [o.region, o.type].filter(Boolean).join(' · ') || '—';

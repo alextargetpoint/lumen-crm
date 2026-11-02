@@ -28,7 +28,9 @@ button{font-family:inherit;cursor:pointer}
 .pe-top .pe-btn-export{background:var(--pe-accent2);color:#fff;border-color:var(--pe-accent2)}
 .pe-top .pe-btn-export:hover{filter:brightness(1.1)}
 .pe-top .pe-btn-export svg{opacity:.95}
-.pe-nav-hd{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;font-weight:600;font-size:14px}
+.pe-nav-hd{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 16px 10px;font-weight:600;font-size:14px}
+.pe-nav-ttl{min-width:0;flex:0 1 auto}
+.pe-nav-hd>div{flex:0 0 auto}
 .pe-nav-add{width:28px;height:28px;border:1px solid var(--pe-line);border-radius:8px;background:transparent;color:var(--pe-ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .pe-nav-add:hover{background:var(--pe-tint,#f4f1ea)}
 .pe-nav-sel{border:1px solid var(--pe-line);border-radius:8px;background:transparent;color:var(--pe-ink);font:inherit;font-size:12px;font-weight:600;padding:0 11px;height:28px;cursor:pointer}
@@ -485,7 +487,7 @@ button{font-family:inherit;cursor:pointer}
 .pe-hd:first-child{margin-top:0}
 
 /* small menu */
-.pe-menu{position:fixed;background:#fff;border:1px solid var(--pe-line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:6px;z-index:60;min-width:180px}
+.pe-menu{position:fixed;background:#fff;border:1px solid var(--pe-line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:6px;z-index:60;min-width:180px;max-height:min(60vh,420px);overflow-y:auto}
 .pe-menu button{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;padding:9px 10px;border-radius:7px;font-size:13px;color:var(--pe-ink);text-align:left}
 .pe-menu button:hover{background:var(--pe-hi)}
 .pe-menu button.danger{color:#c62828}
