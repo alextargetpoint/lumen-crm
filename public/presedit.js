@@ -1604,7 +1604,7 @@
       }).catch(function () { web.loading = false; web.done = true; web.note = 'ошибка сети'; paint(); });
     }
     function grid() {
-      if (tab === 'up') return '<div class="pb-stub">' + ic('image') + '<b>Загрузка своих фото</b><span>Загрузка файлов брокера — скоро. Пока доступны фото из карточки и открытых источников.</span></div>';
+      if (tab === 'up') return '<div class="pb-up"><label class="pb-updrop" for="pbUpFile">' + ic('image') + '<b>Загрузить свои фото</b><span>Перетащите сюда или нажмите — JPG / PNG / WebP, до 14 МБ. Добавятся в медиатеку объекта и станут доступны во вкладке «Из карточки».</span></label><input id="pbUpFile" type="file" accept="image/*" multiple style="display:none"><div class="pb-upstat" id="pbUpStat"></div></div>';
       if (tab === 'web') {
         if (web.loading) return '<div class="pb-stub">' + ic('search') + '<b>Ищем в открытых источниках…</b><span>По названию, локации и застройщику объекта.</span></div>';
         if (!web.done) return '<div class="pb-stub">' + ic('search') + '<b>Поиск фото в открытых источниках</b><span>По названию, локации и застройщику. Найдём кандидатов — вы проверите источник и добавите нужные.</span><button class="pe-btn pe-btn-primary" data-websearch style="margin-top:14px">Найти фотографии</button></div>';
@@ -1627,8 +1627,33 @@
       ov.querySelectorAll('[data-pbid]').forEach(function (b) { b.addEventListener('click', function () { sel = b.getAttribute('data-pbid'); paint(); }); });
       var ws = ov.querySelector('[data-websearch]'); if (ws) ws.addEventListener('click', searchWeb);
       ov.querySelectorAll('[data-webadd]').forEach(function (b) { b.addEventListener('click', function () { importWeb(web.items[+b.getAttribute('data-webadd')], b); }); });
+      var upIn = ov.querySelector('#pbUpFile'); if (upIn) upIn.addEventListener('change', function () { uploadFiles(upIn.files); });
+      var drop = ov.querySelector('.pb-updrop');
+      if (drop) { ['dragover', 'dragenter'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); }); ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); }); drop.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); }); }
       ov.querySelector('.pb-seln').textContent = sel ? '1 фото выбрано' : (tab === 'web' ? 'Проверьте источник и добавьте' : 'Выберите фото');
       var ap = ov.querySelector('.pb-apply'); ap.disabled = !sel;
+    }
+    function uploadFiles(files) {
+      var pid = sectionProjectId(s); if (!pid) { toast('Нет объекта для медиатеки'); return; }
+      var arr = [].slice.call(files || []).filter(function (f) { return /^image\//.test(f.type); });
+      if (!arr.length) return;
+      var stat = ov.querySelector('#pbUpStat'); if (stat) stat.textContent = 'Загружаю…';
+      var done = 0, ok = 0;
+      var finish = function () { if (done === arr.length) { toast(ok ? ('Добавлено фото: ' + ok) : 'Не загрузилось', ok ? 'В медиатеке объекта' : '', !!ok); if (ok) tab = 'card'; paint(); } };
+      arr.forEach(function (f) {
+        if (f.size > 14 * 1024 * 1024) { done++; if (stat) stat.textContent = '«' + f.name + '» больше 14 МБ — пропущено'; finish(); return; }
+        var rd = new FileReader();
+        rd.onload = function () {
+          apiRaw('POST', '/api/media/upload-photo', { propertyId: pid, dataUrl: rd.result, name: f.name }).then(function (r) {
+            done++;
+            if (r.status === 200 && r.json.added) { ok++; S.source.images = S.source.images || []; S.source.images.push(r.json.url); imgs.push({ id: 'img' + (S.source.images.length - 1), url: absU(r.json.url) }); }
+            if (stat) stat.textContent = 'Загружено: ' + ok + ' из ' + arr.length;
+            finish();
+          }).catch(function () { done++; if (stat) stat.textContent = 'Ошибка сети при загрузке'; finish(); });
+        };
+        rd.onerror = function () { done++; finish(); };
+        rd.readAsDataURL(f);
+      });
     }
     function importWeb(it, btn) {
       if (!it) return; if (btn) { btn.textContent = 'Проверяю…'; btn.disabled = true; }

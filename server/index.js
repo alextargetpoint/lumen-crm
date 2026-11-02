@@ -193,10 +193,10 @@ function presEditorShell(id, title) {
   В iframe (window.self!==window.top) не срабатывает — так встраивается в CRM. */
 try{if(window.self===window.top){location.replace('/#pres/'+${JSON.stringify(id)});}}catch(_){}</script>
 ${PRES_FAVICON}
-<link rel="stylesheet" href="/pres-styles.css?v=16"><link rel="stylesheet" href="/presedit.css?v=37">
+<link rel="stylesheet" href="/pres-styles.css?v=16"><link rel="stylesheet" href="/presedit.css?v=38">
 <script>window.__PRES_ID=${JSON.stringify(id)};window.__PRES_TITLE=${JSON.stringify(title || '')};</script></head>
 <body><div id="presedit" class="pe-loading">Загрузка конструктора…</div>
-<script src="/pres-tokens.js?v=13"></script><script src="/pres-templates.js?v=19"></script><script src="/presedit.js?v=51"></script>
+<script src="/pres-tokens.js?v=13"></script><script src="/pres-templates.js?v=19"></script><script src="/presedit.js?v=52"></script>
 </body></html>`;
 }
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
@@ -3584,6 +3584,8 @@ async function ensureTelnyxMsgProfile(db) {
    (username=token, password=token). ⚠️ Yesim требует whitelist IP сервера в их дашборде. */
 function yesimCreds() { try { const r = store.getRegistry(); const p = r.platformYesim || {}; return { user: process.env.YESIM_USER || p.user || '', token: process.env.YESIM_TOKEN || p.token || '' }; } catch (_) { return { user: process.env.YESIM_USER || '', token: process.env.YESIM_TOKEN || '' }; } }
 function yesimToken() { return yesimCreds().token; }
+/* Serper (внешний поиск фото): ключ из env ИЛИ из реестра (оператор задаёт в дашборде, без редеплоя). Free 2500/мес. */
+function serperKey() { try { const r = store.getRegistry(); return process.env.SERPER_API_KEY || (r.platformSerper && r.platformSerper.key) || ''; } catch (_) { return process.env.SERPER_API_KEY || ''; } }
 async function yesimApi(action, params) {
   const { user, token } = yesimCreds(); if (!token) throw new Error('Yesim-токен не задан (оператор: задай в реестре platformYesim)');
   /* Basic-auth: username=API user, password=token (в дашборде это две колонки) */
@@ -8233,6 +8235,25 @@ const server = http.createServer(async (req, res) => {
         if (b.from != null) reg.email.from = String(b.from).slice(0, 120);
         store.saveRegistry();
         return json(res, 200, { ok: true, keySet: !!reg.email.key, from: reg.email.from || '' });
+      }
+      /* ПЛАТФОРМЕННЫЙ Serper-ключ (внешний поиск фото для презентаций): оператор задаёт из панели без редеплоя.
+         💰 Free 2500 запросов/мес, дальше ~$0.3-1/1000. Без ключа «Открытые источники» просто недоступны. */
+      if (p === '/api/admin/platform-serper' && req.method === 'GET') {
+        const reg = store.getRegistry();
+        return json(res, 200, { ok: true, keySet: !!serperKey(), source: (reg.platformSerper && reg.platformSerper.key) ? 'panel' : (process.env.SERPER_API_KEY ? 'env' : 'none') });
+      }
+      if (p === '/api/admin/platform-serper' && req.method === 'POST') {
+        const b = await readBody(req);
+        const reg = store.getRegistry(); reg.platformSerper = reg.platformSerper || {};
+        if (b.clear) { reg.platformSerper.key = ''; store.saveRegistry(); return json(res, 200, { ok: true, cleared: true }); }
+        const key = String(b.key || '').trim();
+        if (key) {
+          try { const vr = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ q: 'test', num: 1 }) }); if (vr.status === 401 || vr.status === 403) return json(res, 400, { error: 'Serper отклонил ключ (401/403) — проверьте, что скопирован верно' }); }
+          catch (e) { return json(res, 400, { error: 'Serper недоступен: ' + e.message }); }
+          reg.platformSerper.key = key;
+        }
+        store.saveRegistry();
+        return json(res, 200, { ok: true, keySet: !!reg.platformSerper.key });
       }
 
       /* Р3 — прогрев */
@@ -14616,9 +14637,9 @@ ${SCR}
       const q = [pr.name, pr.area || '', pr.developer && pr.developer !== '—' ? pr.developer : '', 'Phuket condominium'].filter(Boolean).join(' ');
       /* 2a-serper) ЛУЧШИЙ по цена/качество (2026): Serper.dev /images — прямые URL фото, JSON, 2500 запросов
          БЕСПЛАТНО/мес, дальше ~$0.30-1 за 1000 (≈10× дешевле SerpApi), НОЛЬ Firecrawl. env: SERPER_API_KEY. */
-      if (cand.length < 8 && process.env.SERPER_API_KEY) {
+      if (cand.length < 8 && serperKey()) {
         try {
-          const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 12 }) });
+          const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': serperKey(), 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 12 }) });
           const j = await r.json().catch(() => ({}));
           (j.images || []).forEach(it => { const u = it && (it.imageUrl || it.link); if (okImg(u)) cand.push(u); });
           if (cand.length) via = via ? via + '+serper' : 'serper';
@@ -14676,7 +14697,7 @@ ${SCR}
         } catch (_) { good = good.slice(0, need); }
       } else { good = good.slice(0, need); }
       if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)].slice(0, 15); pr.stub = false; pr.mediaRefetchedAt = Date.now(); store.save(); }
-      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, via, serper: !!process.env.SERPER_API_KEY, cse: !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX), curatedPlans: planCount, curatedDropped: dropped, webKey: !!process.env.RENDER_API_KEY });
+      return json(res, 200, { ok: true, added: good.length, images: (pr.images || []).length, triedSource: scrapedSource, srcIsList: !!srcIsList, candidates: cand.length, srcPages, via, serper: !!serperKey(), cse: !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX), curatedPlans: planCount, curatedDropped: dropped, webKey: !!process.env.RENDER_API_KEY });
     }
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
@@ -18745,11 +18766,11 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
       const geoName = (db.settings.geoNames || {})[pr.geo] || pr.geo || '';
       const q = [pr.name, pr.area || '', (pr.developer && pr.developer !== '—') ? pr.developer : '', geoName, 'жилой комплекс'].filter(Boolean).join(' ');
       const proj = { name: pr.name, geo: geoName, developer: pr.developer || '' };
-      if (!process.env.SERPER_API_KEY) return json(res, 200, { enabled: false, note: 'Внешний поиск подключается ключом SERPER_API_KEY на сервисе CRM', query: q, project: proj });
+      if (!serperKey()) return json(res, 200, { enabled: false, note: 'Внешний поиск подключается ключом SERPER_API_KEY на сервисе CRM', query: q, project: proj });
       const okImg2 = (u) => u && /^https?:\/\//.test(u) && !/\.svg(\?|$)/i.test(u);
       const cand = [];
       try {
-        const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 14 }) });
+        const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': serperKey(), 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 14 }) });
         const j = await r.json().catch(() => ({}));
         (j.images || []).forEach(it => { const u = it && (it.imageUrl || it.link); if (okImg2(u)) cand.push({ url: u, source: (it.source || it.domain || 'web'), title: it.title || '', thumb: it.thumbnailUrl || u }); });
       } catch (e) {}
@@ -18776,6 +18797,28 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
         return json(res, 200, { ok: true, added: true, url: saved.url, width: saved.w, height: saved.h, analysis });
       }
       return json(res, 200, { ok: true, added: false, analysis });
+    }
+    /* ⭐ЗАГРУЗКА СВОИХ ФОТО в медиатеку объекта (вкладка «Загруженные» в фото-пикере). dataURL → том → pr.images.
+       $0 (локальное хранилище), без внешних API. Брокер/владелец. */
+    if (p === '/api/media/upload-photo' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || (R.role !== 'owner' && R.role !== 'broker')) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const pr = (db.properties || []).find(x => x.id === String(b.propertyId || ''));
+      if (!pr) return json(res, 404, { error: 'property not found' });
+      const m = String(b.dataUrl || '').match(/^data:(image\/(?:jpe?g|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/i);
+      if (!m) return json(res, 400, { error: 'нужен image dataURL (jpg/png/webp)' });
+      const buf = Buffer.from(m[2], 'base64');
+      if (!buf.length || buf.length > 14 * 1024 * 1024) return json(res, 400, { error: 'файл до 14 МБ' });
+      let analysis = null;
+      try { const a = media.analyzeAsset(buf, { name: String(b.name || 'upload'), source: 'upload' }); if (!a.ok) return json(res, 400, { error: 'это не похоже на изображение' }); const suit = media.suitability(a, { format: 'portrait_a4', slot: 'cover' }); analysis = { ok: a.ok, width: a.width, height: a.height, mime: a.mime, materialType: a.materialType, status: suit.status, ppi: suit.ppi, reasons: suit.reasons }; }
+      catch (e) { return json(res, 400, { error: 'не удалось обработать: ' + ((e && e.message) || '') }); }
+      const ext = /png/i.test(m[1]) ? 'png' : /webp/i.test(m[1]) ? 'webp' : /gif/i.test(m[1]) ? 'gif' : 'jpg';
+      const dir = path.join(UPLOADS_DIR, 'propphotos'); try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+      const fname = String(pr.id).replace(/[^\w-]/g, '') + '-' + crypto.randomBytes(5).toString('hex') + '.' + ext;
+      fs.writeFileSync(path.join(dir, fname), buf);
+      const url = '/assets/propphotos/' + fname;
+      pr.images = pr.images || []; pr.images.push(url); store.save();
+      return json(res, 200, { ok: true, added: true, url, width: analysis.width, height: analysis.height, analysis });
     }
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 

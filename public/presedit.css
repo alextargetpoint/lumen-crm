@@ -673,3 +673,12 @@ button{font-family:inherit;cursor:pointer}
 /* фото на холсте: явная подсказка, что перетаскиванием двигается ВИДИМАЯ область кадра */
 .pe-ced-photo{cursor:grab}
 .pe-ced-photo.pe-panning{cursor:grabbing}
+
+/* фото-пикер: загрузка своих фото (вкладка «Загруженные») */
+.pb-up{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px}
+.pb-updrop{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:40px 28px;border:2px dashed var(--pe-line);border-radius:14px;cursor:pointer;color:var(--pe-mut);transition:border-color .14s,background .14s,color .14s;max-width:470px}
+.pb-updrop:hover,.pb-updrop.over{border-color:var(--pe-sel);background:color-mix(in srgb,var(--pe-sel) 7%,transparent);color:var(--pe-ink)}
+.pb-updrop svg{width:30px;height:30px;opacity:.7}
+.pb-updrop b{font-size:14px;color:var(--pe-ink)}
+.pb-updrop span{font-size:12px;line-height:1.55;max-width:350px}
+.pb-upstat{font-size:12.5px;color:var(--pe-mut);min-height:16px;text-align:center}
