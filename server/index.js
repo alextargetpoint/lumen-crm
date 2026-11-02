@@ -11543,15 +11543,31 @@ const server = http.createServer(async (req, res) => {
     /* входящие SMS (OTP) по купленным номерам: ?offset=0 */
     if (p === '/api/gray/yesim/sms' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const num = (u.searchParams.get('number') || '').replace(/[^0-9]/g, '');
       try {
-        const r = await yesimApi('get_sms', { offset: parseInt(u.searchParams.get('offset')) || 0 });
-        let list = (r.data && r.data.sms) || r.sms || r.data || r || [];
-        if (!Array.isArray(list)) list = list.sms || [];
-        const num = (u.searchParams.get('number') || '').replace(/[^0-9]/g, '');
-        if (num) list = list.filter(m => { const to = String((m.recipient || m.to || m.number || '')).replace(/[^0-9]/g, ''); return to && (to.endsWith(num) || num.endsWith(to)); });
-        /* нормализуем поля для UI */
-        const norm = list.map(m => ({ from: m.sender || m.from || '', to: m.recipient || m.to || m.number || '', text: m.text || m.message || m.sms || m.body || '', at: m.date || m.time || m.timestamp || m.created_at || '', code: (String(m.text || m.message || m.body || '').match(/\b(\d{3}[- ]?\d{3})\b|\b(\d{4,8})\b/) || [])[0] || '' }));
-        return json(res, 200, { ok: true, sms: norm });
+        const params = { offset: parseInt(u.searchParams.get('offset')) || 0 };
+        if (num) { params.did_number = num; params.number = num; }   /* часть методов фильтрует на сервере — передаём и так */
+        const r = await yesimApi('get_sms', params);
+        /* ⭐РОБАСТНОЕ извлечение массива SMS из РАЗНЫХ форм ответа Yesim (shape плавает) */
+        let list = [];
+        const cand = [r && r.data && r.data.sms, r && r.data && r.data.messages, r && r.data && r.data.items, r && r.data && r.data.list, r && r.sms, r && r.messages, r && r.items, r && r.result, r && r.data, r];
+        for (const c of cand) { if (Array.isArray(c)) { list = c; break; } if (c && Array.isArray(c.sms)) { list = c.sms; break; } }
+        if (!Array.isArray(list)) list = [];
+        const digits = x => String(x == null ? '' : x).replace(/[^0-9]/g, '');
+        const recipOf = m => digits(m.recipient || m.to || m.number || m.destination || m.did || m.did_number || m.msisdn || m.to_number || m.receiver || '');
+        const bodyOf = m => m.text || m.message || m.sms || m.body || m.content || m.msg || '';
+        /* ⭐ЛЕНИВЫЙ фильтр по номеру (последние 8 цифр). Если фильтр ВСЁ отсекает, а сообщения ЕСТЬ —
+           НЕ прячем (показываем все): лучше показать код из общей ленты, чем потерять из-за формата номера. */
+        let filtered = list;
+        if (num && list.length) {
+          const tail = num.slice(-8);
+          const f = list.filter(m => { const to = recipOf(m); return to && (to.endsWith(tail) || to.includes(tail) || num.endsWith(to.slice(-8))); });
+          filtered = f.length ? f : list;
+        }
+        const norm = filtered.map(m => ({ from: m.sender || m.from || m.source || '', to: recipOf(m), text: bodyOf(m), at: m.date || m.time || m.timestamp || m.created_at || m.received_at || '', code: (String(bodyOf(m)).match(/\b(\d{3}[-\s]?\d{3})\b|\b(\d{4,8})\b/) || [])[0] || '' }));
+        const out = { ok: true, sms: norm };
+        if (u.searchParams.get('debug') === '1') { out._rawKeys = (r && typeof r === 'object') ? Object.keys(r) : typeof r; out._dataKeys = (r && r.data && typeof r.data === 'object') ? Object.keys(r.data) : null; out._listLen = list.length; out._sampleKeys = list[0] ? Object.keys(list[0]) : null; out._sample = list[0] || null; }
+        return json(res, 200, out);
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* ===== Официальный WhatsApp Cloud API (Telnyx Tech Provider Hosted Signup) ===== */
