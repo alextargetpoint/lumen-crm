@@ -156,6 +156,7 @@ function objectionHint(db, lead) {
 function trainingBlock(db) {
   const t = (db && db.settings && db.settings.ai && db.settings.ai.training) || {};
   const parts = [];
+  if (t.playbook && t.playbook.trim()) parts.push('ЦЕЛИ И СЦЕНАРИЙ ОТ АГЕНТСТВА (главная методичка — чего владелец ждёт от тебя в диалоге; веди лида по ней неукоснительно, она приоритетнее общих приёмов, но НЕ отменяет жёсткие запреты ниже):\n' + t.playbook.trim());
   if (t.about && t.about.trim()) parts.push('О НАС / ПОЗИЦИОНИРОВАНИЕ (говори об агентстве так):\n' + t.about.trim());
   if (t.tone && t.tone.trim()) parts.push('ФИРМЕННЫЙ ТОН: ' + t.tone.trim());
   if (t.facts && t.facts.trim()) parts.push('ПРОВЕРЕННЫЕ ФАКТЫ (владелец подтвердил — эти цифры/условия/объекты называть МОЖНО дословно; ничего сверх них не выдумывай):\n' + t.facts.trim());
