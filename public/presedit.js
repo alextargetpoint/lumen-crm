@@ -513,6 +513,13 @@
       h += photoField(s, 0, 'План');
       return h;
     },
+    units: function (s) {
+      var h = fld('Надзаголовок', inp('eyebrow', joinArr(cval(s, 'eyebrow'))));
+      h += fld('Заголовок', inp('title', cval(s, 'title')), s, 'title');
+      h += fld('Подзаголовок', txt('subtitle', cval(s, 'subtitle'), 'Короткая подводка (необязательно)'));
+      h += unitsField(s);
+      return h;
+    },
     payment: function (s) {
       var plan = cval(s, 'plan') || { stages: [] };
       var h = fld('Надзаголовок', inp('eyebrow', joinArr(cval(s, 'eyebrow'))));
@@ -614,6 +621,14 @@
     var arr = cval(s, 'params') || [];
     var rows = arr.map(function (m, i) { return '<div class="pe-metric-row" data-mi="' + i + '"><input data-qf="label" value="' + esc(m.label || '') + '" placeholder="Площадь"><input class="v" data-qf="value" value="' + esc(m.value || '') + '" placeholder="84 м²"><button class="pe-mini-del" data-act="delParam" data-mi="' + i + '">×</button></div>'; }).join('');
     return '<div class="pe-field"><label>Параметры</label><div class="pe-metriclist" data-params="1">' + rows + '</div><button class="pe-addrow" data-act="addParam">+ Добавить параметр</button></div>';
+  }
+  /* редактор квартир (семейство units) — раньше его не было вообще, клик по юниту вёл в «Нет полей» */
+  function unitsField(s) {
+    var arr = cval(s, 'units') || [];
+    var rows = arr.map(function (m, i) { return '<div class="pe-metric-row" data-mi="' + i + '" style="flex-direction:column;align-items:stretch;gap:6px">' +
+      '<div style="display:flex;gap:6px"><input data-uf="plan" value="' + esc(m.plan || '') + '" placeholder="Тип (Студия / 1BR)"><input class="v" data-uf="area" value="' + esc(m.area || '') + '" placeholder="28 м²" style="flex:0 0 92px"></div>' +
+      '<div style="display:flex;gap:6px;align-items:center"><input data-uf="price" value="' + esc(m.price || '') + '" placeholder="от $127 000"><input data-uf="status" value="' + esc(m.status || '') + '" placeholder="В продаже" style="flex:0 0 108px"><button class="pe-mini-del" data-act="delUnit" data-mi="' + i + '">×</button></div></div>'; }).join('');
+    return '<div class="pe-field"><label>Квартиры и цены</label><div class="pe-metriclist" data-units="1">' + rows + '</div><button class="pe-addrow" data-act="addUnit">+ Добавить квартиру</button></div>';
   }
   /* иконка пункта преимуществ: имя из словаря pres-templates → эмодзи для пикера; '' = номер (1/2/3/4) */
   var BEN_ICONS = [['', '№'], ['pool', '🏊'], ['gym', '🏋️'], ['leaf', '🌿'], ['shield', '🛡️'], ['beach', '🏖️'], ['palm', '🌴'], ['sun', '☀️'], ['home', '🏠'], ['bed', '🛏️'], ['pin', '📍'], ['globe', '🌐'], ['chat', '💬'], ['check', '✓'], ['calendar', '📅'], ['tag', '🏷️'], ['area', '📐']];
@@ -821,6 +836,7 @@
     ib.querySelectorAll('[data-qf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('params', el); }); });
     ib.querySelectorAll('[data-if]').forEach(function (el) { el.addEventListener('input', function () { onListInput('items', el); }); });
     ib.querySelectorAll('[data-sf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('stages', el); }); });
+    ib.querySelectorAll('[data-uf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('units', el); }); });
     ib.querySelectorAll('[data-pay]').forEach(function (el) { el.addEventListener('input', onPayBase); });
     ib.querySelectorAll('[data-cursel]').forEach(function (el) { el.addEventListener('change', onCur); });
     ib.querySelectorAll('[data-act]').forEach(function (el) { var a = el.getAttribute('data-act'); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'click', function (e) { handle(a, el, e); }); });
@@ -855,6 +871,7 @@
     if (kind === 'params') { var a3 = (cval(s, 'params') || []).slice(); a3[i] = Object.assign({}, a3[i], defineProp(el.getAttribute('data-qf'), el.value)); setOverride(s, 'params', a3); }
     if (kind === 'items') { var a4 = (cval(s, 'items') || []).slice(); a4[i] = Object.assign({}, a4[i], defineProp(el.getAttribute('data-if'), el.value)); setOverride(s, 'items', a4); }
     if (kind === 'stages') { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).slice(); pl.stages[i] = Object.assign({}, pl.stages[i], defineProp(el.getAttribute('data-sf'), el.value)); setOverride(s, 'plan', Object.assign({}, pl)); if (el.getAttribute('data-sf') === 'percent') { updateStageSum(); } }
+    if (kind === 'units') { var au = (cval(s, 'units') || []).slice(); au[i] = Object.assign({}, au[i], defineProp(el.getAttribute('data-uf'), el.value)); setOverride(s, 'units', au); }
     liveCanvas(); scheduleSave(); clearTimeout(S._chkT2); S._chkT2 = setTimeout(revalidate, 600);
   }
   function defineProp(k, v) { var o = {}; o[k] = v; return o; }
@@ -970,6 +987,8 @@
       case 'addItem': mutate(function () { var arr = (cval(s, 'items') || []).slice(); arr.push({ title: '', desc: '' }); setOverride(s, 'items', arr); }); break;
       case 'delItem': mutate(function () { var arr = (cval(s, 'items') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'items', arr); }); break;
       case 'itemIcon': { var _mi = +el.getAttribute('data-mi'); menu(el, BEN_ICONS.map(function (o) { return { t: BEN_LABEL[o[0]] || o[1], fn: function () { mutate(function () { var arr = (cval(s, 'items') || []).slice(); var it = Object.assign({}, arr[_mi] || {}); if (o[0]) it.icon = o[0]; else delete it.icon; arr[_mi] = it; setOverride(s, 'items', arr); }); } }; })); break; }
+      case 'addUnit': mutate(function () { var arr = (cval(s, 'units') || []).slice(); arr.push({ plan: '', area: '', price: '', status: '' }); setOverride(s, 'units', arr); }); break;
+      case 'delUnit': mutate(function () { var arr = (cval(s, 'units') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'units', arr); }); break;
       case 'addStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).concat({ name: '', percent: '' }); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'delStage': mutate(function () { var pl = cval(s, 'plan') || { stages: [] }; pl.stages = (pl.stages || []).slice(); pl.stages.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'plan', Object.assign({}, pl)); }); break;
       case 'replacePhoto': replacePhoto(s, +el.getAttribute('data-idx')); break;
@@ -1104,7 +1123,7 @@
     /* ЦЕНА на обложке → клик = подсветка поля цены (составное поле, инлайн не правим) */
     stage.querySelectorAll('.lp-hero-price').forEach(function (el) { el.classList.add('pe-ced', 'pe-ced-field'); el.setAttribute('data-pe-field', 'price'); });
     {
-      [['.lp-metric', 1], ['.lp-metric-lg', 1], ['.lp-benefits > li', 1], ['.lp-places > li', 1], ['.lp-pay-row', 1], ['.lp-plan-params dl > div', 1]].forEach(function (p) {
+      [['.lp-metric', 1], ['.lp-metric-lg', 1], ['.lp-benefits > li', 1], ['.lp-places > li', 1], ['.lp-pay-row', 1], ['.lp-plan-params dl > div', 1], ['.lp-unit-row', 1]].forEach(function (p) {
         var items = stage.querySelectorAll(p[0]); if (!items.length) return;
         items.forEach(function (el, i) { if (el.classList.contains('pe-ced')) return; el.classList.add('pe-ced', 'pe-ced-list'); el.setAttribute('data-pe-listidx', i); });
       });
@@ -1720,12 +1739,15 @@
   function openCropFormat(s, idx) {
     var ref = (s.assetRefs || [])[idx]; if (!ref) { toast('Нет фото'); return; }
     var url = (S.assets[ref.assetId] || {}).url || ref.url; if (!url) { toast('Нет фото'); return; }
+    /* аспект РЕАЛЬНОГО слота на холсте → рамка кадрирования повторяет форму, в которую ляжет фото (а не формат страницы) */
+    var slotAsp = 0; var slotEl = document.querySelector('#peStage .pe-ced-photo[data-pe-idx="' + idx + '"]');
+    if (slotEl) { var sr = slotEl.getBoundingClientRect(); if (sr.width > 2 && sr.height > 2) slotAsp = sr.width / sr.height; }
     var img = new Image();
-    img.onload = function () { cropFmtModal(s, idx, ref, url, img.naturalWidth || 1600, img.naturalHeight || 1067); };
-    img.onerror = function () { cropFmtModal(s, idx, ref, url, 1600, 1067); };
+    img.onload = function () { cropFmtModal(s, idx, ref, url, img.naturalWidth || 1600, img.naturalHeight || 1067, slotAsp); };
+    img.onerror = function () { cropFmtModal(s, idx, ref, url, 1600, 1067, slotAsp); };
     img.src = url;
   }
-  function cropFmtModal(s, idx, ref, url, iw, ih) {
+  function cropFmtModal(s, idx, ref, url, iw, ih, slotAsp) {
     var mode = ref.fit === 'contain' ? 'fit' : 'fill';
     var imgA = iw / ih;
     var clamp01 = function (v) { return Math.max(0, Math.min(1, v)); };
@@ -1758,7 +1780,7 @@
       ov.querySelector('.cf-warnbox').innerHTML = warnBox();
     }
     var modes = [['fill', 'Заполнить область', 'Приоритет на крупный план, часть фото может быть обрезана'], ['fit', 'Сохранить объект целиком', 'На фото останется весь объект, без обрезки важных элементов']];
-    var mainAsp = (FMT_ASPECT[S.fmt] || 0.707);   // окно кадрирования = пропорции текущего формата
+    var mainAsp = slotAsp || (FMT_ASPECT[S.fmt] || 0.707);   // окно кадрирования = форма РЕАЛЬНОГО слота (фолбэк — формат страницы)
     ov.innerHTML = '<div class="pu-box cf-box"><div class="pu-hd"><h2>Кадрирование под формат</h2><button class="pe-x" data-puclose>' + ic('x') + '</button></div>' +
       '<div class="cf-grid"><div class="cf-left">' +
         '<div class="cf-main" style="aspect-ratio:' + mainAsp + '"><div class="cf-main-img" style="background-image:url(\'' + esc(url) + '\')"></div><div class="cf-pan-hint">' + ic('grip') + 'Перетащите фото, чтобы выбрать видимую область</div></div>' +
