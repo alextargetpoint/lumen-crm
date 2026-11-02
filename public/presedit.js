@@ -840,6 +840,50 @@
   }
   function actEvent(a) { return 'click'; }
 
+  /* ⭐Drag-and-drop перестановка строк в списках инспектора (преимущества и др.). Один механизм на все
+     .pe-metriclist: ключ модели берём из data-атрибута контейнера, после дропа переставляем массив и
+     перерисовываем инспектор+холст. Ручка-хват слева, чтобы не мешать выделению текста в полях. */
+  var GRIP_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="4" r="1.25"/><circle cx="10" cy="4" r="1.25"/><circle cx="6" cy="8" r="1.25"/><circle cx="10" cy="8" r="1.25"/><circle cx="6" cy="12" r="1.25"/><circle cx="10" cy="12" r="1.25"/></svg>';
+  function listKeyOf(list) {
+    if (list.hasAttribute('data-places')) return 'nearbyPlaces';
+    if (list.hasAttribute('data-params')) return 'params';
+    if (list.hasAttribute('data-units')) return 'units';
+    if (list.hasAttribute('data-items')) return 'items';
+    if (list.hasAttribute('data-metrics')) return list.getAttribute('data-metrics') || 'metrics';
+    return null;
+  }
+  function wireListDnD(ib) {
+    ib.querySelectorAll('.pe-metriclist').forEach(function (list) {
+      var key = listKeyOf(list); if (!key) return;
+      var rows = [].slice.call(list.querySelectorAll('.pe-metric-row'));
+      if (rows.length < 2) return;
+      rows.forEach(function (row) {
+        if (row.querySelector('.pe-drag')) return;
+        row.classList.add('pe-dnd-row');
+        var h = document.createElement('span'); h.className = 'pe-drag'; h.title = 'Перетащите, чтобы поменять порядок'; h.setAttribute('draggable', 'true'); h.innerHTML = GRIP_SVG;
+        row.insertBefore(h, row.firstChild);
+        h.addEventListener('dragstart', function (e) { list._drag = row; row.classList.add('pe-dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); } catch (_) {} });
+        h.addEventListener('dragend', function () { row.classList.remove('pe-dragging'); list.querySelectorAll('.pe-dnd-over').forEach(function (x) { x.classList.remove('pe-dnd-over'); }); list._drag = null; });
+      });
+      list.addEventListener('dragover', function (e) {
+        if (!list._drag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        var over = e.target.closest ? e.target.closest('.pe-metric-row') : null;
+        list.querySelectorAll('.pe-dnd-over').forEach(function (x) { x.classList.remove('pe-dnd-over'); });
+        if (over && over !== list._drag) over.classList.add('pe-dnd-over');
+      });
+      list.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var over = e.target.closest ? e.target.closest('.pe-metric-row') : null; var drag = list._drag;
+        list.querySelectorAll('.pe-dnd-over').forEach(function (x) { x.classList.remove('pe-dnd-over'); });
+        if (!over || !drag || over === drag) return;
+        var from = +drag.getAttribute('data-mi'), to = +over.getAttribute('data-mi');
+        var s = curSection(); var arr = (cval(s, key) || []).slice();
+        if (from < 0 || to < 0 || from >= arr.length || to >= arr.length) return;
+        var moved = arr.splice(from, 1)[0]; arr.splice(to, 0, moved);
+        mutate(function () { setOverride(s, key, arr); });   /* render()→wireInsp()→wireListDnD перевесит всё заново */
+      });
+    });
+  }
   // inspector field inputs (live)
   function wireInsp() {
     var ib = document.getElementById('peInsp'); if (!ib) return;
@@ -851,6 +895,7 @@
     ib.querySelectorAll('[data-if]').forEach(function (el) { el.addEventListener('input', function () { onListInput('items', el); }); });
     ib.querySelectorAll('[data-sf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('stages', el); }); });
     ib.querySelectorAll('[data-uf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('units', el); }); });
+    wireListDnD(ib);   /* ⭐перетаскивание строк списков (преимущества/показатели/что рядом/параметры/квартиры) */
     ib.querySelectorAll('[data-cmpcrit]').forEach(function (el) { el.addEventListener('input', function () { var ci = +el.getAttribute('data-ci'), s = curSection(); var a = (cval(s, 'criteria') || []).slice(); a[ci] = Object.assign({}, a[ci], { label: el.value }); setOverride(s, 'criteria', a); s.cmpEdited = true; liveCanvas(); scheduleSave(); }); });
     ib.querySelectorAll('[data-cmpval]').forEach(function (el) { el.addEventListener('input', function () { var ci = +el.getAttribute('data-ci'), oi = +el.getAttribute('data-oi'), s = curSection(); var crit = cval(s, 'criteria') || []; var key = crit[ci] && crit[ci].key; if (!key) return; var objs = (cval(s, 'objects') || []).slice(); var o = Object.assign({}, objs[oi]); o.values = Object.assign({}, o.values); o.values[key] = el.value; objs[oi] = o; setOverride(s, 'objects', objs); s.cmpEdited = true; liveCanvas(); scheduleSave(); }); });
     ib.querySelectorAll('[data-pay]').forEach(function (el) { el.addEventListener('input', onPayBase); });
@@ -1160,6 +1205,19 @@
     if (S._ceSelKey) { var sel = stage.querySelector('.pe-ced[data-pe-key="' + S._ceSelKey + '"]'); if (sel) sel.classList.add('pe-sel'); }
     if (S._ceSelPhoto != null) { var selp = stage.querySelector('.pe-ced-photo[data-pe-idx="' + S._ceSelPhoto + '"]'); if (selp) selp.classList.add('pe-sel'); }
     if ((S._ceSelKey || S._ceSelPhoto != null) && document.getElementById('peFloatbar')) { var se = ceSelectedEl(); if (se) cePositionFloatbar(se); else ceHideFloatbar(); }
+    markPhotoLoading(stage);   /* ⭐индикатор загрузки на фото, которое ещё не прогрузилось (после замены) */
+  }
+  /* спиннер на фото-слоте, пока картинка грузится. Для уже закэшированных — без вспышки (probe.complete). */
+  function markPhotoLoading(stage) {
+    stage.querySelectorAll('.pe-ced-photo').forEach(function (el) {
+      var img = el.tagName === 'IMG' ? el : el.querySelector('img');
+      var url = img ? img.getAttribute('src') : (function () { var m = (el.style.backgroundImage || '').match(/url\(["']?([^"')]+)["']?\)/); return m ? m[1] : ''; })();
+      if (!url || /^data:/.test(url)) { el.classList.remove('pe-img-loading'); return; }
+      var probe = new Image(); probe.src = url;
+      if (probe.complete && probe.naturalWidth) { el.classList.remove('pe-img-loading'); return; }
+      el.classList.add('pe-img-loading');
+      probe.onload = probe.onerror = function () { el.classList.remove('pe-img-loading'); };
+    });
   }
   function ceOpenContentTab() {
     if (S.tab === 'content') return;
