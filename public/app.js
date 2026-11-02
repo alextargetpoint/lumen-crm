@@ -11130,6 +11130,22 @@ PAGES.automations = async (root) => {
             <div class="form-row" style="margin:0"><label>Мин. отклик номера, % (ниже при объёме → из холода)</label><input id="wgReplyFloor" type="number" min="0" max="100" value="${Math.round((((s.waGray || {}).replyRateFloor != null ? (s.waGray || {}).replyRateFloor : 0.05)) * 100)}"></div>
           </div>
           <div class="cg-row" style="margin-top:10px"><div><b>Авто-перевод на чистый номер при передаче брокеру</b><div class="muted" style="font-size:11px">при handover диалог переходит на номер брокера/«только для диалогов» — бридж «передаю вас…» + интро с рекапом + скрин переписки. Клиенту уходят 3 сообщения с нового номера.</div></div>${cb('wgMigrate', !!((s.waGray || {}).migrateOnHandover))}</div>
+          ${(() => { const wg = s.waGray || {};
+            const DEF = { bridge: 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет вам с номера {target} — это мы, сохраните, пожалуйста 🙌', intro: 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с моего личного номера.', recap: 'Напомню, мы остановились на: «{quote}». Продолжаю отсюда.', proof: 'И вот скрин нашей переписки — чтобы вы были спокойны, что это действительно продолжение нашего разговора, а не посторонние 🙌' };
+            const v = (k) => esc(wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] != null ? wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] : DEF[k]);
+            return `<details class="mig-edit" style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:650;color:var(--accent);user-select:none;list-style:none;display:flex;align-items:center;gap:6px">${ic(I.edit || I.doc)}Как переводим диалог — тексты сообщений, шаблоны, схема <span class="muted" style="font-weight:400">— развернуть</span></summary>
+            <div style="margin-top:10px;padding:12px;border:1px solid var(--stroke);border-radius:12px;background:color-mix(in srgb,var(--accent) 3%,transparent)">
+              <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:9px">Когда квалифицированного лида переводят на основной/чистый номер, клиенту автоматически уходит цепочка ниже. Доступные переменные — вставляются в текущее поле:</div>
+              <div id="migVars" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:11px">${['{name}','{broker}','{agency}','{target}','{from}','{quote}'].map(t => `<button type="button" class="mig-var" data-var="${t}" style="font-size:11px;padding:3px 9px;border-radius:7px;border:1px solid var(--stroke);background:var(--bg-2,#fff);cursor:pointer;font-family:monospace;color:var(--accent)">${t}</button>`).join('')}</div>
+              <div style="display:flex;gap:7px;align-items:center;margin-bottom:11px"><label style="font-size:11.5px;color:var(--ink-3)">Готовый набор:</label><select id="migTpl" style="flex:1"><option value="">— выбрать стиль —</option><option value="friendly">Дружелюбный (эмодзи, тёплый)</option><option value="business">Деловой (строгий, без эмодзи)</option><option value="short">Короткий (минимум слов)</option></select></div>
+              <div class="form-row" style="margin:0 0 9px"><label>① Бридж — со СТАРОГО номера («передаю вас…»)</label><textarea id="migBridge" class="mig-ta" rows="2" maxlength="600" style="width:100%;resize:vertical">${v('bridge')}</textarea></div>
+              <div class="form-row" style="margin:0 0 9px"><label>② Интро — с НОВОГО номера (первое сообщение)</label><textarea id="migIntro" class="mig-ta" rows="2" maxlength="600" style="width:100%;resize:vertical">${v('intro')}</textarea></div>
+              <div class="form-row" style="margin:0 0 9px"><label>③ Рекап — на чём остановились ({quote} = последняя реплика лида)</label><textarea id="migRecap" class="mig-ta" rows="2" maxlength="400" style="width:100%;resize:vertical">${v('recap')}</textarea></div>
+              <div class="cg-row" style="margin:2px 0 9px"><div><b style="font-size:12.5px">④ Прикреплять скрин переписки</b><div class="muted" style="font-size:11px">анти-«мошенник»: клиент видит картинку нашего диалога и понимает, что это продолжение</div></div>${cb('wgMigrateProof', wg.migrateProof !== false)}</div>
+              <div class="form-row" style="margin:0 0 4px"><label>Подпись к скрину</label><textarea id="migProof" class="mig-ta" rows="2" maxlength="400" style="width:100%;resize:vertical">${v('proof')}</textarea></div>
+              <div class="muted" style="font-size:11px;margin:10px 0 6px;font-weight:650">Как это увидит клиент (схема):</div>
+              <div id="migPreview" style="display:flex;flex-direction:column;gap:7px"></div>
+            </div></details>`; })()}
           <hr class="cg-hr">
           <div class="form-row" style="margin:0"><label>Жёсткий стоп по тишине: клиент молчит больше N дней → Спящие (0 = выключено)</label><input id="cgSilence" type="number" min="0" max="365" value="${+gv('maxSilenceDays', 0)}"></div>
           <div class="muted" style="font-size:11px;margin-top:5px">Верхнеуровневый рубильник: если от клиента нет сообщений дольше N дней (а не отвечал ни разу — от создания), лид принудительно уходит в «Спящие», независимо от цепочки и дожима. Вернётся — ИИ продолжит.</div>
@@ -11332,9 +11348,48 @@ PAGES.automations = async (root) => {
       replyRateFloor: Math.max(0, Math.min(1, (+$('#wgReplyFloor', root).value || 5) / 100)),
       migrateOnHandover: $('#wgMigrate', root).checked,
     };
+    { const mb = $('#migBridge', root), mi = $('#migIntro', root), mr = $('#migRecap', root), mp = $('#migProof', root), mpr = $('#wgMigrateProof', root);
+      if (mb) wg.migrateBridge = mb.value.trim(); if (mi) wg.migrateIntro = mi.value.trim(); if (mr) wg.migrateRecap = mr.value.trim(); if (mp) wg.migrateProofCaption = mp.value.trim(); if (mpr) wg.migrateProof = mpr.checked; }
     try { await saveAuto({ chainGuard: g }); await api.patch('/settings', { waGray: wg }); loadState(); toast('Защита сохранена', 'Анти-бан и правила применятся к цепочкам и номерам', true); }
     catch (e) { toast('Не сохранилось', e.message); }
   });
+  /* ── Редактор перевода диалога: переменные, шаблоны, живая схема ── */
+  (function initMigEditor() {
+    const bridge = $('#migBridge', root); if (!bridge) return;
+    const intro = $('#migIntro', root), recap = $('#migRecap', root), proof = $('#migProof', root), proofTg = $('#wgMigrateProof', root), prev = $('#migPreview', root);
+    const tas = [bridge, intro, recap, proof].filter(Boolean);
+    let last = intro || bridge;
+    tas.forEach(t => t.addEventListener('focus', () => { last = t; }));
+    /* вставка переменной в текущее поле (в позицию курсора) */
+    $$('#migVars .mig-var', root).forEach(btn => btn.addEventListener('mousedown', (e) => {
+      e.preventDefault(); const t = last || intro || bridge; if (!t) return;
+      const s = t.selectionStart || t.value.length, en = t.selectionEnd || t.value.length, v = btn.dataset.var;
+      t.value = t.value.slice(0, s) + v + t.value.slice(en); t.focus(); t.selectionStart = t.selectionEnd = s + v.length; renderPrev();
+    }));
+    /* готовые наборы текстов */
+    const TPL = {
+      friendly: { bridge: 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет с номера {target}, это мы, сохраните, пожалуйста 🙌', intro: 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с личного номера 😊', recap: 'Напомню, мы остановились на: «{quote}». Продолжаю отсюда!', proof: 'И вот скрин нашей переписки — чтобы вы были спокойны, что это точно продолжение разговора, а не посторонние 🙌' },
+      business: { bridge: 'Передаю ваш вопрос менеджеру {broker}. Он продолжит с номера {target} — это официальный контакт {agency}.', intro: 'Здравствуйте, {name}. {broker}, {agency}. Продолжаю ведение вашего запроса с этого номера.', recap: 'Фиксирую: ранее обсуждали — «{quote}». Продолжаем с этой точки.', proof: 'Прикладываю снимок переписки для подтверждения преемственности диалога.' },
+      short: { bridge: 'Передаю вас {broker} — напишет с {target}, это мы.', intro: '{name}, здравствуйте! {broker}, {agency}. Продолжаем здесь.', recap: 'Остановились на: «{quote}».', proof: 'Скрин нашей переписки — для спокойствия 🙌' },
+    };
+    const tpl = $('#migTpl', root);
+    if (tpl) tpl.addEventListener('change', () => { const set = TPL[tpl.value]; if (!set) return; if (bridge) bridge.value = set.bridge; if (intro) intro.value = set.intro; if (recap) recap.value = set.recap; if (proof) proof.value = set.proof; renderPrev(); });
+    /* живая схема: как клиент увидит цепочку */
+    const SAMPLE = { '{name}': 'Анна', '{broker}': 'Игорь', '{agency}': ((STATE.settings && STATE.settings.agencyName) || 'TargetPoint'), '{target}': '+44 7418 000111', '{from}': '+44 7418 999888', '{quote}': 'ищу 2-комнатную у моря до 300к' };
+    const fill = (s) => String(s || '').replace(/\{name\}|\{broker\}|\{agency\}|\{target\}|\{from\}|\{quote\}/g, m => SAMPLE[m] || m);
+    const bubble = (side, who, txt, img) => `<div style="display:flex;justify-content:${side === 'old' ? 'flex-start' : 'flex-end'}"><div style="max-width:84%;background:${side === 'old' ? 'color-mix(in srgb,var(--ink) 7%,transparent)' : 'color-mix(in srgb,#25D366 20%,transparent)'};border-radius:12px;padding:7px 10px;font-size:12px;line-height:1.4"><div class="muted" style="font-size:9.5px;margin-bottom:2px">${esc(who)}</div>${img ? `<div style="width:120px;height:74px;border-radius:8px;background:repeating-linear-gradient(45deg,var(--stroke),var(--stroke) 6px,transparent 6px,transparent 12px);display:grid;place-items:center;font-size:10px;color:var(--ink-3);margin-bottom:4px">🖼 скрин переписки</div>` : ''}${esc(txt)}</div></div>`;
+    function renderPrev() {
+      if (!prev) return; const out = [];
+      if (bridge && bridge.value.trim()) out.push(bubble('old', 'со старого номера ' + SAMPLE['{from}'], fill(bridge.value)));
+      if (intro && intro.value.trim()) out.push(bubble('new', 'с основного номера ' + SAMPLE['{target}'], fill(intro.value)));
+      if (recap && recap.value.trim()) out.push(bubble('new', 'с основного номера', fill(recap.value)));
+      if (proofTg && proofTg.checked && proof && proof.value.trim()) out.push(bubble('new', 'с основного номера', fill(proof.value), true));
+      prev.innerHTML = out.join('') || '<div class="muted" style="font-size:11px">Заполните тексты выше — здесь появится схема.</div>';
+    }
+    tas.forEach(t => t.addEventListener('input', renderPrev));
+    if (proofTg) proofTg.addEventListener('change', renderPrev);
+    renderPrev();
+  })();
   $('#lrSave') && $('#lrSave').addEventListener('click', async () => {
     const bySource = {};
     $$('[data-lrsrc]', root).forEach(sel => { if (sel.value) bySource[sel.dataset.lrsrc] = sel.value; });

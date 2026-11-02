@@ -4176,7 +4176,8 @@ async function migrateLeadToClean(db, lead, targetPhone, opts = {}) {
   /* 📸 СКРИНШОТ переписки отдельным best-effort сообщением (анти-«мошенник»): клиент видит картинку нашего
      диалога → убеждается, что новый номер — продолжение, а не мошенник. Любая ошибка рендера → без картинки. */
   let proofUrl = null;
-  if (from && from !== target.phone && opts.proof !== false) {
+  const proofOn = opts.proof != null ? opts.proof !== false : (g.migrateProof !== false);   /* настройка «прикреплять скрин» (по умолчанию да) */
+  if (from && from !== target.phone && proofOn) {
     try {
       const png = await require('./chatshot').chatPng(db, lead, { count: 6 });
       const pdir = path.join(UPLOADS_DIR, 'leadfiles'); if (!fs.existsSync(pdir)) fs.mkdirSync(pdir, { recursive: true });
@@ -10670,6 +10671,7 @@ const server = http.createServer(async (req, res) => {
         if (x.migrateIntro != null) wg.migrateIntro = String(x.migrateIntro).slice(0, 600);
         if (x.migrateRecap != null) wg.migrateRecap = String(x.migrateRecap).slice(0, 400);
         if (x.migrateProofCaption != null) wg.migrateProofCaption = String(x.migrateProofCaption).slice(0, 400);
+        if (x.migrateProof != null) wg.migrateProof = !!x.migrateProof;
       }
       store.save();
       return json(res, 200, publicSettings(db));
