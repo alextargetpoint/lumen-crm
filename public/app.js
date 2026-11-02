@@ -8099,12 +8099,13 @@ PAGES.qualifier = async (root) => {
                 <div class="hero-stats">${Object.entries(h.stats).map(([k, v]) => `<div class="hstat"><span>${k}</span><i><b style="width:${v}%"></b></i></div>`).join('')}</div>
                 <div class="hero-xpcap">${L.max ? 'MAX' : L.name} · ${xp}${L.max ? '' : '/' + L.cap} квал</div>
                 <div class="hero-xp"><i style="width:${prog}%"></i></div>
-                ${(() => { const ps = (s.ai.personaStats || {})[h.id] || { handled: 0, qualified: 0 }; const rate = ps.handled ? Math.round(ps.qualified / ps.handled * 100) : 0; return `<div class="hero-ab" title="Честная A/B: реально вёл лидов → квалифицировал"><span>${ps.handled} лид</span><span>${ps.qualified} квал</span><b class="${rate >= 40 ? 'hi' : ''}">${rate}%</b></div>`; })()}
+                ${(() => { const ps = (s.ai.personaStats || {})[h.id] || { handled: 0, qualified: 0 }; const rate = ps.handled ? Math.round(ps.qualified / ps.handled * 100) : 0; return `<div class="hero-ab" title="Сколько лидов этот герой РЕАЛЬНО вёл в диалоге (из ответивших) → скольких квалифицировал. Холодные касания без ответа сюда НЕ входят — их общий счёт в «Аналитике»."><span>${ps.handled} вёл</span><span>${ps.qualified} квал</span><b class="${rate >= 40 ? 'hi' : ''}">${rate}%</b></div>`; })()}
                 <div class="hero-pick">${on ? ic(I.check, 2.4) + ' Выбран' : 'Выбрать'}</div>
               </div>`;
             }).join('')}
           </div>
           <div class="sd" style="margin-top:8px">Ползунки героя реально меняют манеру ИИ в диалоге. Уровень и A/B растут на реальных лидах. <button class="btn-ghost" id="heroClear" style="font-size:11.5px;padding:2px 6px">Без имени (отдел продаж)</button></div>
+          <div class="lc-hint info" style="margin-top:10px;font-size:11.5px"><span>${ic(I.spark)}«вёл» = лиды, которые <b>ответили</b> и которых реально вёл этот герой (не все, кому ушло первое касание). Холодные касания без ответа считаются как отправленные касания в <b><a href="#analytics" class="link" data-go="analytics">Аналитике</a></b> — там видно, сколько всего лидов коснулись. Герой подключается, когда лид вступил в диалог.</span></div>
           <div class="set-row" style="margin-top:12px"><div class="sp"><div class="sl">${ic(I.spark)}Авто-герой по направлению</div><div class="sd">ИИ сам подбирает героя под гео лида: Дубай-люкс → мягкий эксперт, горячий флип → скоростной дожим. Иначе — выбранный сверху.</div></div>
             <label class="switch"><input type="checkbox" id="personaAuto" ${s.ai.personaAuto ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
           <div id="personaMatrix" ${s.ai.personaAuto ? '' : 'style="display:none"'}>
