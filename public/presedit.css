@@ -487,11 +487,15 @@ button{font-family:inherit;cursor:pointer}
 .pe-hd:first-child{margin-top:0}
 
 /* small menu */
-.pe-menu{position:fixed;background:#fff;border:1px solid var(--pe-line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:6px;z-index:60;min-width:180px;max-height:min(60vh,420px);overflow-y:auto}
-.pe-menu button{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;padding:9px 10px;border-radius:7px;font-size:13px;color:var(--pe-ink);text-align:left}
-.pe-menu button:hover{background:var(--pe-hi)}
-.pe-menu button.danger{color:#c62828}
-.pe-menu hr{border:0;border-top:1px solid var(--pe-line);margin:5px 0}
+.pe-menu{position:fixed;background:color-mix(in srgb,var(--pe-panel,#fff) 93%,transparent);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border:1px solid color-mix(in srgb,var(--pe-line) 66%,transparent);border-radius:12px;box-shadow:0 0 0 .5px rgba(20,16,12,.04),0 6px 16px -4px rgba(20,16,12,.16),0 16px 44px -12px rgba(20,16,12,.24);padding:6px;z-index:60;min-width:188px;max-height:min(60vh,420px);overflow-y:auto;animation:pe-ctx-in .14s cubic-bezier(.16,1,.3,1)}
+.pe-menu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:8px 11px;border-radius:8px;font:500 13px/1.25 'Inter',system-ui,sans-serif;color:var(--pe-ink);text-align:left;transition:background .1s ease,color .1s ease}
+.pe-menu button svg{width:16px;height:16px;flex:none;color:var(--pe-mut);transition:color .1s ease}
+.pe-menu button:hover{background:color-mix(in srgb,var(--pe-ink) 6%,transparent)}
+.pe-menu button:hover svg{color:var(--pe-ink)}
+.pe-menu button.danger{color:#c0392b}
+.pe-menu button.danger svg{color:#c0392b}
+.pe-menu button.danger:hover{background:color-mix(in srgb,#c0392b 11%,transparent);color:#a5281a}
+.pe-menu hr{border:0;height:1px;background:color-mix(in srgb,var(--pe-line) 85%,transparent);margin:5px 7px}
 
 /* фото-панель · открытые источники */
 .pb-webcell{position:relative;cursor:default}
@@ -570,10 +574,30 @@ button{font-family:inherit;cursor:pointer}
 .pe-fb-btn svg{width:15px;height:15px;flex:none}
 .pe-fb-btn+.pe-fb-btn{border-left:1px solid var(--pe-line)}
 /* контекстное меню по правому клику */
-.pe-ctxmenu{position:fixed;z-index:200;min-width:196px;background:#fff;border:1px solid var(--pe-line);border-radius:10px;padding:5px;box-shadow:0 10px 32px rgba(20,16,12,.22);display:flex;flex-direction:column;gap:1px}
-.pe-ctx-it{display:flex;align-items:center;gap:9px;border:0;background:transparent;color:var(--pe-ink);font:500 13px/1 'Inter',system-ui,sans-serif;padding:9px 11px;border-radius:7px;cursor:pointer;text-align:left;width:100%}
-.pe-ctx-it:hover{background:var(--pe-hi)}
-.pe-ctx-it svg{width:16px;height:16px;flex:none;color:var(--pe-mut)}
+/* ---------- Контекстное меню (правый клик) — премиум, как в Figma/Linear/Notion ---------- */
+.pe-ctxmenu{position:fixed;z-index:200;min-width:218px;max-width:306px;
+  background:color-mix(in srgb,var(--pe-panel,#fff) 92%,transparent);
+  -webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);
+  border:1px solid color-mix(in srgb,var(--pe-line) 64%,transparent);border-radius:13px;padding:6px;
+  box-shadow:0 0 0 .5px rgba(20,16,12,.04),0 6px 16px -4px rgba(20,16,12,.16),0 16px 46px -12px rgba(20,16,12,.28);
+  display:flex;flex-direction:column;gap:2px;
+  transform-origin:var(--pe-ctx-ox,left) var(--pe-ctx-oy,top);
+  animation:pe-ctx-in .145s cubic-bezier(.16,1,.3,1)}
+@keyframes pe-ctx-in{from{opacity:0;transform:scale(.94) translateY(-5px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.pe-ctxmenu,.pe-menu{animation:none}}
+.pe-ctx-sec{font:600 10px/1 'Inter',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--pe-mut);padding:8px 11px 4px;user-select:none}
+.pe-ctx-it{display:flex;align-items:center;gap:11px;border:0;background:transparent;color:var(--pe-ink);
+  font:500 13px/1.25 'Inter',system-ui,sans-serif;padding:8px 11px;border-radius:8px;cursor:pointer;text-align:left;width:100%;
+  transition:background .1s ease,color .1s ease}
+.pe-ctx-it svg{width:16px;height:16px;flex:none;color:var(--pe-mut);transition:color .1s ease}
+.pe-ctx-it>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pe-ctx-it .pe-ctx-kbd{margin-left:auto;font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--pe-mut);opacity:.6;flex:none;padding-left:10px}
+.pe-ctx-it:hover,.pe-ctx-it.pe-hl{background:color-mix(in srgb,var(--pe-ink) 6%,transparent)}
+.pe-ctx-it:hover svg,.pe-ctx-it.pe-hl svg{color:var(--pe-ink)}
+.pe-ctx-it:active{transform:translateY(.5px)}
+.pe-ctx-it.danger{color:#c0392b}.pe-ctx-it.danger svg{color:#c0392b}
+.pe-ctx-it.danger:hover,.pe-ctx-it.danger.pe-hl{background:color-mix(in srgb,#c0392b 11%,transparent);color:#a5281a}
+.pe-ctxmenu hr{border:0;height:1px;background:color-mix(in srgb,var(--pe-line) 85%,transparent);margin:5px 7px}
 
 /* ===== РЕДИЗАЙН ВКЛАДОК СТИЛЬ / КОМПОЗИЦИЯ (референс клиента) ===== */
 .pe-sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:20px 0 12px}

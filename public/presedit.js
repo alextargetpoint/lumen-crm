@@ -1313,20 +1313,23 @@
   }
   /* контекстное меню по правому клику (ТЗ §6): действия именно этого элемента, в т.ч. вторичные
      (улучшить фото, закрепление) — которых нет на плавающей панели. Переиспользует действия инспектора. */
-  function ceCloseCtx() { var m = document.getElementById('peCtxMenu'); if (m && m.parentNode) m.parentNode.removeChild(m); }
+  function ceCloseCtx() { var m = document.getElementById('peCtxMenu'); if (m) { if (m._key) document.removeEventListener('keydown', m._key, true); if (m.parentNode) m.parentNode.removeChild(m); } }
+  /* элементы меню: ['act','icon','label', {sec?:заголовок, kbd?:хинт, danger?:bool}] | ['__sep__'] | ['__sec__',null,'Текст'] */
   function ceCtxItems(el) {
     var s = curSection();
     if (el.classList.contains('pe-ced-photo')) {
       if (el.getAttribute('data-pe-gallery')) return [['galfield', 'image', 'Выбрать фото в панели']];
-      var pItems = [['replace', 'image', 'Заменить фото'], ['crop', 'crop', 'Кадрировать'], ['enhance', 'sparkle', 'Улучшить фото'], ['pin', 'lock', 'Закрепление…']];
+      var items = [['__sec__', null, 'Фото'],
+        ['replace', 'image', 'Заменить фото'], ['crop', 'crop', 'Кадрировать'], ['enhance', 'sparkle', 'Улучшить фото'],
+        ['__sep__'], ['pin', 'lock', 'Закрепление…']];
       var ref = s && (s.assetRefs || [])[+(el.getAttribute('data-pe-idx') || 0)];
-      if (ref && ref.focalPoint && (ref.focalPoint.x !== 0.5 || ref.focalPoint.y !== 0.5)) pItems.push(['resetfocal', 'back', 'Вернуть фото на место']);
-      return pItems;
+      if (ref && ref.focalPoint && (ref.focalPoint.x !== 0.5 || ref.focalPoint.y !== 0.5)) { items.push(['__sep__'], ['resetfocal', 'back', 'Вернуть фото на место']); }
+      return items;
     }
     if (el.classList.contains('pe-ced-text')) {
-      var tItems = [['edit', 'text', 'Изменить текст'], ['field', 'text', 'Править в панели']];
+      var tItems = [['edit', 'text', 'Изменить текст', { kbd: '2×' }], ['field', 'text', 'Править в панели']];
       var key = el.getAttribute('data-pe-key'); var mv = s && s.elMove && s.elMove[key];
-      if (mv && (mv.dx || mv.dy)) tItems.push(['resetmove', 'back', 'Вернуть на место']);
+      if (mv && (mv.dx || mv.dy)) { tItems.push(['__sep__'], ['resetmove', 'back', 'Вернуть на место']); }
       return tItems;
     }
     return [['field', 'text', 'Править в панели']];
@@ -1335,12 +1338,37 @@
     ceCloseCtx(); ceHideFloatbar();
     var items = ceCtxItems(el);
     var m = document.createElement('div'); m.id = 'peCtxMenu'; m.className = 'pe-ctxmenu';
-    m.innerHTML = items.map(function (it) { return '<button class="pe-ctx-it" data-cx="' + it[0] + '">' + ic(it[1]) + '<span>' + it[2] + '</span></button>'; }).join('');
+    m.innerHTML = items.map(function (it) {
+      if (it[0] === '__sep__') return '<hr>';
+      if (it[0] === '__sec__') return '<div class="pe-ctx-sec">' + esc(it[2]) + '</div>';
+      var o = it[3] || {};
+      return '<button class="pe-ctx-it' + (o.danger ? ' danger' : '') + '" data-cx="' + it[0] + '">' + ic(it[1]) + '<span>' + esc(it[2]) + '</span>' + (o.kbd ? '<span class="pe-ctx-kbd">' + esc(o.kbd) + '</span>' : '') + '</button>';
+    }).join('');
     document.body.appendChild(m);
     var mw = m.offsetWidth, mh = m.offsetHeight;
-    m.style.left = Math.max(4, Math.min(x, window.innerWidth - mw - 6)) + 'px';
-    m.style.top = Math.max(4, Math.min(y, window.innerHeight - mh - 6)) + 'px';
-    m.querySelectorAll('[data-cx]').forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); var a = b.getAttribute('data-cx'); ceCloseCtx(); ceCtxAction(a, el); }; });
+    /* позиция + transform-origin от курсора (как в Figma/Linear): меню «вырастает» из точки клика */
+    var flipX = x + mw + 6 > window.innerWidth, flipY = y + mh + 6 > window.innerHeight;
+    var left = flipX ? (x - mw) : x, top = flipY ? (y - mh) : y;
+    m.style.left = Math.max(4, Math.min(left, window.innerWidth - mw - 6)) + 'px';
+    m.style.top = Math.max(4, Math.min(top, window.innerHeight - mh - 6)) + 'px';
+    m.style.setProperty('--pe-ctx-ox', flipX ? 'right' : 'left');
+    m.style.setProperty('--pe-ctx-oy', flipY ? 'bottom' : 'top');
+    var btns = [].slice.call(m.querySelectorAll('[data-cx]'));
+    var hl = -1;
+    function setHl(i) { if (i === hl) return; btns.forEach(function (b2, j) { b2.classList.toggle('pe-hl', j === i); }); hl = i; if (hl >= 0 && btns[hl].scrollIntoView) btns[hl].scrollIntoView({ block: 'nearest' }); }
+    btns.forEach(function (b, i) {
+      b.onclick = function (ev) { ev.stopPropagation(); var a = b.getAttribute('data-cx'); ceCloseCtx(); ceCtxAction(a, el); };
+      b.addEventListener('mousemove', function () { setHl(i); });
+    });
+    /* клавнавигация — стрелки/Enter/Esc (премиум-конструкторы это умеют) */
+    m._key = function (e) {
+      if (!btns.length) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setHl((hl + 1) % btns.length); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setHl((hl - 1 + btns.length) % btns.length); }
+      else if (e.key === 'Enter') { if (hl >= 0 && btns[hl]) { e.preventDefault(); e.stopPropagation(); btns[hl].click(); } }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ceCloseCtx(); }
+    };
+    document.addEventListener('keydown', m._key, true);
   }
   function ceCtxAction(a, el) {
     if (a === 'edit') { var t = el && el.classList.contains('pe-ced-text') ? el : (document.getElementById('peStage') || document).querySelector('.pe-ced-text.pe-sel'); if (t) ceBeginEdit(t, t.getAttribute('data-pe-key')); }
