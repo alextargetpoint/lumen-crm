@@ -16524,7 +16524,7 @@ PAGES.numbers = async (root) => {
       </div>
       ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card cloud-card" data-tg="${esc(n.phone)}" style="border-color:color-mix(in srgb,#229ED9 34%,var(--stroke))">
         <div class="num-head"><div><div class="ph">${esc(n.username ? '@' + n.username : (n.realPhone ? '+' + n.realPhone : n.phone))}</div><div class="lb">Telegram · <b style="color:#229ED9">серый (MTProto)</b></div></div></div>
-        <div style="margin:10px 0 6px">${stBadge(n.live && n.live.status)}</div>
+        <div style="margin:10px 0 6px">${(() => { const br = !!(p.brokerId || p.mode === 'broker'); return `<span class="badge" title="${br ? 'Закреплён за брокером — ведёт его лидов' : 'Общий пул: холодные касания каскада раскидываются по кругу'}" style="background:${br ? 'color-mix(in srgb,var(--accent) 15%,transparent)' : 'color-mix(in srgb,#B47A1E 16%,transparent)'};color:${br ? 'var(--accent)' : '#B47A1E'};font-weight:600">${br ? '👤 Брокерский' : '📣 Пул охвата'}</span>`; })()} ${stBadge(n.live && n.live.status)}</div>
         ${conn ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5} · рассылки ⛔</div>` : ''}
         <div style="font-size:11px;margin:6px 0">Персона: <b>${esc(p.name || '— не задана')}</b><br>${persBadge[p.mode || 'qualifier']}</div>
         <div class="num-actions">
