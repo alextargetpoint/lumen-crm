@@ -1202,6 +1202,11 @@
         items.forEach(function (el, i) { if (el.classList.contains('pe-ced')) return; el.classList.add('pe-ced', 'pe-ced-list'); el.setAttribute('data-pe-listidx', i); });
       });
     }
+    /* ⭐СРАВНЕНИЕ — инлайн-правка ячеек ПРЯМО на холсте (двойной клик): критерий (строка) и значения.
+       Клиент просил «живую таблицу, а не инспектор». Пишем в criteria/objects, ставим cmpEdited (фриз ресинка). */
+    if (fam === 'comparison') {
+      stage.querySelectorAll('.lp-cmp-crit[data-cmp-crit], .lp-cmp-val[data-cmp-ck]').forEach(function (el) { el.classList.add('pe-ced', 'pe-ced-cmp'); });
+    }
     if (S._ceSelKey) { var sel = stage.querySelector('.pe-ced[data-pe-key="' + S._ceSelKey + '"]'); if (sel) sel.classList.add('pe-sel'); }
     if (S._ceSelPhoto != null) { var selp = stage.querySelector('.pe-ced-photo[data-pe-idx="' + S._ceSelPhoto + '"]'); if (selp) selp.classList.add('pe-sel'); }
     if ((S._ceSelKey || S._ceSelPhoto != null) && document.getElementById('peFloatbar')) { var se = ceSelectedEl(); if (se) cePositionFloatbar(se); else ceHideFloatbar(); }
@@ -1457,6 +1462,34 @@
     }
     el.addEventListener('blur', onBlur); el.addEventListener('keydown', onKd);
   }
+  /* инлайн-правка ячейки таблицы сравнения на холсте: критерий (label) или значение (objects[oi].values[key]) */
+  function ceBeginEditCmp(el) {
+    if (el.getAttribute('contenteditable') === 'true') return;
+    ceHideFloatbar();
+    var isCrit = el.hasAttribute('data-cmp-crit');
+    var ci = +el.getAttribute('data-cmp-crit');
+    var oi = +el.getAttribute('data-cmp-oi'), key = el.getAttribute('data-cmp-ck');
+    var placeholder = el.querySelector('span[style*="opacity"]');
+    var before = placeholder ? '' : (el.innerText || '').trim();
+    if (placeholder) el.textContent = '';   /* «Не указано» → пустое поле для ввода */
+    el.setAttribute('contenteditable', 'true'); el.classList.add('pe-editing'); el.spellcheck = false; el.focus();
+    try { var rg = document.createRange(); rg.selectNodeContents(el); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } catch (_) {}
+    function finish(commit) {
+      el.removeEventListener('blur', onBlur); el.removeEventListener('keydown', onKd);
+      el.removeAttribute('contenteditable'); el.classList.remove('pe-editing');
+      var after = (el.innerText || '').replace(/\s+/g, ' ').trim();
+      if (commit && after !== before) {
+        mutate(function () {
+          var s = curSection();
+          if (isCrit) { var a = (cval(s, 'criteria') || []).slice(); if (a[ci]) { a[ci] = Object.assign({}, a[ci], { label: after }); setOverride(s, 'criteria', a); s.cmpEdited = true; } }
+          else { var objs = (cval(s, 'objects') || []).slice(); if (objs[oi]) { var o = Object.assign({}, objs[oi]); o.values = Object.assign({}, o.values); o.values[key] = after; objs[oi] = o; setOverride(s, 'objects', objs); s.cmpEdited = true; } }
+        });
+      } else { mountCanvas(); }   /* откат визуала (вернёт «Не указано», если было пусто) */
+    }
+    function onBlur() { finish(true); }
+    function onKd(e) { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); finish(false); } else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); } }
+    el.addEventListener('blur', onBlur); el.addEventListener('keydown', onKd);
+  }
   function wireCanvasEditingOnce() {
     var stage = document.getElementById('peStage'); if (!stage || stage._ceWired) return; stage._ceWired = true;
     stage.addEventListener('click', function (e) {
@@ -1465,7 +1498,8 @@
       if (!el) { ceDeselect(); return; }                      /* клик по пустому месту страницы → снять выбор */
       if (el.getAttribute('contenteditable') === 'true') return;
       e.stopPropagation();
-      if (el.classList.contains('pe-ced-list')) ceListSelect(el);
+      if (el.classList.contains('pe-ced-cmp')) { /* ячейка сравнения — правка двойным кликом, одиночный не трогает */ }
+      else if (el.classList.contains('pe-ced-list')) ceListSelect(el);
       else if (el.classList.contains('pe-ced-photo')) { cePhotoSelect(el); if (el.classList.contains('pe-ced-empty')) ceFloatAction('replace'); }   /* пустой слот → сразу открыть «Найти фото» */
       else if (el.classList.contains('pe-ced-field')) ceFieldSelect(el.getAttribute('data-pe-field'));   /* цена и т.п. → фокус поля в панели */
       else ceSelect(el);
@@ -1479,6 +1513,8 @@
         ceBeginEdit(tx, tx.getAttribute('data-pe-key'));   /* правим ПРЯМО на узле — без ререндера, чтобы узел не протух */
         return;
       }
+      var cm = e.target.closest('.pe-ced-cmp');
+      if (cm) { e.preventDefault(); e.stopPropagation(); ceBeginEditCmp(cm); return; }   /* двойной клик по ячейке сравнения → inline-правка */
       var li = e.target.closest('.pe-ced-list');
       if (li) { e.preventDefault(); e.stopPropagation(); li.classList.add('pe-sel'); S._ceSelKey = null; S._ceSelPhoto = null; ceListBeginEdit(li); return; }   /* двойной клик по пункту списка → inline-правка значения */
       var ph = e.target.closest('.pe-ced-photo');

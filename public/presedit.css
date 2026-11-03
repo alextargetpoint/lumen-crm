@@ -550,6 +550,8 @@ button{font-family:inherit;cursor:pointer}
 .pe-ced{cursor:pointer;transition:outline-color .12s,background .12s;outline:1.5px solid transparent;outline-offset:2px;border-radius:3px}
 .pe-ced:hover{outline-color:color-mix(in srgb,var(--pe-sel) 45%,transparent)}
 .pe-ced-text{cursor:text}
+.pe-ced-cmp{cursor:text}
+.pe-ced-cmp:hover{background:color-mix(in srgb,var(--pe-sel) 9%,transparent);outline-color:color-mix(in srgb,var(--pe-sel) 50%,transparent)}
 .pe-ced.pe-sel{outline:1.5px solid var(--pe-sel);outline-offset:2px;background:color-mix(in srgb,var(--pe-sel) 7%,transparent)}
 .pe-ced.pe-editing{outline:2px solid var(--pe-sel);outline-offset:2px;background:color-mix(in srgb,var(--pe-sel) 9%,transparent);cursor:text}
 .pe-ced.pe-editing:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--pe-sel) 18%,transparent)}

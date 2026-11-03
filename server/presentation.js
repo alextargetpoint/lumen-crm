@@ -212,10 +212,12 @@ function buildComparison(db, props) {
       name: pr.name || 'Объект',
       image: (pr.images && pr.images[0]) || null,   /* фото обложки объекта → шапка колонки сравнения */
       values: {
-        location: (pr.district && pr.district.name) || gi.region || null,
+        /* локация: район объекта → pr.area, ЕСЛИ это текст-район (а не число-площадь) → регион гео */
+        location: (pr.district && pr.district.name) || (pr.area && /[a-zа-яё]/i.test(String(pr.area)) ? String(pr.area) : null) || gi.region || null,
         type: pr.type || null,
         price: pr.priceFrom ? T.fmtPrice({ kind: 'from', amount: pr.priceFrom, currency }) : null,
-        area: areaRange ? T.fmtArea(areaRange) : null,
+        /* площадь: из юнитов → из pr.size/pr.area ТОЛЬКО числом (sizeRange фильтрует нечисловые районы) */
+        area: areaRange ? T.fmtArea(areaRange) : (sizeRange(pr) ? T.fmtArea(sizeRange(pr)) : null),
         beds: pr.beds != null ? bedsLabel(pr.beds) : null,
         handover: pr.handover || null,
       },
