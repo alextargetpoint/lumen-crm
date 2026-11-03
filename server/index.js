@@ -5437,7 +5437,8 @@ async function safeFetchBytes(url, cap) {
   cap = cap || 20 * 1024 * 1024;
   const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 15000);
   try {
-    const { rr } = await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)' } });
+    /* браузерный UA + Accept: многие CDN (Flickr/Openverse) отдают 403 ботам, но 200 браузеру */
+    const { rr } = await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8', 'Referer': (() => { try { return new URL(url).origin + '/'; } catch (_) { return ''; } })() } });
     if (!rr.ok) throw new Error('HTTP ' + rr.status);
     const mime = (rr.headers.get('content-type') || '').split(';')[0].trim();
     if (mime && !/^image\//i.test(mime)) throw new Error('не изображение: ' + mime);
@@ -5559,7 +5560,7 @@ async function downloadImageToAsset(url) {
     let _u; try { _u = new URL(url); } catch (_) { return null; }
     if (!/^https?:$/.test(_u.protocol) || ssrfBlocked(_u.hostname)) return null;   /* SEC(#6): не лезем на internal/metadata-хосты */
     const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
-    let r; try { r = (await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } })).rr; } finally { clearTimeout(to); }   /* SEC(SSRF): пере-проверка каждого редиректа */
+    let r; try { r = (await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8', Referer: _u.origin + '/' } })).rr; } finally { clearTimeout(to); }   /* SEC(SSRF): пере-проверка редиректа; браузерный UA — CDN (Flickr) не 403ят */
     if (!r.ok) return null;
     const ct = r.headers.get('content-type') || '';
     if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;   /* только растровые фото, не svg/gif */
@@ -5570,8 +5571,8 @@ async function downloadImageToAsset(url) {
     if (dim && Math.min(dim.w, dim.h) < 420) return null;           /* узкие/мелкие миниатюры (пикселят на слайде) */
     if (dim && buf.length < (dim.w * dim.h) * 0.12) return null;    /* байт/пиксель мало = сильно пережато/апскейл → каша */
     const ext = /png/i.test(ct) ? 'png' : /webp/i.test(ct) ? 'webp' : /avif/i.test(ct) ? 'avif' : 'jpg';
-    const url = saveMedia('car', `src-${crypto.randomBytes(5).toString('hex')}.${ext}`, buf);   /* ПЕРСИСТ: /media на volume (переживает деплой) */
-    return { url, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
+    const savedUrl = saveMedia('car', `src-${crypto.randomBytes(5).toString('hex')}.${ext}`, buf);   /* ПЕРСИСТ: /media на volume (переживает деплой). ⚠️НЕ `url` — затеняло параметр (TDZ) → import падал */
+    return { url: savedUrl, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
   } catch (e) { return null; }
 }
 /* МЯГКАЯ загрузка ОБЛОЖКИ каталога: превью листинга обычно мелкие (300-500px) — строгий хи-рес фильтр
@@ -5581,7 +5582,7 @@ async function downloadCover(url) {
     let _u; try { _u = new URL(url); } catch (_) { return null; }
     if (!/^https?:$/.test(_u.protocol) || ssrfBlocked(_u.hostname)) return null;
     const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
-    let r; try { r = (await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } })).rr; } finally { clearTimeout(to); }   /* SEC(SSRF): пере-проверка каждого редиректа */
+    let r; try { r = (await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8', Referer: (() => { try { return new URL(url).origin + '/'; } catch (_) { return url; } })() } })).rr; } finally { clearTimeout(to); }   /* SEC(SSRF): пере-проверка редиректа; браузерный UA — CDN (Flickr) не 403ят */
     if (!r.ok) return null;
     const ct = r.headers.get('content-type') || '';
     if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;
@@ -18986,14 +18987,41 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
       const geoName = (db.settings.geoNames || {})[pr.geo] || pr.geo || '';
       const q = [pr.name, pr.area || '', (pr.developer && pr.developer !== '—') ? pr.developer : '', geoName, 'жилой комплекс'].filter(Boolean).join(' ');
       const proj = { name: pr.name, geo: geoName, developer: pr.developer || '' };
-      if (!serperKey()) return json(res, 200, { enabled: false, note: 'Внешний поиск подключается ключом SERPER_API_KEY на сервисе CRM', query: q, project: proj });
       const okImg2 = (u) => u && /^https?:\/\//.test(u) && !/\.svg(\?|$)/i.test(u);
       const cand = [];
-      try {
-        const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': serperKey(), 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 14 }) });
-        const j = await r.json().catch(() => ({}));
-        (j.images || []).forEach(it => { const u = it && (it.imageUrl || it.link); if (okImg2(u)) cand.push({ url: u, source: (it.source || it.domain || 'web'), title: it.title || '', thumb: it.thumbnailUrl || u }); });
-      } catch (e) {}
+      if (serperKey()) {
+        /* если задан платный ключ Serper (Google Images) — используем его (шире выдача) */
+        try {
+          const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': serperKey(), 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 14 }) });
+          const j = await r.json().catch(() => ({}));
+          (j.images || []).forEach(it => { const u = it && (it.imageUrl || it.link); if (okImg2(u)) cand.push({ url: u, source: (it.source || it.domain || 'web'), title: it.title || '', thumb: it.thumbnailUrl || u }); });
+        } catch (e) {}
+      }
+      if (!cand.length) {
+        /* ⭐СВОБОДНЫЙ ИСТОЧНИК без ключа: Openverse (openverse.org) — CC-лицензии, провенанс, бесплатно.
+           Openverse НЕ знает конкретных ЖК (это CC-медиа), поэтому ищем ОБОБЩЁННО по локации+типу (EN) —
+           релевантные свободные кадры «под настроение» объекта; точные фото ЖК даёт Serper (с ключом). */
+        const typeKw = /vill?a|house|дом|вилл|таун/i.test(pr.type || '') ? 'villa' : /studio|студи/i.test(pr.type || '') ? 'modern apartment studio' : 'modern apartment building';
+        /* Openverse индексирован по-английски: берём АНГЛИЙСКИЙ код гео (pr.geo: dubai/phuket/bali), а не рус. geoName
+           и не нишевый район (JVC→0). Прогрессивные запросы от конкретного к общему — всегда что-то вернётся. */
+        const geoEn = String(pr.geo || '').replace(/^[a-z]/, c => c.toUpperCase());
+        const owQueries = [
+          [geoEn, typeKw].filter(Boolean).join(' '),
+          [geoEn, 'real estate'].filter(Boolean).join(' '),
+          typeKw,
+          'modern architecture building',
+        ].filter((v, i, a) => v && a.indexOf(v) === i);
+        for (const query of owQueries) {
+          if (cand.length) break;
+          try {
+            const ou = 'https://api.openverse.org/v1/images/?q=' + encodeURIComponent(query) + '&page_size=18&mature=false';
+            const r2 = await fetch(ou, { headers: { 'User-Agent': 'LumenCRM/1.0 (real-estate presentations)', Accept: 'application/json' }, signal: AbortSignal.timeout(9000) });
+            const j2 = await r2.json().catch(() => ({}));
+            (j2.results || []).forEach(it => { const u = it && (it.url || it.image); if (okImg2(u)) cand.push({ url: u, source: (it.source || it.provider || 'openverse'), title: it.title || '', thumb: it.thumbnail || u, license: it.license || '' }); });
+          } catch (e) {}
+        }
+      }
+      if (!cand.length && !serperKey()) return json(res, 200, { enabled: true, query: q, project: proj, candidates: [], note: 'Свободный источник (Openverse) ничего не вернул — уточните название/застройщика в карточке. Для более широкой выдачи оператор может подключить ключ Serper.' });
       const seen = new Set();
       const out = cand.filter(c => { if (seen.has(c.url)) return false; seen.add(c.url); return true; }).slice(0, 12);
       return json(res, 200, { enabled: true, query: q, project: proj, candidates: out });
