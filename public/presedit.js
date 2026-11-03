@@ -120,6 +120,14 @@
   function onKey(e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
     if (e.key === 'Escape') { if (typeof ceCloseCtx === 'function') ceCloseCtx(); return; }
+    var _t = e.target || {}, _inField = /^(INPUT|TEXTAREA|SELECT)$/.test(_t.tagName || '') || _t.isContentEditable;
+    /* ⭐горячие клавиши страницы (не в полях): ⌥↑/⌥↓ — переместить, ⌘⌫/⌘Del — удалить, ⌘⇧N — новая страница */
+    if (!_inField) {
+      if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); pageMoveUp(S.pageIdx); return; }
+      if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); pageMoveDown(S.pageIdx); return; }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); pageDelete(S.pageIdx); return; }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); openPageLibrary(); return; }
+    }
     // навигация по страницам стрелками — только когда не печатаем в поле/на холсте
     var t = e.target || {}; if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || t.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
     var n = sections().length;
@@ -243,6 +251,7 @@
       '<div style="display:flex;gap:4px"><button class="pe-nav-sel' + (S.multiMode ? ' on' : '') + '" data-act="multiToggle">' + (S.multiMode ? 'Готово' : 'Выбрать') + '</button>' +
       '<button class="pe-nav-add" data-act="' + (S.isColl ? 'addobj' : 'addpage') + '" title="' + (S.isColl ? 'Добавить объекты' : 'Добавить страницу') + '">' + ic('plus') + '</button></div></div>';
     if (S.isColl) items += '<button class="pe-addobj-btn" data-act="addobj">' + ic('plus') + 'Добавить объект</button>';
+    items += '<button class="pe-addpage-btn" data-act="addpage">' + ic('plus') + 'Добавить новую страницу</button>';   /* фикс-кнопка библиотеки страниц в левом меню */
     var bulk = '';
     if (S.multiMode) {
       var n = (S.multiSel || []).length;
@@ -273,7 +282,12 @@
       '<div class="pe-canvas" id="peCanvas">' +
         (overflowInfo(curSection()) ? '<div class="pe-ov-banner" data-act="ovopen">' + ic('warn') + '<span>Текст не помещается</span><b>Решить</b></div>' : '') +
         '<div class="pe-stage" id="peStage"></div>' +
-        '<button class="pe-canvas-add" data-act="addpage">' + ic('plus') + 'Добавить блок</button>' +
+        '<div class="pe-page-tools">' +
+          '<button class="pe-pt" data-act="pageUp" title="Страницу выше (⌥↑)"' + (S.pageIdx <= 0 ? ' disabled' : '') + '>' + ic('up') + '</button>' +
+          '<button class="pe-pt" data-act="pageDown" title="Страницу ниже (⌥↓)"' + (S.pageIdx >= sections().length - 1 ? ' disabled' : '') + '>' + ic('down') + '</button>' +
+          '<button class="pe-pt pe-pt-del" data-act="pageDel" title="Удалить страницу (⌘⌫)">' + ic('trash') + '</button>' +
+        '</div>' +
+        '<button class="pe-canvas-add" data-act="addpage">' + ic('plus') + 'Добавить новую страницу</button>' +
         '<div class="pe-zoom"><button data-act="zoomout">−</button><span id="peZoomL">Fit</span><button data-act="zoomin">+</button><button data-act="zoomfit" style="width:auto;font-size:13px">Fit</button></div>' +
         '<div class="pe-pagecount" id="pePageCount"></div>' +
       '</div></div>';
@@ -387,6 +401,27 @@
     });
     S.addMode = false; render();
   }
+  /* мини-макет (вайрфрейм) страницы для карточки библиотеки — «как выглядит», а не просто иконка */
+  function libThumb(k) {
+    var bar = function (w, cls) { return '<i class="lm-bar ' + (cls || '') + '" style="width:' + w + '%"></i>'; };
+    var ph = '<i class="lm-ph"></i>';
+    switch (k) {
+      case 'editorial': return '<div class="lm lm-stack">' + bar(50, 'lm-ttl') + bar(92) + bar(85) + bar(88) + bar(68) + '</div>';
+      case 'photo': return '<div class="lm">' + ph + '</div>';
+      case 'gallery': return '<div class="lm lm-gal"><i class="lm-ph lm-ph-big"></i><i class="lm-ph"></i><i class="lm-ph"></i><i class="lm-ph"></i></div>';
+      case 'metrics': return '<div class="lm lm-stack">' + bar(45, 'lm-ttl') + '<div class="lm-cells"><i></i><i></i><i></i></div></div>';
+      case 'benefits': return '<div class="lm lm-stack">' + bar(45, 'lm-ttl') + '<div class="lm-list"><span><b></b>' + bar(72) + '</span><span><b></b>' + bar(60) + '</span><span><b></b>' + bar(66) + '</span></div></div>';
+      case 'floorplan': return '<div class="lm lm-row"><i class="lm-plan"></i><div class="lm-col">' + bar(80) + bar(60) + bar(70) + '</div></div>';
+      case 'units': return '<div class="lm lm-stack">' + bar(45, 'lm-ttl') + '<div class="lm-tbl"><i></i><i></i><i></i></div></div>';
+      case 'payment': return '<div class="lm lm-stack">' + bar(45, 'lm-ttl') + '<div class="lm-list"><span>' + bar(85) + '</span><span>' + bar(75) + '</span><span>' + bar(80) + '</span></div></div>';
+      case 'location': return '<div class="lm lm-row"><i class="lm-ph lm-map"></i><div class="lm-col">' + bar(70) + bar(55) + bar(62) + '</div></div>';
+      case 'broker': return '<div class="lm lm-center"><i class="lm-circle"></i>' + bar(52) + bar(34, 'lm-mut') + '</div>';
+      case 'agency': return '<div class="lm lm-stack">' + bar(55, 'lm-ttl') + bar(85) + '<div class="lm-stats"><span></span><span></span><span></span></div></div>';
+      case 'team': return '<div class="lm lm-center"><div class="lm-circles"><i></i><i></i><i></i></div>' + bar(40) + '</div>';
+      case 'cta': return '<div class="lm lm-center">' + bar(72, 'lm-ttl') + bar(48, 'lm-mut') + '<div class="lm-btns"><i></i><i></i></div></div>';
+      default: return '<div class="lm">' + ph + '</div>';
+    }
+  }
   /* ⭐красивый ПОПАП-библиотека готовых страниц (контент объекта + закрывающие) — быстрый выбор и вставка */
   function openPageLibrary() {
     if (document.getElementById('peLibOv')) return;
@@ -394,7 +429,7 @@
     var grpOrder = ['Контент объекта', 'Закрывающие']; Object.keys(groups).forEach(function (g) { if (grpOrder.indexOf(g) < 0) grpOrder.push(g); });
     var body = grpOrder.filter(function (g) { return groups[g]; }).map(function (g) {
       return '<div class="pe-lib-grp"><div class="pe-lib-grp-t">' + esc(g) + '</div><div class="pe-lib-grid">' +
-        groups[g].map(function (b) { return '<button class="pe-lib-card" data-libadd="' + esc(b.f) + '"><span class="pe-lib-ic">' + ic(b.ic) + '</span><b>' + esc(b.label) + '</b><span class="pe-lib-desc">' + esc(b.desc || '') + '</span></button>'; }).join('') +
+        groups[g].map(function (b) { return '<button class="pe-lib-card" data-libadd="' + esc(b.f) + '"><span class="pe-lib-thumb">' + libThumb(b.key) + '</span><b>' + esc(b.label) + '</b><span class="pe-lib-desc">' + esc(b.desc || '') + '</span></button>'; }).join('') +
         '</div></div>';
     }).join('');
     var ov = document.createElement('div'); ov.id = 'peLibOv'; ov.className = 'pe-lib-ov';
@@ -619,16 +654,25 @@
     },
     comparison: function (s) {
       var crit = cval(s, 'criteria') || []; var objs = cval(s, 'objects') || [];
-      var h = '<p class="hint">Таблица правится как Excel: строки-критерии, колонки-объекты, значения в ячейках. Правки сохраняются и НЕ перезатираются при обновлении подборки.</p>';
+      var h = '<p class="hint">Критерии — строки, объекты — колонки. Правьте тут или прямо на холсте (двойной клик по ячейке). Правки не затираются при обновлении подборки.</p>';
       h += fld('Заголовок', inp('title', cval(s, 'title'), 'Сравнение объектов'), s, 'title');
       h += '<div class="pe-sec-label" style="margin-top:12px">Объекты (колонки) · ' + objs.length + '</div>';
-      h += '<div class="pe-cmpcols">' + objs.map(function (o, j) { return '<div class="pe-cmpcol"><span class="pe-cmpcol-nm">' + (j + 1) + '. ' + esc(o.name || 'Объект') + '</span><span class="pe-cmpcol-acts"><button class="pe-mini" data-act="cmpColMove" data-oi="' + j + '" data-d="-1" title="Левее"' + (j === 0 ? ' disabled' : '') + '>‹</button><button class="pe-mini" data-act="cmpColMove" data-oi="' + j + '" data-d="1" title="Правее"' + (j === objs.length - 1 ? ' disabled' : '') + '>›</button><button class="pe-mini-del" data-act="cmpColDel" data-oi="' + j + '" title="Убрать колонку">×</button></span></div>'; }).join('') + '</div>';
+      h += '<div class="pe-cmpcols">' + objs.map(function (o, j) {
+        return '<div class="pe-cmpcol"><span class="pe-cmpcol-n">' + (j + 1) + '</span><span class="pe-cmpcol-nm">' + esc(o.name || 'Объект') + '</span>' +
+          '<span class="pe-cmpcol-acts">' +
+          '<button class="pe-ico" data-act="cmpColMove" data-oi="' + j + '" data-d="-1" title="Левее"' + (j === 0 ? ' disabled' : '') + '>‹</button>' +
+          '<button class="pe-ico" data-act="cmpColMove" data-oi="' + j + '" data-d="1" title="Правее"' + (j === objs.length - 1 ? ' disabled' : '') + '>›</button>' +
+          '<button class="pe-ico pe-ico-del" data-act="cmpColDel" data-oi="' + j + '" title="Убрать колонку">×</button></span></div>';
+      }).join('') + '</div>';
       h += '<div class="pe-sec-label" style="margin-top:14px">Критерии (строки) · ' + crit.length + '</div>';
-      h += crit.map(function (cr, ci) {
-        var vals = objs.map(function (o, j) { var v = (o.values && o.values[cr.key]) || ''; return '<input data-cmpval data-ci="' + ci + '" data-oi="' + j + '" value="' + esc(v) + '" placeholder="' + esc((o.name || '').slice(0, 12)) + '">'; }).join('');
-        return '<div class="pe-cmprow" data-ci="' + ci + '"><div style="display:flex;gap:6px;align-items:center"><input data-cmpcrit data-ci="' + ci + '" value="' + esc(cr.label || '') + '" placeholder="Критерий" style="flex:1;font-weight:600"><button class="pe-mini" data-act="cmpCritMove" data-ci="' + ci + '" data-d="-1"' + (ci === 0 ? ' disabled' : '') + '>↑</button><button class="pe-mini" data-act="cmpCritMove" data-ci="' + ci + '" data-d="1"' + (ci === crit.length - 1 ? ' disabled' : '') + '>↓</button><button class="pe-mini-del" data-act="cmpCritDel" data-ci="' + ci + '">×</button></div><div class="pe-cmpvals">' + vals + '</div></div>';
-      }).join('');
-      h += '<button class="pe-addrow" data-act="cmpCritAdd">+ Критерий (строку)</button>';
+      h += '<div class="pe-cmprows">' + crit.map(function (cr, ci) {
+        var vals = objs.map(function (o, j) { var v = (o.values && o.values[cr.key]) || ''; return '<label class="pe-cmpval"><span class="pe-cmpval-n">' + (j + 1) + '</span><input data-cmpval data-ci="' + ci + '" data-oi="' + j + '" value="' + esc(v) + '" placeholder="—"></label>'; }).join('');
+        return '<div class="pe-cmprow" data-ci="' + ci + '">' +
+          '<div class="pe-cmprow-hd"><input class="pe-cmpcrit-in" data-cmpcrit data-ci="' + ci + '" value="' + esc(cr.label || '') + '" placeholder="Название критерия">' +
+          '<span class="pe-cmprow-acts"><button class="pe-ico" data-act="cmpCritMove" data-ci="' + ci + '" data-d="-1" title="Выше"' + (ci === 0 ? ' disabled' : '') + '>↑</button><button class="pe-ico" data-act="cmpCritMove" data-ci="' + ci + '" data-d="1" title="Ниже"' + (ci === crit.length - 1 ? ' disabled' : '') + '>↓</button><button class="pe-ico pe-ico-del" data-act="cmpCritDel" data-ci="' + ci + '" title="Удалить строку">×</button></span></div>' +
+          '<div class="pe-cmpvals">' + vals + '</div></div>';
+      }).join('') + '</div>';
+      h += '<button class="pe-addrow" data-act="cmpCritAdd">' + ic('plus') + 'Добавить критерий</button>';
       return h;
     },
     contents: function (s) {
@@ -1112,6 +1156,9 @@
       case 'blpick': S.addPickKey = el.getAttribute('data-blkey'); render(); break;
       case 'blinsert': insertBlock(el.getAttribute('data-blfam')); break;
       case 'pgmenu': pageMenu(el, +el.getAttribute('data-pg')); break;
+      case 'pageUp': pageMoveUp(S.pageIdx); break;
+      case 'pageDown': pageMoveDown(S.pageIdx); break;
+      case 'pageDel': pageDelete(S.pageIdx); break;
       case 'addMetric': mutate(function () { var k = el.getAttribute('data-key'); var arr = (cval(s, k) || []).slice(); arr.push({ value: '', label: '' }); setOverride(s, k, arr); }); break;
       case 'delMetric': mutate(function () { var arr = (cval(s, 'metrics') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'metrics', arr); }); break;
       case 'addPlace': mutate(function () { var arr = (cval(s, 'nearbyPlaces') || []).slice(); arr.push({ name: '', distance: '' }); setOverride(s, 'nearbyPlaces', arr); }); break;
@@ -1803,6 +1850,15 @@
       { sep: 1 },
       { t: 'Удалить', ic: 'trash', danger: 1, fn: function () { if (isObjHero(s)) { toast('Обложку объекта удалять нельзя', 'Чтобы убрать объект целиком — «Исключить из подборки» в меню объекта (⋯).'); return; } mutate(function () { sections().splice(i, 1); S.pageIdx = Math.max(0, S.pageIdx - (i <= S.pageIdx ? 1 : 0)); }); } },
     ]);
+  }
+  /* быстрые операции над текущей страницей (кнопки на холсте + горячие клавиши) */
+  function pageMoveUp(i) { if (i > 0) mutate(function () { sections().splice(i - 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i - 1; }); }
+  function pageMoveDown(i) { if (i < sections().length - 1) mutate(function () { sections().splice(i + 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i + 1; }); }
+  function pageDelete(i) {
+    var s = sections()[i]; if (!s) return;
+    if (isObjHero(s)) { toast('Обложку объекта удалять нельзя', 'Убрать объект целиком — «Исключить из подборки» в меню объекта (⋯).'); return; }
+    if (enabledSections().length <= 1) { toast('Нельзя удалить единственную страницу'); return; }
+    mutate(function () { sections().splice(i, 1); S.pageIdx = Math.max(0, S.pageIdx - (i <= S.pageIdx ? 1 : 0)); });
   }
   function objMenu(anchor, k) {
     var objGroups = collectionGroups().filter(function (g) { return g.type === 'object'; });
