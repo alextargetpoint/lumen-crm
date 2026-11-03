@@ -9403,3 +9403,46 @@ body.client-view [data-team]{ display:none !important; }
 
 /* секционные заголовки в Control Center — как на референсе (не капс) */
 .acc-work .glass.card .card-title { text-transform:none; }
+
+/* ═══════════ Обучение ИИ под агентство — структурированный вид ═══════════ */
+.ait-wrap { margin-top:4px; }
+.ait-head { display:flex; align-items:center; gap:13px; margin-bottom:14px; flex-wrap:wrap; }
+.ait-head-tx { flex:1; min-width:200px; }
+.ait-head-tx .sd { margin-top:3px; }
+.ait-prog { flex:0 0 auto; display:flex; align-items:center; gap:10px; background:var(--bg-2); border:1px solid var(--stroke); border-radius:12px; padding:9px 14px; }
+.ait-prog-ring { --p:0; width:34px; height:34px; border-radius:50%; background:conic-gradient(var(--ok,#1E7A64) calc(var(--p)*1%), color-mix(in srgb,var(--ink) 12%,transparent) 0); display:grid; place-items:center; flex:0 0 auto; }
+.ait-prog-ring::after { content:''; width:26px; height:26px; border-radius:50%; background:var(--bg-2); }
+.ait-prog-ring b { position:absolute; font-size:10px; font-weight:750; }
+.ait-prog-tx b { font-size:13px; font-weight:700; display:block; }
+.ait-prog-tx span { font-size:11px; color:var(--ink-3); }
+/* секции-аккордеон */
+.ait-sec { border:1px solid var(--stroke); border-radius:14px; margin-bottom:10px; overflow:hidden; background:var(--card,var(--bg-2)); }
+.ait-sec.coll.open { border-color:color-mix(in srgb,var(--accent) 24%,var(--stroke)); }
+.ait-sec .coll-head { display:flex; align-items:center; gap:12px; width:100%; padding:14px 16px; background:transparent; border:0; cursor:pointer; text-align:left; }
+.ait-sec .coll-head:hover { background:color-mix(in srgb,var(--ink) 3%,transparent); }
+.ait-sec .ch-t { flex:1; min-width:0; display:flex; align-items:center; gap:12px; }
+.ait-h-ic { flex:0 0 auto; width:36px; height:36px; border-radius:10px; background:var(--bg-2); border:1px solid var(--stroke); display:grid; place-items:center; font-size:17px; }
+.ait-sec.open .ait-h-ic { background:color-mix(in srgb,var(--accent) 10%,transparent); border-color:color-mix(in srgb,var(--accent) 30%,var(--stroke)); }
+.ait-h-tx { flex:1; min-width:0; }
+.ait-h-tx b { font-size:14px; font-weight:650; display:block; line-height:1.25; }
+.ait-h-tx i { font-size:11.5px; color:var(--ink-3); font-style:normal; display:block; line-height:1.3; margin-top:1px; }
+.ait-fill { flex:0 0 auto; font-size:10.5px; font-weight:650; padding:3px 9px; border-radius:20px; white-space:nowrap; color:var(--ink-3); background:color-mix(in srgb,var(--ink) 7%,transparent); }
+.ait-fill.on { color:var(--ok,#1E7A64); background:color-mix(in srgb,var(--ok) 13%,transparent); }
+.ait-sec .chev { color:var(--ink-3); transition:transform .2s; flex:0 0 auto; }
+.ait-sec.open .chev { transform:rotate(180deg); }
+.ait-sec .coll-inner { padding:4px 16px 16px; }
+.ait-sec textarea, .ait-sec input[type=text], .ait-sec input:not([type]) { width:100%; box-sizing:border-box; }
+.ait-note { font-size:11.5px; color:var(--ink-3); line-height:1.5; margin-bottom:9px; }
+.ait-note.warn { color:#B8701A; background:color-mix(in srgb,#C9821A 8%,transparent); border-radius:9px; padding:8px 11px; }
+.ait-note.ok { color:var(--ok,#1E7A64); background:color-mix(in srgb,var(--ok) 8%,transparent); border-radius:9px; padding:8px 11px; }
+/* чипы-пресеты с активным состоянием */
+.ait-sec .brief-chip { font-size:11.5px; padding:6px 11px; border-radius:9px; border:1px solid var(--stroke); background:var(--bg); cursor:pointer; line-height:1.3; text-align:left; transition:border-color .12s,background .12s; }
+.ait-sec .brief-chip:hover { border-color:color-mix(in srgb,var(--accent) 40%,var(--stroke)); }
+.ait-sec .brief-chip.active { border-color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); font-weight:600; }
+.ait-rules { display:flex; flex-direction:column; gap:10px; }
+.ait-save { width:100%; justify-content:center; margin-top:6px; position:sticky; bottom:12px; }
+
+/* аккордеон обучения ИИ — жёсткий сворачивание (база .coll не клипала → показывался слайвер) */
+.ait-sec .coll-body { overflow:hidden; transition:max-height .24s ease; }
+.ait-sec:not(.open) .coll-body { max-height:0 !important; }
+.ait-sec.open .coll-body { max-height:1800px; }
