@@ -8118,6 +8118,21 @@ PAGES.waProfile = async (root) => {
 /* ---------------- ИИ-КВАЛИФИКАТОР ---------------- */
 PAGES.qualifier = async (root) => {
   const s = STATE.settings;
+  /* #814 — сводка-воронка первой линии: всего → коснулись → ведёт ИИ → квалифицировано.
+     Так видно, почему «вёл» у героев меньше «всего» (холодные касания шлёт цепочка, герой берёт ответивших). */
+  let _fl = null;
+  try {
+    const _lds = await api.get('/leads');
+    const L = Array.isArray(_lds) ? _lds : (_lds.leads || []);
+    const engaged = ['dialog', 'ai_dialog', 'qualified', 'handover', 'viewing', 'deal'];
+    const qual = ['qualified', 'handover', 'viewing', 'deal'];
+    _fl = {
+      total: L.length,
+      touched: L.filter(l => l.stage !== 'new').length,
+      led: L.filter(l => engaged.includes(l.stage) || l.lastDir === 'in' || (l.axesFilled || 0) > 0).length,
+      qual: L.filter(l => qual.includes(l.stage) || (l.axesFilled || 0) >= 4 || l.qualManual === true).length,
+    };
+  } catch (_) {}
   root.innerHTML = `
     ${heroArt('assets/art/core.png', `
       <div class="ha-title">${ic(I.spark)}ИИ-квалификатор<span class="sub">первая линия отвечает ≤ 1 минуты · факты только из слов клиента</span></div>
@@ -8143,6 +8158,14 @@ PAGES.qualifier = async (root) => {
             <div class="sp"><div class="sl">После ручного сообщения — ставить ИИ на паузу</div><div class="sd">Когда пишешь клиенту сам (перехват) — ИИ замолкает, и диалог дальше ведёшь ты. <b>Выключи</b> — ИИ продолжит отвечать даже после твоих сообщений: ты лишь подсказываешь, автопилот не останавливается после первого касания.</div></div>
             <label class="switch"><input type="checkbox" id="aiAutoOffHuman" ${(((s.ai.autoOff || {}).onHumanReply) !== false) ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
           </div>
+          ${_fl ? (() => { const step = (n, l, hue) => `<div class="fl-step"><b style="color:${hue}">${n}</b><span>${l}</span></div>`; const drop = (a, b) => a ? Math.round(b / a * 100) : 0; return `<div class="lp-sec" style="margin-top:18px">Воронка первой линии <span class="sd" style="display:inline">(что происходит с лидами, которых ведёт ИИ)</span></div>
+          <div class="fl-funnel">
+            ${step(_fl.total, 'всего лидов', 'var(--ink)')}<span class="fl-arr">→</span>
+            ${step(_fl.touched, 'коснулись', '#7C3AED')}<span class="fl-arr">→</span>
+            ${step(_fl.led, 'ответили · ведёт ИИ', '#2d6cdf')}<span class="fl-arr">→</span>
+            ${step(_fl.qual, 'квалифицировано', '#129B6E')}
+          </div>
+          <div class="muted" style="font-size:11px;margin:7px 0 2px;line-height:1.5">Холодные первые касания шлёт <b>цепочка</b> по всем лидам, а ИИ-герой берёт в диалог только <b>ответивших</b> — поэтому «вёл» у героя меньше, чем «коснулись». Квалификация ${drop(_fl.led, _fl.qual)}% от ответивших. Детали — в «${t('Лиды и продажи', 'Leads & sales')}».</div>`; })() : ''}
           <div class="lp-sec" style="margin-top:18px">ИИ-герой квалификатора ${hint('persona', 'Как работают герои', [['Свой характер', 'Каждый герой ведёт диалог своей манерой — тон реально меняет ответы ИИ'],['Прокачка', 'Герой растёт в уровне за каждого квалифицированного лида'],['Бесшовно', 'Клиент общается будто с живым менеджером; брокер подхватит тот же чат — тот же голос']])}</div>
           <div class="hero-grid">
             ${AI_HEROES.map(h => {
