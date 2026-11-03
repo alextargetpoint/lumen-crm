@@ -11247,7 +11247,8 @@ PAGES.automations = async (root) => {
             <div class="form-row"><label>Макс. ротаций</label><input id="rotMax" type="number" min="1" max="10" value="${r.maxRotations || 2}"></div>
           </div>
           <div class="exp-only">${swRow('Сначала на квалификатора', 'Переназначать на роль «Квалификатор» (если есть), иначе — на брокеров по загрузке', `<label class="switch"><input type="checkbox" id="rotToQual" ${r.toQualifier ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}</div>
-          <button class="btn btn-sm btn-accent" id="rotSave" style="margin-top:10px">Сохранить ротацию</button>
+          <div class="rot-preview" id="rotPreview"></div>
+          <button class="btn btn-sm btn-accent" id="rotSave" style="margin-top:12px">Сохранить ротацию</button>
         </div>`; })()}
         ${(() => { const ai = s.ai || {}; const dmin = Math.round((+ai.replyDelayMinSec || 180) / 60); const dmax = Math.round((+ai.replyDelayMaxSec || 720) / 60); return `<div class="glass card mb" data-ag="aidelay">
           <div class="card-title">${ic(I.clock || I.spark)}Задержка ответа ИИ<span class="sub">как живой человек, не мгновенный бот</span></div>
@@ -11256,7 +11257,13 @@ PAGES.automations = async (root) => {
             <div class="form-row"><label>От, минут</label><input id="aiDelayMin" type="number" min="0" max="120" value="${dmin}"></div>
             <div class="form-row"><label>До, минут</label><input id="aiDelayMax" type="number" min="1" max="180" value="${dmax}"></div>
           </div>
-          <button class="btn btn-sm btn-accent" id="aiDelaySave" style="margin-top:10px">Сохранить задержку</button>
+          <div class="ai-range" id="aiDelayViz">
+            <span class="ai-range-end" id="aiDelayLo">${dmin} мин</span>
+            <span class="ai-range-line"></span>
+            <span class="ai-range-end" id="aiDelayHi">${dmax} мин</span>
+          </div>
+          <div class="ai-range-tx" id="aiDelayTx"></div>
+          <button class="btn btn-sm btn-accent" id="aiDelaySave" style="margin-top:12px">Сохранить задержку</button>
         </div>`; })()}
         ${(() => { const lg = (s.automations || {}).lossGate || {}; const sel = lg.stages && lg.stages.length ? lg.stages : ['lost'];
           const gateable = STAGES.filter(st => !['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'].includes(st.id));
@@ -11895,6 +11902,19 @@ PAGES.automations = async (root) => {
     await api.patch('/settings', { ai: { replyDelayMinSec: lo * 60, replyDelayMaxSec: hi * 60 } });
     if (STATE.settings.ai) { STATE.settings.ai.replyDelayMinSec = lo * 60; STATE.settings.ai.replyDelayMaxSec = hi * 60; }
     toast('Задержка ответа ИИ сохранена', `${lo}–${hi} мин · случайно в диапазоне`, true);
+  });
+  /* ── живой предпросмотр правил: Ротация (ТЗ §6.4) и диапазон задержки ИИ (§7) ── */
+  (function wireAccPreviews() {
+    const rotPrev = () => { const el = $('#rotPreview', root); if (!el) return; const t = +$('#rotTouches', root).value || 3, h = +$('#rotHours', root).value || 48, m = +$('#rotMax', root).value || 2, on = $('#rotEnabled', root).checked; el.innerHTML = on ? `Если лид не обработан после <b>${t}</b> ${plural(t, 'касания', 'касаний', 'касаний')} <b>или</b> <b>${h}</b> ${plural(h, 'часа', 'часов', 'часов')} — заявка передаётся следующему брокеру. Максимум <b>${m}</b> ${plural(m, 'ротация', 'ротации', 'ротаций')}, затем лид уходит в «Спящие».` : 'Авто-ротация выключена — заявки остаются на назначенном брокере.'; el.classList.toggle('off', !on); };
+    ['#rotTouches', '#rotHours', '#rotMax'].forEach(s => $(s, root)?.addEventListener('input', rotPrev));
+    $('#rotEnabled', root)?.addEventListener('change', rotPrev); rotPrev();
+    const aiPrev = () => { const lo = Math.max(0, Math.round(+$('#aiDelayMin', root).value || 0)); let hi = Math.max(1, Math.round(+$('#aiDelayMax', root).value || 12)); const bad = hi < lo + 1, lhi = bad ? lo + 1 : hi; $('#aiDelayLo', root) && ($('#aiDelayLo', root).textContent = lo + ' мин'); $('#aiDelayHi', root) && ($('#aiDelayHi', root).textContent = lhi + ' мин'); const tx = $('#aiDelayTx', root); if (tx) tx.innerHTML = `ИИ отвечает через <b>случайный интервал от ${lo} до ${lhi} ${plural(lhi, 'минуты', 'минут', 'минут')}</b>${lo === 0 ? ' (с «от 0» может ответить почти сразу)' : ''}.` + (bad ? ' <span class="ai-range-warn">«до» не меньше «от»+1 — поправлено</span>' : ''); const viz = $('#aiDelayViz', root); viz && viz.classList.toggle('bad', bad); };
+    ['#aiDelayMin', '#aiDelayMax'].forEach(s => $(s, root)?.addEventListener('input', aiPrev)); aiPrev();
+  })();
+  /* индикатор активности на кнопках сохранения Control Center (честно: только «Сохраняю…», без ложного ✓ — успех/ошибку даёт тост) */
+  $$('.acc-work .btn-accent', root).forEach(btn => {
+    if (btn.id === 'accDrApply' || !/Сохран|Применить/i.test(btn.textContent)) return;
+    btn.addEventListener('click', () => { if (btn._busy) return; btn._busy = true; const orig = btn.innerHTML; btn.classList.add('acc-saving'); btn.textContent = 'Сохраняю…'; setTimeout(() => { if (document.body.contains(btn)) { btn.innerHTML = orig; btn.classList.remove('acc-saving'); btn._busy = false; } }, 1500); });
   });
   /* Solo: команда/распределение/SLA не нужны — прячем целыми карточками */
   if (IS_SOLO()) {
