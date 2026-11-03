@@ -11253,7 +11253,7 @@ PAGES.automations = async (root) => {
             <div class="form-row"><label>или через часов</label><input id="rotHours" type="number" min="1" max="336" value="${r.afterHours || 48}"></div>
             <div class="form-row"><label>Макс. ротаций</label><input id="rotMax" type="number" min="1" max="10" value="${r.maxRotations || 2}"></div>
           </div>
-          ${swRow('Сначала на квалификатора', 'Переназначать на роль «Квалификатор» (если есть), иначе — на брокеров по загрузке', `<label class="switch"><input type="checkbox" id="rotToQual" ${r.toQualifier ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}
+          <div class="exp-only">${swRow('Сначала на квалификатора', 'Переназначать на роль «Квалификатор» (если есть), иначе — на брокеров по загрузке', `<label class="switch"><input type="checkbox" id="rotToQual" ${r.toQualifier ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}</div>
           <button class="btn btn-sm btn-accent" id="rotSave" style="margin-top:10px">Сохранить ротацию</button>
         </div>`; })()}
         ${(() => { const ai = s.ai || {}; const dmin = Math.round((+ai.replyDelayMinSec || 180) / 60); const dmax = Math.round((+ai.replyDelayMaxSec || 720) / 60); return `<div class="glass card mb" data-ag="aidelay">
@@ -11268,16 +11268,21 @@ PAGES.automations = async (root) => {
         ${(() => { const lg = (s.automations || {}).lossGate || {}; const sel = lg.stages && lg.stages.length ? lg.stages : ['lost'];
           const gateable = STAGES.filter(st => !['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'].includes(st.id));
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
+          const _revName = lg.reviewerId ? (((STATE.brokers || []).find(b => b.id === lg.reviewerId) || {}).name || '—') : 'Владелец агентства';
+          const _lgSum = `${sel.length} ${sel.length === 1 ? 'стадия' : 'стадий'} · проверяющий: ${esc(_revName)}`;
           return `<div class="glass card mb" data-ag="loss">
           <div class="card-title">${ic(I.shield || I.check)}Контроль проигрыша<span class="sub">двойной контроль: менеджер не теряет лида без вашего «ок»</span></div>
-          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Когда менеджер переводит лида в проигранную стадию, лид <b>не уходит сразу</b> — попадает <b>проверяющему</b> на подтверждение. Тот смотрит касания и либо подтверждает проигрыш, либо возвращает в работу с комментарием. (На проверяющего гейт не распространяется — он переводит напрямую.)</div>
-          <div class="cg-row"><div><b>Требовать подтверждение проигрыша</b><div class="muted" style="font-size:11px">для выбранных ниже стадий, при переводе менеджером</div></div>${cb('lgEnabled', !!lg.enabled)}</div>
-          <div class="form-row" style="margin-top:10px"><label>Стадии, требующие подтверждения</label>
-            <div style="display:flex;flex-wrap:wrap;gap:7px">${gateable.map(st => `<label class="lg-chip"><input type="checkbox" data-lgstage="${st.id}" ${sel.includes(st.id) ? 'checked' : ''}> ${esc(st.name)}</label>`).join('') || '<span class="muted">Нет подходящих стадий</span>'}</div></div>
-          <div class="form-row" style="margin-top:10px"><label>Кто подтверждает проигрыш <span class="muted" style="font-weight:400">— кому приходит запрос и кто решает</span></label>
-            <select id="lgReviewer">${(() => { const brs = (STATE.brokers || []).filter(b => b.active !== false); const cur = lg.reviewerId || ''; const valid = brs.some(b => b.id === cur); return `<option value="" ${!valid ? 'selected' : ''}>Владелец агентства (вы)</option>` + brs.map(b => `<option value="${esc(b.id)}" ${cur === b.id ? 'selected' : ''}>${esc(b.name)}${b.role === 'rop' || /роп|руковод/i.test(b.role || '') ? ' · РОП' : ''}</option>`).join(''); })()}</select>
-            <div class="muted" style="font-size:11px;margin-top:4px">Можно назначить РОПа или старшего менеджера — запрос уйдёт ему в личку, и подтверждать/возвращать сможет он. Владелец видит и решает всегда.</div></div>
-          <button class="btn btn-sm btn-accent" id="lgSave" style="margin-top:10px">Сохранить контроль</button>
+          <div class="muted exp-only" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Когда менеджер переводит лида в проигранную стадию, лид <b>не уходит сразу</b> — попадает <b>проверяющему</b> на подтверждение. Тот смотрит касания и либо подтверждает проигрыш, либо возвращает в работу с комментарием. (На проверяющего гейт не распространяется — он переводит напрямую.)</div>
+          <div class="cg-row"><div><b>Требовать подтверждение проигрыша</b><div class="muted" style="font-size:11px">при переводе менеджером в выбранные стадии</div></div>${cb('lgEnabled', !!lg.enabled)}</div>
+          <div class="acc-summary" style="margin-top:12px"><div class="acc-summary-tx"><b>Стадии и проверяющий</b><i id="lgSummary">${_lgSum}</i></div><button class="btn btn-sm" type="button" data-dr-open="loss">${ic(I.edit || I.doc)}Изменить</button></div>
+          <div id="lgEditor" class="acc-dr-ph">
+            <div class="form-row"><label>Стадии, требующие подтверждения</label>
+              <div style="display:flex;flex-wrap:wrap;gap:7px">${gateable.map(st => `<label class="lg-chip"><input type="checkbox" data-lgstage="${st.id}" ${sel.includes(st.id) ? 'checked' : ''}> ${esc(st.name)}</label>`).join('') || '<span class="muted">Нет подходящих стадий</span>'}</div></div>
+            <div class="form-row" style="margin-top:14px"><label>Кто подтверждает проигрыш <span class="muted" style="font-weight:400">— кому приходит запрос и кто решает</span></label>
+              <select id="lgReviewer">${(() => { const brs = (STATE.brokers || []).filter(b => b.active !== false); const cur = lg.reviewerId || ''; const valid = brs.some(b => b.id === cur); return `<option value="" ${!valid ? 'selected' : ''}>Владелец агентства (вы)</option>` + brs.map(b => `<option value="${esc(b.id)}" ${cur === b.id ? 'selected' : ''}>${esc(b.name)}${b.role === 'rop' || /роп|руковод/i.test(b.role || '') ? ' · РОП' : ''}</option>`).join(''); })()}</select>
+              <div class="muted" style="font-size:11px;margin-top:4px">Можно назначить РОПа или старшего менеджера — запрос уйдёт ему в личку, и подтверждать/возвращать сможет он. Владелец видит и решает всегда.</div></div>
+          </div>
+          <button class="btn btn-sm btn-accent" id="lgSave" style="display:none">Сохранить контроль</button>
         </div>`; })()}
         ${(() => { const wg = s.waGray || {};
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
@@ -11325,7 +11330,9 @@ PAGES.automations = async (root) => {
           <div class="mb-sec-h">Готовность менеджеров <span class="muted">— у кого есть чистый номер для приёма диалога</span></div>
           <div class="mb-ready">${readiness.length ? readiness.map(rRow).join('') : '<div class="muted" style="font-size:12px;padding:4px 0">Активных менеджеров нет — добавьте их в «Брокеры».</div>'}</div>
           <div class="mb-ready-foot muted">⭐ Основной чистый номер (куда переводим, если у менеджера нет своего): <b>${primary ? fmtPh(primary.phone) : 'не назначен — пометьте номер «Основной» в «Номерах»'}</b> · всего чистых номеров: <b>${cleans.length}</b></div>
-          <!-- РЕДАКТОР СООБЩЕНИЙ -->
+          <!-- РЕДАКТОР СООБЩЕНИЙ (в выезжающей панели) -->
+          <div class="acc-summary" style="margin-top:14px"><div class="acc-summary-tx"><b>Тексты перевода</b><i>3 сообщения клиенту (бридж · интро+рекап · подпись к скрину) + переменные и шаблоны</i></div><button class="btn btn-sm" type="button" data-dr-open="migtexts">${ic(I.edit || I.doc)}Редактировать</button></div>
+          <div id="migEditorBlock" class="acc-dr-ph">
           <div class="mb-sec-h">Тексты перевода <span class="muted">— что увидит клиент</span></div>
           <div class="mb-edit">
             <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:9px">Переменные — кликните, чтобы вставить в активное поле:</div>
@@ -11338,6 +11345,7 @@ PAGES.automations = async (root) => {
             <div class="form-row" style="margin:0 0 4px"><label>Подпись к скрину</label><textarea id="migProof" class="mig-ta" rows="2" maxlength="400" style="width:100%;resize:vertical">${v('proof')}</textarea></div>
             <div class="muted" style="font-size:11px;margin:12px 0 6px;font-weight:650">Как это увидит клиент:</div>
             <div id="migPreview" style="display:flex;flex-direction:column;gap:7px"></div>
+          </div>
           </div>
           <!-- ТЕСТ -->
           <div class="mb-sec-h">Проверить на себе <span class="muted">— отправит эти сообщения на ваш номер</span></div>
@@ -11397,10 +11405,12 @@ PAGES.automations = async (root) => {
           <div class="card-title">${ic(I.users || I.spark)}Маршрутизация входящих лидов<span class="sub">кому падают новые заявки</span></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Новый лид из рекламы сразу закрепляется за выбранным брокером. Иначе он попадает «в общий пул» с <b>broker = не назначен</b> и не виден в кабинете брокера — каждый брокер видит только <b>своих</b> лидов (конфиденциальность). Это и есть причина «лиды из Меты не подгружаются».</div>
           <div class="form-row"><label>Все новые лиды назначать</label><select id="lrDefault">${optD(r.default || '')}</select></div>
+          <div class="exp-only">
           <hr class="cg-hr">
           <div class="muted" style="font-size:11px;margin-bottom:8px">Переопределить по источнику (необязательно):</div>
           <div style="display:grid;gap:8px">
             ${SRC.map(([k, label]) => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center"><div style="font-size:12.5px">${esc(label)}</div><select data-lrsrc="${k}">${optS(bs[k] || '')}</select></div>`).join('')}
+          </div>
           </div>
           <button class="btn btn-sm btn-accent" id="lrSave" style="margin-top:12px">Сохранить маршрутизацию</button>
         </div>`; })()}
@@ -11578,13 +11588,55 @@ PAGES.automations = async (root) => {
   const accSearch = $('#accSearch', root);
   if (accSearch) {
     const navItems = $$('.acc-nav-i', root);
+    /* обогащаем индекс поиска текстом ВСЕХ настроек секции → поиск находит по названиям полей/значений, не только по секции */
+    navItems.forEach(nav => { const k = nav.dataset.ag; const txt = $$('.acc-work > [data-ag="' + k + '"]', root).map(c => (c.textContent || '').toLowerCase().replace(/\s+/g, ' ')).join(' '); nav.dataset.kw = ((nav.dataset.kw || '') + ' ' + txt).slice(0, 2000); });
     const doFilter = () => { const q = accSearch.value.trim().toLowerCase(); let firstK = null; navItems.forEach(b => { const hit = !q || ((b.dataset.kw || '') + ' ' + (b.dataset.ag || '')).includes(q); b.classList.toggle('hide', !hit); if (hit && !firstK) firstK = b.dataset.ag; }); $$('.acc-nav-lbl', root).forEach(l => l.classList.toggle('hide', !!q)); return firstK; };
+    const jumpHighlight = (k, q) => { const card = root.querySelector('.acc-work > [data-ag="' + k + '"]'); if (!card) return; let tgt = null; if (q) { tgt = [...card.querySelectorAll('.set-row,.form-row,.cg-row,.acc-summary')].find(r => (r.textContent || '').toLowerCase().includes(q)); } const el = tgt || card; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('acc-hit'); setTimeout(() => el.classList.remove('acc-hit'), 1300); };
     accSearch.addEventListener('input', doFilter);
-    accSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const k = doFilter(); if (k) { applyAg(k); accSearch.value = ''; doFilter(); } } });
+    accSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const q = accSearch.value.trim().toLowerCase(); const k = doFilter(); if (k) { applyAg(k); accSearch.value = ''; doFilter(); setTimeout(() => jumpHighlight(k, q), 60); } } });
   }
   /* «Как это работает» — скрыть и запомнить */
   $$('.acc-flow', root).forEach(fl => { if (PAGE_STATE['accFlow_' + fl.dataset.accflow]) fl.classList.add('collapsed'); });
   $$('[data-accflow-x]', root).forEach(b => b.addEventListener('click', () => { const fl = root.querySelector('.acc-flow[data-accflow="' + b.dataset.accflowX + '"]'); if (fl) fl.classList.add('collapsed'); PAGE_STATE['accFlow_' + b.dataset.accflowX] = true; }));
+  /* ── Settings Drawer: сложный редактор уезжает в правую панель. Узел ПЕРЕМЕЩАЕТСЯ (не копируется) —
+     обработчики/состояние сохраняются; «Применить» кликает скрытую кнопку сохранения секции. ── */
+  const DRAWERS = {
+    loss: { title: 'Стадии и проверяющий', desc: 'Выберите стадии под контроль и кто подтверждает проигрыш', icon: I.shield || I.check, node: '#lgEditor', apply: '#lgSave' },
+    migtexts: { title: 'Тексты перевода на чистый номер', desc: 'Что увидит клиент при передаче менеджеру', icon: I.edit || I.doc, node: '#migEditorBlock', apply: '#mbSave' },
+  };
+  const drOv = document.createElement('div'); drOv.className = 'acc-dr-ov';
+  drOv.innerHTML = `<div class="acc-dr" role="dialog" aria-modal="true"><div class="acc-dr-h"><div class="acc-dr-h-ic" id="accDrIc"></div><div style="flex:1;min-width:0"><div class="acc-dr-h-t" id="accDrT"></div><div class="acc-dr-h-d" id="accDrD"></div></div><button class="acc-dr-x" id="accDrX" title="Закрыть">×</button></div><div class="acc-dr-body" id="accDrBody"></div><div class="acc-dr-foot"><button class="btn" id="accDrCancel">Отмена</button><button class="btn btn-accent" id="accDrApply">Применить изменения</button></div></div>`;
+  root.appendChild(drOv);
+  const drPanel = drOv.querySelector('.acc-dr');
+  let drState = null;
+  const drMarkDirty = () => { if (drState) drState.dirty = true; };
+  const openDrawer = (cfg) => {
+    const node = root.querySelector(cfg.node); if (!node) return;
+    const ph = document.createComment('dr'); node.parentNode.insertBefore(ph, node);
+    drOv.querySelector('#accDrBody').appendChild(node); node.classList.remove('acc-dr-ph'); node.style.display = '';
+    drOv.querySelector('#accDrT').textContent = cfg.title; drOv.querySelector('#accDrD').textContent = cfg.desc || ''; drOv.querySelector('#accDrIc').innerHTML = cfg.icon ? ic(cfg.icon) : '';
+    node.addEventListener('input', drMarkDirty); node.addEventListener('change', drMarkDirty);
+    drState = { node, ph, apply: cfg.apply, dirty: false };
+    drOv.classList.add('open'); drPanel.classList.add('open');
+  };
+  const closeDrawer = async (doApply) => {
+    if (!drState) return;
+    if (!doApply && drState.dirty) { if (!(await uiConfirm('Закрыть без сохранения?', 'Изменения не будут применены.', { ok: 'Закрыть', cancel: 'Остаться' }))) return; }
+    const { node, ph, apply } = drState;
+    node.removeEventListener('input', drMarkDirty); node.removeEventListener('change', drMarkDirty);
+    drOv.classList.remove('open'); drPanel.classList.remove('open');
+    drState = null;
+    if (doApply && apply) { const btn = root.querySelector(apply); if (btn) btn.click(); }   /* сохранение секции (→ loadState → перерисовка) */
+    else if (ph && ph.parentNode) { ph.parentNode.insertBefore(node, ph); ph.remove(); node.classList.add('acc-dr-ph'); }   /* вернуть узел на место (без применения) */
+  };
+  $$('[data-dr-open]', root).forEach(b => b.addEventListener('click', () => { const cfg = DRAWERS[b.dataset.drOpen]; if (cfg) openDrawer(cfg); }));
+  drOv.querySelector('#accDrX').addEventListener('click', () => closeDrawer(false));
+  drOv.querySelector('#accDrCancel').addEventListener('click', () => closeDrawer(false));
+  drOv.querySelector('#accDrApply').addEventListener('click', () => closeDrawer(true));
+  drOv.addEventListener('click', (e) => { if (e.target === drOv) closeDrawer(false); });
+  document.addEventListener('keydown', function drEsc(e) { if (e.key === 'Escape' && drState) { if (!root.isConnected) { document.removeEventListener('keydown', drEsc); return; } closeDrawer(false); } });
+  /* простые тумблеры автосохраняются (без отдельной кнопки) */
+  $('#lgEnabled', root) && $('#lgEnabled', root).addEventListener('change', () => { const b = $('#lgSave', root); if (b) b.click(); });
   const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
   $('#cgSave') && $('#cgSave').addEventListener('click', async () => {
     const g = {
