@@ -139,21 +139,33 @@
     const e = ref && ref.enhance; if (!e) return '';
     return `filter:brightness(${e.exposure || 1}) contrast(${e.contrast || 1}) saturate(${e.saturation || 1})${e.warmth ? ' sepia(' + e.warmth + ')' : ''}`;
   }
+  /* произвольное кадрирование (#3): ref.crop = {x,y,w,h} — доля ИСХОДНОГО фото, которую видно в слоте.
+     Аспект рамки = аспект слота (так заданы w/h), поэтому background-size НЕ искажает фото. */
+  function cropBg(ref) {
+    const c = ref && ref.crop; if (!c || !(c.w > 0 && c.h > 0) || (c.w >= 0.999 && c.h >= 0.999)) return null;
+    const cw = Math.min(1, c.w), ch = Math.min(1, c.h);
+    const cx = Math.max(0, Math.min(1 - cw, c.x || 0)), cy = Math.max(0, Math.min(1 - ch, c.y || 0));
+    return { size: `${(100 / cw).toFixed(2)}% ${(100 / ch).toFixed(2)}%`, pos: `${cw < 1 ? (cx / (1 - cw) * 100).toFixed(2) : 50}% ${ch < 1 ? (cy / (1 - ch) * 100).toFixed(2) : 50}%` };
+  }
   function bgStyle(ref, assets, fmtId) {
     const url = assetUrl(ref, assets);
     if (!url) return 'background:linear-gradient(135deg,#3a352f 0%,#241f19 100%)';   /* пустой фон тёмный — белый текст обложки читается, пока фото не подобрано */
-    const fp = ref && ref.focalPoint ? `${Math.round(ref.focalPoint.x*100)}% ${Math.round(ref.focalPoint.y*100)}%` : '50% 50%';
+    const cr = cropBg(ref);
+    const fp = cr ? cr.pos : (ref && ref.focalPoint ? `${Math.round(ref.focalPoint.x*100)}% ${Math.round(ref.focalPoint.y*100)}%` : '50% 50%');
     const fit = (ref && ref.fit) || 'cover';
+    const size = cr ? cr.size : (fit === 'contain' ? 'contain' : 'cover');
     const filt = enhanceFilter(ref);   /* «Улучшить фото» теперь работает и на фоновых фото (обложка/сплит) */
-    return `background-image:url('${esc(url)}');background-size:${fit==='contain'?'contain':'cover'};background-position:${fp};background-repeat:no-repeat${filt?';'+filt:''}`;
+    return `background-image:url('${esc(url)}');background-size:${size};background-position:${fp};background-repeat:no-repeat${filt?';'+filt:''}`;
   }
   function imgTag(ref, assets, cls, alt) {
     const url = assetUrl(ref, assets);
     if (!url) return `<div class="lp-ph ${cls||''}" role="img" aria-label="${esc(alt||'изображение')}"></div>`;
-    const fp = ref && ref.focalPoint ? `${Math.round(ref.focalPoint.x*100)}% ${Math.round(ref.focalPoint.y*100)}%` : '50% 50%';
-    const fit = (ref && ref.fit) === 'contain' ? 'contain' : 'cover';
     const e = ref && ref.enhance;   /* безопасная коррекция (недеструктивно, CSS-фильтр — работает и в PDF) */
     const filt = e ? `;filter:brightness(${e.exposure || 1}) contrast(${e.contrast || 1}) saturate(${e.saturation || 1})${e.warmth ? ' sepia(' + e.warmth + ')' : ''}` : '';
+    const cr = cropBg(ref);
+    if (cr) return `<div class="${cls||''}" role="img" aria-label="${esc(alt||'')}" style="background-image:url('${esc(url)}');background-size:${cr.size};background-position:${cr.pos};background-repeat:no-repeat${filt}"></div>`;
+    const fp = ref && ref.focalPoint ? `${Math.round(ref.focalPoint.x*100)}% ${Math.round(ref.focalPoint.y*100)}%` : '50% 50%';
+    const fit = (ref && ref.fit) === 'contain' ? 'contain' : 'cover';
     return `<img class="${cls||''}" src="${esc(url)}" alt="${esc(alt||'')}" style="object-fit:${fit};object-position:${fp}${filt}" loading="lazy">`;
   }
 
@@ -610,6 +622,7 @@
       return Object.assign({}, r, {
         focalPoint: cf.focalPoint || r.focalPoint,
         fit: cf.mode === 'fit' ? 'contain' : (cf.mode === 'fill' ? 'cover' : r.fit),
+        crop: cf.crop !== undefined ? cf.crop : r.crop,   /* #3 произвольный кадр — пер-формат */
       });
     }) });
   }

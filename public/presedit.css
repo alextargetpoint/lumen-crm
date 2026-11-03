@@ -227,7 +227,12 @@ button{font-family:inherit;cursor:pointer}
 .cf-cropframe:before,.cf-cropframe:after{content:"";position:absolute;width:12px;height:12px;border:2px solid #fff}
 .cf-cropframe:before{top:-2px;left:-2px;border-right:0;border-bottom:0}
 .cf-cropframe:after{bottom:-2px;right:-2px;border-left:0;border-top:0}
-.cf-src{margin:11px 0 16px;color:var(--pe-mut);font-size:12.5px}
+.cf-src{margin:11px 0 12px;color:var(--pe-mut);font-size:12.5px}
+.cf-zoom{display:flex;align-items:center;gap:10px;margin:0 0 15px;padding:9px 12px;border:1px solid var(--pe-line);border-radius:11px}
+.cf-zoom-l{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--pe-mut);white-space:nowrap}
+.cf-zoom-l svg{width:14px;height:14px}
+.cf-zoom input[type=range]{flex:1;accent-color:var(--pe-sel);cursor:pointer}
+.cf-zoom-v{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--pe-ink);min-width:34px;text-align:right}
 .cf-modes{display:flex;flex-direction:column;gap:9px}
 .cf-mode{display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid var(--pe-line);border-radius:11px;background:#fff;cursor:pointer;text-align:left;font:inherit}
 .cf-mode:hover{background:var(--pe-hi)}
