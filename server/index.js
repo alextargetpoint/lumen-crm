@@ -9057,7 +9057,21 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PATCH') {
         const b = await readBody(req);
-        if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); if (b.stage === 'deal' && !lead.dealAt) lead.dealAt = Date.now(); }
+        /* ⭐ГЕЙТ ПРОИГРЫША (#822): брокер переводит лида в «проигранную» стадию из списка настроек →
+           НЕ применяем сразу, ставим на подтверждение руководителя (pendingLoss) + уведомляем его. */
+        if (b.stage && b.stage !== lead.stage && IS_BROKER) {
+          const _lg = (db.settings.automations || {}).lossGate || {};
+          if (_lg.enabled && (_lg.stages && _lg.stages.length ? _lg.stages : ['lost']).includes(b.stage)) {
+            const _rb = (sessionRole(req) || {}).brokerId || null;
+            const _bn = (db.brokers.find(x => x.id === _rb) || {}).name || 'Менеджер';
+            const _to = b.stage;
+            lead.pendingLoss = { toStage: _to, fromStage: lead.stage, by: _rb, byName: _bn, at: Date.now(), reason: b.lossReason ? String(b.lossReason).slice(0, 300) : '' };
+            notify(db, { type: 'lead', level: 'warn', title: 'Проигрыш на подтверждение', text: `${_bn} переводит «${lead.name || lead.phone}» в проигранную стадию — требуется ваше подтверждение. Откройте карточку лида.`, email: false });
+            store.save();
+            return json(res, 200, Object.assign(leadView(db, lead), { pendingLoss: true }));
+          }
+        }
+        if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; if (lead.pendingLoss) delete lead.pendingLoss; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); if (b.stage === 'deal' && !lead.dealAt) lead.dealAt = Date.now(); }
         if (b.qualManual !== undefined) { lead.qualManual = (b.qualManual === true || b.qualManual === false) ? b.qualManual : null; if (lead.qualManual === null) delete lead.qualManual; }   /* ручной оверрайд квала из попапа аналитики (true/false/null=авто) */
         if (b.control !== undefined) { if (b.control) lead.control = true; else delete lead.control; }   /* контрольный номер (мониторинг доставки) */
         if (b.dealValue !== undefined) lead.dealValue = Math.max(0, Math.round(+b.dealValue || 0)) || null;           /* сумма сделки (цена объекта) — для ROI/ROAS по рекламе */
@@ -9103,6 +9117,27 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    /* ⭐#822 — подтверждение/возврат проигрыша руководителем (РОП). Только НЕ брокер. */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/loss\/(confirm|reject)$/)) && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'только руководитель' });
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      if (!lead.pendingLoss) return json(res, 400, { error: 'нет запроса на подтверждение' });
+      const b = await readBody(req).catch(() => ({}));
+      const pl = lead.pendingLoss;
+      if (m[2] === 'confirm') {
+        lead.stage = pl.toStage; delete lead.pendingLoss;
+        markPeakQual(db, lead); try { capi.onStageChange(db, lead, lead.stage); } catch (_) {}
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `✓ Проигрыш подтверждён руководителем (запросил ${pl.byName || 'менеджер'})` });
+        if (pl.by) notifyBrokerAssigned(db, pl.by, [lead], `Проигрыш «${lead.name || lead.phone}» подтверждён руководителем.`).catch(() => {});
+      } else {
+        delete lead.pendingLoss;
+        const note = b.note ? String(b.note).slice(0, 500) : '';
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `↩️ Проигрыш отклонён руководителем — в работу${note ? ': ' + note : ''}` });
+        if (pl.by) notifyBrokerAssigned(db, pl.by, [lead], `Проигрыш «${lead.name || lead.phone}» отклонён — верните в работу${note ? ': ' + note : ''}.`).catch(() => {});
+      }
+      store.save();
+      return json(res, 200, leadView(db, lead));
+    }
     /* транскрибация звонка: raw-аудио в теле (до 24МБ), ?label=&filename= */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/transcribe$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
@@ -13454,7 +13489,8 @@ const server = http.createServer(async (req, res) => {
         if (b.title != null) t.title = String(b.title).replace(/<[^>]*>/g, '').slice(0, 300);
         if (b.notes != null) t.notes = String(b.notes).replace(/<[^>]*>/g, '').slice(0, 2000);
         if (b.priority != null) t.priority = TASK_PRI.has(b.priority) ? b.priority : 'p3';
-        if (b.status != null) { t.status = b.status === 'done' ? 'done' : 'todo'; t.doneAt = t.status === 'done' ? (t.doneAt || Date.now()) : null; }
+        if (b.status != null) { t.status = b.status === 'done' ? 'done' : 'todo'; t.doneAt = t.status === 'done' ? (t.doneAt || Date.now()) : null; if (t.status !== 'done') { t.doneNote = null; t.doneBy = null; } }
+        if (b.doneNote != null) t.doneNote = String(b.doneNote).replace(/<[^>]*>/g, '').slice(0, 500);   /* комментарий при закрытии (регламент) */
         if (b.due !== undefined) t.due = b.due ? +b.due : null;
         if (b.scheduled !== undefined) t.scheduled = b.scheduled ? String(b.scheduled).slice(0, 10) : null;
         if (b.leadId !== undefined) t.leadId = b.leadId ? String(b.leadId).slice(0, 40) : null;
@@ -13574,8 +13610,13 @@ const server = http.createServer(async (req, res) => {
         if ((t.brokerId || null) !== TASK_OWNER) return json(res, 403, { error: 'чужая задача' });
         const wasDone = t.status === 'done';
         sanTask(await readBody(req), t);
-        /* синхрон с лидом: закрыл задачу по лиду → отметка в его хронологии */
-        if (t.leadId && t.status === 'done' && !wasDone) { const l = db.leads.find(x => x.id === t.leadId); if (l) ai.pushEvent(db, { type: 'qual', leadId: l.id, text: `✓ Задача выполнена: ${String(t.title).slice(0, 120)}` }); }
+        /* кто закрыл задачу (для «менеджер оставил комментарий» в карточке) */
+        if (t.status === 'done' && !wasDone) {
+          const _br = IS_BROKER && db.brokers.find(b => b.id === TASK_OWNER);
+          t.doneBy = _br ? _br.name : ((db.settings.agency && db.settings.agency.name) || 'Руководитель');
+        }
+        /* синхрон с лидом: закрыл задачу по лиду → отметка в его хронологии (+ комментарий, если оставлен) */
+        if (t.leadId && t.status === 'done' && !wasDone) { const l = db.leads.find(x => x.id === t.leadId); if (l) ai.pushEvent(db, { type: 'qual', leadId: l.id, text: `✓ Задача выполнена: ${String(t.title).slice(0, 120)}${t.doneNote ? ' — ' + t.doneNote : ''}` }); }
         store.save();
         return json(res, 200, Object.assign({}, t, t.leadId ? { lead: leadBrief(t.leadId) } : {}));
       }

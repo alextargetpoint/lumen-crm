@@ -6520,18 +6520,23 @@ function lcTaskRow(t) {
   const dueLabel = t.due ? (overdue ? 'Просрочено · ' : '') + new Date(t.due).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : (t.scheduled || '');
   const br = (STATE.brokers || []).find(b => b.id === t.brokerId);
   const who = br ? br.name : (t.brokerId ? t.brokerId : 'Вы');
+  const doneMeta = (t.status === 'done' && (t.doneAt || t.doneNote || t.doneBy))
+    ? `<span class="lc-task-donem">✓ ${t.doneAt ? new Date(t.doneAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : 'выполнено'}${t.doneBy ? ' · ' + esc(t.doneBy) : ''}${t.doneNote ? ' — «' + esc(t.doneNote) + '»' : ''}</span>`
+    : '';
   return `<div class="lc-task ${t.status === 'done' ? 'done' : ''} ${overdue ? 'overdue' : ''}" data-tid="${t.id}">
     <button class="lc-task-ck" data-ttog="${t.id}" title="${t.status === 'done' ? 'Вернуть в работу' : 'Завершить'}">${t.status === 'done' ? ic(I.check) : ''}</button>
-    <div class="lc-task-main"><b>${esc(t.title)}</b>${dueLabel ? `<span class="lc-task-due">${ic(I.cal)}${esc(dueLabel)}</span>` : ''}</div>
+    <div class="lc-task-main"><b>${esc(t.title)}</b>${dueLabel && t.status !== 'done' ? `<span class="lc-task-due">${ic(I.cal)}${esc(dueLabel)}</span>` : ''}${doneMeta}</div>
     <span class="lc-task-ava" title="${esc(who)}">${esc((who || '?').slice(0, 1).toUpperCase())}</span>
   </div>`;
 }
 function lcTasksBlock(tasks) {
-  const open = tasks.filter(t => t.status !== 'done'), done = tasks.filter(t => t.status === 'done');
+  const open = tasks.filter(t => t.status !== 'done');
+  const done = tasks.filter(t => t.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  const doneShow = done.slice(0, 3), doneHid = done.slice(3);   /* выполненные НА ВИДУ (зачёркнутые) — последние 3, остальные под «ещё» */
   return `<div class="lc-blk lc-tasks">
     <div class="lc-blk-hd"><b>Задачи по лиду</b><span class="lc-cnt">${open.length}</span><button class="btn btn-sm btn-accent lc-blk-add" id="lcTaskAdd">${ic(I.plus)}Задача</button></div>
     <div class="lc-task-list">${open.map(lcTaskRow).join('') || '<div class="lc-blk-empty">Активных задач нет</div>'}</div>
-    ${done.length ? `<button class="lc-blk-more" id="lcTasksDoneTog" type="button">Выполненные · ${done.length} <i>⌄</i></button><div class="lc-task-done" id="lcTasksDone" style="display:none">${done.map(lcTaskRow).join('')}</div>` : ''}
+    ${done.length ? `<div class="lc-task-donehd">Выполненные</div><div class="lc-task-list lc-task-donelist">${doneShow.map(lcTaskRow).join('')}</div>${doneHid.length ? `<button class="lc-blk-more" id="lcTasksDoneTog" type="button">Ещё выполненных · ${doneHid.length} <i>⌄</i></button><div class="lc-task-done" id="lcTasksDone" style="display:none">${doneHid.map(lcTaskRow).join('')}</div>` : ''}` : ''}
   </div>`;
 }
 function lcCommentRow(n) {
@@ -6618,6 +6623,21 @@ async function openGrayMove(id, currentPhone, onDone) {
     actions: [{ label: 'Отмена' }] });
   setTimeout(() => { $$('.gm-pick').forEach(b => b.addEventListener('click', async () => { try { await api.post('/leads/' + id + '/gray-move', { phone: b.dataset.mv }); toast('Диалог переведён', 'Следующее сообщение уйдёт с нового номера', true); closeModal(); if (onDone) onDone(); } catch (e) { toast('Не вышло', e.message); } })); }, 40);
 }
+/* универсальный однополь-промпт (комментарий). Promise→строка|null(отмена) */
+function askNote(opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    modal({ title: opts.title || 'Комментарий', sub: opts.sub || '', wide: false,
+      body: '<div class="form-row"><textarea id="akNote" rows="2" placeholder="' + esc(opts.placeholder || '') + '" style="width:100%"></textarea></div>',
+      actions: [
+        { label: opts.ok || 'Готово', cls: 'btn-accent', onClick: (b) => { resolve((($('#akNote', b) || {}).value || '').trim()); } },
+        { label: 'Отмена', onClick: () => { resolve(null); } },
+      ] });
+    setTimeout(() => { const t = $('#akNote'); if (t) t.focus(); }, 60);
+  });
+}
+/* комментарий при закрытии задачи (регламент: что сделано). Promise→строка|null(отмена) */
+function askTaskDoneNote() { return askNote({ title: 'Завершить задачу', sub: 'Комментарий по регламенту — что сделано / результат (необязательно)', placeholder: 'напр. дозвонился, назначил показ на четверг', ok: 'Завершить задачу' }); }
 async function openLeadModal(id, backScope) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
@@ -6681,6 +6701,10 @@ async function openLeadModal(id, backScope) {
       <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
       ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
     </div>
+    ${l.pendingLoss ? (() => { const _own = STATE.me && STATE.me.role === 'owner'; const _to = (STAGES.find(s => s.id === l.pendingLoss.toStage) || {}).name || l.pendingLoss.toStage; return `<div class="lc-ploss ${_own ? 'own' : ''}">
+      <div class="lc-ploss-tx">${ic(I.clock)}<span><b>Проигрыш на подтверждении.</b> ${esc(l.pendingLoss.byName || 'Менеджер')} переводит в «${esc(_to)}»${l.pendingLoss.reason ? ' — «' + esc(l.pendingLoss.reason) + '»' : ''}. ${_own ? 'Проверьте касания и решите.' : 'Ожидает решения руководителя.'}</span></div>
+      ${_own ? `<div class="lc-ploss-act"><button class="btn btn-sm btn-accent" id="lcLossOk">Подтвердить проигрыш</button><button class="btn btn-sm" id="lcLossBack">Вернуть в работу</button></div>` : ''}
+    </div>`; })() : ''}
     ${['handover', 'viewing', 'deal'].includes(l.stage) ? `<div class="lc-deal">
       <div class="lc-deal-f"><label class="lc-lbl">Сумма сделки · цена объекта</label><input class="gi" id="mDealVal" type="number" min="0" step="1000" value="${l.dealValue || ''}" placeholder="напр. 150000"></div>
       <div class="lc-deal-f"><label class="lc-lbl">Наша комиссия, $</label><input class="gi" id="mDealCom" type="number" min="0" step="100" value="${l.dealCommission || ''}" placeholder="комиссия"></div>
@@ -6905,7 +6929,13 @@ async function openLeadModal(id, backScope) {
   $('#lcQlBack', bd)?.addEventListener('click', () => { closeModal(); try { window.openQualLeads(backScope); } catch (_) {} });   /* вернуться к списку квал/потенц-лидов, откуда открыли */
   $('#mCtrl', bd)?.addEventListener('change', async function () { try { await api.patch('/leads/' + l.id, { control: this.checked }); l.control = this.checked; toast(this.checked ? 'Отмечен контрольным' : 'Снята отметка', 'Для контроля доставки', true); } catch (e) { toast('Не вышло', e.message); this.checked = !this.checked; } });
   $$('[data-tzedit]', bd).forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openTzEdit(l.id, l.tz, () => { closeModal(); openLeadModal(l.id, backScope); }); }));
-  $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); openLeadModal(l.id, backScope); });   /* перерисовать — чтобы блок суммы сделки появился/скрылся по стадии */
+  $('#mStage', bd).addEventListener('change', async (e) => { const r = await api.patch('/leads/' + l.id, { stage: e.target.value }); if (r && r.pendingLoss) toast('Отправлено руководителю', 'Проигрыш требует подтверждения — лид останется в работе до решения', true); openLeadModal(l.id, backScope); });   /* перерисовать — чтобы блок суммы сделки появился/скрылся по стадии */
+  $('#lcLossOk', bd)?.addEventListener('click', async () => { try { await api.post('/leads/' + l.id + '/loss/confirm', {}); toast('Проигрыш подтверждён', null, true); openLeadModal(l.id, backScope); } catch (e) { toast('Не вышло', e.message); } });
+  $('#lcLossBack', bd)?.addEventListener('click', async () => {
+    const note = await askNote({ title: 'Вернуть лид в работу', sub: 'Комментарий менеджеру (необязательно) — что доработать', ok: 'Вернуть в работу' });
+    if (note === null) return;
+    try { await api.post('/leads/' + l.id + '/loss/reject', { note }); toast('Возвращено в работу', note ? 'комментарий отправлен менеджеру' : null, true); openLeadModal(l.id, backScope); } catch (e) { toast('Не вышло', e.message); }
+  });
   $('#mDealVal', bd)?.addEventListener('change', async (e) => { try { await api.patch('/leads/' + l.id, { dealValue: +e.target.value || 0 }); l.dealValue = +e.target.value || null; const h = bd.querySelector('.lc-deal-hint'); if (h && l.dealValue) h.innerHTML = ic(I.check) + ' учтётся в ROI/ROAS рекламы'; } catch (_) {} });
   $('#mDealCom', bd)?.addEventListener('change', async (e) => { try { await api.patch('/leads/' + l.id, { dealCommission: +e.target.value || 0 }); } catch (_) {} });
   $('#mSpam', bd)?.addEventListener('click', async (e) => {   /* #580: невалидный номер → в спам (закрыт) + тег «неверный номер» */
@@ -7129,7 +7159,10 @@ async function openLeadModal(id, backScope) {
   $('#lcTaskAdd', bd)?.addEventListener('click', () => { openQuickTask({ id: l.id, name: l.name, geoName: l.geoName, geo: l.geo, onDone: () => openLeadModal(id) }); });
   $$('.lc-task-ck[data-ttog]', bd).forEach(b => b.addEventListener('click', async () => {
     const tid = b.dataset.ttog; const row = b.closest('.lc-task'); const done = row && row.classList.contains('done');
-    try { await api.patch('/tasks/' + tid, { status: done ? 'todo' : 'done' }); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); }
+    if (done) { try { await api.patch('/tasks/' + tid, { status: 'todo' }); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); } return; }
+    const note = await askTaskDoneNote();   /* комментарий по регламенту при закрытии (необязательно) */
+    if (note === null) return;              /* отменили */
+    try { await api.patch('/tasks/' + tid, { status: 'done', doneNote: note }); toast('Задача выполнена', note ? 'комментарий сохранён' : null, true); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); }
   }));
   $('#lcTasksDoneTog', bd)?.addEventListener('click', () => { const d = $('#lcTasksDone', bd); if (d) d.style.display = d.style.display === 'none' ? '' : 'none'; });
   $('#lcMoreTog', bd)?.addEventListener('click', () => { const mb = $('#lcMoreBody', bd), mo = $('#lcMore', bd); if (mb) { const open = mb.style.display !== 'none'; mb.style.display = open ? 'none' : ''; if (mo) mo.classList.toggle('open', !open); } });
@@ -11130,6 +11163,17 @@ PAGES.automations = async (root) => {
           </div>
           <button class="btn btn-sm btn-accent" id="aiDelaySave" style="margin-top:10px">Сохранить задержку</button>
         </div>`; })()}
+        ${(() => { const lg = (s.automations || {}).lossGate || {}; const sel = lg.stages && lg.stages.length ? lg.stages : ['lost'];
+          const gateable = STAGES.filter(st => !['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'].includes(st.id));
+          const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
+          return `<div class="glass card mb" data-ag="dist">
+          <div class="card-title">${ic(I.shield || I.check)}Контроль проигрыша<span class="sub">двойной контроль: менеджер не теряет лида без вашего «ок»</span></div>
+          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Когда менеджер переводит лида в проигранную стадию, лид <b>не уходит сразу</b> — попадает к вам на подтверждение. Вы смотрите касания и либо подтверждаете проигрыш, либо возвращаете в работу с комментарием. (На вас, как на руководителя, гейт не распространяется — вы переводите напрямую.)</div>
+          <div class="cg-row"><div><b>Требовать подтверждение проигрыша</b><div class="muted" style="font-size:11px">для выбранных ниже стадий, при переводе менеджером</div></div>${cb('lgEnabled', !!lg.enabled)}</div>
+          <div class="form-row" style="margin-top:10px"><label>Стадии, требующие подтверждения</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">${gateable.map(st => `<label class="lg-chip"><input type="checkbox" data-lgstage="${st.id}" ${sel.includes(st.id) ? 'checked' : ''}> ${esc(st.name)}</label>`).join('') || '<span class="muted">Нет подходящих стадий</span>'}</div></div>
+          <button class="btn btn-sm btn-accent" id="lgSave" style="margin-top:10px">Сохранить контроль</button>
+        </div>`; })()}
         ${(() => { const g = (s.automations || {}).chainGuard || {}; const gv = (k, d) => g[k] !== undefined ? g[k] : d;
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
           return `<div class="glass card mb" data-ag="dist">
@@ -11421,6 +11465,11 @@ PAGES.automations = async (root) => {
     if (proofTg) proofTg.addEventListener('change', renderPrev);
     renderPrev();
   })();
+  $('#lgSave') && $('#lgSave').addEventListener('click', async () => {
+    const stages = $$('[data-lgstage]', root).filter(x => x.checked).map(x => x.dataset.lgstage);
+    try { await saveAuto({ lossGate: { enabled: $('#lgEnabled', root).checked, stages } }); toast('Контроль проигрыша сохранён', stages.length ? ('стадий под контролем: ' + stages.length) : 'стадии не выбраны', true); }
+    catch (e) { toast('Не сохранилось', e.message); }
+  });
   $('#lrSave') && $('#lrSave').addEventListener('click', async () => {
     const bySource = {};
     $$('[data-lrsrc]', root).forEach(sel => { if (sel.value) bySource[sel.dataset.lrsrc] = sel.value; });
