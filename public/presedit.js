@@ -19,19 +19,23 @@
   var esc = T.esc;
   var FAM_LABEL = { hero: 'Обложка', editorial: 'О проекте', metrics: 'Показатели', gallery: 'Галерея',
     location: 'Локация', floorplan: 'Планировка', units: 'Квартиры и цены', payment: 'План оплаты', comparison: 'Сравнение',
-    benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная', contents: 'Содержание', recommendation: 'Рекомендация брокера' };
-  /* библиотека блоков (макет «Добавить блок») — key уникален, f = family движка */
+    benefits: 'Преимущества', broker: 'Визитка брокера', custom: 'Произвольная', contents: 'Содержание', recommendation: 'Рекомендация брокера',
+    agency: 'О агентстве', cta: 'Призыв к действию', team: 'Команда' };
+  /* библиотека блоков (попап «Добавить страницу») — key уникален, f = family движка, grp = раздел, desc = подпись */
   var BLOCK_TYPES = [
-    { key: 'editorial', f: 'editorial', label: 'Текст', ic: 'text' },
-    { key: 'photo', f: 'gallery', label: 'Фото', ic: 'image' },
-    { key: 'gallery', f: 'gallery', label: 'Галерея', ic: 'image' },
-    { key: 'metrics', f: 'metrics', label: 'Характеристики', ic: 'grid' },
-    { key: 'benefits', f: 'benefits', label: 'Преимущества', ic: 'grid' },
-    { key: 'floorplan', f: 'floorplan', label: 'Планировка', ic: 'crop' },
-    { key: 'units', f: 'units', label: 'Квартиры и цены', ic: 'grid' },
-    { key: 'payment', f: 'payment', label: 'Условия оплаты', ic: 'doc' },
-    { key: 'location', f: 'location', label: 'Расположение', ic: 'pin' },
-    { key: 'broker', f: 'broker', label: 'Контакты', ic: 'phone' },
+    { key: 'editorial', f: 'editorial', label: 'Текст', ic: 'text', grp: 'Контент объекта', desc: 'Заголовок + абзац с описанием' },
+    { key: 'photo', f: 'gallery', label: 'Фото', ic: 'image', grp: 'Контент объекта', desc: 'Крупный кадр на страницу' },
+    { key: 'gallery', f: 'gallery', label: 'Галерея', ic: 'image', grp: 'Контент объекта', desc: 'Сетка фотографий' },
+    { key: 'metrics', f: 'metrics', label: 'Характеристики', ic: 'grid', grp: 'Контент объекта', desc: 'Площадь · спальни · сдача' },
+    { key: 'benefits', f: 'benefits', label: 'Преимущества', ic: 'grid', grp: 'Контент объекта', desc: 'Список плюсов с иконками' },
+    { key: 'floorplan', f: 'floorplan', label: 'Планировка', ic: 'crop', grp: 'Контент объекта', desc: 'Чертёж + параметры' },
+    { key: 'units', f: 'units', label: 'Квартиры и цены', ic: 'grid', grp: 'Контент объекта', desc: 'Таблица юнитов' },
+    { key: 'payment', f: 'payment', label: 'Условия оплаты', ic: 'doc', grp: 'Контент объекта', desc: 'План рассрочки' },
+    { key: 'location', f: 'location', label: 'Расположение', ic: 'pin', grp: 'Контент объекта', desc: 'Район · что рядом' },
+    { key: 'broker', f: 'broker', label: 'Брокер', ic: 'phone', grp: 'Закрывающие', desc: 'Эксперт + контакты' },
+    { key: 'agency', f: 'agency', label: 'О агентстве', ic: 'home', grp: 'Закрывающие', desc: 'Кто мы · цифры · УТП' },
+    { key: 'team', f: 'team', label: 'Команда', ic: 'users', grp: 'Закрывающие', desc: 'Фото и роли команды' },
+    { key: 'cta', f: 'cta', label: 'Призыв к действию', ic: 'sparkle', grp: 'Закрывающие', desc: 'Следующий шаг + кнопки связи' },
   ];
 
   /* ---------- boot ---------- */
@@ -353,14 +357,55 @@
   }
   function newSecId(pfx) { return (pfx || '') + 's' + Math.random().toString(16).slice(2, 8); }
   function isObjHero(sec) { return S.isColl && sec && sec.family === 'hero' && /^o\d+_/.test(String(sec.id || '')); }
+  /* дефолт-контент новых закрывающих страниц (чтобы не были пустыми) — из бренда/брокеров/агентства */
+  function seedBlockContent(fam) {
+    var ov = function (v) { return { mode: 'override', value: v }; };
+    var brand = S.brand || {}, ag = brand.agency || {}, br = S.broker || (brand.broker || {});
+    if (fam === 'agency') {
+      return { eyebrow: ov('Агентство'), title: ov(brand.logoText || ag.name || 'Наше агентство'),
+        body: ov(ag.about || 'Мы помогаем клиентам находить и покупать недвижимость под их задачи — от подбора до сделки под ключ.'),
+        metrics: ov((ag.stats && ag.stats.length) ? ag.stats : [{ value: '8 лет', label: 'на рынке' }, { value: '500+', label: 'сделок' }, { value: '12', label: 'стран' }]),
+        items: ov((ag.points && ag.points.length) ? ag.points : [{ icon: 'check', title: 'Только проверенные объекты', desc: '' }, { icon: 'shield', title: 'Сопровождение сделки', desc: '' }]) };
+    }
+    if (fam === 'cta') {
+      return { eyebrow: ov('Следующий шаг'), title: ov('Готовы двигаться дальше?'),
+        body: ov('Напишите удобным способом — подберём варианты под ваш запрос и ответим на вопросы.'),
+        profile: ov({ channels: (br.channels || {}) }) };
+    }
+    if (fam === 'team') {
+      var mem = (S.brokers || []).filter(function (b) { return b.active !== false; }).slice(0, 6).map(function (b) { return { name: b.name || '', role: b.role || 'Брокер', photo: b.avatar || b.photo || '' }; });
+      return { eyebrow: ov('Команда'), title: ov('Наша команда'), members: ov(mem) };
+    }
+    return { title: ov(FAM_LABEL[fam] || 'Блок') };
+  }
   function insertBlock(fam) {
     mutate(function () {
       var at = Math.min(sections().length, S.pageIdx + 1);
       var pfx = S.isColl ? objPrefixOf(sections()[S.pageIdx]) : '';   // на странице объекта → блок уходит в ЭТОТ объект, а не в сироты
-      var ns = { id: newSecId(pfx), family: fam, enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: FAM_LABEL[fam] || 'Блок' } } };
+      var ns = { id: newSecId(pfx), family: fam, enabled: true, assetRefs: [], contentBindings: seedBlockContent(fam) };
       sections().splice(at, 0, ns); S.pageIdx = at;
     });
     S.addMode = false; render();
+  }
+  /* ⭐красивый ПОПАП-библиотека готовых страниц (контент объекта + закрывающие) — быстрый выбор и вставка */
+  function openPageLibrary() {
+    if (document.getElementById('peLibOv')) return;
+    var groups = {}; BLOCK_TYPES.forEach(function (b) { (groups[b.grp || 'Блоки'] = groups[b.grp || 'Блоки'] || []).push(b); });
+    var grpOrder = ['Контент объекта', 'Закрывающие']; Object.keys(groups).forEach(function (g) { if (grpOrder.indexOf(g) < 0) grpOrder.push(g); });
+    var body = grpOrder.filter(function (g) { return groups[g]; }).map(function (g) {
+      return '<div class="pe-lib-grp"><div class="pe-lib-grp-t">' + esc(g) + '</div><div class="pe-lib-grid">' +
+        groups[g].map(function (b) { return '<button class="pe-lib-card" data-libadd="' + esc(b.f) + '"><span class="pe-lib-ic">' + ic(b.ic) + '</span><b>' + esc(b.label) + '</b><span class="pe-lib-desc">' + esc(b.desc || '') + '</span></button>'; }).join('') +
+        '</div></div>';
+    }).join('');
+    var ov = document.createElement('div'); ov.id = 'peLibOv'; ov.className = 'pe-lib-ov';
+    ov.innerHTML = '<div class="pe-lib-modal"><div class="pe-lib-hd"><div class="pe-lib-hd-t"><b>Добавить страницу</b><span>готовые блоки — выберите и вставьте</span></div><button class="pe-x" id="peLibX" title="Закрыть">' + ic('x') + '</button></div><div class="pe-lib-body">' + body + '</div></div>';
+    document.body.appendChild(ov);
+    function close() { ov.remove(); document.removeEventListener('keydown', onEsc); }
+    function onEsc(e) { if (e.key === 'Escape') close(); }
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelector('#peLibX').addEventListener('click', close);
+    ov.querySelectorAll('[data-libadd]').forEach(function (b) { b.addEventListener('click', function () { var fam = b.getAttribute('data-libadd'); close(); insertBlock(fam); }); });
+    document.addEventListener('keydown', onEsc);
   }
 
   /* ---------- переполнение «Текст не помещается» (макет) ---------- */
@@ -485,6 +530,27 @@
       h += fld('Текст', txt('body', cval(s, 'body'), 'Описание проекта'), s, 'body');
       h += metricsField(s, 'metrics', 'Показатели (до 4)');
       h += photoField(s, 0, 'Фотография');
+      return h;
+    },
+    agency: function (s) {
+      var h = fld('Надзаголовок', inp('eyebrow', joinArr(cval(s, 'eyebrow')), 'Агентство'), s, 'eyebrow');
+      h += fld('Заголовок', inp('title', cval(s, 'title'), 'Наше агентство'), s, 'title');
+      h += fld('О нас', txt('body', cval(s, 'body'), 'Коротко о вас и подходе'), s, 'body');
+      h += metricsField(s, 'metrics', 'Цифры (до 4)');
+      h += itemsField(s);
+      return h;
+    },
+    cta: function (s) {
+      var h = fld('Надзаголовок', inp('eyebrow', joinArr(cval(s, 'eyebrow')), 'Следующий шаг'), s, 'eyebrow');
+      h += fld('Заголовок', inp('title', cval(s, 'title'), 'Готовы двигаться дальше?'), s, 'title');
+      h += fld('Текст-призыв', txt('body', cval(s, 'body'), 'Короткое приглашение связаться'), s, 'body');
+      h += '<div class="pe-field"><div class="hint">Кнопки связи (WhatsApp / Telegram / телефон) подтягиваются из контактов брокера или агентства.</div></div>';
+      return h;
+    },
+    team: function (s) {
+      var h = fld('Надзаголовок', inp('eyebrow', joinArr(cval(s, 'eyebrow')), 'Команда'), s, 'eyebrow');
+      h += fld('Заголовок', inp('title', cval(s, 'title'), 'Наша команда'), s, 'title');
+      h += membersField(s);
       return h;
     },
     metrics: function (s) {
@@ -703,7 +769,7 @@
   function compositionTab() {
     var s = curSection(); if (!s) return '';
     // соединяющие/авто-управляемые страницы: тип менять нельзя (одна смена = потеря авто-оглавления/сравнения)
-    var LOCKED_TYPE = { contents: 1, comparison: 1, recommendation: 1, broker: 1 };
+    var LOCKED_TYPE = { contents: 1, comparison: 1, recommendation: 1, broker: 1, agency: 1, cta: 1, team: 1 };
     var h = '<div class="pe-sec-label">Тип страницы</div>';
     if (LOCKED_TYPE[s.family]) {
       h += '<div class="pe-selectcard" style="opacity:.75;cursor:default"><span class="pe-selectcard-val">' + esc(FAM_LABEL[s.family] || s.family) + '</span><span class="pe-selectcard-chev" style="opacity:.4">' + ic('lock') + '</span></div>' +
@@ -893,6 +959,7 @@
     ib.querySelectorAll('[data-pf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('places', el); }); });
     ib.querySelectorAll('[data-qf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('params', el); }); });
     ib.querySelectorAll('[data-if]').forEach(function (el) { el.addEventListener('input', function () { onListInput('items', el); }); });
+    ib.querySelectorAll('[data-tf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('members', el); }); });
     ib.querySelectorAll('[data-sf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('stages', el); }); });
     ib.querySelectorAll('[data-uf]').forEach(function (el) { el.addEventListener('input', function () { onListInput('units', el); }); });
     wireListDnD(ib);   /* ⭐перетаскивание строк списков (преимущества/показатели/что рядом/параметры/квартиры) */
@@ -925,8 +992,14 @@
     liveCanvas(); scheduleSave();
   }
   function onPayBase(e) { var s = curSection(); var pl = cval(s, 'plan') || { stages: [] }; pl.basePrice = pl.basePrice || { currency: 'USD' }; pl.basePrice.amount = e.target.value; setOverride(s, 'plan', Object.assign({}, pl)); liveCanvas(); scheduleSave(); }
+  function membersField(s) {
+    var arr = cval(s, 'members') || [];
+    var rows = arr.map(function (m, i) { return '<div class="pe-metric-row" data-mi="' + i + '"><input data-tf="name" value="' + esc(m.name || '') + '" placeholder="Имя"><input data-tf="role" value="' + esc(m.role || '') + '" placeholder="Роль" style="flex:0 0 42%"><button class="pe-mini-del" data-act="delMember" data-mi="' + i + '">×</button></div>'; }).join('');
+    return '<div class="pe-field"><label>Участники команды</label><div class="pe-metriclist" data-members="1">' + rows + '</div><button class="pe-addrow" data-act="addMember">+ Участник</button><div class="hint" style="margin-top:5px">Фото подтягиваются из профилей брокеров.</div></div>';
+  }
   function onListInput(kind, el) {
     var s = curSection(); var row = el.closest('[data-mi]'); var i = +row.getAttribute('data-mi');
+    if (kind === 'members') { var am = (cval(s, 'members') || []).slice(); am[i] = Object.assign({}, am[i], defineProp(el.getAttribute('data-tf'), el.value)); setOverride(s, 'members', am); liveCanvas(); scheduleSave(); return; }
     if (kind === 'metrics') { var arr = (cval(s, 'metrics') || []).slice(); arr[i] = Object.assign({}, arr[i], defineProp(el.getAttribute('data-mf'), el.value)); setOverride(s, 'metrics', arr); }
     if (kind === 'places') { var a2 = (cval(s, 'nearbyPlaces') || []).slice(); a2[i] = Object.assign({}, a2[i], defineProp(el.getAttribute('data-pf'), el.value)); setOverride(s, 'nearbyPlaces', a2); }
     if (kind === 'params') { var a3 = (cval(s, 'params') || []).slice(); a3[i] = Object.assign({}, a3[i], defineProp(el.getAttribute('data-qf'), el.value)); setOverride(s, 'params', a3); }
@@ -1022,7 +1095,7 @@
       case 'zoomin': setZoom(curZoom() + 0.1); break;
       case 'zoomout': setZoom(curZoom() - 0.1); break;
       case 'zoomfit': S.zoom = 'fit'; fitCanvas(); document.getElementById('peZoomL').textContent = 'Fit'; break;
-      case 'addpage': S.addMode = true; S.addPickKey = S.addPickKey || 'editorial'; S.addQ = ''; render(); break;
+      case 'addpage': openPageLibrary(); break;   /* ⭐попап-библиотека готовых страниц */
       case 'addclose': S.addMode = false; render(); break;
       case 'grptoggle': S.openGroups = S.openGroups || {}; var gk = +el.getAttribute('data-gk'); S.openGroups[gk] = !S.openGroups[gk]; render(); break;
       case 'objmenu': objMenu(el, +el.getAttribute('data-gk')); break;
@@ -1046,6 +1119,8 @@
       case 'addParam': mutate(function () { var arr = (cval(s, 'params') || []).slice(); arr.push({ label: '', value: '' }); setOverride(s, 'params', arr); }); break;
       case 'delParam': mutate(function () { var arr = (cval(s, 'params') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'params', arr); }); break;
       case 'addItem': mutate(function () { var arr = (cval(s, 'items') || []).slice(); arr.push({ title: '', desc: '' }); setOverride(s, 'items', arr); }); break;
+      case 'addMember': mutate(function () { var arr = (cval(s, 'members') || []).slice(); arr.push({ name: '', role: 'Брокер' }); setOverride(s, 'members', arr); }); break;
+      case 'delMember': mutate(function () { var arr = (cval(s, 'members') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'members', arr); }); break;
       case 'delItem': mutate(function () { var arr = (cval(s, 'items') || []).slice(); arr.splice(+el.getAttribute('data-mi'), 1); setOverride(s, 'items', arr); }); break;
       case 'itemIcon': { var _mi = +el.getAttribute('data-mi'); menu(el, BEN_ICONS.map(function (o) { return { t: BEN_LABEL[o[0]] || o[1], fn: function () { mutate(function () { var arr = (cval(s, 'items') || []).slice(); var it = Object.assign({}, arr[_mi] || {}); if (o[0]) it.icon = o[0]; else delete it.icon; arr[_mi] = it; setOverride(s, 'items', arr); }); } }; })); break; }
       case 'addUnit': mutate(function () { var arr = (cval(s, 'units') || []).slice(); arr.push({ plan: '', area: '', price: '', status: '' }); setOverride(s, 'units', arr); }); break;
@@ -2335,6 +2410,8 @@
       plus: '<path d="M12 5v14M5 12h14"/>', dots: '<circle cx="12" cy="6" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="18" r="1"/>',
       db: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
       image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5L5 20"/>',
+      home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/>',
+      users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.2 2.7-5 6-5s6 1.8 6 5"/><path d="M16 5.2a3 3 0 0 1 0 5.6M21 20c0-2.6-1.6-4.2-3.6-4.8"/>',
       crop: '<path d="M6 2v16h16M2 6h16v16"/>', palette: '<circle cx="12" cy="12" r="9"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="7" r="1"/><circle cx="16" cy="9" r="1"/>',
       copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4h12"/>', up: '<path d="M12 19V5M5 12l7-7 7 7"/>', down: '<path d="M12 5v14M5 12l7 7 7-7"/>',
       trash: '<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>', check: '<path d="M4 12l5 5L20 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',

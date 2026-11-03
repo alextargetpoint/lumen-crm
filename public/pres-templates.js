@@ -467,6 +467,53 @@
     return [introPage(), contactsPage()];
   };
 
+  // ---- AGENCY (закрывающая: о агентстве) ----
+  F.agency = (ctx) => {
+    const { c, brand } = ctx;
+    const name = c.title || brand.logoText || 'Наше агентство';
+    const about = c.body || '';
+    const stats = Array.isArray(c.metrics) ? c.metrics : [];
+    const points = Array.isArray(c.items) ? c.items : [];
+    const statsHtml = stats.length ? `<div class="lp-ag-stats">${stats.slice(0, 4).map(m => `<div class="lp-ag-stat"><b>${esc(m.value || '')}</b><span>${esc(m.label || '')}</span></div>`).join('')}</div>` : '';
+    const pointsHtml = points.length ? `<ul class="lp-ag-points">${points.slice(0, 4).map(p => `<li><span class="lp-metric-ic">${icon(p.icon || 'check')}</span><div><b>${esc(p.title || '')}</b>${p.desc ? `<span>${esc(p.desc)}</span>` : ''}</div></li>`).join('')}</ul>` : '';
+    return [`<div class="lp-safe lp-agency">
+      ${eyebrow(c.eyebrow || 'Агентство')}
+      <h2 class="lp-h2">${nl2br(name)}</h2>
+      ${about ? `<p class="lp-body lp-ag-about">${nl2br(about)}</p>` : ''}
+      ${statsHtml}${pointsHtml}
+    </div>`];
+  };
+  // ---- CTA (закрывающая: призыв / следующий шаг) ----
+  F.cta = (ctx) => {
+    const { c, brand } = ctx;
+    const br = c.profile || brand.broker || {};
+    const ch = br.channels || {};
+    const btn = (k, label, href) => href ? `<a class="lp-cta-btn lp-ch-${k}" href="${esc(href)}"><span class="lp-metric-ic">${icon(k === 'whatsapp' ? 'whatsapp' : k === 'telegram' ? 'telegram' : k === 'site' ? 'globe' : k)}</span>${esc(label)}</a>` : '';
+    const buttons = `<div class="lp-cta-btns">
+      ${btn('whatsapp', 'Написать в WhatsApp', ch.whatsapp ? ('https://wa.me/' + String(ch.whatsapp).replace(/[^0-9]/g, '')) : '')}
+      ${btn('telegram', 'Telegram', ch.telegram ? ('https://t.me/' + String(ch.telegram).replace(/^@/, '')) : '')}
+      ${ch.phone ? `<a class="lp-cta-btn lp-ch-phone" href="tel:${esc(String(ch.phone).replace(/[^0-9+]/g, ''))}"><span class="lp-metric-ic">${icon('phone')}</span>${esc(ch.phone)}</a>` : ''}
+    </div>`;
+    return [`<div class="lp-safe lp-cta">
+      <div class="lp-cta-mid">
+        ${eyebrow(c.eyebrow || 'Следующий шаг')}
+        <h2 class="lp-h1 lp-cta-h">${nl2br(c.title || 'Готовы двигаться дальше?')}</h2>
+        ${c.body ? `<p class="lp-body lp-cta-sub">${nl2br(c.body)}</p>` : ''}
+        ${buttons}
+      </div>
+    </div>`];
+  };
+  // ---- TEAM (закрывающая: команда) ----
+  F.team = (ctx) => {
+    const { c } = ctx;
+    const members = (Array.isArray(c.members) ? c.members : []).slice(0, 6);
+    const cards = members.map(m => `<div class="lp-team-card">${m.photo ? `<div class="lp-team-ava" style="background-image:url('${esc(m.photo)}')"></div>` : '<div class="lp-team-ava lp-ph"></div>'}<b>${esc(m.name || '')}</b><span>${esc(m.role || '')}</span></div>`).join('');
+    return [`<div class="lp-safe lp-team">
+      ${eyebrow(c.eyebrow || 'Команда')}
+      <h2 class="lp-h2">${nl2br(c.title || 'Наша команда')}</h2>
+      <div class="lp-team-grid">${cards || '<div class="lp-empty">Добавьте участников команды в панели справа</div>'}</div>
+    </div>`];
+  };
   // ---- CUSTOM (neutral, from allowed blocks) ----
   F.custom = (ctx) => {
     const { c } = ctx;

@@ -739,3 +739,26 @@ button{font-family:inherit;cursor:pointer}
 .pe-cmprow{margin:0 0 9px;padding:0 0 9px;border-bottom:1px solid var(--pe-line)}
 .pe-cmpvals{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
 .pe-cmpvals input{flex:1;min-width:84px;font-size:12px}
+
+/* ===== Попап-библиотека готовых страниц (#7) ===== */
+.pe-lib-ov{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(20,16,12,.44);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:pe-lib-fade .15s ease}
+@keyframes pe-lib-fade{from{opacity:0}to{opacity:1}}
+.pe-lib-modal{width:min(720px,92vw);max-height:86vh;overflow:auto;background:var(--pe-panel,#fff);border:1px solid var(--pe-line);border-radius:18px;box-shadow:0 24px 70px -20px rgba(20,16,12,.5);animation:pe-lib-pop .18s cubic-bezier(.16,1,.3,1)}
+@keyframes pe-lib-pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.pe-lib-ov,.pe-lib-modal{animation:none}}
+.pe-lib-hd{display:flex;align-items:center;gap:12px;padding:20px 22px 14px;position:sticky;top:0;background:var(--pe-panel,#fff);z-index:2;border-bottom:1px solid var(--pe-line)}
+.pe-lib-hd-t b{font:700 17px/1.1 'Manrope',system-ui,sans-serif;display:block;color:var(--pe-ink)}
+.pe-lib-hd-t span{font-size:12.5px;color:var(--pe-mut)}
+.pe-lib-hd .pe-x{margin-left:auto}
+.pe-lib-body{padding:16px 22px 24px}
+.pe-lib-grp{margin-bottom:18px}
+.pe-lib-grp-t{font:600 11px/1 'Manrope',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--pe-mut);margin:4px 0 10px}
+.pe-lib-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.pe-lib-card{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:14px;border:1px solid var(--pe-line);border-radius:13px;background:var(--pe-panel,#fff);cursor:pointer;transition:border-color .12s,background .12s,transform .08s}
+.pe-lib-card:hover{border-color:var(--pe-sel);background:color-mix(in srgb,var(--pe-sel) 6%,transparent)}
+.pe-lib-card:active{transform:translateY(1px)}
+.pe-lib-ic{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:color-mix(in srgb,var(--pe-sel) 12%,transparent);color:var(--pe-sel);margin-bottom:7px}
+.pe-lib-ic svg{width:18px;height:18px}
+.pe-lib-card b{font:650 13.5px/1.2 'Manrope',system-ui,sans-serif;color:var(--pe-ink)}
+.pe-lib-desc{font-size:11.5px;color:var(--pe-mut);line-height:1.35}
+@media (max-width:560px){.pe-lib-grid{grid-template-columns:repeat(2,1fr)}}
