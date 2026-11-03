@@ -3228,8 +3228,9 @@ function go(page) {
   closeModal(true);   /* FIX: навигация закрывает открытую модалку ТИХО (без history.back — иначе гонка откатывала навигацию обратно: «мигнул диалог → вернулся в воронку») */
   document.getElementById('bulkBar')?.remove();   /* FIX: снять панель массовых действий при уходе со страницы (не висеть сиротой поверх других разделов) */
   navProgress();
-  /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
-  if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
+  /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю).
+     Под-путь (#automations/<секция>) сохраняем, если остаёмся на той же странице — для прямых ссылок. */
+  { const curBase = location.hash.slice(1).split('/')[0]; if (curBase !== page) history.replaceState(null, '', '#' + page); }
   document.documentElement.setAttribute('data-page', page);   /* пер-экранная атмосфера (Lumen Glass) */
   if (PARENT_OF[page]) PAGE_STATE['ws_' + PARENT_OF[page]] = page; /* запоминаем вкладку пространства */
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.ws ? WORKSPACES[b.dataset.ws].pages.includes(page) : b.dataset.page === page));
@@ -11160,27 +11161,72 @@ PAGES.automations = async (root) => {
   const sw = (key, on) => `<label class="switch"><input type="checkbox" data-auto="${key}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
   const link = (page, label) => `<button class="btn btn-sm" data-go="${page}">${label}</button>`;
   const autoOn = ['autoHandover', 'meetRemind', 'noshowReturn'].filter(k => a[k]).length + (s.ai.autopilot ? 1 : 0);
-  root.innerHTML = `
-    <div class="seg auto-seg" id="autoSeg">
-      <button class="seg-b on" data-ag="first">${ic(I.spark)}Первая линия</button>
-      <button class="seg-b" data-ag="dist">${ic(I.users)}Распределение</button>
-      <button class="seg-b" data-ag="meet">${ic(I.cal)}Встречи</button>
-      <button class="seg-b" data-ag="reports">${ic(I.send)}Отчёты и каналы</button>
-      <button class="seg-b" data-ag="build">${ic(I.funnel)}Конструкторы</button>
-    </div>
-    ${heroArt('assets/art/gears.png', `
-      <div class="ha-title">${ic(I.bolt)}Автоматизации<span class="sub">рутина крутится сама — команда занимается клиентами</span></div>
-      <div class="ha-chips">
-        <span class="ha-chip" data-ha>Включено <b>${autoOn}</b></span>
-        <span class="ha-chip" data-ha>${s.ai.autopilot ? '⚡ Автопилот ИИ активен' : 'Автопилот ИИ выключен'}</span>
-        <span class="ha-chip" data-ha>${a.assignMode === 'load' ? 'Распределение: по загрузке' : a.assignMode === 'roundrobin' ? 'Распределение: по очереди' : 'Распределение: по сменам'}</span>
+  /* ── Automation Control Center: вертикальная локальная навигация. Карточки НЕ меняются (та же логика/IDs/
+     обработчики) — только реорганизованы в секции. Статусы считаются из реальных настроек. ── */
+  const _wg = s.waGray || {}, _lg = a.lossGate || {}, _cg = a.chainGuard || {}, _lr = a.leadRouting || {}, _rot = a.rotation || {};
+  const ACC_PRIMARY = [
+    { k: 'distribute', ic: I.users, t: 'Распределение лидов', d: 'кому и как попадают лиды', st: true },
+    { k: 'rotation', ic: I.refresh || I.spark, t: 'Ротация заявок', d: 'переназначение, смены', st: !!_rot.enabled },
+    { k: 'aidelay', ic: I.clock || I.spark, t: 'Задержка ответа ИИ', d: 'время на первый ответ', st: true },
+    { k: 'loss', ic: I.shield || I.check, t: 'Контроль проигрыша', d: 'подтверждение и возврат', st: !!_lg.enabled },
+    { k: 'burnout', ic: I.shield || I.spark, t: 'Защита от выгорания', d: 'лимиты и паузы', st: _cg.enabled !== false },
+    { k: 'antiban', ic: I.shield || I.spark, t: 'Анти-бан WhatsApp', d: 'прогрев и чистые номера', st: !!_wg.migrateOnHandover },
+    { k: 'routing', ic: I.link, t: 'Маршрутизация', d: 'правила и источники', st: !!(_lr.default || Object.keys(_lr.bySource || {}).length) },
+  ];
+  const ACC_MORE = [
+    { k: 'reports', ic: I.send, t: 'Отчёты и каналы', d: 'сводки и омниканал', st: !!((s.reports || {}).daily || (s.reports || {}).weekly) },
+    { k: 'meet', ic: I.cal, t: 'Встречи', d: 'напоминания и SLA', st: null },
+    { k: 'first', ic: I.spark, t: 'Первая линия', d: 'ИИ, дожим, поток', st: !!(s.ai && s.ai.autopilot) },
+    { k: 'build', ic: I.funnel, t: 'Конструкторы', d: 'воронка и поля', st: null },
+  ];
+  const accNavItem = (x) => `<button class="acc-nav-i" data-ag="${x.k}" data-kw="${esc((x.t + ' ' + x.d).toLowerCase())}"><span class="acc-nav-ic">${ic(x.ic)}</span><span class="acc-nav-tx"><b>${x.t}</b><i>${x.d}</i></span>${x.st != null ? `<span class="acc-dot ${x.st ? 'on' : ''}"></span>` : ''}<span class="acc-nav-ch">${ic(I.chev)}</span></button>`;
+  /* Обзор: реальные счётчики + предупреждения */
+  const _brokers = (STATE.brokers || []).filter(b => b.active !== false);
+  const _onN = ACC_PRIMARY.filter(x => x.st === true).length, _offN = ACC_PRIMARY.filter(x => x.st === false).length;
+  const _warns = [];
+  if (a.assignOnNew && !_brokers.length) _warns.push('«Закреплять брокера сразу при входе» включено, но активных брокеров нет — лиды некому назначить.');
+  if (_rot.enabled && !_brokers.length) _warns.push('Ротация включена, но активных брокеров нет — переназначать не на кого.');
+  if (_lg.enabled && _lg.reviewerId && !_brokers.some(b => b.id === _lg.reviewerId)) _warns.push('Контроль проигрыша: назначенный проверяющий не найден среди активных брокеров.');
+  if (_wg.migrateOnHandover && !((_wg.numbers || []).some(n => n.roles && n.roles.outreach === false))) _warns.push('Анти-бан: авто-перевод на чистый номер включён, но ни один номер не помечен «только для диалогов».');
+  const accOverview = `<div class="glass card mb" data-ag="overview">
+      <div class="acc-ov-metrics">
+        <div class="acc-ov-m"><b>${_onN}</b><span>активных сценариев</span></div>
+        <div class="acc-ov-m"><b>${_offN}</b><span>выключено</span></div>
+        <div class="acc-ov-m ${_warns.length ? 'warn' : ''}"><b>${_warns.length}</b><span>требует внимания</span></div>
       </div>
-      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Отчёты в мессенджер: <b>${(s.reports || {}).daily || (s.reports || {}).weekly ? 'включены' : 'выключены'}</b> · мгновенные алерты: <b>${Object.values((s.reports || {}).instant || {}).filter(Boolean).length}</b></span></div>
-    `, { v: 'mark', hue: '#5E7BB8' })}
-    <div class="auto-grid" id="autoGrid">
-        <div class="glass card mb" data-ag="dist">
-          <div class="card-title">${ic(I.users)}Распределение по брокерам</div>
-          <div class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5">Как это работает по умолчанию: новый лид попадает в <b>общий пул</b>, ИИ-первая линия ведёт его по цепочке касаний, а брокер закрепляется <b>в момент квалификации</b> (4 оси) или вручную. Хотите, чтобы брокер видел лида <b>сразу с первой секунды</b> — включите «Закреплять сразу при входе» ниже.</div>
+      ${_warns.length ? `<div class="acc-ov-warn"><div class="acc-ov-warn-h">${ic(I.shield)} Требует внимания</div><ul>${_warns.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+      <div class="acc-ov-list">
+        ${ACC_PRIMARY.map(x => `<div class="acc-ov-row"><span class="acc-nav-ic">${ic(x.ic)}</span><div class="acc-ov-row-tx"><b>${x.t}</b><i>${x.d}</i></div>${x.st != null ? `<span class="acc-ov-badge ${x.st ? 'on' : 'off'}">${x.st ? '● активно' : '○ выключено'}</span>` : ''}<button class="btn btn-sm" data-acc-go="${x.k}">Настроить</button></div>`).join('')}
+      </div>
+    </div>`;
+  root.innerHTML = `
+    <div class="acc-head">
+      <div class="acc-head-ic">${ic(I.bolt)}</div>
+      <div><div class="acc-head-t">Автоматизации</div><div class="acc-head-d">Гибкие сценарии, распределение лидов и защита от выгорания команды</div></div>
+      <div class="acc-head-r">
+        <div class="acc-search"><input id="accSearch" placeholder="Поиск настройки…" autocomplete="off"></div>
+        <div class="acc-mode" id="accMode"><button type="button" data-mode="basic" class="on">Основное</button><button type="button" data-mode="expert">Экспертное</button></div>
+      </div>
+    </div>
+    <div class="acc-shell">
+      <aside class="acc-nav" id="accNav">
+        <button class="acc-nav-i" data-ag="overview" data-kw="обзор сводка статус"><span class="acc-nav-ic">${ic(I.grid || I.bolt)}</span><span class="acc-nav-tx"><b>Обзор</b><i>состояние всех сценариев</i></span><span class="acc-nav-ch">${ic(I.chev)}</span></button>
+        ${ACC_PRIMARY.map(accNavItem).join('')}
+        <div class="acc-nav-lbl">Ещё</div>
+        ${ACC_MORE.map(accNavItem).join('')}
+      </aside>
+      <div class="acc-work" id="autoGrid">
+        ${accOverview}
+        <div class="glass card mb" data-ag="distribute">
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.users)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Распределение по брокерам</div><div class="acc-wh-d">Определите, кому назначаются новые заявки и когда происходит передача.</div></div></div>
+          <div class="acc-flow" data-accflow="distribute">
+            <div class="acc-flow-ic">${ic(I.users)}</div>
+            <div class="acc-flow-body"><div class="acc-flow-t">Как это работает</div>
+              <div class="acc-flow-steps"><span class="acc-flow-step"><b>1</b>Лид попадает в пул</span><span class="acc-flow-arr">→</span><span class="acc-flow-step"><b>2</b>Применяются правила</span><span class="acc-flow-arr">→</span><span class="acc-flow-step"><b>3</b>Назначается брокер</span></div>
+            </div>
+            <button type="button" class="acc-flow-x" data-accflow-x="distribute">×</button>
+          </div>
+          <div class="muted exp-only" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5">Как это работает по умолчанию: новый лид попадает в <b>общий пул</b>, ИИ-первая линия ведёт его по цепочке касаний, а брокер закрепляется <b>в момент квалификации</b> (4 оси) или вручную. Хотите, чтобы брокер видел лида <b>сразу с первой секунды</b> — включите «Закреплять сразу при входе» ниже.</div>
           ${swRow('Режим распределения', 'Кому уходит лид нужного гео (при квалификации и при закреплении на входе)', `<select data-auto-sel="assignMode" style="width:190px">
             <option value="load" ${a.assignMode === 'load' ? 'selected' : ''}>По загрузке (меньше — берёт)</option>
             <option value="roundrobin" ${a.assignMode === 'roundrobin' ? 'selected' : ''}>По очереди</option>
@@ -11189,8 +11235,16 @@ PAGES.automations = async (root) => {
           ${swRow('Закреплять брокера сразу при входе', 'Новый лид сразу виден закреплённому брокеру (с первой секунды), а ИИ продолжает вести цепочку. Выкл — лид до квалификации в общем пуле', sw('assignOnNew', a.assignOnNew))}
           ${swRow('Авто-передача при квалификации', '4 оси закрыты → лид сам уходит брокеру с саммари и слотом, без ручного клика', sw('autoHandover', a.autoHandover))}
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
+          <div class="acc-rel-wrap">
+            <div class="acc-rel-h">${ic(I.spark)}Связанные сценарии</div>
+            <div class="acc-rel">
+              <button type="button" class="acc-rel-c" data-acc-go="burnout"><div class="acc-rel-ic">${ic(I.shield)}</div><div class="acc-rel-t">Защита от выгорания</div><div class="acc-rel-d">Лимиты касаний, авто-стоп и мягкий выход</div><span class="acc-rel-ok ${_cg.enabled !== false ? '' : 'off'}">✓</span></button>
+              <button type="button" class="acc-rel-c" data-acc-go="loss"><div class="acc-rel-ic">${ic(I.shield || I.check)}</div><div class="acc-rel-t">Контроль проигрыша</div><div class="acc-rel-d">Подтверждение, возврат в работу</div><span class="acc-rel-ok ${_lg.enabled ? '' : 'off'}">✓</span></button>
+              <button type="button" class="acc-rel-c" data-acc-go="routing"><div class="acc-rel-ic">${ic(I.link)}</div><div class="acc-rel-t">Маршрутизация входящих</div><div class="acc-rel-d">Распределение по источникам и брокерам</div><span class="acc-rel-ok ${(_lr.default || Object.keys(_lr.bySource || {}).length) ? '' : 'off'}">✓</span></button>
+            </div>
+          </div>
         </div>
-        ${(() => { const r = a.rotation || {}; return `<div class="glass card mb" data-ag="dist">
+        ${(() => { const r = a.rotation || {}; return `<div class="glass card mb" data-ag="rotation">
           <div class="card-title">${ic(I.refresh || I.spark)}Ротация непрожатых заявок<span class="sub">не ответил — уходит другому</span></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 10px">Если клиент молчит после N касаний ИЛИ X часов — заявка автоматически переназначается на следующего (по загрузке или на квалификатора), цепочка стартует заново. Исчерпаны ротации → лид уходит в «Спящие».</div>
           ${swRow('Включить авто-ротацию', 'Не даём «мёртвым» лидам застревать на одном человеке', `<label class="switch"><input type="checkbox" id="rotEnabled" ${r.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}
@@ -11202,7 +11256,7 @@ PAGES.automations = async (root) => {
           ${swRow('Сначала на квалификатора', 'Переназначать на роль «Квалификатор» (если есть), иначе — на брокеров по загрузке', `<label class="switch"><input type="checkbox" id="rotToQual" ${r.toQualifier ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}
           <button class="btn btn-sm btn-accent" id="rotSave" style="margin-top:10px">Сохранить ротацию</button>
         </div>`; })()}
-        ${(() => { const ai = s.ai || {}; const dmin = Math.round((+ai.replyDelayMinSec || 180) / 60); const dmax = Math.round((+ai.replyDelayMaxSec || 720) / 60); return `<div class="glass card mb" data-ag="dist">
+        ${(() => { const ai = s.ai || {}; const dmin = Math.round((+ai.replyDelayMinSec || 180) / 60); const dmax = Math.round((+ai.replyDelayMaxSec || 720) / 60); return `<div class="glass card mb" data-ag="aidelay">
           <div class="card-title">${ic(I.clock || I.spark)}Задержка ответа ИИ<span class="sub">как живой человек, не мгновенный бот</span></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5">ИИ отвечает клиенту не сразу, а через <b>случайное время в вашем диапазоне</b> (напр. 4–15 мин → то 5, то 7, то 12). Так переписка выглядит по-человечески и не палит бота. 0 в поле «от» — может ответить почти сразу.</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -11214,7 +11268,7 @@ PAGES.automations = async (root) => {
         ${(() => { const lg = (s.automations || {}).lossGate || {}; const sel = lg.stages && lg.stages.length ? lg.stages : ['lost'];
           const gateable = STAGES.filter(st => !['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'].includes(st.id));
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
-          return `<div class="glass card mb" data-ag="dist">
+          return `<div class="glass card mb" data-ag="loss">
           <div class="card-title">${ic(I.shield || I.check)}Контроль проигрыша<span class="sub">двойной контроль: менеджер не теряет лида без вашего «ок»</span></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Когда менеджер переводит лида в проигранную стадию, лид <b>не уходит сразу</b> — попадает <b>проверяющему</b> на подтверждение. Тот смотрит касания и либо подтверждает проигрыш, либо возвращает в работу с комментарием. (На проверяющего гейт не распространяется — он переводит напрямую.)</div>
           <div class="cg-row"><div><b>Требовать подтверждение проигрыша</b><div class="muted" style="font-size:11px">для выбранных ниже стадий, при переводе менеджером</div></div>${cb('lgEnabled', !!lg.enabled)}</div>
@@ -11248,7 +11302,7 @@ PAGES.automations = async (root) => {
             if (r.state === 'warn') return `<div class="mb-rd warn"><span class="mb-rd-i">!</span><b>${nm}</b><span class="mb-rd-ph">${fmtPh(r.ph)} — пометьте «только для диалогов»</span><button class="btn btn-xs" type="button" data-go="numbers">Исправить</button></div>`;
             return `<div class="mb-rd none"><span class="mb-rd-i">○</span><b>${nm}</b><span class="mb-rd-ph">нет своего чистого номера — уйдёт на общий${primary ? ' (' + fmtPh(primary.phone) + ')' : ''}</span><button class="btn btn-xs" type="button" data-go="numbers">Назначить</button></div>`;
           };
-          return `<div class="glass card mb mbridge" data-ag="dist" id="mbridgeCard">
+          return `<div class="glass card mb mbridge" data-ag="antiban" id="mbridgeCard">
           <div class="card-title">${ic(I.shield || I.spark)}Мост: серый → чистый номер<span class="sub">как клиент переезжает на номер менеджера</span></div>
           <div class="mb-expl">
             <div class="mb-expl-ic">${ic(I.shield)}</div>
@@ -11299,7 +11353,7 @@ PAGES.automations = async (root) => {
         </div>`; })()}
         ${(() => { const g = (s.automations || {}).chainGuard || {}; const gv = (k, d) => g[k] !== undefined ? g[k] : d;
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
-          return `<div class="glass card mb" data-ag="dist">
+          return `<div class="glass card mb" data-ag="burnout">
           <div class="card-title">${ic(I.shield || I.spark)}Защита цепочек от выгорания<span class="sub">не бомбить молчунов — меньше жалоб и банов номеров</span></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Если клиент молчит на 4–5-е касание, долбить дальше вредно: копится негатив → жалобы → бан номера. Эти правила дают клиенту мягко выйти и останавливают рассылку по сигналу отказа.</div>
           <div class="cg-row"><div><b>Включить защиту</b><div class="muted" style="font-size:11px">главный выключатель всех правил ниже</div></div>${cb('cgEnabled', gv('enabled', true) !== false)}</div>
@@ -11339,7 +11393,7 @@ PAGES.automations = async (root) => {
           const optS = (sel) => `<option value="">— как по умолчанию</option>` + brs.map(b => `<option value="${esc(b.id)}" ${sel === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
           const SRC = [['meta_api', 'Meta — кабинет (напрямую)'], ['meta_form', 'Meta / интегратор (Albato)'], ['site', 'Сайт / лендинг']];
           const bs = r.bySource || {};
-          return `<div class="glass card mb" data-ag="dist">
+          return `<div class="glass card mb" data-ag="routing">
           <div class="card-title">${ic(I.users || I.spark)}Маршрутизация входящих лидов<span class="sub">кому падают новые заявки</span></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Новый лид из рекламы сразу закрепляется за выбранным брокером. Иначе он попадает «в общий пул» с <b>broker = не назначен</b> и не виден в кабинете брокера — каждый брокер видит только <b>своих</b> лидов (конфиденциальность). Это и есть причина «лиды из Меты не подгружаются».</div>
           <div class="form-row"><label>Все новые лиды назначать</label><select id="lrDefault">${optD(r.default || '')}</select></div>
@@ -11495,20 +11549,42 @@ PAGES.automations = async (root) => {
           <input id="cfUnit" placeholder="Единица измерения (напр. м², €, %) — для «Число» / «Деньги»" style="width:100%;margin-top:8px;display:none">
           <button class="btn btn-accent btn-sm" id="cfAdd" style="margin-top:10px">${ic(I.plus)}Добавить поле</button>
         </div>
+      </div>
     </div>`;
   $$('[data-go]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
   // сегментированная суб-навигация: показываем одну группу карточек за раз
   const autoGrid = root.querySelector('#autoGrid');
+  const ALL_SECTIONS = ['overview', 'distribute', 'rotation', 'aidelay', 'loss', 'burnout', 'antiban', 'routing', 'reports', 'meet', 'first', 'build'];
   const applyAg = (g) => {
-    PAGE_STATE.funnelAg = g;   /* запоминаем активную группу — сохранение воронки не выкидывает в «Первую линию» */
-    $$('#autoSeg .seg-b', root).forEach(b => b.classList.toggle('on', b.dataset.ag === g));
+    if (!ALL_SECTIONS.includes(g)) g = 'overview';
+    PAGE_STATE.funnelAg = g;   /* запоминаем активную секцию — сохранение внутри неё не выкидывает в другую */
+    $$('.acc-nav-i', root).forEach(b => b.classList.toggle('on', b.dataset.ag === g));
     let shown = 0;
     $$('[data-ag]', autoGrid).forEach(c => { const v = c.dataset.ag === g; c.style.display = v ? '' : 'none'; if (v) shown++; });
     autoGrid.classList.toggle('solo', shown === 1);
+    const want = '#automations' + (g === 'overview' ? '' : '/' + g);   /* прямая ссылка на секцию (replaceState — без ре-роутинга) */
+    if (location.hash !== want) history.replaceState(null, '', want);
     closePop();
   };
-  $$('#autoSeg .seg-b', root).forEach(b => b.addEventListener('click', () => applyAg(b.dataset.ag)));
-  applyAg(PAGE_STATE.funnelAg || 'first');
+  $$('.acc-nav-i', root).forEach(b => b.addEventListener('click', () => applyAg(b.dataset.ag)));
+  $$('[data-acc-go]', root).forEach(b => b.addEventListener('click', () => applyAg(b.dataset.accGo)));
+  const _urlSub = (location.hash.slice(1).split('/')[1] || '').trim();
+  applyAg(ALL_SECTIONS.includes(_urlSub) ? _urlSub : (ALL_SECTIONS.includes(PAGE_STATE.funnelAg) ? PAGE_STATE.funnelAg : 'overview'));
+  /* режим Основное / Экспертное: в «Основном» прячем .exp-only */
+  const applyMode = (mde) => { autoGrid.classList.toggle('basic', mde === 'basic'); $$('#accMode button', root).forEach(b => b.classList.toggle('on', b.dataset.mode === mde)); PAGE_STATE.accMode = mde; };
+  $$('#accMode button', root).forEach(b => b.addEventListener('click', () => applyMode(b.dataset.mode)));
+  applyMode(PAGE_STATE.accMode || 'basic');
+  /* поиск по настройкам: фильтр пунктов + Enter прыгает к первому совпавшему */
+  const accSearch = $('#accSearch', root);
+  if (accSearch) {
+    const navItems = $$('.acc-nav-i', root);
+    const doFilter = () => { const q = accSearch.value.trim().toLowerCase(); let firstK = null; navItems.forEach(b => { const hit = !q || ((b.dataset.kw || '') + ' ' + (b.dataset.ag || '')).includes(q); b.classList.toggle('hide', !hit); if (hit && !firstK) firstK = b.dataset.ag; }); $$('.acc-nav-lbl', root).forEach(l => l.classList.toggle('hide', !!q)); return firstK; };
+    accSearch.addEventListener('input', doFilter);
+    accSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const k = doFilter(); if (k) { applyAg(k); accSearch.value = ''; doFilter(); } } });
+  }
+  /* «Как это работает» — скрыть и запомнить */
+  $$('.acc-flow', root).forEach(fl => { if (PAGE_STATE['accFlow_' + fl.dataset.accflow]) fl.classList.add('collapsed'); });
+  $$('[data-accflow-x]', root).forEach(b => b.addEventListener('click', () => { const fl = root.querySelector('.acc-flow[data-accflow="' + b.dataset.accflowX + '"]'); if (fl) fl.classList.add('collapsed'); PAGE_STATE['accFlow_' + b.dataset.accflowX] = true; }));
   const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
   $('#cgSave') && $('#cgSave').addEventListener('click', async () => {
     const g = {
@@ -20489,13 +20565,13 @@ document.getElementById('agencyMenuBtn')?.addEventListener('click', (e) => {
 });
 
 /* стартовый раздел — из hash (переживает F5); битый hash → обзор */
-const startPage = () => (NAV[location.hash.slice(1)] ? location.hash.slice(1) : 'overview');
+const startPage = () => { const base = location.hash.slice(1).split('/')[0]; return NAV[base] ? base : 'overview'; };
 window.addEventListener('hashchange', () => {
   const h = location.hash.slice(1);
   if (h.indexOf('pres/') === 0) { _editorId = h.slice(5); mountEditor(); return; }   /* #pres/<id> → встроенный редактор */
   const wasEditor = !!_editorId;
   if (_editorId) leaveEditor();
-  const p = h;
+  const p = h.split('/')[0];   /* под-путь #page/<секция> → страница = часть до «/» (секцию читает сама страница) */
   /* ⚠️ после выхода из редактора раздел перерисовываем ВСЕГДА (в #content остался iframe редактора):
      даже если p === CUR (раздел-основа под редактором был 'properties', CUR тоже 'properties') —
      иначе класс editor-mode снят, а контент так и держит iframe → сломанный экран. */
