@@ -7377,7 +7377,13 @@ PAGES.inbox = async (root) => {
       <div class="conv-head">
         <div class="conv-search-wrap">${ic(I.search || I.doc)}<input class="conv-search" id="convSearch" placeholder="Имя или телефон" value="${esc(PAGE_STATE.inboxSearch || '')}"></div>
         <select id="convBroker" class="conv-broker"><option value="">Все брокеры</option><option value="__none">Без брокера</option>${brokers.map(b => `<option value="${b.id}" ${PAGE_STATE.inboxBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
-        <div class="conv-segs">${INBOX_SEGS.map(([k, n]) => `<button class="conv-seg ${(PAGE_STATE.inboxSeg || 'all') === k ? 'on' : ''}" data-seg="${k}">${n}</button>`).join('')}</div>
+        <div class="conv-head-row2">
+          <div class="conv-segs">${INBOX_SEGS.map(([k, n]) => `<button class="conv-seg ${(PAGE_STATE.inboxSeg || 'all') === k ? 'on' : ''}" data-seg="${k}">${n}</button>`).join('')}</div>
+          <div class="conv-viewtog" title="Как показывать диалоги">
+            <button class="cv-vt ${(PAGE_STATE.inboxView || 'list') === 'list' ? 'on' : ''}" data-view="list" title="Списком">${ic(I.list || I.menu || I.doc)}</button>
+            <button class="cv-vt ${PAGE_STATE.inboxView === 'funnel' ? 'on' : ''}" data-view="funnel" title="По воронке — сгруппировать по стадиям">${ic(I.funnel)}</button>
+          </div>
+        </div>
       </div>
       <div class="conv-items" id="convItems"></div>
     </div>
@@ -7388,6 +7394,7 @@ PAGES.inbox = async (root) => {
   let deb; search.addEventListener('input', () => { PAGE_STATE.inboxSearch = search.value; clearTimeout(deb); deb = setTimeout(() => refreshInbox(false), 200); });
   $('#convBroker', root).addEventListener('change', (e) => { PAGE_STATE.inboxBroker = e.target.value; refreshInbox(false); });
   $$('.conv-seg', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.inboxSeg = b.dataset.seg; $$('.conv-seg', root).forEach(x => x.classList.toggle('on', x === b)); refreshInbox(false); }));
+  $$('.cv-vt', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.inboxView = b.dataset.view; $$('.cv-vt', root).forEach(x => x.classList.toggle('on', x === b)); refreshInbox(false); }));
   await refreshInbox(true);
 };
 PAGES.inbox.refresh = () => refreshInbox(false);
@@ -7412,7 +7419,7 @@ async function refreshInbox(first) {
   const list = $('#convItems');
   if (!list) return;
   if ((!PAGE_STATE.inboxLead || !leads.some(l => l.id === PAGE_STATE.inboxLead)) && leads.length) PAGE_STATE.inboxLead = leads[0].id;
-  list.innerHTML = leads.map(l => {
+  const convRow = (l) => {
     const nh = (l.tags || []).includes('нужен человек');
     const dir = l.lastDir === 'in' ? '<span class="conv-dir in">↙</span>' : l.lastDir === 'out' ? '<span class="conv-dir out">↗</span>' : '';
     return `<div class="conv ${l.id === PAGE_STATE.inboxLead ? 'active' : ''} ${nh ? 'nh' : ''}" data-id="${l.id}">
@@ -7426,7 +7433,25 @@ async function refreshInbox(first) {
         ${nh ? `<div class="conv-nh" title="Нужен человек — клиент просил менеджера">${ic(I.user, 2)}</div>` : (l.unread || 0) > 0 ? `<div class="unread-badge" style="background:var(--accent);color:#fff;border-radius:10px;min-width:18px;height:18px;display:grid;place-items:center;font-size:10.5px;font-weight:700;padding:0 5px;box-shadow:0 1px 4px rgba(37,99,235,.4)">${l.unread > 9 ? '9+' : l.unread}</div>` : (l.lastDir === 'in' ? '<div class="unread"></div>' : '')}
       </div>
     </div>`;
-  }).join('') || `<div class="empty" style="padding:24px 14px">Ничего не найдено${PAGE_STATE.inboxSeg !== 'all' || PAGE_STATE.inboxBroker || PAGE_STATE.inboxSearch ? ' — снимите фильтры' : ''}</div>`;
+  };
+  const emptyMsg = `<div class="empty" style="padding:24px 14px">Ничего не найдено${PAGE_STATE.inboxSeg !== 'all' || PAGE_STATE.inboxBroker || PAGE_STATE.inboxSearch ? ' — снимите фильтры' : ''}</div>`;
+  if ((PAGE_STATE.inboxView || 'list') === 'funnel') {
+    /* ⭐#819 — диалоги СГРУППИРОВАНЫ ПО ВОРОНКЕ (как в ТГ-боте): шапка стадии + сворачиваемая группа */
+    PAGE_STATE.inboxFold = PAGE_STATE.inboxFold || {};
+    const groups = {}; leads.forEach(l => { (groups[l.stage] = groups[l.stage] || []).push(l); });
+    const ordered = STAGES.map(s => s.id).filter(id => groups[id] && groups[id].length);
+    Object.keys(groups).forEach(id => { if (!ordered.includes(id)) ordered.push(id); });
+    list.innerHTML = ordered.map(stId => {
+      const grp = groups[stId]; const fold = !!PAGE_STATE.inboxFold[stId];
+      return `<div class="conv-grp" data-grp="${stId}">
+        <button class="conv-grp-hd" data-grpfold="${stId}"><span class="conv-stdot" style="background:${stageColor(stId)}"></span><b>${esc(stageName(stId))}</b><span class="conv-grp-ct">${grp.length}</span><i class="conv-grp-chev ${fold ? '' : 'open'}">${ic(I.chev || I.chevron)}</i></button>
+        <div class="conv-grp-body" ${fold ? 'style="display:none"' : ''}>${grp.map(convRow).join('')}</div>
+      </div>`;
+    }).join('') || emptyMsg;
+    $$('.conv-grp-hd', list).forEach(h => h.addEventListener('click', () => { const k = h.dataset.grpfold; PAGE_STATE.inboxFold[k] = !PAGE_STATE.inboxFold[k]; const body = h.nextElementSibling; if (body) body.style.display = PAGE_STATE.inboxFold[k] ? 'none' : ''; h.querySelector('.conv-grp-chev')?.classList.toggle('open', !PAGE_STATE.inboxFold[k]); }));
+  } else {
+    list.innerHTML = leads.map(convRow).join('') || emptyMsg;
+  }
   $$('.conv', list).forEach(c => c.addEventListener('click', () => { PAGE_STATE.inboxLead = c.dataset.id; $$('.conv', list).forEach(x => x.classList.toggle('active', x === c)); document.getElementById('inboxWrap')?.classList.add('show-chat'); renderChat(c.dataset.id, true); }));
   if (PAGE_STATE.inboxLead && leads.length) await renderChat(PAGE_STATE.inboxLead, first);
   else if (!leads.length) { const cp = $('#chatPane'); if (cp) cp.innerHTML = '<div class="chat-empty"><div>Нет диалогов по фильтру</div></div>'; }

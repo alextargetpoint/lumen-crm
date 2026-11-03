@@ -9092,6 +9092,21 @@ body.client-view [data-team]{ display:none !important; }
 .fl-step b{font-size:23px;font-weight:750;line-height:1;font-variant-numeric:tabular-nums}
 .fl-step span{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;line-height:1.25}
 .fl-arr{display:flex;align-items:center;color:var(--ink-3);opacity:.45;font-size:15px;padding:0 1px}
+/* #819 диалоги по воронке (переключатель вида + группы по стадиям) */
+.conv-head-row2{display:flex;align-items:center;gap:8px}
+.conv-head-row2 .conv-segs{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.conv-head-row2 .conv-segs::-webkit-scrollbar{display:none}
+.conv-viewtog{display:flex;gap:2px;flex:0 0 auto;background:var(--bg-2,rgba(20,19,17,.05));border-radius:9px;padding:2px}
+.cv-vt{width:30px;height:28px;display:grid;place-items:center;border:0;background:transparent;border-radius:7px;cursor:pointer;color:var(--ink-3)}
+.cv-vt svg{width:16px;height:16px}
+.cv-vt.on{background:var(--card,#fff);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.conv-grp{border-bottom:1px solid var(--stroke)}
+.conv-grp-hd{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--bg-2,rgba(20,19,17,.03));padding:8px 14px;cursor:pointer;text-align:left;position:sticky;top:0;z-index:2}
+.conv-grp-hd b{font-size:12px;font-weight:700;color:var(--ink-2)}
+.conv-grp-ct{font-size:11px;color:var(--ink-3);background:var(--card);border-radius:8px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.conv-grp-chev{margin-left:auto;color:var(--ink-3);display:inline-flex;transition:transform .15s;transform:rotate(-90deg)}
+.conv-grp-chev svg{width:14px;height:14px}
+.conv-grp-chev.open{transform:rotate(0deg)}
 .lc-task-main{flex:1;min-width:0}
 .lc-task-main b{display:block;font-weight:550;font-size:13.5px;line-height:1.3}
 .lc-task-due{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink-3);margin-top:3px}
