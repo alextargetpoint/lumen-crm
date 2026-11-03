@@ -18989,8 +18989,19 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
       const proj = { name: pr.name, geo: geoName, developer: pr.developer || '' };
       const okImg2 = (u) => u && /^https?:\/\//.test(u) && !/\.svg(\?|$)/i.test(u);
       const cand = [];
-      if (serperKey()) {
-        /* если задан платный ключ Serper (Google Images) — используем его (шире выдача) */
+      /* 1) ⭐ХАНТИНГ как при добавлении объекта: Firecrawl ищет в вебе (сайты застройщиков, порталы,
+         форумы) по названию ЖК + застройщик + гео и СКРЕЙПИТ реальные фото проекта со страниц выдачи.
+         Это даёт именно фото объекта, а не стоковую картинку. (RENDER_API_KEY — ключ Firecrawl.) */
+      try {
+        const ws = await webSearch(q + ' фото галерея', 7, { media: true });
+        if (ws && Array.isArray(ws.images)) {
+          const bySrc = {};
+          ws.images.forEach(u => { if (okImg2(u)) { let host = ''; try { host = new URL(u).hostname.replace(/^www\./, ''); } catch (_) {} cand.push({ url: u, source: host || 'web', title: '', thumb: u }); } });
+          void bySrc;
+        }
+      } catch (e) {}
+      if (!cand.length && serperKey()) {
+        /* 2) если задан платный ключ Serper (Google Images) — используем его (шире выдача) */
         try {
           const r = await fetch('https://google.serper.dev/images', { method: 'POST', headers: { 'X-API-KEY': serperKey(), 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 14 }) });
           const j = await r.json().catch(() => ({}));
@@ -19021,7 +19032,7 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
           } catch (e) {}
         }
       }
-      if (!cand.length && !serperKey()) return json(res, 200, { enabled: true, query: q, project: proj, candidates: [], note: 'Свободный источник (Openverse) ничего не вернул — уточните название/застройщика в карточке. Для более широкой выдачи оператор может подключить ключ Serper.' });
+      if (!cand.length) return json(res, 200, { enabled: true, query: q, project: proj, candidates: [], note: 'Ничего не нашли по этому объекту — уточните название/застройщика в карточке. Поиск идёт по вебу (хантинг) + свободному источнику.' });
       const seen = new Set();
       const out = cand.filter(c => { if (seen.has(c.url)) return false; seen.add(c.url); return true; }).slice(0, 12);
       return json(res, 200, { enabled: true, query: q, project: proj, candidates: out });
