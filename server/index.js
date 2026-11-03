@@ -4161,7 +4161,7 @@ async function migrateLeadToClean(db, lead, targetPhone, opts = {}) {
   if (target.phone === lead.grayPhone) return { ok: false, error: 'лид уже на этом номере' };
   const from = lead.grayPhone;
   const broker = lead.broker ? (db.brokers || []).find(b => b.id === lead.broker) : null;
-  const agency = db.settings.agencyName || db.settings.brandName || (db.settings.brand && db.settings.brand.name) || 'агентство';
+  const agency = (db.settings.agency && db.settings.agency.name) || db.settings.agencyName || db.settings.brandName || (db.settings.brand && db.settings.brand.name) || 'агентство';
   const vars = (s) => String(s || '').replace(/\{name\}/g, lead.name || '').replace(/\{broker\}/g, (broker && broker.name) || 'ваш менеджер').replace(/\{agency\}/g, agency).replace(/\{target\}/g, '+' + target.phone).replace(/\{from\}/g, from ? '+' + from : '');
   if (from && from !== target.phone) {   /* бридж со старого номера — анти-«мошенник» */
     const bridge = vars(g.migrateBridge || 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет вам с номера {target} — это мы, сохраните, пожалуйста 🙌');
@@ -11971,6 +11971,45 @@ const server = http.createServer(async (req, res) => {
       if (b.media && b.media.url) { const _mu = /^https?:\/\//i.test(b.media.url) ? b.media.url : (callBase(db) + b.media.url); _sbody.media = { type: b.media.type || 'image', url: _mu, name: b.media.name || '', mimetype: b.media.mimetype || '' }; }
       try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/send', _sbody); return json(res, 200, r); }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* ТЕСТ МОСТА серый→чистый: собирает 3 сообщения (бридж/интро+рекап/подпись к скрину) на демо-данных текущими
+       текстами настроек и (если указан телефон + есть номера на связи) реально шлёт их на тестовый номер, чтобы
+       владелец увидел ГЛАЗАМИ, что придёт клиенту при передаче. Скрин переписки в тесте не прикрепляем (нет лида). */
+    if (p === '/api/wa/gray/migrate-test' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req).catch(() => ({}));
+      const to = String(b.phone || '').replace(/[^0-9]/g, '');
+      const g = db.settings.waGray || {};
+      const DEF = { bridge: 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет вам с номера {target} — это мы, сохраните, пожалуйста 🙌', intro: 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с моего личного номера.', recap: 'Напомню, мы остановились на: «{quote}». Продолжаю отсюда.', proof: 'И вот скрин нашей переписки — чтобы вы были спокойны, что это действительно продолжение нашего разговора, а не посторонние 🙌' };
+      let live = {}; try { live = await waGrayLiveSessions(db); } catch (_) {}
+      const conn = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected' && (!n.roles || n.roles.send !== false); });
+      const cleanNum = cleanNumberFor(db, { broker: null }, live);                                   /* куда переводим (чистый/основной) */
+      const grayNum = conn.find(n => !cleanNum || n.phone !== cleanNum.phone) || conn[0] || null;     /* откуда бридж (серый) */
+      const broker = (db.brokers || []).find(x => x.active !== false);
+      const agency = (db.settings.agency && db.settings.agency.name) || db.settings.agencyName || db.settings.brandName || (db.settings.brand && db.settings.brand.name) || 'агентство';
+      const vars = (t) => String(t || '')
+        .replace(/\{name\}/g, 'Иван')
+        .replace(/\{broker\}/g, (broker && broker.name) || 'ваш менеджер')
+        .replace(/\{agency\}/g, agency)
+        .replace(/\{target\}/g, cleanNum ? ('+' + cleanNum.phone) : '+971 00 000 00 00')
+        .replace(/\{from\}/g, grayNum ? ('+' + grayNum.phone) : '')
+        .replace(/\{quote\}/g, 'Сколько стоит студия с видом на море и какой план рассрочки?');
+      const recapTxt = vars(g.migrateRecap != null ? g.migrateRecap : DEF.recap);
+      const msgs = [
+        { label: '① Бридж (со старого номера)', text: vars(g.migrateBridge != null ? g.migrateBridge : DEF.bridge), fromRole: 'gray' },
+        { label: '② Интро + рекап (с нового номера)', text: vars(g.migrateIntro != null ? g.migrateIntro : DEF.intro) + (recapTxt ? '\n\n' + recapTxt : ''), fromRole: 'clean' },
+      ];
+      if (g.migrateProof !== false) msgs.push({ label: '③ Подпись к скрину переписки (с нового номера)', text: vars(g.migrateProofCaption != null ? g.migrateProofCaption : DEF.proof) + '\n\n⟨в реальном переводе здесь прикрепляется скриншот вашей переписки⟩', fromRole: 'clean' });
+      let sent = 0, sendErr = null;
+      if (to && conn.length) {
+        for (const m of msgs) {
+          const src = m.fromRole === 'clean' ? (cleanNum || grayNum) : (grayNum || cleanNum);
+          if (!src) continue;
+          try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(src.phone) + '/send', { to, text: m.text }); if (r && r.ok !== false) sent++; else if (!sendErr) sendErr = (r && r.error) || 'воркер отклонил отправку'; }
+          catch (e) { if (!sendErr) sendErr = e.message; }
+        }
+      }
+      return json(res, 200, { ok: true, messages: msgs.map(m => ({ label: m.label, text: m.text })), sent, target: cleanNum ? cleanNum.phone : null, from: grayNum ? grayNum.phone : null, connected: conn.length, sendErr, note: (!to ? 'Телефон не указан — показан только предпросмотр текстов.' : (!conn.length ? 'Нет номера WhatsApp на связи — показан только предпросмотр (реальная отправка невозможна).' : null)) });
     }
     /* закрепить прогретый номер за брокером (без перезапуска сессии) — с него уходит первое касание и вся цепочка лидов брокера */
     if (p === '/api/wa/gray/assign' && req.method === 'POST') {

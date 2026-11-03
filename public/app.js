@@ -11222,6 +11222,78 @@ PAGES.automations = async (root) => {
             <div style="display:flex;flex-wrap:wrap;gap:7px">${gateable.map(st => `<label class="lg-chip"><input type="checkbox" data-lgstage="${st.id}" ${sel.includes(st.id) ? 'checked' : ''}> ${esc(st.name)}</label>`).join('') || '<span class="muted">Нет подходящих стадий</span>'}</div></div>
           <button class="btn btn-sm btn-accent" id="lgSave" style="margin-top:10px">Сохранить контроль</button>
         </div>`; })()}
+        ${(() => { const wg = s.waGray || {};
+          const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
+          const DEF = { bridge: 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет вам с номера {target} — это мы, сохраните, пожалуйста 🙌', intro: 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с моего личного номера.', recap: 'Напомню, мы остановились на: «{quote}». Продолжаю отсюда.', proof: 'И вот скрин нашей переписки — чтобы вы были спокойны, что это действительно продолжение нашего разговора, а не посторонние 🙌' };
+          const v = (k) => esc(wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] != null ? wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] : DEF[k]);
+          const nums = (wg.numbers || []);
+          const cleans = nums.filter(n => n.roles && n.roles.outreach === false);
+          const primary = cleans.find(n => n.roles && n.roles.primary);
+          const brs = (STATE.brokers || []).filter(b => b.active !== false);
+          const fmtPh = (p) => '+' + String(p || '').replace(/[^0-9]/g, '');
+          /* готовность каждого менеджера: свой чистый номер / есть номер но не помечен / нет своего */
+          const readiness = brs.map(b => {
+            const ownClean = nums.find(n => n.brokerId === b.id && n.roles && n.roles.outreach === false);
+            const ownAny = nums.find(n => n.brokerId === b.id);
+            if (ownClean) return { b, state: 'ok', ph: ownClean.phone };
+            if (ownAny) return { b, state: 'warn', ph: ownAny.phone };
+            return { b, state: 'none' };
+          });
+          const rRow = (r) => {
+            const nm = esc((r.b.name || '').split(' ').slice(0, 2).join(' '));
+            if (r.state === 'ok') return `<div class="mb-rd ok"><span class="mb-rd-i">✓</span><b>${nm}</b><span class="mb-rd-ph">${fmtPh(r.ph)} · чистый</span></div>`;
+            if (r.state === 'warn') return `<div class="mb-rd warn"><span class="mb-rd-i">!</span><b>${nm}</b><span class="mb-rd-ph">${fmtPh(r.ph)} — пометьте «только для диалогов»</span><button class="btn btn-xs" type="button" data-go="numbers">Исправить</button></div>`;
+            return `<div class="mb-rd none"><span class="mb-rd-i">○</span><b>${nm}</b><span class="mb-rd-ph">нет своего чистого номера — уйдёт на общий${primary ? ' (' + fmtPh(primary.phone) + ')' : ''}</span><button class="btn btn-xs" type="button" data-go="numbers">Назначить</button></div>`;
+          };
+          return `<div class="glass card mb mbridge" data-ag="dist" id="mbridgeCard">
+          <div class="card-title">${ic(I.shield || I.spark)}Мост: серый → чистый номер<span class="sub">как клиент переезжает на номер менеджера</span></div>
+          <div class="mb-expl">
+            <div class="mb-expl-ic">${ic(I.shield)}</div>
+            <div>Серые номера делают холодные касания и квалификацию — у них высокий риск бана. Как только клиент ответил и его передают менеджеру, диалог <b>«переезжает» на чистый номер менеджера</b> — тот не делает рассылок, поэтому почти не банится. Клиенту уходит честная связка сообщений + скрин переписки, чтобы новый номер не приняли за мошенника.</div>
+          </div>
+          <!-- СХЕМА -->
+          <div class="mb-flow">
+            <div class="mb-node gray"><div class="mb-node-ic">🌫</div><div class="mb-node-t">Серый номер</div><div class="mb-node-s">холодные касания, квалификация</div></div>
+            <div class="mb-arrow"><span>клиент ответил →<br>передача менеджеру</span></div>
+            <div class="mb-node clean"><div class="mb-node-ic">✓</div><div class="mb-node-t">Чистый номер менеджера</div><div class="mb-node-s">весь дальнейший диалог, без рассылок</div></div>
+          </div>
+          <div class="mb-steps">
+            <div class="mb-step"><b>①</b> со старого номера: «передаю вас менеджеру…»</div>
+            <div class="mb-step"><b>②</b> с нового: интро менеджера + на чём остановились</div>
+            <div class="mb-step"><b>③</b> с нового: скрин вашей переписки (анти-мошенник)</div>
+          </div>
+          <!-- ГЛАВНЫЙ ТУМБЛЕР -->
+          <div class="cg-row mb-main"><div><b>Автоматически переводить при передаче менеджеру</b><div class="muted" style="font-size:11px">handover лида → три сообщения ниже уходят сами. Выключено — переводите вручную кнопкой «На чистый номер» в карточке лида.</div></div>${cb('wgMigrate', !!wg.migrateOnHandover)}</div>
+          <!-- ГОТОВНОСТЬ МЕНЕДЖЕРОВ -->
+          <div class="mb-sec-h">Готовность менеджеров <span class="muted">— у кого есть чистый номер для приёма диалога</span></div>
+          <div class="mb-ready">${readiness.length ? readiness.map(rRow).join('') : '<div class="muted" style="font-size:12px;padding:4px 0">Активных менеджеров нет — добавьте их в «Брокеры».</div>'}</div>
+          <div class="mb-ready-foot muted">⭐ Основной чистый номер (куда переводим, если у менеджера нет своего): <b>${primary ? fmtPh(primary.phone) : 'не назначен — пометьте номер «Основной» в «Номерах»'}</b> · всего чистых номеров: <b>${cleans.length}</b></div>
+          <!-- РЕДАКТОР СООБЩЕНИЙ -->
+          <div class="mb-sec-h">Тексты перевода <span class="muted">— что увидит клиент</span></div>
+          <div class="mb-edit">
+            <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:9px">Переменные — кликните, чтобы вставить в активное поле:</div>
+            <div id="migVars" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:11px">${['{name}','{broker}','{agency}','{target}','{from}','{quote}'].map(t => `<button type="button" class="mig-var" data-var="${t}">${t}</button>`).join('')}</div>
+            <div style="display:flex;gap:7px;align-items:center;margin-bottom:11px"><label style="font-size:11.5px;color:var(--ink-3)">Готовый набор:</label><select id="migTpl" style="flex:1"><option value="">— выбрать стиль —</option><option value="friendly">Дружелюбный (эмодзи, тёплый)</option><option value="business">Деловой (строгий, без эмодзи)</option><option value="short">Короткий (минимум слов)</option></select></div>
+            <div class="form-row" style="margin:0 0 9px"><label>① Бридж — со СТАРОГО номера («передаю вас…»)</label><textarea id="migBridge" class="mig-ta" rows="2" maxlength="600" style="width:100%;resize:vertical">${v('bridge')}</textarea></div>
+            <div class="form-row" style="margin:0 0 9px"><label>② Интро — с НОВОГО номера (первое сообщение)</label><textarea id="migIntro" class="mig-ta" rows="2" maxlength="600" style="width:100%;resize:vertical">${v('intro')}</textarea></div>
+            <div class="form-row" style="margin:0 0 9px"><label>③ Рекап — на чём остановились (<code>{quote}</code> = последняя реплика лида)</label><textarea id="migRecap" class="mig-ta" rows="2" maxlength="400" style="width:100%;resize:vertical">${v('recap')}</textarea></div>
+            <div class="cg-row" style="margin:2px 0 9px"><div><b style="font-size:12.5px">④ Прикреплять скрин переписки</b><div class="muted" style="font-size:11px">анти-«мошенник»: клиент видит картинку диалога и понимает, что это продолжение</div></div>${cb('wgMigrateProof', wg.migrateProof !== false)}</div>
+            <div class="form-row" style="margin:0 0 4px"><label>Подпись к скрину</label><textarea id="migProof" class="mig-ta" rows="2" maxlength="400" style="width:100%;resize:vertical">${v('proof')}</textarea></div>
+            <div class="muted" style="font-size:11px;margin:12px 0 6px;font-weight:650">Как это увидит клиент:</div>
+            <div id="migPreview" style="display:flex;flex-direction:column;gap:7px"></div>
+          </div>
+          <!-- ТЕСТ -->
+          <div class="mb-sec-h">Проверить на себе <span class="muted">— отправит эти сообщения на ваш номер</span></div>
+          <div class="mb-test">
+            <div class="mb-test-row">
+              <input id="mbTestPhone" placeholder="ваш WhatsApp, напр. +971501234567" value="${esc(wg._lastTestPhone || '')}">
+              <button class="btn btn-sm btn-accent" type="button" id="mbTestBtn">${ic(I.send)}Отправить тест</button>
+            </div>
+            <div class="muted" style="font-size:11px;margin-top:6px">Текущими текстами (демо-данные) на указанный номер WhatsApp. Нужен хотя бы один номер «на связи». Скрин переписки в тесте не прикрепляется.</div>
+            <div id="mbTestOut" class="mb-test-out" style="display:none"></div>
+          </div>
+          <button class="btn btn-accent" id="mbSave" style="margin-top:14px">Сохранить мост</button>
+        </div>`; })()}
         ${(() => { const g = (s.automations || {}).chainGuard || {}; const gv = (k, d) => g[k] !== undefined ? g[k] : d;
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
           return `<div class="glass card mb" data-ag="dist">
@@ -11252,23 +11324,7 @@ PAGES.automations = async (root) => {
             <div class="form-row" style="margin:0"><label>Прогрев нового номера, дней (лимит растёт)</label><input id="wgWarmDays" type="number" min="1" max="60" value="${+((s.waGray || {}).warmupDays || 14)}"></div>
             <div class="form-row" style="margin:0"><label>Мин. отклик номера, % (ниже при объёме → из холода)</label><input id="wgReplyFloor" type="number" min="0" max="100" value="${Math.round((((s.waGray || {}).replyRateFloor != null ? (s.waGray || {}).replyRateFloor : 0.05)) * 100)}"></div>
           </div>
-          <div class="cg-row" style="margin-top:10px"><div><b>Авто-перевод на чистый номер при передаче брокеру</b><div class="muted" style="font-size:11px">при handover диалог переходит на номер брокера/«только для диалогов» — бридж «передаю вас…» + интро с рекапом + скрин переписки. Клиенту уходят 3 сообщения с нового номера.</div></div>${cb('wgMigrate', !!((s.waGray || {}).migrateOnHandover))}</div>
-          ${(() => { const wg = s.waGray || {};
-            const DEF = { bridge: 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет вам с номера {target} — это мы, сохраните, пожалуйста 🙌', intro: 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с моего личного номера.', recap: 'Напомню, мы остановились на: «{quote}». Продолжаю отсюда.', proof: 'И вот скрин нашей переписки — чтобы вы были спокойны, что это действительно продолжение нашего разговора, а не посторонние 🙌' };
-            const v = (k) => esc(wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] != null ? wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] : DEF[k]);
-            return `<details class="mig-edit" style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:650;color:var(--accent);user-select:none;list-style:none;display:flex;align-items:center;gap:6px">${ic(I.edit || I.doc)}Как переводим диалог — тексты сообщений, шаблоны, схема <span class="muted" style="font-weight:400">— развернуть</span></summary>
-            <div style="margin-top:10px;padding:12px;border:1px solid var(--stroke);border-radius:12px;background:color-mix(in srgb,var(--accent) 3%,transparent)">
-              <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:9px">Когда квалифицированного лида переводят на основной/чистый номер, клиенту автоматически уходит цепочка ниже. Доступные переменные — вставляются в текущее поле:</div>
-              <div id="migVars" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:11px">${['{name}','{broker}','{agency}','{target}','{from}','{quote}'].map(t => `<button type="button" class="mig-var" data-var="${t}" style="font-size:11px;padding:3px 9px;border-radius:7px;border:1px solid var(--stroke);background:var(--bg-2,#fff);cursor:pointer;font-family:monospace;color:var(--accent)">${t}</button>`).join('')}</div>
-              <div style="display:flex;gap:7px;align-items:center;margin-bottom:11px"><label style="font-size:11.5px;color:var(--ink-3)">Готовый набор:</label><select id="migTpl" style="flex:1"><option value="">— выбрать стиль —</option><option value="friendly">Дружелюбный (эмодзи, тёплый)</option><option value="business">Деловой (строгий, без эмодзи)</option><option value="short">Короткий (минимум слов)</option></select></div>
-              <div class="form-row" style="margin:0 0 9px"><label>① Бридж — со СТАРОГО номера («передаю вас…»)</label><textarea id="migBridge" class="mig-ta" rows="2" maxlength="600" style="width:100%;resize:vertical">${v('bridge')}</textarea></div>
-              <div class="form-row" style="margin:0 0 9px"><label>② Интро — с НОВОГО номера (первое сообщение)</label><textarea id="migIntro" class="mig-ta" rows="2" maxlength="600" style="width:100%;resize:vertical">${v('intro')}</textarea></div>
-              <div class="form-row" style="margin:0 0 9px"><label>③ Рекап — на чём остановились ({quote} = последняя реплика лида)</label><textarea id="migRecap" class="mig-ta" rows="2" maxlength="400" style="width:100%;resize:vertical">${v('recap')}</textarea></div>
-              <div class="cg-row" style="margin:2px 0 9px"><div><b style="font-size:12.5px">④ Прикреплять скрин переписки</b><div class="muted" style="font-size:11px">анти-«мошенник»: клиент видит картинку нашего диалога и понимает, что это продолжение</div></div>${cb('wgMigrateProof', wg.migrateProof !== false)}</div>
-              <div class="form-row" style="margin:0 0 4px"><label>Подпись к скрину</label><textarea id="migProof" class="mig-ta" rows="2" maxlength="400" style="width:100%;resize:vertical">${v('proof')}</textarea></div>
-              <div class="muted" style="font-size:11px;margin:10px 0 6px;font-weight:650">Как это увидит клиент (схема):</div>
-              <div id="migPreview" style="display:flex;flex-direction:column;gap:7px"></div>
-            </div></details>`; })()}
+          <div class="cg-row" style="margin-top:10px"><div><b>Мост: серый → чистый номер</b><div class="muted" style="font-size:11px">перевод диалога на чистый номер менеджера при передаче — вынесен в отдельный раздел «Распределение → Мост серый→чистый» (там тумблер, тексты, готовность номеров и тест)</div></div><button class="btn btn-sm" type="button" id="cgGoBridge">Открыть раздел</button></div>
           <hr class="cg-hr">
           <div class="form-row" style="margin:0"><label>Жёсткий стоп по тишине: клиент молчит больше N дней → Спящие (0 = выключено)</label><input id="cgSilence" type="number" min="0" max="365" value="${+gv('maxSilenceDays', 0)}"></div>
           <div class="muted" style="font-size:11px;margin-top:5px">Верхнеуровневый рубильник: если от клиента нет сообщений дольше N дней (а не отвечал ни разу — от создания), лид принудительно уходит в «Спящие», независимо от цепочки и дожима. Вернётся — ИИ продолжит.</div>
@@ -11469,10 +11525,7 @@ PAGES.automations = async (root) => {
       dailySendCapBase: Math.max(5, Math.min(500, +$('#wgDailyCap', root).value || 80)),
       warmupDays: Math.max(1, Math.min(60, +$('#wgWarmDays', root).value || 14)),
       replyRateFloor: Math.max(0, Math.min(1, (+$('#wgReplyFloor', root).value || 5) / 100)),
-      migrateOnHandover: $('#wgMigrate', root).checked,
     };
-    { const mb = $('#migBridge', root), mi = $('#migIntro', root), mr = $('#migRecap', root), mp = $('#migProof', root), mpr = $('#wgMigrateProof', root);
-      if (mb) wg.migrateBridge = mb.value.trim(); if (mi) wg.migrateIntro = mi.value.trim(); if (mr) wg.migrateRecap = mr.value.trim(); if (mp) wg.migrateProofCaption = mp.value.trim(); if (mpr) wg.migrateProof = mpr.checked; }
     try { await saveAuto({ chainGuard: g }); await api.patch('/settings', { waGray: wg }); loadState(); toast('Защита сохранена', 'Анти-бан и правила применятся к цепочкам и номерам', true); }
     catch (e) { toast('Не сохранилось', e.message); }
   });
@@ -11498,7 +11551,7 @@ PAGES.automations = async (root) => {
     const tpl = $('#migTpl', root);
     if (tpl) tpl.addEventListener('change', () => { const set = TPL[tpl.value]; if (!set) return; if (bridge) bridge.value = set.bridge; if (intro) intro.value = set.intro; if (recap) recap.value = set.recap; if (proof) proof.value = set.proof; renderPrev(); });
     /* живая схема: как клиент увидит цепочку */
-    const SAMPLE = { '{name}': 'Анна', '{broker}': 'Игорь', '{agency}': ((STATE.settings && STATE.settings.agencyName) || 'TargetPoint'), '{target}': '+44 7418 000111', '{from}': '+44 7418 999888', '{quote}': 'ищу 2-комнатную у моря до 300к' };
+    const SAMPLE = { '{name}': 'Анна', '{broker}': 'Игорь', '{agency}': ((STATE.settings && STATE.settings.agency && STATE.settings.agency.name) || (STATE.settings && STATE.settings.agencyName) || 'агентство'), '{target}': '+44 7418 000111', '{from}': '+44 7418 999888', '{quote}': 'ищу 2-комнатную у моря до 300к' };
     const fill = (s) => String(s || '').replace(/\{name\}|\{broker\}|\{agency\}|\{target\}|\{from\}|\{quote\}/g, m => SAMPLE[m] || m);
     const bubble = (side, who, txt, img) => `<div style="display:flex;justify-content:${side === 'old' ? 'flex-start' : 'flex-end'}"><div style="max-width:84%;background:${side === 'old' ? 'color-mix(in srgb,var(--ink) 7%,transparent)' : 'color-mix(in srgb,#25D366 20%,transparent)'};border-radius:12px;padding:7px 10px;font-size:12px;line-height:1.4"><div class="muted" style="font-size:9.5px;margin-bottom:2px">${esc(who)}</div>${img ? `<div style="width:120px;height:74px;border-radius:8px;background:repeating-linear-gradient(45deg,var(--stroke),var(--stroke) 6px,transparent 6px,transparent 12px);display:grid;place-items:center;font-size:10px;color:var(--ink-3);margin-bottom:4px">🖼 скрин переписки</div>` : ''}${esc(txt)}</div></div>`;
     function renderPrev() {
@@ -11513,6 +11566,38 @@ PAGES.automations = async (root) => {
     if (proofTg) proofTg.addEventListener('change', renderPrev);
     renderPrev();
   })();
+  /* ── Мост серый→чистый: переход из анти-бана, сохранение, тест ── */
+  $('#cgGoBridge') && $('#cgGoBridge').addEventListener('click', () => { applyAg('dist'); const c = $('#mbridgeCard', root); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'start' }); c.classList.add('mb-flash'); setTimeout(() => c.classList.remove('mb-flash'), 1400); } });
+  $('#mbSave') && $('#mbSave').addEventListener('click', async () => {
+    const wg = { migrateOnHandover: $('#wgMigrate', root).checked, migrateProof: $('#wgMigrateProof', root).checked };
+    const mb = $('#migBridge', root), mi = $('#migIntro', root), mr = $('#migRecap', root), mp = $('#migProof', root);
+    if (mb) wg.migrateBridge = mb.value.trim(); if (mi) wg.migrateIntro = mi.value.trim(); if (mr) wg.migrateRecap = mr.value.trim(); if (mp) wg.migrateProofCaption = mp.value.trim();
+    try { await api.patch('/settings', { waGray: wg }); loadState(); toast('Мост сохранён', wg.migrateOnHandover ? 'Перевод на чистый номер включён' : 'Перевод включите тумблером, когда будете готовы', true); }
+    catch (e) { toast('Не сохранилось', e.message); }
+  });
+  $('#mbTestBtn') && $('#mbTestBtn').addEventListener('click', async () => {
+    const phone = ($('#mbTestPhone', root).value || '').trim();
+    const out = $('#mbTestOut', root);
+    const btn = $('#mbTestBtn', root);
+    /* сохраним текущие тексты перед тестом — чтобы тест бил по тому, что видно на экране */
+    const wg = { migrateProof: $('#wgMigrateProof', root).checked };
+    const mb = $('#migBridge', root), mi = $('#migIntro', root), mr = $('#migRecap', root), mp = $('#migProof', root);
+    if (mb) wg.migrateBridge = mb.value.trim(); if (mi) wg.migrateIntro = mi.value.trim(); if (mr) wg.migrateRecap = mr.value.trim(); if (mp) wg.migrateProofCaption = mp.value.trim();
+    btn.disabled = true; btn.textContent = 'Отправляю…';
+    try {
+      await api.patch('/settings', { waGray: wg });
+      const r = await api.post('/wa/gray/migrate-test', { phone });
+      const msgs = (r.messages || []).map(m => `<div class="mb-to-msg"><div class="mb-to-lbl">${esc(m.label)}</div><div class="mb-to-txt">${esc(m.text)}</div></div>`).join('');
+      let head = '';
+      if (r.sent) head = `<div class="mb-to-ok">✓ Отправлено сообщений: ${r.sent}${r.target ? ' · с номера ' + fmt(r.from) + ' и ' + fmt(r.target) : ''} — проверьте WhatsApp на ${esc(phone)}</div>`;
+      else head = `<div class="mb-to-warn">${esc(r.note || r.sendErr || 'Отправка не выполнена')} ${r.sendErr && r.sent === 0 ? '· ' + esc(r.sendErr) : ''}</div>`;
+      function fmt(p) { return '+' + String(p || '').replace(/[^0-9]/g, ''); }
+      out.innerHTML = head + '<div class="mb-to-list">' + msgs + '</div>';
+      out.style.display = '';
+      if (r.sent) toast('Тест отправлен', `${r.sent} сообщ. ушло на ${phone}`, true);
+    } catch (e) { out.innerHTML = `<div class="mb-to-warn">Ошибка: ${esc(e.message)}</div>`; out.style.display = ''; }
+    btn.disabled = false; btn.innerHTML = `${ic(I.send)}Отправить тест`;
+  });
   $('#lgSave') && $('#lgSave').addEventListener('click', async () => {
     const stages = $$('[data-lgstage]', root).filter(x => x.checked).map(x => x.dataset.lgstage);
     try { await saveAuto({ lossGate: { enabled: $('#lgEnabled', root).checked, stages } }); toast('Контроль проигрыша сохранён', stages.length ? ('стадий под контролем: ' + stages.length) : 'стадии не выбраны', true); }
