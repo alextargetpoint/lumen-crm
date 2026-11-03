@@ -323,7 +323,10 @@
   F.gallery = (ctx) => {
     const { c, fmt } = ctx;
     const refs = (ctx.section.assetRefs || []);
-    const perPage = fmt.orient === 'portrait' ? (fmt.id==='portrait_9_16'?3:3) : 4;
+    /* #5 авто-лаяут: больше фото на слайд, сетка подстраивается (.lp-gal-N). Terracotta — дизайн «крупное+1»,
+       поэтому у неё 2 фото/слайд (её hide-правило при этом ничего не прячет). */
+    const preset = (ctx.theme && ctx.theme.presetId) || '';
+    const perPage = preset === 'terracotta' ? 2 : (fmt.orient === 'portrait' ? 4 : 6);
     const pages = [];
     for (let i = 0; i < Math.max(refs.length,1); i += perPage) {
       const slice = refs.slice(i, i + perPage);

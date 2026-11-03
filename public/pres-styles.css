@@ -302,6 +302,18 @@
 .lp-preset-terracotta.lp-portrait_a4 .lp-gal, .lp-preset-terracotta.lp-portrait_9_16 .lp-gal{ grid-template-columns:1.55fr 1fr; grid-template-rows:1fr; }
 .lp-preset-terracotta.lp-portrait_a4 .lp-gal-big, .lp-preset-terracotta.lp-portrait_9_16 .lp-gal-big{ grid-column:1; grid-row:1; }
 .lp-preset-terracotta .lp-gal-sm ~ .lp-gal-sm{ display:none; }
+
+/* ====== #5 авто-лаяут галереи под число фото ====== */
+/* чётные (2/4/6) — РАВНАЯ сетка (сбалансированно); нечётные (3/5) оставляем «крупное + мелкие» (базовые правила выше). */
+/* специфичность .lp-<fmt> .lp-gal.lp-gal-N = (0,3,0) — бьёт базовую (0,2,0) и ниже пресетов → равняем даже под пресетами */
+.lp-landscape_16_9 .lp-gal.lp-gal-2, .lp-landscape_a4 .lp-gal.lp-gal-2{ grid-template-columns:1fr 1fr; grid-template-rows:1fr; }
+.lp-landscape_16_9 .lp-gal.lp-gal-4, .lp-landscape_a4 .lp-gal.lp-gal-4{ grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+.lp-landscape_16_9 .lp-gal.lp-gal-6, .lp-landscape_a4 .lp-gal.lp-gal-6{ grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr 1fr; }
+.lp-portrait_a4 .lp-gal.lp-gal-2, .lp-portrait_9_16 .lp-gal.lp-gal-2{ grid-template-columns:1fr; grid-template-rows:1fr 1fr; }
+.lp-portrait_a4 .lp-gal.lp-gal-4, .lp-portrait_9_16 .lp-gal.lp-gal-4{ grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+.lp-portrait_a4 .lp-gal.lp-gal-6, .lp-portrait_9_16 .lp-gal.lp-gal-6{ grid-template-columns:1fr 1fr; grid-template-rows:repeat(3,1fr); }
+/* в равных сетках крупное фото — обычная ячейка (сбрасываем span, в т.ч. пресетный) */
+.lp-gal.lp-gal-2 .lp-gal-big, .lp-gal.lp-gal-4 .lp-gal-big, .lp-gal.lp-gal-6 .lp-gal-big{ grid-row:auto !important; grid-column:auto !important; }
 /* Urban — большое горизонтальное сверху + два снизу (дефолт §4, доп. не нужно) */
 
 /* === характеристики/показатели на пресет (ТЗ §3/§4/§5) === */
