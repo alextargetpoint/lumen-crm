@@ -1490,8 +1490,56 @@
     function onKd(e) { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); finish(false); } else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); } }
     el.addEventListener('blur', onBlur); el.addEventListener('keydown', onKd);
   }
+  /* ⭐#4 — перетаскивание файла-картинки ПРЯМО на слот фото на холсте → загрузка в медиатеку объекта + установка в слот */
+  function ceDropUploadToSlot(el, file) {
+    if (!file || !/^image\//.test(file.type)) { toast('Нужен файл-картинка'); return; }
+    if (file.size > 14 * 1024 * 1024) { toast('Файл больше 14 МБ'); return; }
+    var s = curSection();
+    /* projectId слота; для вступления подборки (нет своего объекта) — медиатека первого объекта */
+    var pid = sectionProjectId(s) || (S.pres && S.pres.projectIds && S.pres.projectIds[0]) || (S.pres && S.pres.projectId);
+    if (!pid) { toast('Нет объекта для медиатеки'); return; }
+    var isGal = !!el.getAttribute('data-pe-gallery');
+    var ti = isGal ? +(String(el.getAttribute('data-pe-idx') || '0').replace(/[^0-9]/g, '') || 0) : +(el.getAttribute('data-pe-idx') || 0);
+    el.classList.add('pe-img-loading');
+    var rd = new FileReader();
+    rd.onload = function () {
+      apiRaw('POST', '/api/media/upload-photo', { propertyId: pid, dataUrl: rd.result, name: file.name }).then(function (r) {
+        if (r.status === 200 && r.json && r.json.added) {
+          var url = r.json.url, aid;
+          if (S.pres && S.pres.kind === 'collection') {
+            /* подборка: ассеты в S.assets с ключом объекта (<pfx>img<N>) — как их резолвит рендерер/пикер */
+            var pfx = objPrefixOf(s) || '';
+            var n = 0; Object.keys(S.assets || {}).forEach(function (k) { if (pfx && k.indexOf(pfx) !== 0) return; var mm = String(k).match(/img(\d+)$/); if (mm) n = Math.max(n, +mm[1] + 1); });
+            aid = pfx + 'img' + n; S.assets = S.assets || {}; S.assets[aid] = { url: url };
+          } else {
+            S.source = S.source || {}; S.source.images = S.source.images || []; S.source.images.push(url); aid = 'img' + (S.source.images.length - 1);
+          }
+          /* assetId → в пул; url → прямой фолбэк рендерера ((S.assets[id]||{}).url || ref.url) — гарантия показа */
+          mutate(function () { var ss = curSection(); ss.assetRefs = ss.assetRefs || []; ss.assetRefs[ti] = Object.assign({}, ss.assetRefs[ti], { assetId: aid, url: url, fit: ss.family === 'floorplan' ? 'contain' : 'cover' }); });
+          toast('Фото заменено перетаскиванием', '', true);
+        } else { el.classList.remove('pe-img-loading'); toast('Не загрузилось', (r.json && r.json.error) || ''); }
+      }).catch(function () { el.classList.remove('pe-img-loading'); toast('Ошибка сети при загрузке'); });
+    };
+    rd.onerror = function () { el.classList.remove('pe-img-loading'); toast('Не прочитал файл'); };
+    rd.readAsDataURL(file);
+  }
   function wireCanvasEditingOnce() {
     var stage = document.getElementById('peStage'); if (!stage || stage._ceWired) return; stage._ceWired = true;
+    /* файл-drop на фото-слот (только когда тащат ФАЙЛЫ, не внутренний reorder) */
+    stage.addEventListener('dragover', function (e) {
+      if (!e.dataTransfer || [].indexOf.call(e.dataTransfer.types || [], 'Files') < 0) return;
+      var el = e.target.closest && e.target.closest('.pe-ced-photo'); if (!el) return;
+      e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
+      stage.querySelectorAll('.pe-filedrop').forEach(function (x) { x.classList.remove('pe-filedrop'); });
+      el.classList.add('pe-filedrop');
+    });
+    stage.addEventListener('dragleave', function (e) { var el = e.target.closest && e.target.closest('.pe-ced-photo'); if (el && !el.contains(e.relatedTarget)) el.classList.remove('pe-filedrop'); });
+    stage.addEventListener('drop', function (e) {
+      if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+      var el = e.target.closest && e.target.closest('.pe-ced-photo'); if (!el) return;
+      e.preventDefault(); e.stopPropagation(); el.classList.remove('pe-filedrop');
+      ceDropUploadToSlot(el, e.dataTransfer.files[0]);
+    });
     stage.addEventListener('click', function (e) {
       if (S._justPanned) { S._justPanned = false; return; }   /* это был драг фото, не клик */
       var el = e.target.closest('.pe-ced');
