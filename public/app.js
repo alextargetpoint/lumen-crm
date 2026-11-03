@@ -5365,7 +5365,8 @@ PAGES.funnel = async (root) => {
       const conv = all.length ? Math.round(deals / all.length * 100) : 0;
       const hot = all.filter(l => l.hint && l.hint.kind === 'act').length;
       const over = all.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()).length;
-      return `<div class="fnl-pulse">
+      return `<div class="fnl-pulse fnl-collapsible${F.funnelStage ? ' fnl-open' : ''}">
+        <span class="fnl-peek" title="Наведите, чтобы раскрыть статистику по стадиям">${ic(I.bars || I.spark)}<span>Статистика по стадиям</span><i class="fnl-chev">▾</i></span>
         <div class="fnl-stages">${prog.map((s, i) => { const n = cnt(s.id), on = F.funnelStage === s.id; return `${i ? '<span class="fnl-sep">›</span>' : ''}<button class="fnl-st ${on ? 'on' : ''}" data-fstage="${s.id}" style="--stg:${stageColor(s.id)}" title="${esc(s.name)} — кликните, чтобы отфильтровать"><span class="fnl-st-bar"><i style="height:${Math.max(8, Math.round(n / maxN * 100))}%"></i></span><span class="fnl-st-n">${n}</span><span class="fnl-st-l">${esc(s.name)}</span></button>`; }).join('')}</div>
         <div class="fnl-kpis">
           ${hot ? `<button class="fnl-kpi hot ${F.funnelFlag === 'hot' ? 'on' : ''}" data-flag="hot" title="Горячие — требуют действия">${ic(I.flame || I.bolt)}<b>${hot}</b> горячих</button>` : ''}
@@ -20422,7 +20423,8 @@ function mountAssistant() {
   document.body.appendChild(wrap);
   $('#lasstPill', wrap).addEventListener('click', () => { ASST.open ? asstClose() : asstOpen(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ASST.open) asstClose(); });
-  document.addEventListener('click', (e) => { if (ASST.open && !e.target.closest('#lasst')) asstClose(); });
+  /* НЕ закрываем по клику вне панели — клиент жаловался, что окно «постоянно скрывается» при скролле/работе
+     с доской. Закрытие — только крестиком, Esc или повторным кликом по пилюле. */
   asstVisibility(); asstPoll();
   setInterval(asstPoll, 45000);
 }
@@ -20492,7 +20494,7 @@ function asstRender() {
     const primLbl = ({ qualify: 'Квалифицировать', assign_broker: (r.needsBroker ? 'Выбрать брокера' : 'Подтвердить передачу'), clarify_information: 'Создать задачу' })[r.type];
     const canDo = r.type !== 'assign_broker' || (r.can && r.can.assign);
     actions = '<div class="la-row">' + (canDo ? '<button class="la-btn la-primary" id="laDo"' + (ASST.busy ? ' disabled' : '') + '>' + (ASST.busy ? '<span class="la-spin"></span>' : ic(tm.ic)) + esc(primLbl) + '</button>' : '<span class="la-noperm">Передача — у руководителя</span>') +
-      '<button class="la-btn la-ghost" id="laLater">Позже</button><button class="la-btn la-icon" id="laMore" aria-label="Ещё">…</button></div>';
+      '<button class="la-btn la-ghost" id="laLater">Позже</button><button class="la-btn la-ghost la-dismiss" id="laDismiss" title="Убрать эту подсказку — она неактуальна">Отклонить</button><button class="la-btn la-icon" id="laMore" aria-label="Ещё">…</button></div>';
   }
   const nav = fl.length > 1 ? '<div class="la-nav"><button class="la-navb" id="laPrev"' + (ASST.idx <= 0 ? ' disabled' : '') + '>' + ic(I.chev || I.arrow) + '</button><div class="la-dots">' + fl.map((_, i) => '<span class="la-dot' + (i === ASST.idx ? ' on' : '') + '" data-dot="' + i + '"></span>').join('') + '</div><button class="la-navb" id="laNextC"' + (ASST.idx >= fl.length - 1 ? ' disabled' : '') + '>' + ic(I.chev || I.arrow) + '</button></div>' : '';
   const body = '<div class="la-card ' + (ASST.dir > 0 ? 'slide-l' : ASST.dir < 0 ? 'slide-r' : 'fadein') + ' t-' + tm.cls + '">' +
@@ -20509,6 +20511,7 @@ function asstRender() {
   const doB = $('#laDo', p); if (doB) doB.onclick = () => { if (r.type === 'assign_broker' && r.needsBroker) { ASST.pickBroker = true; asstRender(); } else asstApply(r); };
   const back = $('#laBack', p); if (back) back.onclick = () => { ASST.pickBroker = false; asstRender(); };
   const later = $('#laLater', p); if (later) later.onclick = (e) => asstLaterMenu(e, r);
+  const dism = $('#laDismiss', p); if (dism) dism.onclick = () => asstDismiss(r);   /* видимая кнопка «Отклонить» — клиент не находил её в «…» */
   const more = $('#laMore', p); if (more) more.onclick = (e) => asstMoreMenu(e, r);
   const all = $('#laAll', p); if (all) all.onclick = () => asstAllList();
   const pv = $('#laPrev', p); if (pv) pv.onclick = () => asstGoto(ASST.idx - 1);
@@ -20525,8 +20528,16 @@ function asstAllList() {
   // иначе при активном сегменте индекс не совпадёт с отфильтрованным списком и карточка уедет/опустеет.
   p.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { ASST.seg = ''; ASST.idx = +b.dataset.i; ASST.expanded = false; ASST.pickBroker = false; asstRender(); });
 }
-function asstLaterMenu(e, r) { e.stopPropagation(); const H = 36e5; const opts = [['Через час', Date.now() + H], ['Завтра', Date.now() + 24 * H]]; simpleMenu(e.currentTarget, opts.map(o => ({ t: o[0], fn: () => asstSnooze(r, o[1]) }))); }
-function asstMoreMenu(e, r) { e.stopPropagation(); simpleMenu(e.currentTarget, [{ t: 'Неактуально', fn: () => asstDismiss(r) }]); }
+function asstLaterMenu(e, r) { e.stopPropagation(); const H = 36e5; const opts = [['Через час', Date.now() + H], ['Через 3 часа', Date.now() + 3 * H], ['Завтра', Date.now() + 24 * H], ['На неделю', Date.now() + 7 * 24 * H]]; simpleMenu(e.currentTarget, opts.map(o => ({ t: o[0], fn: () => asstSnooze(r, o[1]) }))); }
+function asstMoreMenu(e, r) {
+  e.stopPropagation();
+  const items = [
+    { t: 'Открыть карточку лида', fn: () => { asstClose(); if (typeof openLeadModal === 'function') openLeadModal(r.leadId, 'funnel'); } },
+    { t: 'Отложить на неделю', fn: () => asstSnooze(r, Date.now() + 7 * 24 * 36e5) },
+    { t: 'Отклонить (неактуально)', fn: () => asstDismiss(r) },
+  ];
+  simpleMenu(e.currentTarget, items);
+}
 function simpleMenu(anchor, items) {
   const old = document.getElementById('laMenu'); if (old) old.remove();
   const m = el('<div id="laMenu" class="la-menu"></div>'); items.forEach(it => { const b = el('<button>' + esc(it.t) + '</button>'); b.onclick = (ev) => { ev.stopPropagation(); m.remove(); it.fn(); }; m.appendChild(b); });
