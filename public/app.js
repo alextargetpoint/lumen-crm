@@ -6701,9 +6701,9 @@ async function openLeadModal(id, backScope) {
       <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
       ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
     </div>
-    ${l.pendingLoss ? (() => { const _own = STATE.me && STATE.me.role === 'owner'; const _to = (STAGES.find(s => s.id === l.pendingLoss.toStage) || {}).name || l.pendingLoss.toStage; return `<div class="lc-ploss ${_own ? 'own' : ''}">
-      <div class="lc-ploss-tx">${ic(I.clock)}<span><b>Проигрыш на подтверждении.</b> ${esc(l.pendingLoss.byName || 'Менеджер')} переводит в «${esc(_to)}»${l.pendingLoss.reason ? ' — «' + esc(l.pendingLoss.reason) + '»' : ''}. ${_own ? 'Проверьте касания и решите.' : 'Ожидает решения руководителя.'}</span></div>
-      ${_own ? `<div class="lc-ploss-act"><button class="btn btn-sm btn-accent" id="lcLossOk">Подтвердить проигрыш</button><button class="btn btn-sm" id="lcLossBack">Вернуть в работу</button></div>` : ''}
+    ${l.pendingLoss ? (() => { const _own = STATE.me && STATE.me.role === 'owner'; const _rev = STATE.me && STATE.me.role === 'broker' && l.pendingLoss.reviewer && STATE.me.brokerId === l.pendingLoss.reviewer; const _canAct = _own || _rev; const _to = (STAGES.find(s => s.id === l.pendingLoss.toStage) || {}).name || l.pendingLoss.toStage; return `<div class="lc-ploss ${_canAct ? 'own' : ''}">
+      <div class="lc-ploss-tx">${ic(I.clock)}<span><b>Проигрыш на подтверждении.</b> ${esc(l.pendingLoss.byName || 'Менеджер')} переводит в «${esc(_to)}»${l.pendingLoss.reason ? ' — «' + esc(l.pendingLoss.reason) + '»' : ''}. ${_canAct ? 'Проверьте касания и решите.' : 'Ожидает решения проверяющего.'}</span></div>
+      ${_canAct ? `<div class="lc-ploss-act"><button class="btn btn-sm btn-accent" id="lcLossOk">Подтвердить проигрыш</button><button class="btn btn-sm" id="lcLossBack">Вернуть в работу</button></div>` : ''}
     </div>`; })() : ''}
     ${['handover', 'viewing', 'deal'].includes(l.stage) ? `<div class="lc-deal">
       <div class="lc-deal-f"><label class="lc-lbl">Сумма сделки · цена объекта</label><input class="gi" id="mDealVal" type="number" min="0" step="1000" value="${l.dealValue || ''}" placeholder="напр. 150000"></div>
@@ -11216,16 +11216,19 @@ PAGES.automations = async (root) => {
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
           return `<div class="glass card mb" data-ag="dist">
           <div class="card-title">${ic(I.shield || I.check)}Контроль проигрыша<span class="sub">двойной контроль: менеджер не теряет лида без вашего «ок»</span></div>
-          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Когда менеджер переводит лида в проигранную стадию, лид <b>не уходит сразу</b> — попадает к вам на подтверждение. Вы смотрите касания и либо подтверждаете проигрыш, либо возвращаете в работу с комментарием. (На вас, как на руководителя, гейт не распространяется — вы переводите напрямую.)</div>
+          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Когда менеджер переводит лида в проигранную стадию, лид <b>не уходит сразу</b> — попадает <b>проверяющему</b> на подтверждение. Тот смотрит касания и либо подтверждает проигрыш, либо возвращает в работу с комментарием. (На проверяющего гейт не распространяется — он переводит напрямую.)</div>
           <div class="cg-row"><div><b>Требовать подтверждение проигрыша</b><div class="muted" style="font-size:11px">для выбранных ниже стадий, при переводе менеджером</div></div>${cb('lgEnabled', !!lg.enabled)}</div>
           <div class="form-row" style="margin-top:10px"><label>Стадии, требующие подтверждения</label>
             <div style="display:flex;flex-wrap:wrap;gap:7px">${gateable.map(st => `<label class="lg-chip"><input type="checkbox" data-lgstage="${st.id}" ${sel.includes(st.id) ? 'checked' : ''}> ${esc(st.name)}</label>`).join('') || '<span class="muted">Нет подходящих стадий</span>'}</div></div>
+          <div class="form-row" style="margin-top:10px"><label>Кто подтверждает проигрыш <span class="muted" style="font-weight:400">— кому приходит запрос и кто решает</span></label>
+            <select id="lgReviewer">${(() => { const brs = (STATE.brokers || []).filter(b => b.active !== false); const cur = lg.reviewerId || ''; const valid = brs.some(b => b.id === cur); return `<option value="" ${!valid ? 'selected' : ''}>Владелец агентства (вы)</option>` + brs.map(b => `<option value="${esc(b.id)}" ${cur === b.id ? 'selected' : ''}>${esc(b.name)}${b.role === 'rop' || /роп|руковод/i.test(b.role || '') ? ' · РОП' : ''}</option>`).join(''); })()}</select>
+            <div class="muted" style="font-size:11px;margin-top:4px">Можно назначить РОПа или старшего менеджера — запрос уйдёт ему в личку, и подтверждать/возвращать сможет он. Владелец видит и решает всегда.</div></div>
           <button class="btn btn-sm btn-accent" id="lgSave" style="margin-top:10px">Сохранить контроль</button>
         </div>`; })()}
         ${(() => { const wg = s.waGray || {};
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
           const DEF = { bridge: 'Чтобы вам было удобнее, передаю вас {broker} — продолжим с того же места. Он напишет вам с номера {target} — это мы, сохраните, пожалуйста 🙌', intro: 'Здравствуйте, {name}! Это {broker} из {agency} — продолжаю наш разговор здесь, с моего личного номера.', recap: 'Напомню, мы остановились на: «{quote}». Продолжаю отсюда.', proof: 'И вот скрин нашей переписки — чтобы вы были спокойны, что это действительно продолжение нашего разговора, а не посторонние 🙌' };
-          const v = (k) => esc(wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] != null ? wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] : DEF[k]);
+          const v = (k) => esc(wg['migrate' + k.charAt(0).toUpperCase() + k.slice(1)] || DEF[k]);
           const nums = (wg.numbers || []);
           const cleans = nums.filter(n => n.roles && n.roles.outreach === false);
           const primary = cleans.find(n => n.roles && n.roles.primary);
@@ -11600,7 +11603,8 @@ PAGES.automations = async (root) => {
   });
   $('#lgSave') && $('#lgSave').addEventListener('click', async () => {
     const stages = $$('[data-lgstage]', root).filter(x => x.checked).map(x => x.dataset.lgstage);
-    try { await saveAuto({ lossGate: { enabled: $('#lgEnabled', root).checked, stages } }); toast('Контроль проигрыша сохранён', stages.length ? ('стадий под контролем: ' + stages.length) : 'стадии не выбраны', true); }
+    const reviewerId = ($('#lgReviewer', root) || {}).value || '';
+    try { await saveAuto({ lossGate: { enabled: $('#lgEnabled', root).checked, stages, reviewerId } }); const rn = reviewerId ? ((STATE.brokers || []).find(b => b.id === reviewerId) || {}).name : 'Владелец'; toast('Контроль проигрыша сохранён', `Проверяющий: ${rn || '—'}` + (stages.length ? ` · стадий: ${stages.length}` : ''), true); }
     catch (e) { toast('Не сохранилось', e.message); }
   });
   $('#lrSave') && $('#lrSave').addEventListener('click', async () => {

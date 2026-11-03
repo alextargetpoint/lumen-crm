@@ -7967,7 +7967,8 @@ const server = http.createServer(async (req, res) => {
     /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
     const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length || (MEMBER.leadFilter.contractors || []).length)) ? MEMBER.leadFilter : null;
     const matchesLeadFilter = (l) => { if (!LF) return true; const byTag = (LF.tags || []).length && (l.tags || []).some(t => LF.tags.includes(t)); const bySrc = (LF.sources || []).length && LF.sources.includes(l.source); const byVendor = (LF.contractors || []).length && LF.contractors.includes(l.vendorId); return !!(byTag || bySrc || byVendor); };
-    const canSeeLead = (l) => (!IS_BROKER || (CAP && CAP.leads === 'all') || l.broker === ROLE.brokerId) && matchesLeadFilter(l);
+    /* назначенный проверяющий проигрыша видит ЧУЖОЙ лид, пока тот ждёт его решения (иначе не сможет открыть карточку и подтвердить/вернуть) */
+    const canSeeLead = (l) => (IS_BROKER && l && l.pendingLoss && l.pendingLoss.reviewer && l.pendingLoss.reviewer === ROLE.brokerId) || ((!IS_BROKER || (CAP && CAP.leads === 'all') || l.broker === ROLE.brokerId) && matchesLeadFilter(l));
     /* SEC: трафик-подрядчик — его собственный contractorId. Для него ФОРСИМ cid в ads-аналитике (игнорим
        ?contractorId= из URL), чтобы он не мог запросить данные чужого подрядчика. Для остальных = null (не форсим). */
     const scopedCid = (IS_BROKER && MEMBER && (MEMBER.contractorId || ((MEMBER.leadFilter || {}).contractors || [])[0])) || null;
@@ -9064,12 +9065,18 @@ const server = http.createServer(async (req, res) => {
           const _lg = (db.settings.automations || {}).lossGate || {};
           if (_lg.enabled && (_lg.stages && _lg.stages.length ? _lg.stages : ['lost']).includes(b.stage)) {
             const _rb = (sessionRole(req) || {}).brokerId || null;
-            const _bn = (db.brokers.find(x => x.id === _rb) || {}).name || 'Менеджер';
-            const _to = b.stage;
-            lead.pendingLoss = { toStage: _to, fromStage: lead.stage, by: _rb, byName: _bn, at: Date.now(), reason: b.lossReason ? String(b.lossReason).slice(0, 300) : '' };
-            notify(db, { type: 'lead', level: 'warn', title: 'Проигрыш на подтверждение', text: `${_bn} переводит «${lead.name || lead.phone}» в проигранную стадию — требуется ваше подтверждение. Откройте карточку лида.`, email: false });
-            store.save();
-            return json(res, 200, Object.assign(leadView(db, lead), { pendingLoss: true }));
+            /* проверяющий: назначенный брокер (reviewerId) ЛИБО владелец (пусто). Сам проверяющий себе гейт не ставит. */
+            const _reviewer = (_lg.reviewerId && (db.brokers || []).some(x => x.id === _lg.reviewerId && x.active !== false)) ? _lg.reviewerId : null;
+            if (!(_reviewer && _rb && _reviewer === _rb)) {
+              const _bn = (db.brokers.find(x => x.id === _rb) || {}).name || 'Менеджер';
+              const _to = b.stage;
+              lead.pendingLoss = { toStage: _to, fromStage: lead.stage, by: _rb, byName: _bn, at: Date.now(), reason: b.lossReason ? String(b.lossReason).slice(0, 300) : '', reviewer: _reviewer };
+              const _txt = `${_bn} переводит «${lead.name || lead.phone}» в проигранную стадию — требуется ваше подтверждение. Откройте карточку лида.`;
+              if (_reviewer) notifyBrokerAssigned(db, _reviewer, [lead], _txt).catch(() => {});   /* назначенный проверяющий — в его личку */
+              else notify(db, { type: 'lead', level: 'warn', title: 'Проигрыш на подтверждение', text: _txt, email: false });   /* владелец */
+              store.save();
+              return json(res, 200, Object.assign(leadView(db, lead), { pendingLoss: true }));
+            }
           }
         }
         if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; if (lead.pendingLoss) delete lead.pendingLoss; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); if (b.stage === 'deal' && !lead.dealAt) lead.dealAt = Date.now(); }
@@ -9118,22 +9125,25 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    /* ⭐#822 — подтверждение/возврат проигрыша руководителем (РОП). Только НЕ брокер. */
+    /* ⭐#822 — подтверждение/возврат проигрыша. Владелец ВСЕГДА; брокер — только если он назначенный проверяющий (pl.reviewer). */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/loss\/(confirm|reject)$/)) && req.method === 'POST') {
-      if (IS_BROKER) return json(res, 403, { error: 'только руководитель' });
       const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
       if (!lead.pendingLoss) return json(res, 400, { error: 'нет запроса на подтверждение' });
+      const _bid = (sessionRole(req) || {}).brokerId || null;
+      const _isReviewer = IS_BROKER && lead.pendingLoss.reviewer && _bid === lead.pendingLoss.reviewer;
+      if (IS_BROKER && !_isReviewer) return json(res, 403, { error: 'подтверждать проигрыш может только руководитель или назначенный проверяющий' });
+      const _byWhom = _isReviewer ? ((db.brokers.find(x => x.id === _bid) || {}).name || 'проверяющим') : 'руководителем';
       const b = await readBody(req).catch(() => ({}));
       const pl = lead.pendingLoss;
       if (m[2] === 'confirm') {
         lead.stage = pl.toStage; delete lead.pendingLoss;
         markPeakQual(db, lead); try { capi.onStageChange(db, lead, lead.stage); } catch (_) {}
-        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `✓ Проигрыш подтверждён руководителем (запросил ${pl.byName || 'менеджер'})` });
-        if (pl.by) notifyBrokerAssigned(db, pl.by, [lead], `Проигрыш «${lead.name || lead.phone}» подтверждён руководителем.`).catch(() => {});
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `✓ Проигрыш подтверждён ${_byWhom} (запросил ${pl.byName || 'менеджер'})` });
+        if (pl.by) notifyBrokerAssigned(db, pl.by, [lead], `Проигрыш «${lead.name || lead.phone}» подтверждён ${_byWhom}.`).catch(() => {});
       } else {
         delete lead.pendingLoss;
         const note = b.note ? String(b.note).slice(0, 500) : '';
-        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `↩️ Проигрыш отклонён руководителем — в работу${note ? ': ' + note : ''}` });
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `↩️ Проигрыш отклонён ${_byWhom} — в работу${note ? ': ' + note : ''}` });
         if (pl.by) notifyBrokerAssigned(db, pl.by, [lead], `Проигрыш «${lead.name || lead.phone}» отклонён — верните в работу${note ? ': ' + note : ''}.`).catch(() => {});
       }
       store.save();
@@ -11994,12 +12004,12 @@ const server = http.createServer(async (req, res) => {
         .replace(/\{target\}/g, cleanNum ? ('+' + cleanNum.phone) : '+971 00 000 00 00')
         .replace(/\{from\}/g, grayNum ? ('+' + grayNum.phone) : '')
         .replace(/\{quote\}/g, 'Сколько стоит студия с видом на море и какой план рассрочки?');
-      const recapTxt = vars(g.migrateRecap != null ? g.migrateRecap : DEF.recap);
+      const recapTxt = vars(g.migrateRecap || DEF.recap);
       const msgs = [
-        { label: '① Бридж (со старого номера)', text: vars(g.migrateBridge != null ? g.migrateBridge : DEF.bridge), fromRole: 'gray' },
-        { label: '② Интро + рекап (с нового номера)', text: vars(g.migrateIntro != null ? g.migrateIntro : DEF.intro) + (recapTxt ? '\n\n' + recapTxt : ''), fromRole: 'clean' },
+        { label: '① Бридж (со старого номера)', text: vars(g.migrateBridge || DEF.bridge), fromRole: 'gray' },
+        { label: '② Интро + рекап (с нового номера)', text: vars(g.migrateIntro || DEF.intro) + (recapTxt ? '\n\n' + recapTxt : ''), fromRole: 'clean' },
       ];
-      if (g.migrateProof !== false) msgs.push({ label: '③ Подпись к скрину переписки (с нового номера)', text: vars(g.migrateProofCaption != null ? g.migrateProofCaption : DEF.proof) + '\n\n⟨в реальном переводе здесь прикрепляется скриншот вашей переписки⟩', fromRole: 'clean' });
+      if (g.migrateProof !== false) msgs.push({ label: '③ Подпись к скрину переписки (с нового номера)', text: vars(g.migrateProofCaption || DEF.proof) + '\n\n⟨в реальном переводе здесь прикрепляется скриншот вашей переписки⟩', fromRole: 'clean' });
       let sent = 0, sendErr = null;
       if (to && conn.length) {
         for (const m of msgs) {
