@@ -3657,8 +3657,16 @@ function yesimPurchaseId(r) {
 function yesimCountryCfg(db) {
   let py = {}; try { py = (store.getRegistry() || {}).platformYesim || {}; } catch (_) {}
   const norm = a => (Array.isArray(a) ? a : []).map(c => String(c).toUpperCase().slice(0, 2)).filter(Boolean);
+  let waCountries = norm(py.waCountries).length ? norm(py.waCountries) : ['NL', 'GB'];   /* UK = GB (ISO) */
+  /* ⭐+66/TH для Пхукета (voice 755, msg 11:01): агентству, РАБОТАЮЩЕМУ в Таиланде, разрешаем WA-номера TH —
+     чтобы писать Пхукет-клиентам с местного кода, а не UK (+44) «некрасиво». Консервативно: только TH и только
+     для тай-агентств (у WA строгий список стран из-за банов); фактическое наличие +66 пересекается с каталогом Yesim. */
+  try {
+    const geos = ((db && db.settings && db.settings.agency && db.settings.agency.geos) || []).map(g => String(g).toLowerCase());
+    if (geos.some(g => /phuket|thai|bangkok|pattaya|samui|krabi|chiang/.test(g)) && !waCountries.includes('TH')) waCountries = [...waCountries, 'TH'];
+  } catch (_) {}
   return {
-    waCountries: norm(py.waCountries).length ? norm(py.waCountries) : ['NL', 'GB'],   /* UK = GB (ISO) */
+    waCountries,
     tgCountries: norm(py.tgCountries),                                                 /* пусто = любая из каталога */
     tgExclude: norm(py.tgExclude).length ? norm(py.tgExclude) : ['UA'],                /* Украину не берём */
   };
