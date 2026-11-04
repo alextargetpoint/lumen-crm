@@ -11433,7 +11433,7 @@ PAGES.automations = async (root) => {
           <button class="btn btn-sm btn-accent" id="lrSave" style="margin-top:14px">Сохранить маршрутизацию</button>
         </div>`; })()}
         <div class="glass card mb" data-ag="reports">
-          <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.doc)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Отчёты и уведомления</div><div class="acc-wh-d">Сводки и мгновенные алерты владельцу в Telegram + ссылка на отчёт для клиента.</div></div></div>
           ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
           ${swRow('Еженедельная (пн) и ежемесячная (1-е)', 'Расширенные сводки по периодам', sw('rep_weekly', (s.reports || {}).weekly) + sw('rep_monthly', (s.reports || {}).monthly))}
           ${swRow('Мгновенные уведомления', 'Смотрит подборку · квалифицирован · нужен человек · сделка', sw('rep_instant', Object.values((s.reports || {}).instant || {}).some(Boolean)))}
@@ -11529,27 +11529,27 @@ PAGES.automations = async (root) => {
           })()}
         </div>
         <div class="glass card mb" data-ag="meet">
-          <div class="card-title">${ic(I.cal)}Встречи</div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.cal)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Встречи</div><div class="acc-wh-d">Напоминания клиенту, тихие часы по поясу, SLA брокера и возврат «не пришёл».</div></div></div>
           ${swRow('Цепочка напоминаний клиенту', 'Часы до встречи через запятую (0.5 = за 30 мин) — каждое уходит в WhatsApp со ссылкой на страницу встречи', `<input id="meetChain" style="width:150px" value="${esc((a.meetRemindChain || (a.meetingReminderHrs ? [a.meetingReminderHrs] : [24, 3])).join(', '))}" placeholder="24, 3, 0.5">`)}
           ${swRow('Тихие часы по поясу лида', 'Ночью касания/реанимация/напоминания сдвигаются на утро клиента; мгновенный ответ на свежую заявку — исключение (клиент онлайн). Пояс берётся из кода страны номера', `<span style="display:inline-flex;gap:6px;align-items:center;font-size:12px">с <input id="qhFrom" type="number" style="width:58px" value="${(a.quietHours || {}).from ?? 21}"> до <input id="qhTo" type="number" style="width:58px" value="${(a.quietHours || {}).to ?? 9}"> <label class="switch"><input type="checkbox" id="qhOn" ${(a.quietHours || {}).enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></span>`)}
           ${swRow('SLA брокера, минут', 'Не коснулся лида после передачи за N мин → эскалация в ленту; за 2×N → лид уходит следующему брокеру', `<input id="slaMin" type="number" style="width:90px" value="${a.brokerSlaMin || ''}" placeholder="30">`)}
           ${swRow('«Не пришёл» — вернуть в работу', 'Мягкое сообщение клиенту + ИИ снова ведёт диалог, лид не теряется', sw('noShowMessage', a.noShowMessage))}
         </div>
         <div class="glass card" data-ag="first">
-          <div class="card-title">${ic(I.spark)}Первая линия и ИИ</div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.spark)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Первая линия и ИИ</div><div class="acc-wh-d">Мгновенный ответ, авто-дожим молчащих, квалификатор и реанимация спящих.</div></div></div>
           ${swRow('Мгновенный ответ + цепочка касаний', '7 касаний / 18 дней, пока клиент не ответил', link('sequences', 'Настроить'))}
           ${(() => { const re = a.reengage || {}; const on = re.enabled !== false; return swRow('Авто-дожим молчащих диалогов', 'Клиент ответил и пропал → ИИ сам возвращает его (follow-up), а не только кнопкой «Подтолкнуть». Первый дожим через N ч тишины, дальше нарастающие паузы; после лимита попыток → «Спящие». Видно в диалоге, когда ИИ коснётся.', `<span style="display:inline-flex;gap:6px;align-items:center;font-size:12px">через <input id="reFirst" type="number" min="1" max="720" style="width:62px" value="${re.firstDelayHours ?? 20}"> ч · до <input id="reMax" type="number" min="1" max="10" style="width:50px" value="${re.maxAttempts ?? 3}"> попыток <label class="switch"><input type="checkbox" id="reOn" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></span>`); })()}
           ${swRow('ИИ-квалификатор и правила отключения', 'Критерии по гео, стоп-слова, перехват человеком', link('qualifier', 'Настроить'))}
           ${swRow('Реанимация спящих', 'Скоринг + безопасные кампании пачками', link('wake', 'Настроить'))}
         </div>
         <div class="glass card mb" data-ag="first">
-          <div class="card-title">${ic(I.link)}Поток лидов</div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.link)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Поток лидов</div><div class="acc-wh-d">Приём из рекламы с дедупликацией, атрибуция к объявлениям, исходящий мост в CRM.</div></div></div>
           ${swRow('Приём из рекламы + дедупликация', 'Вебхук Albato/Make, повторные заявки не плодят дубли', link('ads', 'Настроить'))}
           ${swRow('Атрибуция к объявлениям', 'Мэтчинг ad_id на базу объявлений', link('ads', 'К базе'))}
           ${swRow('Исходящий мост', 'Квал/передача уходят POST-ом во внешнюю CRM', link('ads', 'Настроить'))}
         </div>
         <div class="glass card mb" data-ag="build">
-          <div class="card-title">${ic(I.funnel)}Конструктор воронки<span class="sub">названия, порядок, свои стадии</span></div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.funnel)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Конструктор воронки</div><div class="acc-wh-d">Названия и порядок стадий, свои стадии (Бронь / Договор / Ипотека).</div></div></div>
           <div id="stList">${(STAGES._all || STAGES).map(st => `<div class="ch-prio" data-stid="${st.id}">
             <span class="kb-ic">${ic(I[st.icon] || I.doc)}</span>
             <input class="gi" data-stname value="${esc(st.name)}" style="flex:1">
@@ -11566,7 +11566,7 @@ PAGES.automations = async (root) => {
           <button class="btn btn-accent btn-sm" id="stSave" style="margin-top:10px">Сохранить воронку</button>
         </div>
         <div class="glass card" data-ag="build">
-          <div class="card-title">${ic(I.doc)}Свои поля карточки лида</div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.doc)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Свои поля карточки лида</div><div class="acc-wh-d">Поля агентства в каждой карточке лида — 12 типов (текст, деньги, дата, выбор…).</div></div></div>
           <div class="muted" style="font-size:11.8px;margin-bottom:10px">Поля агентства — видны в карточке каждого лида. 12 типов: текст, число, деньги, дата, выбор, рейтинг и другие.</div>
           <div id="cfList">${(s.customFields || []).map((f, i) => `<div class="set-row"><div class="sp"><div class="sl">${esc(f.label)}<span class="cf-tbadge">${CF_TYPE_RU[f.type] || 'Текст'}</span></div><div class="sd">${cfTypeDesc(f)}</div></div><button class="btn-ghost" data-cfdel="${i}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;padding:6px 0">Полей пока нет</div>'}</div>
           <div class="lc-note-row" style="margin-top:10px">
