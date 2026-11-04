@@ -11362,38 +11362,44 @@ PAGES.automations = async (root) => {
         ${(() => { const g = (s.automations || {}).chainGuard || {}; const gv = (k, d) => g[k] !== undefined ? g[k] : d;
           const cb = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
           return `<div class="glass card mb" data-ag="burnout">
-          <div class="card-title">${ic(I.shield || I.spark)}Защита цепочек от выгорания<span class="sub">не бомбить молчунов — меньше жалоб и банов номеров</span></div>
-          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Если клиент молчит на 4–5-е касание, долбить дальше вредно: копится негатив → жалобы → бан номера. Эти правила дают клиенту мягко выйти и останавливают рассылку по сигналу отказа.</div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.shield || I.spark)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Защита от выгорания</div><div class="acc-wh-d">Не бомбить молчунов: мягкий выход и остановка по сигналу отказа — меньше жалоб и банов номеров.</div></div></div>
           <div class="cg-row"><div><b>Включить защиту</b><div class="muted" style="font-size:11px">главный выключатель всех правил ниже</div></div>${cb('cgEnabled', gv('enabled', true) !== false)}</div>
-          <hr class="cg-hr">
-          <div class="cg-row"><div><b>Авто-стоп на отказ</b><div class="muted" style="font-size:11px">клиент пишет «не интересно / воздержусь / нет» → ИИ шлёт одно вежливое закрытие и прекращает касания (лид → Спящие)</div></div>${cb('cgDecline', gv('autoStopOnDecline', true) !== false)}</div>
-          <div class="form-row"><label>Текст закрытия (<code>{name}</code> — имя клиента)</label><textarea id="cgClosing" rows="2" style="min-height:52px;width:100%;box-sizing:border-box">${esc(gv('closingMessage', 'Понял вас, {name}. Не буду настаивать — остаёмся на связи. Если тема станет актуальной, просто напишите сюда, и мы продолжим с того же места. Хорошего дня! 🙏'))}</textarea></div>
-          <hr class="cg-hr">
-          <div class="cg-row"><div><b>Мягкий выход в цепочке</b><div class="muted" style="font-size:11px">на N-м касании добавить клиенту лёгкую возможность остановить рассылку</div></div>${cb('cgSoftExit', gv('softExitOffer', true) !== false)}</div>
-          <div style="display:grid;grid-template-columns:150px 1fr;gap:10px">
-            <div class="form-row"><label>На каком касании</label><input id="cgSoftAt" type="number" min="1" max="20" value="${+gv('softExitAtTouch', 3)}"></div>
-            <div class="form-row"><label>Текст предложения выхода</label><textarea id="cgSoftText" rows="2" style="min-height:52px;width:100%;box-sizing:border-box">${esc(gv('softExitText', 'Если тема сейчас не актуальна — просто напишите «нет», и я больше не буду беспокоить. А если интересно, с радостью помогу дальше.'))}</textarea></div>
+          <div class="acc-sub" style="margin-top:14px"><div class="acc-sub-h">${ic(I.x || I.shield)}Авто-стоп на отказ</div>
+            <div class="cg-row" style="margin:0"><div><b>Останавливать по сигналу отказа</b><div class="muted" style="font-size:11px">клиент пишет «не интересно / воздержусь / нет» → ИИ шлёт одно вежливое закрытие и прекращает касания (лид → Спящие)</div></div>${cb('cgDecline', gv('autoStopOnDecline', true) !== false)}</div>
+            <div class="form-row" style="margin-top:11px"><label>Текст закрытия (<code>{name}</code> — имя клиента)</label><textarea id="cgClosing" rows="2" style="min-height:52px;width:100%;box-sizing:border-box">${esc(gv('closingMessage', 'Понял вас, {name}. Не буду настаивать — остаёмся на связи. Если тема станет актуальной, просто напишите сюда, и мы продолжим с того же места. Хорошего дня! 🙏'))}</textarea></div>
           </div>
-          <hr class="cg-hr">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
-            <div class="form-row" style="margin:0"><label>Потолок касаний без ответа → Спящие (0 = без потолка)</label><input id="cgMaxTouch" type="number" min="0" max="30" value="${+gv('maxTouchesNoReply', 5)}"></div>
-            <div class="cg-row" style="margin:0"><div><b>Пауза при офлайн-номере</b><div class="muted" style="font-size:11px">не слать, пока номер разлогинен (иначе шлём в пустоту)</div></div>${cb('cgPause', gv('pauseOnOffline', true) !== false)}</div>
+          <div class="acc-sub" style="margin-top:12px"><div class="acc-sub-h">${ic(I.refresh || I.shield)}Мягкий выход из цепочки</div>
+            <div class="cg-row" style="margin:0"><div><b>Предлагать мягкий выход</b><div class="muted" style="font-size:11px">на N-м касании добавить клиенту лёгкую возможность остановить рассылку</div></div>${cb('cgSoftExit', gv('softExitOffer', true) !== false)}</div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:10px;margin-top:11px">
+              <div class="form-row"><label>На каком касании</label><input id="cgSoftAt" type="number" min="1" max="20" value="${+gv('softExitAtTouch', 3)}"></div>
+              <div class="form-row"><label>Текст предложения выхода</label><textarea id="cgSoftText" rows="2" style="min-height:52px;width:100%;box-sizing:border-box">${esc(gv('softExitText', 'Если тема сейчас не актуальна — просто напишите «нет», и я больше не буду беспокоить. А если интересно, с радостью помогу дальше.'))}</textarea></div>
+            </div>
           </div>
-          <hr class="cg-hr">
-          <div class="card-title" style="font-size:13px;margin-bottom:2px">${ic(I.shield || I.spark)}Анти-бан серого WhatsApp<span class="sub">главное против бана номеров</span></div>
-          <div class="muted" style="font-size:11px;margin:0 0 8px">Банит НОМЕР за холодный объём при низком отклике. Прогрев, дневной потолок и выход с серого после N касаний — активны по умолчанию.</div>
-          <div class="form-row" style="margin:0 0 10px"><label><b>Жёсткий потолок: всего касаний БЕЗ единого ответа (по ВСЕМ каналам) → долгосрочный прохладный</b> (0 = выкл)</label><input id="cgTotalCold" type="number" min="0" max="30" value="${+gv('maxColdTouchesTotal', 4)}"><div class="muted" style="font-size:11px;margin-top:3px">Главный предохранитель: клиент ни разу не отреагировал и уже отправлено столько касаний (WhatsApp + Telegram + email вместе) — прекращаем касания, лид уходит в «долгосрочный прохладный». Считаются реальные отправленные, а не по-канальный счётчик.</div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
+          <div class="acc-sub" style="margin-top:12px"><div class="acc-sub-h">${ic(I.clock || I.shield)}Общие ограничения</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
+              <div class="form-row" style="margin:0"><label>Потолок касаний без ответа → Спящие (0 = без потолка)</label><input id="cgMaxTouch" type="number" min="0" max="30" value="${+gv('maxTouchesNoReply', 5)}"></div>
+              <div class="cg-row" style="margin:0"><div><b>Пауза при офлайн-номере</b><div class="muted" style="font-size:11px">не слать, пока номер разлогинен (иначе шлём в пустоту)</div></div>${cb('cgPause', gv('pauseOnOffline', true) !== false)}</div>
+            </div>
+            <div class="form-row" style="margin:12px 0 0"><label>Жёсткий стоп по тишине: клиент молчит больше N дней → Спящие (0 = выключено)</label><input id="cgSilence" type="number" min="0" max="365" value="${+gv('maxSilenceDays', 0)}"><div class="muted" style="font-size:11px;margin-top:5px">Верхнеуровневый рубильник: нет сообщений дольше N дней — лид уходит в «Спящие». Вернётся — ИИ продолжит.</div></div>
+          </div>
+          <button class="btn btn-sm btn-accent" id="cgSave" style="margin-top:14px">Сохранить защиту</button>
+        </div>
+        <div class="glass card mb" data-ag="antiban">
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.shield || I.spark)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Анти-бан: лимиты и прогрев номера</div><div class="acc-wh-d">WhatsApp банит НОМЕР за холодный объём при низком отклике. Прогрев, дневной потолок и выход с серого после N касаний снижают риск.</div></div></div>
+          <div class="ait-note" style="font-size:11.5px;color:var(--ink-3);line-height:1.5;margin-bottom:12px">Интерфейс ограничивает нагрузку и снижает риск, но не гарантирует отсутствие блокировок WhatsApp.</div>
+          <div class="acc-sub"><div class="acc-sub-h">${ic(I.send || I.shield)}Ограничения касаний</div>
+            <div class="form-row" style="margin:0 0 11px"><label><b>Жёсткий потолок: всего касаний БЕЗ единого ответа (по ВСЕМ каналам) → долгосрочный прохладный</b> (0 = выкл)</label><input id="cgTotalCold" type="number" min="0" max="30" value="${+gv('maxColdTouchesTotal', 4)}"><div class="muted" style="font-size:11px;margin-top:3px">Главный предохранитель: клиент ни разу не отреагировал и уже отправлено столько касаний (WhatsApp + Telegram + email вместе) — прекращаем касания. Считаются реальные отправленные.</div></div>
             <div class="form-row" style="margin:0"><label>Холодных касаний в WhatsApp на лида → уйти на TG/email/рассылку (0 = выкл)</label><input id="cgGrayCold" type="number" min="0" max="20" value="${+gv('grayColdTouchCap', 3)}"></div>
-            <div class="form-row" style="margin:0"><label>Дневной потолок отправок на зрелый номер</label><input id="wgDailyCap" type="number" min="5" max="500" value="${+((s.waGray || {}).dailySendCapBase || 80)}"></div>
-            <div class="form-row" style="margin:0"><label>Прогрев нового номера, дней (лимит растёт)</label><input id="wgWarmDays" type="number" min="1" max="60" value="${+((s.waGray || {}).warmupDays || 14)}"></div>
-            <div class="form-row" style="margin:0"><label>Мин. отклик номера, % (ниже при объёме → из холода)</label><input id="wgReplyFloor" type="number" min="0" max="100" value="${Math.round((((s.waGray || {}).replyRateFloor != null ? (s.waGray || {}).replyRateFloor : 0.05)) * 100)}"></div>
           </div>
-          <div class="cg-row" style="margin-top:10px"><div><b>Мост: серый → чистый номер</b><div class="muted" style="font-size:11px">перевод диалога на чистый номер менеджера при передаче — вынесен в отдельный раздел «Распределение → Мост серый→чистый» (там тумблер, тексты, готовность номеров и тест)</div></div><button class="btn btn-sm" type="button" id="cgGoBridge">Открыть раздел</button></div>
-          <hr class="cg-hr">
-          <div class="form-row" style="margin:0"><label>Жёсткий стоп по тишине: клиент молчит больше N дней → Спящие (0 = выключено)</label><input id="cgSilence" type="number" min="0" max="365" value="${+gv('maxSilenceDays', 0)}"></div>
-          <div class="muted" style="font-size:11px;margin-top:5px">Верхнеуровневый рубильник: если от клиента нет сообщений дольше N дней (а не отвечал ни разу — от создания), лид принудительно уходит в «Спящие», независимо от цепочки и дожима. Вернётся — ИИ продолжит.</div>
-          <button class="btn btn-sm btn-accent" id="cgSave" style="margin-top:12px">Сохранить защиту</button>
+          <div class="acc-sub" style="margin-top:12px"><div class="acc-sub-h">${ic(I.clock || I.shield)}Дневные лимиты и прогрев</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end">
+              <div class="form-row" style="margin:0"><label>Дневной потолок на зрелый номер</label><input id="wgDailyCap" type="number" min="5" max="500" value="${+((s.waGray || {}).dailySendCapBase || 80)}"></div>
+              <div class="form-row" style="margin:0"><label>Прогрев нового номера, дней</label><input id="wgWarmDays" type="number" min="1" max="60" value="${+((s.waGray || {}).warmupDays || 14)}"></div>
+              <div class="form-row" style="margin:0"><label>Мин. отклик номера, %</label><input id="wgReplyFloor" type="number" min="0" max="100" value="${Math.round((((s.waGray || {}).replyRateFloor != null ? (s.waGray || {}).replyRateFloor : 0.05)) * 100)}"></div>
+            </div>
+          </div>
+          <div class="acc-summary" style="margin-top:14px"><div class="acc-summary-tx"><b>Передача диалога на чистый номер</b><i>мост серый→чистый настраивается в карточке выше, в этом же разделе</i></div><button class="btn btn-sm" type="button" id="cgGoBridge">К мосту ↑</button></div>
+          <button class="btn btn-sm btn-accent" id="cbLimitsSave" style="margin-top:14px">Сохранить лимиты</button>
         </div>`; })()}
         ${(() => { const r = (s.automations || {}).leadRouting || {};
           const brs = (STATE.brokers || []).filter(b => b.active !== false);
@@ -11698,7 +11704,9 @@ PAGES.automations = async (root) => {
     renderPrev();
   })();
   /* ── Мост серый→чистый: переход из анти-бана, сохранение, тест ── */
-  $('#cgGoBridge') && $('#cgGoBridge').addEventListener('click', () => { applyAg('dist'); const c = $('#mbridgeCard', root); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'start' }); c.classList.add('mb-flash'); setTimeout(() => c.classList.remove('mb-flash'), 1400); } });
+  $('#cgGoBridge') && $('#cgGoBridge').addEventListener('click', () => { applyAg('antiban'); const c = $('#mbridgeCard', root); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'start' }); c.classList.add('mb-flash'); setTimeout(() => c.classList.remove('mb-flash'), 1400); } });
+  /* «Анти-бан: лимиты» — своя кнопка, но сохранение единое (cgSave читает все поля из DOM, обе карточки в root) */
+  $('#cbLimitsSave') && $('#cbLimitsSave').addEventListener('click', () => { const b = $('#cgSave', root); if (b) b.click(); });
   $('#mbSave') && $('#mbSave').addEventListener('click', async () => {
     const wg = { migrateOnHandover: $('#wgMigrate', root).checked, migrateProof: $('#wgMigrateProof', root).checked };
     const mb = $('#migBridge', root), mi = $('#migIntro', root), mr = $('#migRecap', root), mp = $('#migProof', root);
