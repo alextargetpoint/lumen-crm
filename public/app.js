@@ -11238,7 +11238,7 @@ PAGES.automations = async (root) => {
           </div>
         </div>
         ${(() => { const r = a.rotation || {}; return `<div class="glass card mb" data-ag="rotation">
-          <div class="card-title">${ic(I.refresh || I.spark)}Ротация непрожатых заявок<span class="sub">не ответил — уходит другому</span></div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.refresh || I.spark)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Ротация заявок</div><div class="acc-wh-d">Не ответил после N касаний или X часов — заявка уходит следующему брокеру, цепочка стартует заново.</div></div></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 10px">Если клиент молчит после N касаний ИЛИ X часов — заявка автоматически переназначается на следующего (по загрузке или на квалификатора), цепочка стартует заново. Исчерпаны ротации → лид уходит в «Спящие».</div>
           ${swRow('Включить авто-ротацию', 'Не даём «мёртвым» лидам застревать на одном человеке', `<label class="switch"><input type="checkbox" id="rotEnabled" ${r.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
@@ -11251,7 +11251,7 @@ PAGES.automations = async (root) => {
           <button class="btn btn-sm btn-accent" id="rotSave" style="margin-top:12px">Сохранить ротацию</button>
         </div>`; })()}
         ${(() => { const ai = s.ai || {}; const dmin = Math.round((+ai.replyDelayMinSec || 180) / 60); const dmax = Math.round((+ai.replyDelayMaxSec || 720) / 60); return `<div class="glass card mb" data-ag="aidelay">
-          <div class="card-title">${ic(I.clock || I.spark)}Задержка ответа ИИ<span class="sub">как живой человек, не мгновенный бот</span></div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.clock || I.spark)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Задержка ответа ИИ</div><div class="acc-wh-d">ИИ отвечает не мгновенно, а через случайное время в диапазоне — переписка выглядит по-человечески.</div></div></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5">ИИ отвечает клиенту не сразу, а через <b>случайное время в вашем диапазоне</b> (напр. 4–15 мин → то 5, то 7, то 12). Так переписка выглядит по-человечески и не палит бота. 0 в поле «от» — может ответить почти сразу.</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>От, минут</label><input id="aiDelayMin" type="number" min="0" max="120" value="${dmin}"></div>
@@ -11271,7 +11271,7 @@ PAGES.automations = async (root) => {
           const _revName = lg.reviewerId ? (((STATE.brokers || []).find(b => b.id === lg.reviewerId) || {}).name || '—') : 'Владелец агентства';
           const _lgSum = `${sel.length} ${sel.length === 1 ? 'стадия' : 'стадий'} · проверяющий: ${esc(_revName)}`;
           return `<div class="glass card mb" data-ag="loss">
-          <div class="card-title">${ic(I.shield || I.check)}Контроль проигрыша<span class="sub">двойной контроль: менеджер не теряет лида без вашего «ок»</span></div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.shield || I.check)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Контроль проигрыша</div><div class="acc-wh-d">Двойной контроль: менеджер не закроет лида как проигранного без подтверждения проверяющего.</div></div></div>
           <div class="muted exp-only" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Когда менеджер переводит лида в проигранную стадию, лид <b>не уходит сразу</b> — попадает <b>проверяющему</b> на подтверждение. Тот смотрит касания и либо подтверждает проигрыш, либо возвращает в работу с комментарием. (На проверяющего гейт не распространяется — он переводит напрямую.)</div>
           <div class="cg-row"><div><b>Требовать подтверждение проигрыша</b><div class="muted" style="font-size:11px">при переводе менеджером в выбранные стадии</div></div>${cb('lgEnabled', !!lg.enabled)}</div>
           <div class="acc-summary" style="margin-top:12px"><div class="acc-summary-tx"><b>Стадии и проверяющий</b><i id="lgSummary">${_lgSum}</i></div><button class="btn btn-sm" type="button" data-dr-open="loss">${ic(I.edit || I.doc)}Изменить</button></div>
@@ -11408,17 +11408,17 @@ PAGES.automations = async (root) => {
           const SRC = [['meta_api', 'Meta — кабинет (напрямую)'], ['meta_form', 'Meta / интегратор (Albato)'], ['site', 'Сайт / лендинг']];
           const bs = r.bySource || {};
           return `<div class="glass card mb" data-ag="routing">
-          <div class="card-title">${ic(I.users || I.spark)}Маршрутизация входящих лидов<span class="sub">кому падают новые заявки</span></div>
-          <div class="muted" style="font-size:11.5px;margin:-4px 0 12px;line-height:1.55">Новый лид из рекламы сразу закрепляется за выбранным брокером. Иначе он попадает «в общий пул» с <b>broker = не назначен</b> и не виден в кабинете брокера — каждый брокер видит только <b>своих</b> лидов (конфиденциальность). Это и есть причина «лиды из Меты не подгружаются».</div>
+          <div class="acc-work-head"><div class="acc-wh-ic">${ic(I.link)}</div><div class="acc-wh-tx"><div class="acc-wh-t">Маршрутизация входящих</div><div class="acc-wh-d">Кому падают новые заявки. Назначенный лид сразу виден брокеру; «не назначен» = общий пул (брокер видит только своих).</div></div></div>
           <div class="form-row"><label>Все новые лиды назначать</label><select id="lrDefault">${optD(r.default || '')}</select></div>
-          <div class="exp-only">
-          <hr class="cg-hr">
-          <div class="muted" style="font-size:11px;margin-bottom:8px">Переопределить по источнику (необязательно):</div>
-          <div style="display:grid;gap:8px">
-            ${SRC.map(([k, label]) => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center"><div style="font-size:12.5px">${esc(label)}</div><select data-lrsrc="${k}">${optS(bs[k] || '')}</select></div>`).join('')}
+          <div class="muted exp-only" style="font-size:11px;margin-top:7px;line-height:1.55">Если лид попадает «в общий пул» с <b>broker = не назначен</b>, он не виден в кабинете брокера (каждый видит только <b>своих</b> — конфиденциальность). Это и есть причина «лиды из Меты не подгружаются».</div>
+          <div class="acc-sub exp-only" style="margin-top:14px">
+            <div class="acc-sub-h">${ic(I.link)}Переопределить по источнику</div>
+            <div class="muted" style="font-size:11px;margin:-4px 0 11px;line-height:1.5">Задано — правило по источнику имеет <b>приоритет</b> над общим назначением. Пусто = как по умолчанию.</div>
+            <table class="acc-tbl"><thead><tr><th>Источник</th><th>Назначение</th></tr></thead><tbody>
+              ${SRC.map(([k, label]) => `<tr><td>${esc(label)}</td><td><select data-lrsrc="${k}">${optS(bs[k] || '')}</select></td></tr>`).join('')}
+            </tbody></table>
           </div>
-          </div>
-          <button class="btn btn-sm btn-accent" id="lrSave" style="margin-top:12px">Сохранить маршрутизацию</button>
+          <button class="btn btn-sm btn-accent" id="lrSave" style="margin-top:14px">Сохранить маршрутизацию</button>
         </div>`; })()}
         <div class="glass card mb" data-ag="reports">
           <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
