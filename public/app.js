@@ -8166,7 +8166,10 @@ PAGES.qualifier = async (root) => {
     const qual = ['qualified', 'handover', 'viewing', 'deal'];
     _fl = {
       total: L.length,
-      touched: L.filter(l => l.stage !== 'new').length,
+      /* «коснулись» = был хотя бы один контакт (исходящее касание ставит lastMsgAt/lastDir='out').
+         ⚠️БАГ (voice 812 «80 лидов→5»): считали stage!=='new', но холодно-коснувшийся-но-не-ответивший лид
+         ОСТАЁТСЯ в 'new' (стадия двигается только по ответу) → все такие выпадали из «коснулись». */
+      touched: L.filter(l => l.lastMsgAt || l.lastDir || l.stage !== 'new').length,
       led: L.filter(l => engaged.includes(l.stage) || l.lastDir === 'in' || (l.axesFilled || 0) > 0).length,
       qual: L.filter(l => qual.includes(l.stage) || (l.axesFilled || 0) >= 4 || l.qualManual === true).length,
     };
