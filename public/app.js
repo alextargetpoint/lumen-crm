@@ -609,6 +609,17 @@ function rebuildStages() {
 const stageName = (id) => ((STAGES._all || STAGES).find(s => s.id === id) || {}).name || id;
 /* #578/#585: бейдж невалидного номера (кривой caller-ID, напр. +69…) — операторы режут звук/доставку */
 function phInvBadge(l) { return (l && l.phoneInvalid) ? ` <span class="ph-inv" title="Номер невалиден по E.164 (неверная длина или несуществующий код страны). Операторы могут резать звук при звонке и доставку сообщений. Проверьте источник лида или пометьте как «Спам / неверный номер».">${ic(I.flag)}невалидный №</span>` : ''; }
+/* #827: единый человекочитаемый ярлык источника лида — для бейджа в карточке, подписей, фильтров.
+   targetpoint/avito — новые источники (TargetPoint-лиды и Авито); подключаются через интеграцию. */
+const SRC_LABEL = {
+  targetpoint: 'Target Point', avito: 'Авито',
+  meta_form: 'Lead-форма Meta', meta_api: 'Meta API', meta: 'Meta',
+  ctwa: 'Click-to-WhatsApp', ig_direct: 'Instagram Direct', ad_comment: 'Комментарии рекламы',
+  landing: 'Лендинг', site: 'Сайт', manual: 'Вручную', import: 'Импорт', broker_card: 'От брокера',
+  wa_inbound: 'Входящий WhatsApp', wa_gray: 'WhatsApp (серый)', tg_gray: 'Telegram', viber: 'Viber',
+  email: 'E-mail', google: 'Google', tiktok: 'TikTok', yandex: 'Яндекс',
+};
+function srcDisp(k) { return k ? (SRC_LABEL[k] || k) : 'Прямые / другое'; }
 /* бейдж «профильный лид»: совпадение с профилем квал/закрытых клиентов (ICP). Не показываем на закрытых. */
 function icpBadge(l) { const m = l && l.icpMatch; return (m && m.score >= 60 && !['deal', 'lost'].includes(l.stage)) ? ` <span class="icp-b" title="Совпадение с профилем ваших квалифицированных и закрытых лидов${m.matched && m.matched.length ? ': ' + m.matched.join(', ') : ''}. Такие лиды чаще доходят до квала — звоните в первую очередь.">${ic(I.star)}профиль ${m.score}%</span>` : ''; }
 
@@ -4896,7 +4907,7 @@ function selTagPrompt(cfg) {
 function exportLeadsCsv(ids) {
   const rows = (ids || []).map(id => LEAD_LOOKUP[id]).filter(Boolean);
   if (!rows.length) { toast('Нечего экспортировать'); return; }
-  const SRC = { meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA', ig_direct: 'Instagram', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
+  const SRC = { targetpoint: 'Target Point', avito: 'Авито', meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA', ig_direct: 'Instagram', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
   const q = (v) => { v = String(v == null ? '' : v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const chY = (v) => v === 'yes' ? 'да' : v === 'no' ? 'нет' : '—';
   const fmtd = (t) => t ? new Date(t).toLocaleString('ru-RU') : '';
@@ -5309,7 +5320,7 @@ PAGES.funnel = async (root) => {
       (F.funnelFlag === 'ai' && l.ai && l.ai.enabled)));
   const srcs = [...new Set(all.map(l => l.source))];
   const view = F.funnelView || 'kanban';
-  const srcName = { meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA', ig_direct: 'Instagram', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
+  const srcName = { targetpoint: 'Target Point', avito: 'Авито', meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA', ig_direct: 'Instagram', tg_gray: 'Telegram', wa_gray: 'WhatsApp', viber: 'Viber', email: 'E-mail', import: 'Импорт' };
   /* ── хелперы расширенной таблицы воронки ── */
   const ICO_WA = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.03c-.24.68-1.42 1.3-1.95 1.34-.52.05-1.01.24-3.4-.71-2.87-1.13-4.7-4.07-4.84-4.26-.14-.19-1.15-1.53-1.15-2.92s.73-2.07 1-2.35c.26-.29.57-.36.76-.36l.55.01c.18 0 .42-.07.65.5l.79 1.92c.07.14.11.3.02.48-.33.68-.68.65-.5.96.69 1.18 1.38 1.6 2.43 2.12.18.09.29.08.4-.05.11-.13.46-.54.58-.72.12-.19.24-.16.4-.1l1.8.85c.23.11.39.17.45.26.06.1.06.58-.18 1.26z"/></svg>';
   const ICO_TG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71l-4.14-3.05-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>';
@@ -6728,7 +6739,7 @@ async function openLeadModal(id, backScope) {
 
   const bd = modal({
     title: l.name,
-    sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> ${channelBadges(l)} · ${l.geoName} ${clientTzBadge(l)} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
+    sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> ${channelBadges(l)} · ${l.geoName} ${clientTzBadge(l)} · источник: ${esc(srcDisp(l.source))} · создан ${ago(l.createdAt)}`,
     wide: 'card',
     body: `
       ${backScope ? `<button class="lc-qlback" id="lcQlBack" title="Вернуться к списку, откуда открыли">${ic(I.chev)}К списку ${backScope.mode === 'pot' ? 'потенц-квалов' : 'квал-лидов'}${backScope.title ? ' · ' + esc(backScope.title) : ''}</button>` : ''}
@@ -6736,6 +6747,7 @@ async function openLeadModal(id, backScope) {
       ${l.hint ? `<div class="lc-hint ${l.hint.kind}">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
       ${l.playTip ? `<div class="lc-hint info" style="border-style:dashed">${ic(I.flame)}<span><b>Приём:</b> ${esc(l.playTip.tip)}</span></div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <span class="badge acc" title="Источник лида — откуда пришёл. Определяет формат работы и какая цепочка автоматизаций сработает (настраивается в «Автоматизациях» → «Кому идёт» → «Источник заявки»).">${ic(I.target)}${esc(srcDisp(l.source))}</span>
         ${(l.tags || []).map(t => t === 'нужен человек' ? `<span class="badge" data-tagdismiss="нужен человек" title="Снять метку — вы взяли лид на себя (плашка «Нужен человек» в воронке пропадёт)" style="cursor:pointer">${esc(t)}<i style="margin-left:6px;opacity:.6;font-style:normal">✕</i></span>` : `<span class="badge">${esc(t)}</span>`).join('')}
       </div>
       <div class="lc-grid">
@@ -8498,7 +8510,7 @@ PAGES.sequences = async (root) => {
   const fmtDay = (d) => Math.max(1, Math.round(d));   /* целые дни — без дробных «1.2/2.2», которые читались как «1-2, 2-2» */
   const dayLabel = (d) => d < 0.02 ? 'сразу' : d < 1 ? 'через ' + Math.round(d * 24) + ' ч' : 'День ' + fmtDay(d);
   /* ---- ТАРГЕТИНГ цепочки: на какие лиды распространяется ---- */
-  const SEQ_SOURCES = [['meta_form', 'Lead-форма Meta'], ['ctwa', 'Click-to-WhatsApp'], ['ig_direct', 'Instagram Direct'], ['ad_comment', 'Комментарии рекламы'], ['landing', 'Лендинг'], ['site', 'Сайт'], ['meta_api', 'Meta API'], ['wa_inbound', 'Входящий WhatsApp'], ['wa_gray', 'WhatsApp (серый)'], ['viber', 'Viber'], ['import', 'Импорт'], ['broker_card', 'От брокера']];
+  const SEQ_SOURCES = [['targetpoint', 'Target Point'], ['avito', 'Авито'], ['meta_form', 'Lead-форма Meta'], ['ctwa', 'Click-to-WhatsApp'], ['ig_direct', 'Instagram Direct'], ['ad_comment', 'Комментарии рекламы'], ['landing', 'Лендинг'], ['site', 'Сайт'], ['meta_api', 'Meta API'], ['wa_inbound', 'Входящий WhatsApp'], ['wa_gray', 'WhatsApp (серый)'], ['viber', 'Viber'], ['import', 'Импорт'], ['broker_card', 'От брокера']];
   const SEQ_CHANNELS = [['wa', 'WhatsApp'], ['ig', 'Instagram'], ['tg', 'Telegram'], ['viber', 'Viber'], ['email', 'E-mail']];
   const srcLabel = k => (SEQ_SOURCES.find(s => s[0] === k) || [k, k])[1];
   const chLabel = k => (SEQ_CHANNELS.find(s => s[0] === k) || [k, k])[1];
