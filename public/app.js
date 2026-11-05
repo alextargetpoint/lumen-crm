@@ -6546,13 +6546,24 @@ function lcTaskRow(t, myId) {
     <span class="lc-task-ava" title="${esc(who)}">${esc((who || '?').slice(0, 1).toUpperCase())}</span>
   </div>`;
 }
-function lcTasksBlock(tasks, myId) {
+function lcTasksBlock(tasks, myId, lead) {
   const open = tasks.filter(t => t.status !== 'done');
   const done = tasks.filter(t => t.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const doneShow = done.slice(0, 3), doneHid = done.slice(3);   /* выполненные НА ВИДУ (зачёркнутые) — последние 3, остальные под «ещё» */
+  /* ⭐#839: «следующий шаг» (lead.nextAction) — НЕ задача, но клиент искал его «внутри задач» и не находил, из-за чего
+     просроченную плашку в воронке нечем было снять. Показываем шаг СТРОКОЙ в этом же блоке с галкой «выполнено». */
+  const na = lead && lead.nextAction && (lead.nextAction.text || lead.nextAction.at) ? lead.nextAction : null;
+  const naOver = na && na.at && na.at < Date.now();
+  const naTxt = na ? (String(na.text || '').replace(/^Передан вам\s*[—–-]\s*/i, '').trim() || 'Связаться') : '';
+  const naRow = na ? `<div class="lc-task lc-task-na ${naOver ? 'overdue' : ''}" title="Следующий шаг по лиду (запланированное касание, не задача). Галка — снять шаг: красная плашка «просрочено» в воронке пропадёт.">
+    <button class="lc-task-ck" data-nadonetask title="Отметить выполненным и снять шаг">${ic(I.check)}</button>
+    <div class="lc-task-main"><b>${esc(naTxt.charAt(0).toUpperCase() + naTxt.slice(1))}<span class="lc-task-steptag">шаг</span></b>${na.at ? `<span class="lc-task-due">${ic(I.clock)}${naOver ? 'Просрочено · ' : ''}${new Date(na.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>` : ''}</div>
+    <span class="lc-task-ava" title="Следующий шаг">→</span>
+  </div>` : '';
+  const emptyTxt = (open.length || na) ? '' : '<div class="lc-blk-empty">Активных задач нет</div>';
   return `<div class="lc-blk lc-tasks">
-    <div class="lc-blk-hd"><b>Задачи по лиду</b><span class="lc-cnt">${open.length}</span><button class="btn btn-sm btn-accent lc-blk-add" id="lcTaskAdd">${ic(I.plus)}Задача</button></div>
-    <div class="lc-task-list">${open.map(t => lcTaskRow(t, myId)).join('') || '<div class="lc-blk-empty">Активных задач нет</div>'}</div>
+    <div class="lc-blk-hd"><b>Задачи по лиду</b><span class="lc-cnt">${open.length + (na ? 1 : 0)}</span><button class="btn btn-sm btn-accent lc-blk-add" id="lcTaskAdd">${ic(I.plus)}Задача</button></div>
+    <div class="lc-task-list">${naRow}${open.map(t => lcTaskRow(t, myId)).join('')}${emptyTxt}</div>
     ${done.length ? `<div class="lc-task-donehd">Выполненные</div><div class="lc-task-list lc-task-donelist">${doneShow.map(t => lcTaskRow(t, myId)).join('')}</div>${doneHid.length ? `<button class="lc-blk-more" id="lcTasksDoneTog" type="button">Ещё выполненных · ${doneHid.length} <i>⌄</i></button><div class="lc-task-done" id="lcTasksDone" style="display:none">${doneHid.map(t => lcTaskRow(t, myId)).join('')}</div>` : ''}` : ''}
   </div>`;
 }
@@ -6798,7 +6809,7 @@ async function openLeadModal(id, backScope) {
           <div class="lc-timeline" id="lcTimeline">${tlHtml}</div>
         </div>
         <div class="lc-right">
-          ${lcTasksBlock(leadTasks, leadTasksMe)}
+          ${lcTasksBlock(leadTasks, leadTasksMe, l)}
           ${lcFactsBlock(l)}
           ${lcCommentsBlock(l)}
           ${coll('Материалы клиента', '<div id="lcMaterials" class="lc-materials"><div class="muted" style="font-size:12px;padding:4px 0">Загрузка…</div></div>', { open: true, icon: I.layers })}
@@ -7015,6 +7026,16 @@ async function openLeadModal(id, backScope) {
   /* «Выполнено» прямо на плашке «Просрочен следующий шаг» — чтобы снять шаг там, где его видно,
      не разворачивая блок «Управление» (клиенты искали кнопку в «Задачах» и не находили). Та же логика, что #lcNaDone. */
   $('#lcHintDone', bd)?.addEventListener('click', async () => {
+    const txt = (l.nextAction && l.nextAction.text) || '';
+    try {
+      await api.patch('/leads/' + l.id, { nextAction: null });
+      if (txt) { try { await api.post('/leads/' + l.id + '/note', { text: '✓ Выполнено: ' + txt }); } catch (_) {} }
+      toast('Шаг выполнен', 'Следующий шаг снят — плашка «просрочено» в воронке пропадёт', true);
+      openLeadModal(id);
+    } catch (e) { toast('Не вышло', e.message); }
+  });
+  /* #839: галка «выполнено» на строке «следующий шаг» ВНУТРИ блока «Задачи по лиду» — та же логика снятия шага */
+  $('[data-nadonetask]', bd)?.addEventListener('click', async () => {
     const txt = (l.nextAction && l.nextAction.text) || '';
     try {
       await api.patch('/leads/' + l.id, { nextAction: null });

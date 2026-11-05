@@ -9481,3 +9481,9 @@ body.client-view [data-team]{ display:none !important; }
 .acc-tbl tbody tr:last-child td { border-bottom:0; }
 .acc-tbl tbody td:first-child { font-weight:550; }
 .acc-tbl select { width:100%; }
+
+/* #839: строка «следующий шаг» внутри блока «Задачи по лиду» (не задача, но снимается галкой тут же) */
+.lc-task-na { border-left:3px solid var(--accent, #2563EB); }
+.lc-task-na.overdue { border-left-color:#C9821A; }
+.lc-task-steptag { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--accent,#2563EB); background:color-mix(in srgb,var(--accent) 13%,transparent); border-radius:5px; padding:1px 5px; margin-left:7px; vertical-align:middle; }
+.lc-task-na.overdue .lc-task-steptag { color:#B8701A; background:color-mix(in srgb,#C9821A 14%,transparent); }
