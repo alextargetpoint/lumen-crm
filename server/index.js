@@ -11255,6 +11255,11 @@ const server = http.createServer(async (req, res) => {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const g = db.settings.waGray || { numbers: [] };
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
+      /* ⭐САМОЛЕЧЕНИЕ «возможно забанен»: если воркер прямо сейчас отдаёт connected — номер доказанно НЕ забанен,
+         гасим подозрение немедленно (не ждём 10-мин waDropWatch). Был баг: после реконнекта плашка не уходила. */
+      let _glChanged = false;
+      for (const n of (g.numbers || [])) { const lv = live[waGraySid(n.phone)]; if (lv && lv.status === 'connected' && (n.suspectBanned || n._downSince || n._autoQrAt)) { n.suspectBanned = false; n._downSince = null; n._autoQrAt = 0; _glChanged = true; } }
+      if (_glChanged) store.save();
       const numbers = (g.numbers || []).map(n => { const lv = live[waGraySid(n.phone)] || { status: 'none' }; return Object.assign({}, n, { live: lv, realPhone: lv.phone || null, newToday: grayNewToday(n), newCap: grayNewLeadCap(db), warm: grayWarmScore(n) }); });
       const platform = waWorkerPlatform();
       const R2 = sessionRole(req);
@@ -11974,7 +11979,7 @@ const server = http.createServer(async (req, res) => {
            connectedAt + live.status. По нему заказ сам доедет до «Готово» и уйдёт из активного списка. */
         if (r && r.session && r.session.status === 'connected') {
           const rec = ((db.settings.waGray || {}).numbers || []).find(n => String(n.phone).replace(/\D/g, '') === phone || (n.live && String(n.live.phone || '').replace(/\D/g, '') === phone));
-          if (rec) { if (!rec.connectedAt) rec.connectedAt = Date.now(); rec.live = Object.assign({}, rec.live || {}, { status: 'connected', phone: r.session.phone || (rec.live && rec.live.phone) || null }); store.save(); }
+          if (rec) { if (!rec.connectedAt) rec.connectedAt = Date.now(); rec.live = Object.assign({}, rec.live || {}, { status: 'connected', phone: r.session.phone || (rec.live && rec.live.phone) || null }); if (rec.suspectBanned) rec.suspectBanned = false; rec._downSince = null; rec._autoQrAt = 0; store.save(); }
         }
         return json(res, 200, { ok: true, session: r.session });
       }
