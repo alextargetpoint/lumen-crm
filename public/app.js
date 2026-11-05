@@ -6752,7 +6752,7 @@ async function openLeadModal(id, backScope) {
     body: `
       ${backScope ? `<button class="lc-qlback" id="lcQlBack" title="Вернуться к списку, откуда открыли">${ic(I.chev)}К списку ${backScope.mode === 'pot' ? 'потенц-квалов' : 'квал-лидов'}${backScope.title ? ' · ' + esc(backScope.title) : ''}</button>` : ''}
       <div class="lc-funnel">${FUNNEL_STEPS.map((st, i) => `<div class="lcf-step ${i < stepIdx ? 'done' : ''} ${i === stepIdx ? 'cur' : ''}"><i></i><span>${stageName(st)}</span></div>`).join('')}${l.stage === 'sleeping' ? '<div class="lcf-step warn cur"><i></i><span>Спит</span></div>' : ''}${l.stage === 'lost' ? '<div class="lcf-step bad cur"><i></i><span>Закрыт</span></div>' : ''}</div>
-      ${l.hint ? `<div class="lc-hint ${l.hint.kind}">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
+      ${l.hint ? (() => { const naOver = l.hint.kind === 'warn' && l.nextAction && l.nextAction.at && l.nextAction.at < Date.now(); return `<div class="lc-hint ${l.hint.kind}">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}<span>${esc(l.hint.text)}</span>${naOver ? `<button class="btn btn-sm lc-hint-done" id="lcHintDone" title="Отметить следующий шаг выполненным и снять его — плашка «просрочено» в воронке пропадёт">${ic(I.check)}Выполнено</button>` : ''}</div>`; })() : ''}
       ${l.playTip ? `<div class="lc-hint info" style="border-style:dashed">${ic(I.flame)}<span><b>Приём:</b> ${esc(l.playTip.tip)}</span></div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
         <span class="badge acc" title="Источник лида — откуда пришёл. Определяет формат работы и какая цепочка автоматизаций сработает (настраивается в «Автоматизациях» → «Кому идёт» → «Источник заявки»).">${ic(I.target)}${esc(srcDisp(l.source))}</span>
@@ -7004,6 +7004,17 @@ async function openLeadModal(id, backScope) {
   /* «Выполнено» по следующему шагу: снимаем nextAction (красная плашка «просрочено» в воронке пропадает),
      фиксируем в комментариях что шаг закрыт — чтобы было видно в истории лида. */
   $('#lcNaDone', bd)?.addEventListener('click', async () => {
+    const txt = (l.nextAction && l.nextAction.text) || '';
+    try {
+      await api.patch('/leads/' + l.id, { nextAction: null });
+      if (txt) { try { await api.post('/leads/' + l.id + '/note', { text: '✓ Выполнено: ' + txt }); } catch (_) {} }
+      toast('Шаг выполнен', 'Следующий шаг снят — плашка «просрочено» в воронке пропадёт', true);
+      openLeadModal(id);
+    } catch (e) { toast('Не вышло', e.message); }
+  });
+  /* «Выполнено» прямо на плашке «Просрочен следующий шаг» — чтобы снять шаг там, где его видно,
+     не разворачивая блок «Управление» (клиенты искали кнопку в «Задачах» и не находили). Та же логика, что #lcNaDone. */
+  $('#lcHintDone', bd)?.addEventListener('click', async () => {
     const txt = (l.nextAction && l.nextAction.text) || '';
     try {
       await api.patch('/leads/' + l.id, { nextAction: null });

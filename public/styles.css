@@ -1465,6 +1465,7 @@ body > .dtp-pop.dtp-time, .dtp-pop.dtp-time.show { max-height: 300px; overflow-y
 .lc-hint.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBD9B0; }
 .lc-hint.info { background: var(--bg); color: var(--ink-2); border: 1px solid var(--stroke-soft); }
 .lc-hint.info svg { color: var(--accent-2); }
+.lc-hint .lc-hint-done { margin-left: auto; flex: 0 0 auto; white-space: nowrap; }
 .lc-ai { border: 1px solid var(--stroke); border-radius: var(--r-md); padding: 12px 14px; background: var(--bg); }
 .lc-ai.on { background: linear-gradient(150deg, var(--blue-100), #EDF3FE); border-color: var(--accent-soft-bd); }
 .lc-ai-head { display: flex; gap: 8px; align-items: center; }
