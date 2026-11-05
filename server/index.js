@@ -3884,7 +3884,7 @@ async function autoQrOnDrop(db, n, who) {
     for (const cid of targets) {
       try {
         if (connected) await tgbridge.notify(db, cid, `🟢 «${esc(who)}» переподключился сам — QR не нужен.`);
-        else if (qr) await tgbridge.sendDataUrlPhoto(db, cid, qr, `📷 Номер «${who}» отвалился — вот новый QR. WhatsApp → Связанные устройства → Привязать устройство. (прислан автоматически)`);
+        else if (qr) await tgbridge.sendDataUrlPhoto(db, cid, qr, `📷 Номер «${esc(who)}» отвалился — вот новый QR. WhatsApp → Связанные устройства → Привязать устройство.\n⏱ QR живёт ~минуту. Не успели — пришлите <code>/qr ${esc(who)}</code> за свежим. (прислан автоматически)`);
         else await tgbridge.notify(db, cid, `⚠️ «${esc(who)}» отвалился, QR пока не готов. Отправьте в бот <code>/qr ${esc(who)}</code> или откройте CRM → «Номера».`);
       } catch (_) {}
     }
@@ -4347,7 +4347,7 @@ async function waDropWatch() {
           /* ⭐АВТО-ПОДОЗРЕНИЕ НА БАН: номер не возвращается >24ч → вероятно заблокирован WhatsApp. Ставим флаг
              (бейдж в UI + кнопка «Заменить») и ОДИН мягкий алерт. НЕ списываем деньги сами — замену клиент
              подтверждает кнопкой (покупка нового за свой баланс). Восстановление/бан-замена сбрасывают флаг. */
-          if (cur === 'connected' || n.banned) { n._downSince = null; if (n.suspectBanned) n.suspectBanned = false; }
+          if (cur === 'connected' || n.banned) { n._downSince = null; if (n.suspectBanned) n.suspectBanned = false; n._autoQrAt = 0; }   /* ⭐ сброс рейт-лимита авто-QR при возврате на связь: номер «падает несколько раз в день» — КАЖДЫЙ новый отвал после успешного реконнекта шлёт свежий QR (30-мин лимит глушит только номер, что СТОИТ в отвале/флапе, не восстановившись) */
           else { if (!n._downSince) n._downSince = Date.now();
             const _downMs = Date.now() - n._downSince;
             /* ⭐ЗАЛИП: номер застрял не-connected (reconnecting/qr/none) >20 мин — воркер явно не восстановился сам.
