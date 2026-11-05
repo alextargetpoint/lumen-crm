@@ -13629,6 +13629,16 @@ const server = http.createServer(async (req, res) => {
         }
         return json(res, 200, { tasks, meetings, stats, suggestions: suggestions.slice(0, 6), today: todayStr });
       }
+      /* задачи по КОНКРЕТНОМУ лиду — КОМАНДНЫЙ вид (все брокеры), для блока «Задачи по лиду» в карточке.
+         Личный /api/tasks брокер-скопнут → коллега поставил задачу на общий лид, а другой её не видел (рассинхрон #834). */
+      if ((m = p.match(/^\/api\/tasks\/lead\/([^/]+)$/)) && req.method === 'GET') {
+        const lid = m[1];
+        const tasks = db.brokerTasks.filter(t => t.leadId === lid).map(t => {
+          const br = (db.brokers || []).find(b => b.id === t.brokerId);
+          return Object.assign({}, t, { brokerName: br ? br.name : (t.brokerId ? t.brokerId : 'Владелец') });
+        });
+        return json(res, 200, { tasks, me: TASK_OWNER });
+      }
       if (p === '/api/tasks' && req.method === 'POST') {
         const b = await readBody(req);
         if (!String(b.title || '').trim()) return json(res, 400, { error: 'пустая задача' });

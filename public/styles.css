@@ -3950,6 +3950,11 @@ body.has-preview { padding-top: 38px; }
 .tk-dp-quick { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; margin-bottom: 6px; border-bottom: 1px solid var(--stroke); }
 .tk-dp-q { font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 20px; padding: 5px 11px; transition: all .14s; }
 .tk-dp-q:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tk-dp-time { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--stroke); font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.tk-dp-time svg { width: 15px; height: 15px; color: var(--ink-3); flex: none; }
+.tk-dp-time span { flex: 1; }
+.tk-dp-time input { font: inherit; font-weight: 600; color: var(--ink); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 8px; padding: 6px 9px; }
+.tk-dp-time input:focus { border-color: var(--accent); outline: none; }
 .tk-dp-clear { width: 100%; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--bad); background: none; border: 1px solid var(--stroke); border-radius: 8px; padding: 7px; }
 .tk-dp-clear:hover { background: color-mix(in srgb, var(--bad) 8%, transparent); border-color: var(--bad); }
 
@@ -9075,6 +9080,8 @@ body.client-view [data-team]{ display:none !important; }
 .lc-task-ck{width:20px;height:20px;flex:0 0 auto;border-radius:6px;border:1.6px solid var(--stroke);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;padding:0}
 .lc-task-ck svg{width:13px;height:13px}
 .lc-task.done .lc-task-ck{background:var(--accent);border-color:var(--accent)}
+.lc-task-ck.ro{cursor:default;border-style:dashed;opacity:.7}
+.lc-task.done .lc-task-ck.ro{background:var(--ink-3);border-color:var(--ink-3)}
 .lc-task.done .lc-task-main b{text-decoration:line-through;color:var(--ink-3)}
 .lc-task-donem{display:block;font-size:11px;color:var(--ink-3);margin-top:2px;line-height:1.35}
 .lc-task-donehd{font-size:10.5px;font-weight:650;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:11px 0 5px}
@@ -9121,8 +9128,9 @@ body.client-view [data-team]{ display:none !important; }
 .lc-cmt-meta b{font-size:12.5px;font-weight:600}
 .lc-cmt-meta span{font-size:11px;color:var(--ink-3)}
 .lc-cmt-tx{font-size:13px;line-height:1.45;background:var(--bg-2);border-radius:10px;padding:8px 11px;white-space:pre-wrap;word-break:break-word}
-.lc-cmt-add{display:flex;gap:8px;margin-top:12px}
-.lc-cmt-add input{flex:1;border:1px solid var(--stroke);border-radius:9px;padding:9px 11px;font:inherit;background:var(--card);color:inherit}
+.lc-cmt-add{display:flex;gap:8px;margin-top:12px;align-items:flex-end}
+.lc-cmt-add input,.lc-cmt-add textarea{flex:1;border:1px solid var(--stroke);border-radius:9px;padding:9px 11px;font:inherit;background:var(--card);color:inherit}
+.lc-cmt-add textarea{resize:none;overflow-y:auto;min-height:38px;max-height:200px;line-height:1.4;display:block}
 /* ИИ-факты из транскрибации (на утверждение) */
 .lc-facts-list{display:flex;flex-direction:column;gap:9px;margin-top:4px}
 .lc-fact{border:1px solid color-mix(in srgb,var(--accent) 30%,var(--stroke));border-radius:11px;padding:10px 11px;background:color-mix(in srgb,var(--accent) 5%,var(--card))}

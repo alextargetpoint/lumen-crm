@@ -6527,28 +6527,33 @@ function fvBody(l) {
 let LC_AUDIO = null;
 
 /* ── блоки карточки лида: Задачи и Комментарии (видны сразу при открытии, справа) ── */
-function lcTaskRow(t) {
+function lcTaskRow(t, myId) {
   const overdue = t.status !== 'done' && t.due && t.due < Date.now();
   const dueLabel = t.due ? (overdue ? 'Просрочено · ' : '') + new Date(t.due).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : (t.scheduled || '');
+  const mine = (t.brokerId || null) === (myId !== undefined ? (myId || null) : ((STATE.me && STATE.me.brokerId) || null));
   const br = (STATE.brokers || []).find(b => b.id === t.brokerId);
-  const who = br ? br.name : (t.brokerId ? t.brokerId : 'Вы');
+  const who = mine ? 'Вы' : (t.brokerName || (br ? br.name : (t.brokerId || 'Владелец')));
   const doneMeta = (t.status === 'done' && (t.doneAt || t.doneNote || t.doneBy))
     ? `<span class="lc-task-donem">✓ ${t.doneAt ? new Date(t.doneAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : 'выполнено'}${t.doneBy ? ' · ' + esc(t.doneBy) : ''}${t.doneNote ? ' — «' + esc(t.doneNote) + '»' : ''}</span>`
     : '';
-  return `<div class="lc-task ${t.status === 'done' ? 'done' : ''} ${overdue ? 'overdue' : ''}" data-tid="${t.id}">
-    <button class="lc-task-ck" data-ttog="${t.id}" title="${t.status === 'done' ? 'Вернуть в работу' : 'Завершить'}">${t.status === 'done' ? ic(I.check) : ''}</button>
+  /* чекбокс активен только у СВОЕЙ задачи (чужую завершать нельзя — личный таск-менеджер), но видна всей команде */
+  const ck = mine
+    ? `<button class="lc-task-ck" data-ttog="${t.id}" title="${t.status === 'done' ? 'Вернуть в работу' : 'Завершить'}">${t.status === 'done' ? ic(I.check) : ''}</button>`
+    : `<span class="lc-task-ck ro" title="Задача коллеги · ${esc(who)}">${t.status === 'done' ? ic(I.check) : ''}</span>`;
+  return `<div class="lc-task ${t.status === 'done' ? 'done' : ''} ${overdue ? 'overdue' : ''} ${mine ? '' : 'other'}" data-tid="${t.id}">
+    ${ck}
     <div class="lc-task-main"><b>${esc(t.title)}</b>${dueLabel && t.status !== 'done' ? `<span class="lc-task-due">${ic(I.cal)}${esc(dueLabel)}</span>` : ''}${doneMeta}</div>
     <span class="lc-task-ava" title="${esc(who)}">${esc((who || '?').slice(0, 1).toUpperCase())}</span>
   </div>`;
 }
-function lcTasksBlock(tasks) {
+function lcTasksBlock(tasks, myId) {
   const open = tasks.filter(t => t.status !== 'done');
   const done = tasks.filter(t => t.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const doneShow = done.slice(0, 3), doneHid = done.slice(3);   /* выполненные НА ВИДУ (зачёркнутые) — последние 3, остальные под «ещё» */
   return `<div class="lc-blk lc-tasks">
     <div class="lc-blk-hd"><b>Задачи по лиду</b><span class="lc-cnt">${open.length}</span><button class="btn btn-sm btn-accent lc-blk-add" id="lcTaskAdd">${ic(I.plus)}Задача</button></div>
-    <div class="lc-task-list">${open.map(lcTaskRow).join('') || '<div class="lc-blk-empty">Активных задач нет</div>'}</div>
-    ${done.length ? `<div class="lc-task-donehd">Выполненные</div><div class="lc-task-list lc-task-donelist">${doneShow.map(lcTaskRow).join('')}</div>${doneHid.length ? `<button class="lc-blk-more" id="lcTasksDoneTog" type="button">Ещё выполненных · ${doneHid.length} <i>⌄</i></button><div class="lc-task-done" id="lcTasksDone" style="display:none">${doneHid.map(lcTaskRow).join('')}</div>` : ''}` : ''}
+    <div class="lc-task-list">${open.map(t => lcTaskRow(t, myId)).join('') || '<div class="lc-blk-empty">Активных задач нет</div>'}</div>
+    ${done.length ? `<div class="lc-task-donehd">Выполненные</div><div class="lc-task-list lc-task-donelist">${doneShow.map(t => lcTaskRow(t, myId)).join('')}</div>${doneHid.length ? `<button class="lc-blk-more" id="lcTasksDoneTog" type="button">Ещё выполненных · ${doneHid.length} <i>⌄</i></button><div class="lc-task-done" id="lcTasksDone" style="display:none">${doneHid.map(t => lcTaskRow(t, myId)).join('')}</div>` : ''}` : ''}
   </div>`;
 }
 function lcCommentRow(n) {
@@ -6563,7 +6568,7 @@ function lcCommentsBlock(l) {
   return `<div class="lc-blk lc-comments">
     <div class="lc-blk-hd"><b>Комментарии</b><span class="lc-cnt">${notes.length}</span><span class="lc-blk-lock">${ic(I.shield)}Видны только команде</span></div>
     <div class="lc-cmt-list">${notes.map(lcCommentRow).join('') || '<div class="lc-blk-empty">Внутренних заметок пока нет</div>'}</div>
-    <div class="lc-cmt-add"><input id="lcNote" placeholder="Добавить внутренний комментарий…"><button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.send)}</button></div>
+    <div class="lc-cmt-add"><textarea id="lcNote" rows="1" placeholder="Добавить внутренний комментарий…"></textarea><button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.send)}</button></div>
   </div>`;
 }
 /* ИИ-факты из транскрибации (звонок/Zoom) — на утверждение: правим значение → галочка (→ комментарий) или отклоняем */
@@ -6654,7 +6659,10 @@ async function openLeadModal(id, backScope) {
   const l = await api.get('/leads/' + id);
   await ensureVendors();
   /* задачи ЭТОГО лида — показываем прямо в карточке (блок справа), без перехода в «Мои задачи» */
-  const leadTasks = await api.get('/tasks').then(d => (d.tasks || []).filter(t => t.leadId === id)).catch(() => []);
+  /* задачи ЭТОГО лида — КОМАНДНЫЙ вид (все брокеры, не только свои) → коллега поставил задачу = видно всем (#834) */
+  const leadTasksRes = await api.get('/tasks/lead/' + id).catch(() => ({}));
+  const leadTasks = (leadTasksRes && leadTasksRes.tasks) || [];
+  const leadTasksMe = leadTasksRes && leadTasksRes.me !== undefined ? leadTasksRes.me : ((STATE.me && STATE.me.brokerId) || null);
   const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
   const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
   const contactKinds = { telegram: 'Telegram', email: 'E-mail', instagram: 'Instagram', whatsapp: 'WhatsApp #2', other: 'Другое' };
@@ -6790,7 +6798,7 @@ async function openLeadModal(id, backScope) {
           <div class="lc-timeline" id="lcTimeline">${tlHtml}</div>
         </div>
         <div class="lc-right">
-          ${lcTasksBlock(leadTasks)}
+          ${lcTasksBlock(leadTasks, leadTasksMe)}
           ${lcFactsBlock(l)}
           ${lcCommentsBlock(l)}
           ${coll('Материалы клиента', '<div id="lcMaterials" class="lc-materials"><div class="muted" style="font-size:12px;padding:4px 0">Загрузка…</div></div>', { open: true, icon: I.layers })}
@@ -7238,7 +7246,14 @@ async function openLeadModal(id, backScope) {
     if (r.ok) { toast('Транскрипт готов', 'Добавлен в хронологию и ИИ-сводку', true); openLeadModal(id); }
     else { toast('Не расшифровалось', j.error); btn.disabled = false; btn.textContent = 'Звонок'; }
   });
-  $('#lcNote', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') addNote(); });
+  /* комментарий: textarea авто-растёт вниз по мере набора (не уводит текст вправо — баг #832). Enter — отправить, Shift+Enter — перенос строки */
+  const lcNoteEl = $('#lcNote', bd);
+  if (lcNoteEl) {
+    const grow = () => { lcNoteEl.style.height = 'auto'; lcNoteEl.style.height = Math.min(lcNoteEl.scrollHeight, 200) + 'px'; };
+    lcNoteEl.addEventListener('input', grow);
+    lcNoteEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); } });
+    grow();
+  }
   /* --- первое касание: креатив + Gemini + отправка --- */
   const ftText = $('#lcFtText', bd);
   if (ftText) {
@@ -15792,7 +15807,10 @@ function tkDatePop(anchor, curMs) {
     const pop = el('<div class="dtp-pop tk-dp"></div>');
     let settled = false;
     const done = (v) => { if (settled) return; settled = true; closePop(); resolve(v); };
-    const pick = (ds) => done(new Date(ds + 'T12:00:00').getTime());
+    /* ⏰ точное время можно задать СРАЗУ при постановке (раньше всегда 12:00 → приходилось лезть в задачу и править — жалоба #836) */
+    const two = (n) => String(n).padStart(2, '0');
+    let timeStr = cur ? `${two(cur.getHours())}:${two(cur.getMinutes())}` : '12:00';
+    const pick = (ds) => { const te = $('.tk-dp-tm', pop); const tm = (te && /^\d\d:\d\d$/.test(te.value)) ? te.value : timeStr; done(new Date(ds + 'T' + tm + ':00').getTime()); };
     const build = () => {
       const first = new Date(view.y, view.m, 1); const shift = (first.getDay() + 6) % 7; const days = new Date(view.y, view.m + 1, 0).getDate();
       const selStr = cur ? fmt(cur) : '';
@@ -15800,7 +15818,9 @@ function tkDatePop(anchor, curMs) {
         <div class="tk-dp-quick">${quick.map(([n, d]) => `<button type="button" class="tk-dp-q" data-q="${fmt(d)}">${n}</button>`).join('')}</div>
         <div class="dtp-head"><button type="button" class="dtp-nav" data-d="-1">${ic(I.chev, 2)}</button><b>${MONTHS_N[view.m]} ${view.y}</b><button type="button" class="dtp-nav" data-d="1">${ic(I.chev, 2)}</button></div>
         <div class="dtp-grid">${DOW.map(d => `<span class="dtp-dow">${d}</span>`).join('')}${Array.from({ length: shift }, () => '<span></span>').join('')}${Array.from({ length: days }, (_, i) => { const ds = `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`; return `<button type="button" class="dtp-day ${selStr === ds ? 'sel' : ''} ${fmt(now) === ds ? 'today' : ''}" data-day="${ds}">${i + 1}</button>`; }).join('')}</div>
+        <label class="tk-dp-time">${ic(I.clock)}<span>Время</span><input type="time" class="tk-dp-tm" value="${timeStr}" step="300"></label>
         ${curMs ? '<button type="button" class="tk-dp-clear" data-clear>Убрать срок</button>' : ''}`;
+      const te = $('.tk-dp-tm', pop); if (te) te.addEventListener('input', () => { if (/^\d\d:\d\d$/.test(te.value)) timeStr = te.value; });
       $$('.tk-dp-q', pop).forEach(b => b.addEventListener('click', () => pick(b.dataset.q)));
       $$('.dtp-nav', pop).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); view.m += +b.dataset.d; if (view.m < 0) { view.m = 11; view.y--; } if (view.m > 11) { view.m = 0; view.y++; } build(); }));
       $$('.dtp-day', pop).forEach(b => b.addEventListener('click', () => pick(b.dataset.day)));
@@ -16146,7 +16166,7 @@ function openQuickTask(lead) {
     } }, { label: 'Отмена' }],
   });
   $$('#qtPri .tk-pdot', bd).forEach(b => b.addEventListener('click', () => { pri = b.dataset.np; $$('#qtPri .tk-pdot', bd).forEach(x => x.classList.toggle('on', x === b)); }));
-  $('#qtDue', bd).addEventListener('click', async () => { const ms = await tkDatePop($('#qtDue', bd), dueMs); if (ms !== undefined) { dueMs = ms; $('#qtDueLbl', bd).textContent = ms ? new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''; } });
+  $('#qtDue', bd).addEventListener('click', async () => { const ms = await tkDatePop($('#qtDue', bd), dueMs); if (ms !== undefined) { dueMs = ms; $('#qtDueLbl', bd).textContent = ms ? new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''; } });
   setTimeout(() => { const i = $('#qtTitle', bd); if (i) i.focus(); }, 30);
 }
 PAGES.tasks = async (root) => {
