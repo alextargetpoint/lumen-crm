@@ -514,8 +514,10 @@ function tickChains(db) {
       if (!l.ai || ['deal', 'lost', 'sleeping'].includes(l.stage)) continue;
       const ref = l.lastInboundAt || l.createdAt || 0;
       if (ref && ref < cut) {
-        l.stage = 'sleeping'; l.ai.reengage = null; delete l.ai.nextDraft; delete l.ai._reengageText;
-        ai.pushEvent(db, { type: 'sleep', leadId: l.id, text: `${l.name}: тишина > ${_sg.maxSilenceDays} дн — авто-стоп, лид в «Спящие»` });
+        /* отвечал хоть раз (lastInboundAt) + включено авто-перераспределение → «Перестал отвечать», иначе «Спящие» */
+        const _toStalled = !!((db.settings.automations || {}).stalledBucket) && !!l.lastInboundAt;
+        l.stage = _toStalled ? 'stalled' : 'sleeping'; l.ai.reengage = null; delete l.ai.nextDraft; delete l.ai._reengageText;
+        ai.pushEvent(db, { type: _toStalled ? 'note' : 'sleep', leadId: l.id, text: `${l.name}: тишина > ${_sg.maxSilenceDays} дн — ${_toStalled ? 'отвечал и перестал → «Перестал отвечать»' : 'авто-стоп, лид в «Спящие»'}` });
       }
     }
   }
@@ -910,9 +912,16 @@ function tickReengage(db) {
     if (lead.ai && (lead.ai.pendingTouch || lead.ai.pendingReply || lead.ai._replying)) continue;   /* занят: ждёт одобрения/ответа/генерации */
     if (!reengageEligible(db, lead)) continue;
     const re = lead.ai.reengage = lead.ai.reengage || { attempts: 0, nextAt: null };
-    if (re.attempts >= cfg.maxAttempts) {                           /* дожимы исчерпаны → в «Спящие» (дальше — bulk-wake) */
-      lead.stage = 'sleeping';
-      ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: не отвечает после ${re.attempts} дожимов ИИ → «Спящие»` });
+    if (re.attempts >= cfg.maxAttempts) {                           /* дожимы исчерпаны */
+      /* ⭐АВТО-ПЕРЕРАСПРЕДЕЛЕНИЕ (клиент 05.11): лид ОТВЕЧАЛ и перестал → отдельный bucket «Перестал отвечать»
+         (не в «Спящие», где только те, кто ВООБЩЕ не вышел на связь). Периодический доп-прогрев — реанимацией (bulk-wake). */
+      if ((db.settings.automations || {}).stalledBucket) {
+        lead.stage = 'stalled';
+        ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name}: отвечал и перестал (${re.attempts} дожимов) → «Перестал отвечать» — периодический прогрев реанимацией` });
+      } else {
+        lead.stage = 'sleeping';
+        ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: не отвечает после ${re.attempts} дожимов ИИ → «Спящие»` });
+      }
       lead.ai.reengage = null; delete lead.ai._reengageText; delete lead.ai._gReengage; delete lead.ai.nextDraft;
       store.save(); continue;
     }
@@ -1028,7 +1037,7 @@ function wakePreview(db, filters = {}) {
   const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
   const list = db.leads
     .filter(l => !l.marketingOptOut)                                                                    /* отписавшихся в рассылку не берём */
-    .filter(l => (filters.stages || ['sleeping']).includes(l.stage))
+    .filter(l => (filters.stages || ['sleeping', 'stalled']).includes(l.stage))   /* реанимация по умолчанию берёт и «Перестал отвечать» → периодический доп-прогрев отвечавших молчунов */
     .filter(l => !filters.geo || l.geo === filters.geo)
     .filter(l => !filters.olderDays || dorm(l) >= filters.olderDays * DAY * accel)
     .filter(l => !filters.maxDays || dorm(l) <= filters.maxDays * DAY)                                 /* верхняя граница окна «спячки» → точечное окно */

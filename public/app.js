@@ -571,6 +571,7 @@ const BASE_STAGES = [
   { id: 'handover', name: 'У брокера', icon: 'handover', sys: true },
   { id: 'viewing', name: 'Показ', icon: 'eye' },
   { id: 'deal', name: 'Сделка', icon: 'flame', sys: true },
+  { id: 'stalled', name: 'Перестал отвечать', icon: 'clock', sys: true },   /* отвечал и пропал (не то же, что «Спящие» = вообще не вышел на связь). Скрыт, пока не включено авто-перераспределение */
   { id: 'sleeping', name: 'Спящие', icon: 'moon', sys: true },
   { id: 'lost', name: 'Закрыт', icon: 'x', sys: true },
 ];
@@ -579,7 +580,7 @@ let STAGES = BASE_STAGES.slice();
 /* эстетичная цветовая градация стадий (приглушённая палитра 2026, без неона) */
 const STAGE_COLORS = {
   new: '#6B7A99', touch: '#7C8FE0', dialog: '#4F7DFF', qualified: '#2FA98C',
-  handover: '#8B7BD8', viewing: '#C9922E', deal: '#129B6E', sleeping: '#97A2B5', lost: '#C77B7B',
+  handover: '#8B7BD8', viewing: '#C9922E', deal: '#129B6E', stalled: '#C9922E', sleeping: '#97A2B5', lost: '#C77B7B',
 };
 const STAGE_PALETTE = ['#4F7DFF', '#2FA98C', '#8B7BD8', '#C9922E', '#129B6E', '#E08A6B', '#5AAFD6', '#B07CC9'];
 function stageColor(id) {
@@ -603,7 +604,9 @@ function rebuildStages() {
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
     });
   }
-  STAGES = list.filter(st => !(cfg.hidden || []).includes(st.id));
+  /* «Перестал отвечать» показываем ТОЛЬКО если включено авто-перераспределение (иначе не засоряем воронку пустой колонкой) */
+  const stalledOn = !!((STATE && STATE.settings.automations) || {}).stalledBucket;
+  STAGES = list.filter(st => !(cfg.hidden || []).includes(st.id) && !(st.id === 'stalled' && !stalledOn));
   STAGES._all = list;
 }
 const stageName = (id) => ((STAGES._all || STAGES).find(s => s.id === id) || {}).name || id;
@@ -5619,16 +5622,12 @@ function wireKanbanScroll(root) {
   if (!window._kbFitBound) { window._kbFitBound = true; window.addEventListener('resize', () => { const b = document.querySelector('.kanban'); if (b) { const t = b.getBoundingClientRect().top; b.style.height = Math.max(340, window.innerHeight - t - 14) + 'px'; } }); }
   board.addEventListener('wheel', (e) => {
     if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;   /* горизонтальный жест (трекпад) — не мешаем */
-    /* ВАЖНО: если курсор над колонкой, которая ещё может скроллиться вертикально в эту сторону —
-       отдаём вертикальный скролл колонке (раньше ВЕСЬ вертикальный жест уходил в бок → по столбцу не опуститься). */
-    const cards = e.target.closest && e.target.closest('.kb-cards');
-    if (cards) {
-      const canDown = e.deltaY > 0 && cards.scrollTop + cards.clientHeight < cards.scrollHeight - 1;
-      const canUp = e.deltaY < 0 && cards.scrollTop > 0;
-      if (canDown || canUp) return;   /* колонка сама прокрутится вертикально */
-    }
+    /* #841: вертикальное колесо БЕЗ shift ВСЕГДА скроллит колонку (обработчик document-wheel ниже, с clamp) — доску
+       вбок НЕ двигаем, даже когда колонка докручена до конца (клиент: «прокрутил воронку до конца → она едет вправо/
+       влево, неудобно»). Горизонталь доски — только явным намерением: shift+колесо или боковые кнопки-стрелки. */
+    if (!e.shiftKey) return;
     if (!scrollable()) return;        /* некуда вести вбок — выходим */
-    board.scrollLeft += e.deltaY;     /* иначе (над шапкой/краем/колонка на пределе) — листаем доску вбок */
+    board.scrollLeft += e.deltaY;     /* shift+колесо → листаем доску вбок (Windows без трекпада) */
     e.preventDefault();
   }, { passive: false });
   /* боковые кнопки-стрелки (видны только когда есть куда скроллить) */
@@ -11590,6 +11589,7 @@ PAGES.automations = async (root) => {
           ${swRow('Мгновенный ответ + цепочка касаний', '7 касаний / 18 дней, пока клиент не ответил', link('sequences', 'Настроить'))}
           ${(() => { const re = a.reengage || {}; const on = re.enabled !== false; return swRow('Авто-дожим молчащих диалогов', 'Клиент ответил и пропал → ИИ сам возвращает его (follow-up), а не только кнопкой «Подтолкнуть». Первый дожим через N ч тишины, дальше нарастающие паузы; после лимита попыток → «Спящие». Видно в диалоге, когда ИИ коснётся.', `<span style="display:inline-flex;gap:6px;align-items:center;font-size:12px">через <input id="reFirst" type="number" min="1" max="720" style="width:62px" value="${re.firstDelayHours ?? 20}"> ч · до <input id="reMax" type="number" min="1" max="10" style="width:50px" value="${re.maxAttempts ?? 3}"> попыток <label class="switch"><input type="checkbox" id="reOn" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></span>`); })()}
           ${swRow('ИИ-квалификатор и правила отключения', 'Критерии по гео, стоп-слова, перехват человеком', link('qualifier', 'Настроить'))}
+          ${swRow('Авто-перераспределение: отвечавшие молчуны → «Перестал отвечать»', 'Лид <b>отвечал</b> ИИ и пропал (исчерпал дожимы или тишина) → падает в отдельную колонку воронки <b>«Перестал отвечать»</b>, а не в «Спящие». В «Спящих» остаются только те, кто <b>вообще не вышел на связь</b>. Отвечавших периодически догревает реанимация пачками.', sw('stalledBucket', a.stalledBucket))}
           ${swRow('Реанимация спящих', 'Скоринг + безопасные кампании пачками', link('wake', 'Настроить'))}
         </div>
         <div class="glass card mb" data-ag="first">

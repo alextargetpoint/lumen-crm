@@ -1916,6 +1916,7 @@ function leadHint(db, l, axesFilled) {
   if (['handover', 'viewing'].includes(l.stage) && !(db.meetings || []).some(mt => mt.leadId === l.id && mt.status === 'scheduled')) return { kind: 'act', text: 'Встреча не назначена — предложите слот' };
   if (l.stage === 'dialog' && axesFilled < 4) return { kind: 'info', text: `ИИ выясняет оси: осталось ${4 - axesFilled} из 4` };
   if (['new', 'touch'].includes(l.stage) && l.ai.nextTouchAt) return { kind: 'info', text: `Молчит — цепочка коснётся ${new Date(l.ai.nextTouchAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` };
+  if (l.stage === 'stalled') return { kind: 'info', text: `Перестал отвечать · скоринг реанимации ${engine.wakeScore(db, l)} — периодический прогрев кампанией` };
   if (l.stage === 'sleeping') return { kind: 'info', text: `Спит · скоринг реанимации ${engine.wakeScore(db, l)} — кандидат в кампанию` };
   return null;
 }
@@ -1982,7 +1983,7 @@ function leadView(db, l) {
     phoneInvalid: l.phone ? !validE164(l.phone) : false,   /* #578/#585: кривой caller-ID (напр. +69…, слипшиеся номера) — звук режут операторы */
     icpMatch: (() => { try { return icpScore(db, l); } catch (_) { return null; } })(),   /* похож на профиль лучших клиентов → приоритет на звонок */
     axesFilled,
-    wakeScore: l.stage === 'sleeping' ? engine.wakeScore(db, l) : null,
+    wakeScore: (l.stage === 'sleeping' || l.stage === 'stalled') ? engine.wakeScore(db, l) : null,
     lastText,
     hint: leadHint(db, l, axesFilled),
     playTip: (playbook.forContext(l, axesFilled, playbook.effective(db))[0] || null),
@@ -2075,7 +2076,7 @@ function analytics(db, opts = {}) {
     unreadMsgs: leads.reduce((n, l) => n + (l.stage !== 'lost' ? (l.unread || 0) : 0), 0),
     lastUnread: (() => { const u = leads.filter(l => (l.unread || 0) > 0 && l.stage !== 'lost').sort((a, b) => (b.lastInboundAt || 0) - (a.lastInboundAt || 0))[0]; return u ? { id: u.id, name: u.name, at: u.lastInboundAt || 0, broker: u.broker || null } : null; })(),
     totalActive: leads.filter(l => !['lost'].includes(l.stage)).length,
-    funnel: { new: by('new'), touch: by('touch'), dialog: by('dialog'), qualified: by('qualified'), handover: by('handover'), viewing: by('viewing'), deal: by('deal'), sleeping: by('sleeping'), lost: by('lost') },
+    funnel: { new: by('new'), touch: by('touch'), dialog: by('dialog'), qualified: by('qualified'), handover: by('handover'), viewing: by('viewing'), deal: by('deal'), stalled: by('stalled'), sleeping: by('sleeping'), lost: by('lost') },
     compare: {
       human: { firstContact: '47 мин', dialogConv: 40, qualConv: 30, qualTime: '2–3 дня' },
       aiLine: {
@@ -6330,7 +6331,7 @@ const server = http.createServer(async (req, res) => {
       if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/stage$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         const b = await readBody(req); const st = String(b.stage || '');
-        if (!['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal', 'sleeping', 'lost'].includes(st)) return json(res, 400, { error: 'плохая стадия' });
+        if (!['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal', 'stalled', 'sleeping', 'lost'].includes(st)) return json(res, 400, { error: 'плохая стадия' });
         if (lead.stage !== st) { lead.stage = st; markPeakQual(db, lead); capi.onStageChange(db, lead, st); ai.pushEvent(db, { type: 'stage', leadId: lead.id, text: `${lead.name}: стадия изменена брокером из бота → ${st}` }); store.save(); }
         return json(res, 200, { stage: lead.stage });
       }
