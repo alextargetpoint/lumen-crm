@@ -103,7 +103,12 @@ function screen(db, lead) {
   /* стадии двигаем только вперёд и только по фактам; ручные стадии
      (handover/viewing/deal/lost) скрининг никогда не трогает */
   if (!['new', 'touch', 'dialog', 'qualified'].includes(lead.stage)) return lead; // ручные и кастомные стадии не трогаем
-  if (filled === 4) { lead.stage = 'qualified'; lead.stagePeakQual = true; }   /* durable-флаг квала: иначе правка/обнуление оси задним числом «теряет» квал в отчётах */
+  /* ⭐РЕЖИМ ФИЛЬТРА (клиент #843): ИИ не додавливает до всех 4 осей, а передаёт менеджеру по ВОВЛЕЧЁННОСТИ —
+     клиент ответил на пул вопросов (даже «не знаю») → интерес есть → квалифицируем. В «Спящих»/«Перестал
+     отвечать» остаются молчуны. Включается тумблером в «Обучение ИИ». Иначе — классика: все 4 оси. */
+  const filterMode = !!(((db.settings.ai && db.settings.ai.training) || {}).filterMode);
+  const engaged = filterMode && (filled >= 2 || inbound.length >= 3);   /* ответил на ≥2 оси ИЛИ ≥3 реплики = вовлечён */
+  if (filled === 4 || engaged) { lead.stage = 'qualified'; lead.stagePeakQual = true; }   /* durable-флаг квала: иначе правка/обнуление оси задним числом «теряет» квал в отчётах */
   else if (inbound.length > 0) lead.stage = 'dialog';
   else if (lead.ai.chainStep > 0) lead.stage = 'touch';
   return lead;
