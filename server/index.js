@@ -1348,6 +1348,27 @@ engine.onInboundMessage = (db, lead, m) => {
       ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `🚨 Антислив: ${lead.name} — ${leak.reason}. Проверьте, не уводят ли диалог мимо CRM.` });
     }
   } catch (_) {}
+  /* ⭐АНТИ-СПАМ: мусор/агрессия/троллинг → не даём ИИ дальше спамить враждебному лиду (риск жалобы→бан
+     нашего номера) и не тащим его в квалификацию. Severe (угрозы/троллинг) или ПОВТОР → авто-закрытие + стоп ИИ.
+     Первый несерьёзный срыв — только флаг+сигнал: ИИ по промпту мягко закрывает границу один раз. */
+  try {
+    const ab = control.detectAbuse(m && m.text);
+    if (ab) {
+      const prev = lead.abuseFlag || { count: 0 };
+      lead.abuseFlag = { reason: ab.reason, kind: ab.kind, count: (prev.count || 0) + 1, at: Date.now(), text: String(m.text || '').slice(0, 200) };
+      const axes = (require('./ai').AXES || []).filter(a => lead.quals && lead.quals[a]).length;
+      const close = (ab.severe || lead.abuseFlag.count >= 2) && axes < 2 && !['deal', 'viewing', 'handover'].includes(lead.stage);
+      if (close) {
+        lead.stage = 'lost';
+        lead.lostReason = 'Спам/агрессия: ' + ab.reason;
+        if (lead.ai) lead.ai.enabled = false;   /* стоп ИИ — больше ни одного исходящего (бережём номер) */
+        lead.nextTouch = null; lead.nextAction = null;   /* снять запланированные касания */
+        ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `🧹 Авто-закрытие: ${lead.name} — ${ab.reason}. Лид в «Проигранные», ИИ остановлен (защита номера от жалоб/бана).` });
+      } else if (prev.count === 0) {
+        ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `⚠️ Агрессия/мусор: ${lead.name} — ${ab.reason}. ИИ мягко закроет границу; при повторе — авто-закрытие.` });
+      }
+    }
+  } catch (_) {}
   return tgbridge.forwardInbound(db, lead, m); /* мост: входящее клиента → брокеру в Telegram */
 };
 engine.matchAd = matchAd; /* демо-генератор комментариев цепляет объявление к лиду */

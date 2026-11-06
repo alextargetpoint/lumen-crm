@@ -56,6 +56,27 @@ function detectLeak(text) {
   return null;
 }
 
+/* ── детектор мусора/агрессии/троллинга (анти-спам) ──
+   Ловит ЯВНО не-покупателя: угрозы/насилие, троллинг/вымогательство, шквал мата без интереса.
+   КОНСЕРВАТИВЕН: злой, но реальный клиент («вы меня кинули», «верните деньги») НЕ ловится —
+   только явная агрессия/абсурд. Возвращает {hit, reason, kind:'violence'|'troll'|'abuse', severe}. */
+const ABUSE_VIOLENCE = new RegExp(`(ракет[${К}]*|стрел[${К}]*|убь?[юё][${К}]*|уб[ие][${К}]*ть|взорв[${К}]*|бомб[${К}]*|тер[ао]кт|захват[${К}]*\\s+мир|уничтож[${К}]*|расстрел[${К}]*|kill you|shoot you|blow up)`, 'i');
+const ABUSE_TROLL = new RegExp(`(дан[ьъ]|хакер[${К}]*\\s+взлом|взлом[${К}]*\\s+хакер|кндр|северн[${К}]*\\s+коре[${К}]*|выуч[${К}]*\\s+язык[${К}]*\\s+(и\\s+)?приед|повелит[${К}]*\\s+мир|захватыва[${К}]*\\s+мир|пришельц[${К}]*|рептилоид[${К}]*)`, 'i');
+/* явный мат (как сигнал враждебности, не как причина сам по себе) */
+const PROFANITY = new RegExp(`(ху[ийея][${К}]*|пизд[${К}]*|бляд?[ьъ]?|еба[${К}]*|ёба[${К}]*|уёб[${К}]*|уеб[${К}]*|мудак[${К}]*|долбоёб|пидор[${К}]*|нах[уеёя][${К}]*|fuck|bitch|asshole)`, 'ig');
+function detectAbuse(text) {
+  const t = String(text || '');
+  if (t.length < 4) return null;
+  if (ABUSE_VIOLENCE.test(t)) return { hit: true, reason: 'угрозы/насилие', kind: 'violence', severe: true };
+  if (ABUSE_TROLL.test(t)) return { hit: true, reason: 'троллинг/абсурд (не покупатель)', kind: 'troll', severe: true };
+  const prof = (t.match(PROFANITY) || []).length;
+  /* ≥3 матерных токена в одном сообщении И нет признаков обсуждения покупки → враждебный флуд */
+  if (prof >= 3 && !/куп[аеи—]|бюджет|квартир|апарт|объект|цен[аеуы]|рассрочк|ипотек|инвест|price|budget|buy|apartment/i.test(t)) {
+    return { hit: true, reason: 'поток агрессии/мата без интереса к покупке', kind: 'abuse', severe: false };
+  }
+  return null;
+}
+
 /* ── главный скан: всё, что требует руководителя, по корзинам ── */
 function scanRisks(db) {
   const C = cfg(db);
@@ -374,4 +395,4 @@ function recordOwner(db, lead, brokerId, by, reason) {
   if (lead.ownerHistory.length > 40) lead.ownerHistory.splice(0, lead.ownerHistory.length - 40);
 }
 
-module.exports = { scanRisks, detectLeak, offboardPreview, recordOwner, findDuplicates, dealFactCheck, commissionSplit, toneScan, funnelAnalysis, controlAlert, normPhone, FUNNEL_ORDER, ACTIVE_STAGES, CLOSED_STAGES, cfg };
+module.exports = { scanRisks, detectLeak, detectAbuse, offboardPreview, recordOwner, findDuplicates, dealFactCheck, commissionSplit, toneScan, funnelAnalysis, controlAlert, normPhone, FUNNEL_ORDER, ACTIVE_STAGES, CLOSED_STAGES, cfg };
