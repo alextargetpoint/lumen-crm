@@ -1168,6 +1168,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 .form-row { margin-bottom: 13px; }
 .form-row label { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-3); margin-bottom: 5px; }
 .form-row input, .form-row select, .form-row textarea { width: 100%; }
+/* чекбоксы/радио внутри .form-row НЕ должны растягиваться на 100% — иначе квадрат «съедает» строку,
+   а подпись выдавливается в узкую колонку (баг попапа «Профиль» номера). */
+.form-row input[type="checkbox"], .form-row input[type="radio"] { width: auto; flex: 0 0 auto; }
 /* футер действий ЛИПКИЙ: при длинном теле (превью диалога в карточке лида) кнопки «Открыть диалог» и др.
    раньше уходили за край — модалка скроллилась целиком. Теперь кнопки всегда видны внизу. */
 .m-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; position: sticky; bottom: -24px; z-index: 3; margin: 18px -24px -24px; padding: 15px 24px; background: rgba(255, 255, 255, .97); border-top: 1px solid var(--stroke-soft, #e7e3dd); border-radius: 0 0 var(--r-lg) var(--r-lg); }
