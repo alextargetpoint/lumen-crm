@@ -63,6 +63,8 @@ const I = {
   pause: '<path d="M7 4h4v16H7zM13 4h4v16h-4z"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   shield: '<path d="M12 2l8 3.5v5.2c0 5-3.4 9.6-8 11.3-4.6-1.7-8-6.3-8-11.3V5.5L12 2z"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
   handover: '<path d="M3 12h11M10 8l4 4-4 4"/><path d="M17 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/>',
   eye: '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
   cal: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2v4M16 2v4"/>',
@@ -5394,8 +5396,9 @@ PAGES.funnel = async (root) => {
       const conv = all.length ? Math.round(deals / all.length * 100) : 0;
       const hot = all.filter(l => l.hint && l.hint.kind === 'act').length;
       const over = all.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()).length;
-      return `<div class="fnl-pulse fnl-collapsible${F.funnelStage ? ' fnl-open' : ''}">
-        <span class="fnl-peek" title="Наведите, чтобы раскрыть статистику по стадиям">${ic(I.bars || I.spark)}<span>Статистика по стадиям</span><i class="fnl-chev">▾</i></span>
+      const statsOpen = !!(F.funnelStatsOpen || F.funnelStage);
+      return `<div class="fnl-pulse fnl-collapsible${statsOpen ? ' fnl-open' : ''}">
+        <button type="button" class="fnl-peek" id="fnlStatsToggle" title="${statsOpen ? 'Закреплено открытым — клик скроет' : 'Клик — закрепить статистику открытой'}">${ic(I.bars || I.spark)}<span>Статистика по стадиям</span><span class="fnl-lock${statsOpen ? ' on' : ''}" aria-hidden="true">${ic(statsOpen ? (I.lock || I.shield) : (I.unlock || I.lock || I.shield))}</span></button>
         <div class="fnl-stages">${prog.map((s, i) => { const n = cnt(s.id), on = F.funnelStage === s.id; return `${i ? '<span class="fnl-sep">›</span>' : ''}<button class="fnl-st ${on ? 'on' : ''}" data-fstage="${s.id}" style="--stg:${stageColor(s.id)}" title="${esc(s.name)} — кликните, чтобы отфильтровать"><span class="fnl-st-bar"><i style="height:${Math.max(8, Math.round(n / maxN * 100))}%"></i></span><span class="fnl-st-n">${n}</span><span class="fnl-st-l">${esc(s.name)}</span></button>`; }).join('')}</div>
         <div class="fnl-kpis">
           ${hot ? `<button class="fnl-kpi hot ${F.funnelFlag === 'hot' ? 'on' : ''}" data-flag="hot" title="Горячие — требуют действия">${ic(I.flame || I.bolt)}<b>${hot}</b> горячих</button>` : ''}
@@ -5479,6 +5482,8 @@ PAGES.funnel = async (root) => {
   const setF = (k, v) => { PAGE_STATE[k] = v; render(); };
   $('#fToggle')?.addEventListener('click', () => { const d = $('#fDrawer', root); if (!d) return; const willOpen = d.hasAttribute('hidden'); d.toggleAttribute('hidden'); PAGE_STATE.funnelFiltersOpen = willOpen; $('#fToggle', root)?.classList.toggle('open', willOpen); });
   $('#fViews')?.addEventListener('click', (e) => openFunnelViews(e));
+  /* «Статистика по стадиям»: клик-тумблер (пин) вместо открытия по случайному hover — больше не «скачет» */
+  $('#fnlStatsToggle')?.addEventListener('click', () => { PAGE_STATE.funnelStatsOpen = !(PAGE_STATE.funnelStatsOpen || PAGE_STATE.funnelStage); render(); });
   $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; PAGE_STATE.funnelCreated = ''; PAGE_STATE.funnelActivity = ''; PAGE_STATE.funnelChan = ''; render(); });
   $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => setF('funnelQ', e.target.value), 350); });
   $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));
