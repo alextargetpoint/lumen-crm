@@ -1340,10 +1340,17 @@
       var img = el.tagName === 'IMG' ? el : el.querySelector('img');
       var url = img ? img.getAttribute('src') : (function () { var m = (el.style.backgroundImage || '').match(/url\(["']?([^"')]+)["']?\)/); return m ? m[1] : ''; })();
       if (!url || /^data:/.test(url)) { el.classList.remove('pe-img-loading'); return; }
-      var probe = new Image(); probe.src = url;
-      if (probe.complete && probe.naturalWidth) { el.classList.remove('pe-img-loading'); return; }
+      /* ⚠️гонка кэша: если ставить src ДО обработчика, onload кэш-картинки успевает выстрелить в зазоре
+         между проверкой .complete и назначением onload → класс «загрузки» ЗАЛИПАЕТ, и блюр-оверлей прячет
+         уже готовое фото («картинка пропадает» после клика/ре-рендера). Фикс: обработчик СНАЧАЛА, потом src. */
+      var probe = new Image();
+      var to = null;
+      var clear = function () { if (to) { clearTimeout(to); to = null; } el.classList.remove('pe-img-loading'); };
+      probe.onload = probe.onerror = clear;
       el.classList.add('pe-img-loading');
-      probe.onload = probe.onerror = function () { el.classList.remove('pe-img-loading'); };
+      to = setTimeout(clear, 5000);   /* страховка: оверлей-загрузка НИКОГДА не висит дольше 5с → готовое фото не прячется навсегда */
+      probe.src = url;
+      if (probe.complete && probe.naturalWidth) clear();   /* синхронно из кэша — снимаем сразу, без вспышки */
     });
   }
   function ceOpenContentTab() {
