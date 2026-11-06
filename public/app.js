@@ -11367,11 +11367,17 @@ PAGES.automations = async (root) => {
             if (ownAny) return { b, state: 'warn', ph: ownAny.phone };
             return { b, state: 'none' };
           });
+          const numOpt = (n) => `<option value="${n.phone}">${fmtPh(n.phone)}${n.label ? ' · ' + esc(n.label) : ''}${n.roles && n.roles.outreach === false ? ' · чистый' : ''}</option>`;
           const rRow = (r) => {
             const nm = esc((r.b.name || '').split(' ').slice(0, 2).join(' '));
             if (r.state === 'ok') return `<div class="mb-rd ok"><span class="mb-rd-i">✓</span><b>${nm}</b><span class="mb-rd-ph">${fmtPh(r.ph)} · чистый</span></div>`;
-            if (r.state === 'warn') return `<div class="mb-rd warn"><span class="mb-rd-i">!</span><b>${nm}</b><span class="mb-rd-ph">${fmtPh(r.ph)} — пометьте «только для диалогов»</span><button class="btn btn-xs" type="button" data-go="numbers">Исправить</button></div>`;
-            return `<div class="mb-rd none"><span class="mb-rd-i">○</span><b>${nm}</b><span class="mb-rd-ph">нет своего чистого номера — уйдёт на общий${primary ? ' (' + fmtPh(primary.phone) + ')' : ''}</span><button class="btn btn-xs" type="button" data-go="numbers">Назначить</button></div>`;
+            if (r.state === 'warn') return `<div class="mb-rd warn"><span class="mb-rd-i">!</span><b>${nm}</b><span class="mb-rd-ph">${fmtPh(r.ph)} — ещё не помечен «только для диалогов»</span><button class="btn btn-xs" type="button" data-mb-clean="${String(r.ph).replace(/[^0-9]/g, '')}" data-mb-broker="${r.b.id}">Пометить чистым</button></div>`;
+            /* «Назначить» теперь инлайн: выбираем номер прямо здесь (свободный или уже закреплённый за этим менеджером) — без захода в «Номера» */
+            const avail = nums.filter(n => !n.brokerId || n.brokerId === r.b.id);
+            const assign = avail.length
+              ? `<select class="mb-assign-sel" data-mb-assign="${r.b.id}"><option value="">Назначить номер…</option>${avail.map(numOpt).join('')}</select>`
+              : `<button class="btn btn-xs" type="button" data-go="numbers">Добавить номер</button>`;
+            return `<div class="mb-rd none"><span class="mb-rd-i">○</span><b>${nm}</b><span class="mb-rd-ph">нет своего чистого номера — уйдёт на общий${primary ? ' (' + fmtPh(primary.phone) + ')' : ''}</span>${assign}</div>`;
           };
           return `<div class="glass card mb mbridge" data-ag="antiban" id="mbridgeCard">
           <div class="card-title">${ic(I.shield || I.spark)}Мост: серый → чистый номер<span class="sub">как клиент переезжает на номер менеджера</span></div>
@@ -11395,7 +11401,9 @@ PAGES.automations = async (root) => {
           <!-- ГОТОВНОСТЬ МЕНЕДЖЕРОВ -->
           <div class="mb-sec-h">Готовность менеджеров <span class="muted">— у кого есть чистый номер для приёма диалога</span></div>
           <div class="mb-ready">${readiness.length ? readiness.map(rRow).join('') : '<div class="muted" style="font-size:12px;padding:4px 0">Активных менеджеров нет — добавьте их в «Брокеры».</div>'}</div>
-          <div class="mb-ready-foot muted">⭐ Основной чистый номер (куда переводим, если у менеджера нет своего): <b>${primary ? fmtPh(primary.phone) : 'не назначен — пометьте номер «Основной» в «Номерах»'}</b> · всего чистых номеров: <b>${cleans.length}</b></div>
+          <div class="mb-ready-foot muted">⭐ Основной чистый номер <span style="opacity:.8">(куда переводим, если у менеджера нет своего)</span>: ${nums.length
+            ? `<select class="mb-primary-sel" id="mbPrimarySel" data-cur="${primary ? primary.phone : ''}"><option value="">— не назначен —</option>${nums.map(numOpt).join('')}</select>`
+            : '<b>нет номеров — сначала добавьте в «Номерах»</b>'} · всего чистых: <b>${cleans.length}</b></div>
           <!-- РЕДАКТОР СООБЩЕНИЙ (в выезжающей панели) -->
           <div class="acc-summary" style="margin-top:14px"><div class="acc-summary-tx"><b>Тексты перевода</b><i>3 сообщения клиенту (бридж · интро+рекап · подпись к скрину) + переменные и шаблоны</i></div><button class="btn btn-sm" type="button" data-dr-open="migtexts">${ic(I.edit || I.doc)}Редактировать</button></div>
           <div id="migEditorBlock" class="acc-dr-ph">
@@ -11783,6 +11791,19 @@ PAGES.automations = async (root) => {
     try { await api.patch('/settings', { waGray: wg }); loadState(); toast('Мост сохранён', wg.migrateOnHandover ? 'Перевод на чистый номер включён' : 'Перевод включите тумблером, когда будете готовы', true); }
     catch (e) { toast('Не сохранилось', e.message); }
   });
+  /* ── Ручной выбор чистых номеров прямо в «Мосте» (без захода в «Номера») ── */
+  const mbPersona = async (payload, okMsg) => { try { await api.post('/wa/gray/persona', payload); toast(okMsg || 'Сохранено', '', true); loadState(); } catch (e) { toast('Не вышло', e.message); } };
+  const mbPrimary = $('#mbPrimarySel', root);
+  if (mbPrimary) {
+    mbPrimary.value = mbPrimary.dataset.cur || '';   /* показать текущий основной как выбранный */
+    mbPrimary.addEventListener('change', (e) => {
+      const ph = e.target.value;
+      if (ph) mbPersona({ phone: ph, primary: true }, 'Основной чистый номер назначен');
+      else { const cur = e.target.dataset.cur; if (cur) mbPersona({ phone: cur, primary: false }, 'Основной сброшен'); }
+    });
+  }
+  $$('[data-mb-clean]', root).forEach(b => b.addEventListener('click', () => mbPersona({ phone: b.dataset.mbClean, brokerId: b.dataset.mbBroker, outreach: false }, 'Номер помечен чистым')));
+  $$('[data-mb-assign]', root).forEach(sel => sel.addEventListener('change', (e) => { if (e.target.value) mbPersona({ phone: e.target.value, brokerId: sel.dataset.mbAssign, outreach: false }, 'Номер закреплён за менеджером'); }));
   $('#mbTestBtn') && $('#mbTestBtn').addEventListener('click', async () => {
     const phone = ($('#mbTestPhone', root).value || '').trim();
     const out = $('#mbTestOut', root);
