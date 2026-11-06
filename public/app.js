@@ -6269,15 +6269,23 @@ function buildIntakeCard(l) {
   }
   const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
   const leadIdLine = metaLeadId ? `<div class="lc-ik-leadid" title="ID заявки из лид-формы Meta — для сверки с рекламным кабинетом, поддержки и Conversions API"><span>Lead ID</span><code data-copy="${esc(metaLeadId)}">${esc(metaLeadId)}</code></div>` : '';
-  return `<div class="lc-intake">
-    <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
+  /* ⭐рекламная атрибуция (кампания/объявление/креатив/поля формы) сворачивается, чтобы не мельтешить перед
+     брокером после первого касания. Шапка + просьба клиента (время/канал) всегда видны — это нужно для общения.
+     По умолчанию свёрнуто, если лид уже тронут; ручной тумблер запоминается на лид. */
+  const detailHtml = `${adBlock}${crea}${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}${leadIdLine}`;
+  const hasDetail = !!(adBlock || crea || qa || leadIdLine);
+  const ikKey = 'ikOpen_' + l.id;
+  const touched = !!(l.lastDir || (l.ai && l.ai.chainStep > 0) || !['new', 'touch'].includes(l.stage));
+  const collapsed = hasDetail && (PAGE_STATE[ikKey] !== undefined ? !PAGE_STATE[ikKey] : touched);
+  const collapseBtn = hasDetail ? `<button type="button" class="lc-ik-collapse" data-ik-toggle="${esc(l.id)}" aria-label="Свернуть/развернуть детали заявки" title="Свернуть/развернуть источник и детали заявки">${ic(I.chev)}</button>` : '';
+  const summary = hasDetail ? `<button type="button" class="lc-ik-summary" data-ik-toggle="${esc(l.id)}" title="Показать источник и детали заявки">${ic(I.target)}<span>${esc(adPathLine(l) || 'Источник и детали заявки')}</span></button>` : '';
+  return `<div class="lc-intake${collapsed ? ' ik-collapsed' : ''}">
+    <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span>${collapseBtn}</div>
     <span class="lc-ik-clock" id="lcIkClock" title="Местное время клиента — по нему считаются тихие часы (ночью дожимы не идут)"></span>
-    ${adBlock}
-    ${crea}
-    ${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
+    ${summary}
+    <div class="lc-ik-detail">${detailHtml}</div>
     ${prefRow}
     ${schedRow}
-    ${leadIdLine}
   </div>`;
 }
 /* лёгкий лайтбокс креатива ПОВЕРХ карточки лида — НЕ через modal() (тот закрывает карточку под собой).
@@ -6303,6 +6311,14 @@ function wireIntakeCard(scope, l, done) {
   $('[data-plancall]', scope)?.addEventListener('click', () => scheduleCall(l, done));
   $('[data-planmsg]', scope)?.addEventListener('click', () => openScheduleMessage(l, done));
   $$('[data-schedcancel]', scope).forEach(b => b.addEventListener('click', async () => { try { await api.del(`/leads/${l.id}/schedule/${b.dataset.schedcancel}`); toast('Отменено', null, true); done && done(); } catch (e) { toast('Не вышло', e.message); } }));
+  /* свернуть/развернуть рекламную атрибуцию (на месте, без ре-рендера) + запомнить выбор на лид */
+  $$('[data-ik-toggle]', scope).forEach(b => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const card = b.closest('.lc-intake'); if (!card) return;
+    const willCollapse = !card.classList.contains('ik-collapsed');
+    card.classList.toggle('ik-collapsed', willCollapse);
+    PAGE_STATE['ikOpen_' + b.dataset.ikToggle] = !willCollapse;
+  }));
   startLeadClock(scope, l);
 }
 /* УМНЫЕ ЧАСЫ: живое местное время клиента + индикатор тихих часов (ночью автопилот дожимы не шлёт).

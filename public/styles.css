@@ -853,6 +853,17 @@ textarea { resize: vertical; min-height: 70px; }
 .lc-ik-who span { font-size: 11px; color: var(--muted); }
 .lc-ik-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 20px; padding: 3px 8px; flex: 0 0 auto; }
 .lc-ik-tag svg { width: 11px; height: 11px; }
+/* сворачивание рекламной атрибуции — чтобы не мельтешила перед брокером после первого касания */
+.lc-ik-collapse { flex: 0 0 auto; width: 26px; height: 26px; border: 0; background: transparent; border-radius: 7px; color: var(--ink-3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background .12s, transform .2s ease; }
+.lc-ik-collapse svg { width: 15px; height: 15px; transition: transform .2s ease; }
+.lc-ik-collapse:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+.lc-intake:not(.ik-collapsed) .lc-ik-collapse svg { transform: rotate(180deg); }
+.lc-intake.ik-collapsed .lc-ik-detail { display: none; }
+.lc-intake:not(.ik-collapsed) .lc-ik-summary { display: none; }
+.lc-ik-summary { display: inline-flex; align-items: center; gap: 7px; width: 100%; margin-top: 9px; padding: 8px 10px; border: 1px dashed var(--stroke); border-radius: 10px; background: color-mix(in srgb, var(--accent) 4%, transparent); color: var(--ink-2); font-size: 12px; font-weight: 550; cursor: pointer; text-align: left; transition: background .12s, border-color .12s; }
+.lc-ik-summary:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, var(--stroke)); }
+.lc-ik-summary svg { width: 14px; height: 14px; color: var(--accent); flex: 0 0 auto; }
+.lc-ik-summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .lc-ik-clock { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; margin: 8px 0 0; font-size: 12px; color: var(--ink-2); background: var(--surface-2, rgba(127,127,127,.07)); border: 1px solid var(--stroke); border-radius: 20px; padding: 4px 10px; overflow: hidden; vertical-align: middle; }
 .lc-ik-clock:empty { display: none; }
 .lc-ik-clock svg { width: 13px; height: 13px; opacity: .8; flex: 0 0 auto; }
