@@ -108,7 +108,7 @@ async function run() {
   engine.inbound(db3, db3.leads[0], 'Есть что-то до 1 млн?');
   await new Promise(r => setTimeout(r, 30)); // forwardInbound асинхронный (fire-and-forget из хука)
   const fwdText = sends.find(s => s.method === 'sendMessage');
-  ok('WA→broker text: forwarded', !!fwdText && /Иван Клиент/.test(fwdText.body.text) && /до 1 млн/.test(fwdText.body.text), JSON.stringify(fwdText ? fwdText.body : {}).slice(0, 90));
+  ok('WA→broker text: forwarded', !!fwdText && /Иван/.test(fwdText.body.text) && /до 1 млн/.test(fwdText.body.text), JSON.stringify(fwdText ? fwdText.body : {}).slice(0, 90)); // бриджу своего брокера имя клиента причёсано до первого (см. who/first в tgbridge.forwardInbound)
   ok('WA→broker: replyMap remembers msg→lead', Object.values(db3.tgBridge.replyMap).some(v => v.leadId === 'ld1'));
 
   // 6) WA-входящее с МЕДИА → sendPhoto брокеру с caption
@@ -119,7 +119,7 @@ async function run() {
   const fwdMedia = sends.find(s => s.method === 'sendPhoto');
   ok('WA→broker media: sendPhoto used', !!fwdMedia, JSON.stringify(fwdMedia ? fwdMedia.body : {}).slice(0, 90));
   ok('WA→broker media: absolute URL to Telegram', fwdMedia && String(fwdMedia.body.photo).startsWith('https://tunnel.example/assets/wa-media/'));
-  ok('WA→broker media: caption has name+text', fwdMedia && /Иван Клиент/.test(fwdMedia.body.caption) && /смотри план/.test(fwdMedia.body.caption));
+  ok('WA→broker media: caption has name+text', fwdMedia && /Иван/.test(fwdMedia.body.caption) && /смотри план/.test(fwdMedia.body.caption));
   ok('inbound stores media on message', db4.messages.some(m => m.dir === 'in' && m.media && m.media.type === 'image'));
 
   // 7) WA-媒 sendMedia payload формируется правильно (Cloud API форма)
