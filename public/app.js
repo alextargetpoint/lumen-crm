@@ -5278,11 +5278,11 @@ function openMerge(cluster) {
 /* ── сохранённые виды воронки (пресеты фильтров+сортировки) ── */
 function currentFunnelFilter() {
   const F = PAGE_STATE;
-  return { stage: F.funnelStage || '', flag: F.funnelFlag || '', geo: F.funnelGeo || '', src: F.funnelSrc || '', vendor: F.funnelVendor || '', broker: F.funnelBroker || '', sort: F.funnelSort || '', sortDir: F.funnelSortDir || '', view: F.funnelView || '', q: F.funnelQ || '' };
+  return { stage: F.funnelStage || '', flag: F.funnelFlag || '', geo: F.funnelGeo || '', src: F.funnelSrc || '', vendor: F.funnelVendor || '', broker: F.funnelBroker || '', created: F.funnelCreated || '', activity: F.funnelActivity || '', chan: F.funnelChan || '', sort: F.funnelSort || '', sortDir: F.funnelSortDir || '', view: F.funnelView || '', q: F.funnelQ || '' };
 }
 function applyFunnelView(f) {
   const F = PAGE_STATE;
-  F.funnelStage = f.stage || ''; F.funnelFlag = f.flag || ''; F.funnelGeo = f.geo || ''; F.funnelSrc = f.src || ''; F.funnelVendor = f.vendor || ''; F.funnelBroker = f.broker || '';
+  F.funnelStage = f.stage || ''; F.funnelFlag = f.flag || ''; F.funnelGeo = f.geo || ''; F.funnelSrc = f.src || ''; F.funnelVendor = f.vendor || ''; F.funnelBroker = f.broker || ''; F.funnelCreated = f.created || ''; F.funnelActivity = f.activity || ''; F.funnelChan = f.chan || '';
   if (f.sort) F.funnelSort = f.sort; if (f.sortDir) F.funnelSortDir = f.sortDir; if (f.view) F.funnelView = f.view; F.funnelQ = f.q || '';
   render();
 }
@@ -5313,12 +5313,19 @@ PAGES.funnel = async (root) => {
   const F = PAGE_STATE;
   const geos = STATE.settings.agency.geos;
   const q = (F.funnelQ || '').toLowerCase();
+  /* ── многогранные фильтры (как в Bitrix): дата создания, дата активности, канал ── */
+  const _DAY = 86400000, _NOW = Date.now();
+  const _tStart = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const inCreated = (l) => { if (!F.funnelCreated) return true; const c = l.createdAt || 0; if (!c) return false; if (F.funnelCreated === 'today') return c >= _tStart; if (F.funnelCreated === '7d') return _NOW - c < 7 * _DAY; if (F.funnelCreated === '30d') return _NOW - c < 30 * _DAY; if (F.funnelCreated === '90d') return _NOW - c < 90 * _DAY; return true; };
+  const inActivity = (l) => { if (!F.funnelActivity) return true; const a = l.lastMsgAt || l.createdAt || 0; const age = _NOW - a; if (F.funnelActivity === 'today') return a >= _tStart; if (F.funnelActivity === '7d') return age < 7 * _DAY; if (F.funnelActivity === 'stale14') return age >= 14 * _DAY; if (F.funnelActivity === 'stale30') return age >= 30 * _DAY; return true; };
+  const inChan = (l) => { if (!F.funnelChan) return true; const ch = l.channels || {}; const hasWa = ch.wa === 'yes', hasTg = ch.tg === 'yes' || l.activeChannel === 'tg'; if (F.funnelChan === 'wa') return hasWa; if (F.funnelChan === 'tg') return hasTg; if (F.funnelChan === 'none') return !hasWa && !hasTg; return true; };
   const leads = all.filter(l =>
     (!F.funnelStage || l.stage === F.funnelStage) &&
     (!F.funnelGeo || l.geo === F.funnelGeo) &&
     (!F.funnelSrc || l.source === F.funnelSrc) &&
     (!F.funnelVendor || (F.funnelVendor === '__none' ? !l.vendorId : l.vendorId === F.funnelVendor)) &&
-    (!F.funnelBroker || l.broker === F.funnelBroker) &&
+    (!F.funnelBroker || (F.funnelBroker === '__none' ? !l.broker : l.broker === F.funnelBroker)) &&
+    inCreated(l) && inActivity(l) && inChan(l) &&
     (!q || l.name.toLowerCase().includes(q) || l.phone.includes(q)) &&
     (!F.funnelFlag ||
       (F.funnelFlag === 'overdue' && l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()) ||
@@ -5342,7 +5349,7 @@ PAGES.funnel = async (root) => {
   const launchable = leads.filter(l => ['new', 'touch', 'sleeping'].includes(l.stage));
 
   root.innerHTML = `
-    ${(() => { const activeN = ['funnelGeo', 'funnelSrc', 'funnelVendor', 'funnelBroker'].filter(k => F[k]).length; const drawerOpen = !!F.funnelFiltersOpen || activeN > 0; return `
+    ${(() => { const activeN = ['funnelGeo', 'funnelSrc', 'funnelVendor', 'funnelBroker', 'funnelCreated', 'funnelActivity', 'funnelChan'].filter(k => F[k]).length; const drawerOpen = !!F.funnelFiltersOpen || activeN > 0; return `
     <div class="filters">
       <input id="fQ" placeholder="Имя или номер…" value="${esc(F.funnelQ || '')}" style="width:170px">
       <button class="btn btn-sm f-toggle ${activeN ? 'on' : ''}" id="fToggle" title="Фильтры: направление, источник, подрядчик, брокер">${ic(I.funnel)}Фильтры${activeN ? ` · ${activeN}` : ''}</button>
@@ -5364,7 +5371,10 @@ PAGES.funnel = async (root) => {
       <select id="fGeo"><option value="">Все направления</option>${geos.map(g => `<option value="${g}" ${F.funnelGeo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
       <select id="fSrc"><option value="">Все источники</option>${srcs.map(x => `<option value="${x}" ${F.funnelSrc === x ? 'selected' : ''}>${srcName[x] || x}</option>`).join('')}</select>
       ${vendors.length && !fieldHiddenForMe('vendor') ? `<select id="fVendor"><option value="">Все подрядчики</option><option value="__none" ${F.funnelVendor === '__none' ? 'selected' : ''}>Без подрядчика</option>${vendors.map(v => `<option value="${v.id}" ${F.funnelVendor === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}
-      <select id="fBroker"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${F.funnelBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+      <select id="fBroker"><option value="">Все брокеры</option><option value="__none" ${F.funnelBroker === '__none' ? 'selected' : ''}>Без брокера</option>${STATE.brokers.map(b => `<option value="${b.id}" ${F.funnelBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+      <select id="fCreated" title="Когда лид создан"><option value="">Создан: любой срок</option>${[['today', 'Создан сегодня'], ['7d', 'Создан за 7 дней'], ['30d', 'Создан за 30 дней'], ['90d', 'Создан за 90 дней']].map(([v, n]) => `<option value="${v}" ${F.funnelCreated === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <select id="fActivity" title="Последняя активность по лиду"><option value="">Активность: любая</option>${[['today', 'Актив сегодня'], ['7d', 'Актив за 7 дней'], ['stale14', 'Молчит 14 дней+'], ['stale30', 'Молчит 30 дней+']].map(([v, n]) => `<option value="${v}" ${F.funnelActivity === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <select id="fChan" title="Канал связи с лидом"><option value="">Канал: любой</option>${[['wa', 'Есть WhatsApp'], ['tg', 'Есть Telegram'], ['none', 'Без контакта']].map(([v, n]) => `<option value="${v}" ${F.funnelChan === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
       ${activeN ? `<button class="btn btn-sm" id="fClear">${ic(I.x)}Сбросить</button>` : ''}
     </div>`; })()}
     <div class="cc-panel glass" id="ccPanel" ${PAGE_STATE.funnelChainOpen ? '' : 'hidden'}>
@@ -5469,12 +5479,15 @@ PAGES.funnel = async (root) => {
   const setF = (k, v) => { PAGE_STATE[k] = v; render(); };
   $('#fToggle')?.addEventListener('click', () => { const d = $('#fDrawer', root); if (!d) return; const willOpen = d.hasAttribute('hidden'); d.toggleAttribute('hidden'); PAGE_STATE.funnelFiltersOpen = willOpen; $('#fToggle', root)?.classList.toggle('open', willOpen); });
   $('#fViews')?.addEventListener('click', (e) => openFunnelViews(e));
-  $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; render(); });
+  $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; PAGE_STATE.funnelCreated = ''; PAGE_STATE.funnelActivity = ''; PAGE_STATE.funnelChan = ''; render(); });
   $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => setF('funnelQ', e.target.value), 350); });
   $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));
   $('#fSrc').addEventListener('change', (e) => setF('funnelSrc', e.target.value));
   $('#fVendor')?.addEventListener('change', (e) => setF('funnelVendor', e.target.value));
   $('#fBroker').addEventListener('change', (e) => setF('funnelBroker', e.target.value));
+  $('#fCreated')?.addEventListener('change', (e) => setF('funnelCreated', e.target.value));
+  $('#fActivity')?.addEventListener('change', (e) => setF('funnelActivity', e.target.value));
+  $('#fChan')?.addEventListener('change', (e) => setF('funnelChan', e.target.value));
   $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', (F.funnelFlag === b.dataset.flag && b.dataset.flag) ? '' : b.dataset.flag)));
   $$('[data-fstage]', root).forEach(b => b.addEventListener('click', () => setF('funnelStage', F.funnelStage === b.dataset.fstage ? '' : b.dataset.fstage)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
