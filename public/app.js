@@ -4921,7 +4921,7 @@ function exportLeadsCsv(ids) {
   const chY = (v) => v === 'yes' ? 'да' : v === 'no' ? 'нет' : '—';
   const fmtd = (t) => t ? new Date(t).toLocaleString('ru-RU') : '';
   const head = ['Имя', 'Телефон', 'Стадия', 'Направление', 'Бюджет', 'Квал', 'Источник', 'Брокер', 'WhatsApp', 'Telegram', 'Создан', 'Последняя активность', 'Следующий шаг'];
-  const lines = rows.map(l => [l.name, l.phone, stageName(l.stage), l.geoName || l.geo, (l.quals.budget || {}).value || '', (l.axesFilled || 0) + '/4', SRC[l.source] || l.source || '', l.brokerName || '', chY((l.channels || {}).wa), chY((l.channels || {}).tg), fmtd(l.createdAt), fmtd(l.lastMsgAt || l.createdAt), (l.nextAction && l.nextAction.text) || ''].map(q).join(';'));
+  const lines = rows.map(l => [l.name, l.phone, stageName(l.stage), l.geoName || l.geo, fmtBudget(l.quals.budget, l.geo) || '', (l.axesFilled || 0) + '/4', SRC[l.source] || l.source || '', l.brokerName || '', chY((l.channels || {}).wa), chY((l.channels || {}).tg), fmtd(l.createdAt), fmtd(l.lastMsgAt || l.createdAt), (l.nextAction && l.nextAction.text) || ''].map(q).join(';'));
   const csv = '﻿' + head.map(q).join(';') + '\n' + lines.join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = 'leads-' + rows.length + '-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
@@ -5419,7 +5419,7 @@ PAGES.funnel = async (root) => {
             ${items.map(l => {
               const sel = selSet("funnel").has(l.id) ? "sel" : "";
               const hot = l.hint && l.hint.kind === 'act' ? 'hot' : '';
-              const bud = (l.quals.budget || {}).value, prop = (l.quals.type || {}).value;
+              const bud = fmtBudget(l.quals.budget, l.geo), prop = (l.quals.type || {}).value;
               const ctx = [l.geoName, bud || prop || ''].filter(Boolean).join(' · ');
               const aiOn = l.ai && l.ai.enabled, needHuman = (l.tags || []).includes('нужен человек');
               /* строка ДЕЙСТВИЯ — только когда реально нужно действовать (задача брокера / нужен человек). «ИИ коснётся» сюда НЕ выносим — это фон */
@@ -5467,7 +5467,7 @@ PAGES.funnel = async (root) => {
           <td>${tblCh(l)}</td>
           <td><span class="tbl-stage ${stageCls(l.stage)}">${stageName(l.stage)}</span></td>
           <td class="tbl-geo">${esc(l.geoName || '—')}</td>
-          <td class="tbl-bud">${(l.quals.budget || {}).value ? '<b>' + esc((l.quals.budget || {}).value) + '</b>' : '<span class="muted">—</span>'}</td>
+          <td class="tbl-bud">${(l.quals.budget || {}).value ? '<b>' + esc(fmtBudget(l.quals.budget, l.geo)) + '</b>' : '<span class="muted">—</span>'}</td>
           <td><div class="tbl-qual"><div class="axes" style="width:48px;margin:0">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div><span class="tbl-qn">${l.axesFilled}/4</span></div></td>
           <td class="tbl-icp">${(l.icpMatch && l.icpMatch.score != null && !['deal', 'lost'].includes(l.stage)) ? `<span class="tbl-icpv ${l.icpMatch.score >= 60 ? 'hi' : l.icpMatch.score >= 40 ? 'mid' : ''}" title="Совпадение с профилем квал/закрытых${l.icpMatch.matched && l.icpMatch.matched.length ? ': ' + l.icpMatch.matched.join(', ') : ''}">${l.icpMatch.score}%</span>` : '<span class="muted">—</span>'}</td>
           <td>${l.source ? `<span class="tbl-src">${esc(srcName[l.source] || l.source)}</span>` : '<span class="muted">—</span>'}</td>
@@ -6217,6 +6217,21 @@ function adPathHtml(l) {
 }
 /* компактная строка пути (для бейджей/списков) */
 function adPathLine(l) { const a = adInfo(l); if (!a) return ''; return [a.ad, a.set, a.camp].filter(Boolean).join(' · ') || a.id; }
+/* ⭐ЕДИНЫЙ ФОРМАТ БЮДЖЕТА: вместо разнобоя «до 200 000 USD / 120000 USD / $66 899» — одна эстетичная форма
+   «до $200 000». Берёт распознанное число (budget.num) + символ валюты направления, сохраняет приставку до/от/~.
+   Нет числа → показываем как есть (строка клиента). */
+function fmtBudget(b, geo) {
+  if (!b) return '';
+  const raw = (b.value == null ? '' : b.value).toString();
+  const num = +b.num;
+  if (num && num > 0) {
+    const cur = ((((STATE.settings || {}).criteria || {})[geo] || {}).currency === 'EUR') ? '€' : '$';
+    const low = raw.toLowerCase();   /* \b в JS не работает с кириллицей → детект приставки без \b */
+    const pfx = (/до\s*\d|up\s*to|^</.test(low)) ? 'до ' : (/(^|\s)от\s*\d|from\s*\d|^>/.test(low)) ? 'от ' : (/~|around|примерн|около|в\s?район/.test(low)) ? '~' : '';
+    return pfx + cur + num.toLocaleString('ru-RU').replace(/,/g, ' ');
+  }
+  return raw;
+}
 /* КАРТОЧКА ЗАЯВКИ — фото + вопросы/ответы из формы + путь из рекламы + просьба клиента с движком времени.
    Общая для карточки лида и панели «Диалоги». Всегда наверху ленты (вне фильтров). */
 /* формы Meta часто пакуют несколько ответов в одно поле: «Stage: ready_to_move_in Time: Today».
@@ -6398,7 +6413,7 @@ function ftChipsHtml(l) {
   if (l.ads && l.ads.adName) chips.push(['проект', l.ads.adName]);
   if (l.geoName) chips.push(['гео', l.geoName]);
   const AXN = { purpose: 'цель', budget: 'бюджет', timeline: 'срок', type: 'тип' };
-  for (const a of Object.keys(AXN)) { const q = (l.quals || {})[a]; if (q && q.value) chips.push([AXN[a], q.value]); }
+  for (const a of Object.keys(AXN)) { const q = (l.quals || {})[a]; if (q && q.value) chips.push([AXN[a], a === 'budget' ? fmtBudget(q, l.geo) : q.value]); }
   if (l.custom && typeof l.custom === 'object') {
     const defs = STATE.settings.customFields || [];
     Object.entries(l.custom).slice(0, 6).forEach(([k, v]) => {
@@ -6791,7 +6806,7 @@ async function openLeadModal(id, backScope) {
     ${(l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()) ? `<div class="lc-hint warn" style="margin-top:8px">${ic(I.clock)}Шаг просрочен · ${ago(l.nextAction.at).replace(' назад', '')}. Это та самая красная плашка в воронке — нажмите «Выполнено», чтобы снять её.</div>` : ''}
     ${l.ads && (l.ads.adId || l.ads.campaignName || l.ads.adName) ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${esc([l.ads.adName, l.ads.adsetName, l.ads.campaignName].filter(Boolean).join(' · ') || ('ad_id ' + (l.ads.adId || '—')))}${l.ads.adId && !l.ads.matched ? ' <span>· не в базе (путь из интегратора)</span>' : ''}</div>` : ''}
     <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
-    <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>`;
+    <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(a === 'budget' ? fmtBudget(q, l.geo) : q.value) : '—'}</b></div>`; }).join('')}</div>`;
 
   const bd = modal({
     title: l.name,
