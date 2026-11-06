@@ -11281,7 +11281,7 @@ PAGES.automations = async (root) => {
           <div class="acc-flow" data-accflow="distribute">
             <div class="acc-flow-ic">${ic(I.users)}</div>
             <div class="acc-flow-body"><div class="acc-flow-t">Как это работает</div>
-              <div class="acc-flow-steps"><span class="acc-flow-step"><b>1</b>Лид попадает в пул</span><span class="acc-flow-arr">→</span><span class="acc-flow-step"><b>2</b>Применяются правила</span><span class="acc-flow-arr">→</span><span class="acc-flow-step"><b>3</b>Назначается брокер</span></div>
+              <div class="acc-flow-steps"><span class="acc-flow-step"><b>1</b>Лид попадает в пул</span><span class="acc-flow-seg"><span class="acc-flow-arr">→</span><span class="acc-flow-step"><b>2</b>Применяются правила</span></span><span class="acc-flow-seg"><span class="acc-flow-arr">→</span><span class="acc-flow-step"><b>3</b>Назначается брокер</span></span></div>
             </div>
             <button type="button" class="acc-flow-x" data-accflow-x="distribute">×</button>
           </div>

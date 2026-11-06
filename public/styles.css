@@ -9332,6 +9332,9 @@ body.client-view [data-team]{ display:none !important; }
 .acc-flow-body { flex:1; }
 .acc-flow-t { font-size:15px; font-weight:700; margin-bottom:9px; }
 .acc-flow-steps { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+/* стрелка держится ВМЕСТЕ со следующим шагом (неразрывно) — при переносе строки
+   стрелка не повисает в конце строки «в воздухе», а уходит на новую строку слева от шага */
+.acc-flow-seg { display:inline-flex; align-items:center; gap:10px; white-space:nowrap; }
 .acc-flow-step { display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,.08); border-radius:30px; padding:7px 13px 7px 8px; font-size:12px; }
 .acc-flow-step b { width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.14); display:grid; place-items:center; font-size:11px; }
 .acc-flow-arr { color:rgba(255,255,255,.4); }
