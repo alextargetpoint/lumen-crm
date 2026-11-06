@@ -320,6 +320,10 @@ document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.cs, .dtp, .cs-list, .dtp-pop')) closePop();
 });
 window.addEventListener('scroll', (e) => { if (CUR_POP && Date.now() - POP_GUARD > 350 && !e.target.closest?.('.cs-list, .dtp-pop')) closePop(); }, true);
+/* панель под-разделов (.ws-tabs) гаснет, как только #content прокручен с верха —
+   иначе при скролле она обрезается об верхнюю кромку и выглядит сломанной (жалоба
+   «сверху ломается интерфейс»). Один делегированный слушатель на капче — без утечек. */
+window.addEventListener('scroll', (e) => { const c = e.target; if (!c || c.id !== 'content') return; const bar = c.querySelector(':scope > .ws-tabs'); if (bar) bar.classList.toggle('ws-tucked', c.scrollTop > 4); }, true);
 window.addEventListener('resize', closePop);
 
 function enhanceControls(root) {
@@ -11650,9 +11654,11 @@ PAGES.automations = async (root) => {
   const _urlSub = (location.hash.slice(1).split('/')[1] || '').trim();
   applyAg(ALL_SECTIONS.includes(_urlSub) ? _urlSub : (ALL_SECTIONS.includes(PAGE_STATE.funnelAg) ? PAGE_STATE.funnelAg : 'overview'));
   /* режим Основное / Экспертное: в «Основном» прячем .exp-only */
-  const applyMode = (mde) => { autoGrid.classList.toggle('basic', mde === 'basic'); $$('#accMode button', root).forEach(b => b.classList.toggle('on', b.dataset.mode === mde)); PAGE_STATE.accMode = mde; };
+  const applyMode = (mde) => { autoGrid.classList.toggle('basic', mde === 'basic'); $$('#accMode button', root).forEach(b => b.classList.toggle('on', b.dataset.mode === mde)); PAGE_STATE.accMode = mde; try { localStorage.setItem('lumen.accMode', mde); } catch (e) {} };
   $$('#accMode button', root).forEach(b => b.addEventListener('click', () => applyMode(b.dataset.mode)));
-  applyMode(PAGE_STATE.accMode || 'basic');
+  /* режим запоминается между сессиями: выбрал «Экспертное» — остаётся после перезагрузки (раньше сбрасывался в «Основное») */
+  let _savedMode = PAGE_STATE.accMode; try { _savedMode = _savedMode || localStorage.getItem('lumen.accMode'); } catch (e) {}
+  applyMode(_savedMode === 'expert' ? 'expert' : 'basic');
   /* поиск по настройкам: фильтр пунктов + Enter прыгает к первому совпавшему */
   const accSearch = $('#accSearch', root);
   if (accSearch) {
