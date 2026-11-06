@@ -9155,6 +9155,13 @@ body.client-view [data-team]{ display:none !important; }
 .lc-task-due svg{width:12px;height:12px}
 .lc-task.overdue .lc-task-due{color:var(--bad,#C0392B);font-weight:600}
 .lc-task-ava{width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:var(--bg-2);color:var(--ink);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+/* быстрые действия по задаче (перенос срока/приоритет) + точка приоритета */
+.lc-task-pri{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--pc,#2F6BDF);margin-right:7px;vertical-align:middle;flex:0 0 auto}
+.lc-task-more{width:26px;height:26px;flex:0 0 auto;border:0;background:transparent;border-radius:7px;color:var(--ink-3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;opacity:0;transition:opacity .12s,background .12s,color .12s}
+.lc-task:hover .lc-task-more{opacity:1}
+.lc-task-more:hover{background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink)}
+.lc-task-more svg{width:15px;height:15px}
+@media (hover:none){.lc-task-more{opacity:1}}
 .lc-cmt-list{display:flex;flex-direction:column;gap:12px}
 .lc-cmt{display:flex;gap:10px}
 .lc-cmt-ava{width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--bg-2);color:var(--ink);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}

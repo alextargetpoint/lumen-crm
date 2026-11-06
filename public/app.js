@@ -65,6 +65,7 @@ const I = {
   shield: '<path d="M12 2l8 3.5v5.2c0 5-3.4 9.6-8 11.3-4.6-1.7-8-6.3-8-11.3V5.5L12 2z"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+  dots: '<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>',
   handover: '<path d="M3 12h11M10 8l4 4-4 4"/><path d="M17 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/>',
   eye: '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
   cal: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2v4M16 2v4"/>',
@@ -6618,9 +6619,13 @@ function lcTaskRow(t, myId) {
   const ck = mine
     ? `<button class="lc-task-ck" data-ttog="${t.id}" title="${t.status === 'done' ? 'Вернуть в работу' : 'Завершить'}">${t.status === 'done' ? ic(I.check) : ''}</button>`
     : `<span class="lc-task-ck ro" title="Задача коллеги · ${esc(who)}">${t.status === 'done' ? ic(I.check) : ''}</span>`;
+  const PRI_DOT = { p1: '#D9534F', p2: '#E0922E', p3: '#2F6BDF', p4: '#8a8a8a' };
+  const priDot = t.status !== 'done' ? `<span class="lc-task-pri" style="--pc:${PRI_DOT[t.priority] || PRI_DOT.p3}" title="Приоритет"></span>` : '';
+  const more = (mine && t.status !== 'done') ? `<button class="lc-task-more" data-tmore="${t.id}" title="Быстрые действия: перенести срок, приоритет">${ic(I.dots || I.gear)}</button>` : '';
   return `<div class="lc-task ${t.status === 'done' ? 'done' : ''} ${overdue ? 'overdue' : ''} ${mine ? '' : 'other'}" data-tid="${t.id}">
     ${ck}
-    <div class="lc-task-main"><b>${esc(t.title)}</b>${dueLabel && t.status !== 'done' ? `<span class="lc-task-due">${ic(I.cal)}${esc(dueLabel)}</span>` : ''}${doneMeta}</div>
+    <div class="lc-task-main"><b>${priDot}${esc(t.title)}</b>${dueLabel && t.status !== 'done' ? `<span class="lc-task-due">${ic(I.cal)}${esc(dueLabel)}</span>` : ''}${doneMeta}</div>
+    ${more}
     <span class="lc-task-ava" title="${esc(who)}">${esc((who || '?').slice(0, 1).toUpperCase())}</span>
   </div>`;
 }
@@ -7294,6 +7299,20 @@ async function openLeadModal(id, backScope) {
     const note = await askTaskDoneNote();   /* комментарий по регламенту при закрытии (необязательно) */
     if (note === null) return;              /* отменили */
     try { await api.patch('/tasks/' + tid, { status: 'done', doneNote: note }); toast('Задача выполнена', note ? 'комментарий сохранён' : null, true); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); }
+  }));
+  /* быстрые действия по задаче прямо в карточке лида: перенос срока + приоритет (синк с задачником — тот же /tasks/:id) */
+  const _setPri = async (tid, pri) => { try { await api.patch('/tasks/' + tid, { priority: pri }); toast('Приоритет обновлён', null, true); openLeadModal(id); } catch (e) { toast('Не вышло', e.message); } };
+  $$('[data-tmore]', bd).forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const tid = b.dataset.tmore; const t = (leadTasks || []).find(x => x.id === tid) || {};
+    const r = b.getBoundingClientRect();
+    ctxPopup(r.right, r.bottom + 4, [
+      { ic: I.clock || I.cal, label: 'Перенести срок…', onClick: async () => { const ms = await tkDatePop(b, t.due); if (ms) { try { await api.patch('/tasks/' + tid, { due: ms }); toast('Срок перенесён', new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), true); openLeadModal(id); } catch (er) { toast('Не вышло', er.message); } } } },
+      { sep: true },
+      { ic: I.flame || I.bolt, label: 'Срочно' + (t.priority === 'p1' ? ' ✓' : ''), onClick: () => _setPri(tid, 'p1') },
+      { label: 'Обычный' + (t.priority === 'p2' || !t.priority ? ' ✓' : ''), onClick: () => _setPri(tid, 'p2') },
+      { label: 'Низкий' + (t.priority === 'p3' || t.priority === 'p4' ? ' ✓' : ''), onClick: () => _setPri(tid, 'p3') },
+    ]);
   }));
   $('#lcTasksDoneTog', bd)?.addEventListener('click', () => { const d = $('#lcTasksDone', bd); if (d) d.style.display = d.style.display === 'none' ? '' : 'none'; });
   $('#lcMoreTog', bd)?.addEventListener('click', () => { const mb = $('#lcMoreBody', bd), mo = $('#lcMore', bd); if (mb) { const open = mb.style.display !== 'none'; mb.style.display = open ? 'none' : ''; if (mo) mo.classList.toggle('open', !open); } });
