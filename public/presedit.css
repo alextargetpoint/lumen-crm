@@ -370,7 +370,7 @@ button{font-family:inherit;cursor:pointer}
 
 /* ---- inspector ---- */
 .pe-insp-tabs{display:flex;flex:0 0 auto;border-bottom:1px solid var(--pe-line)}
-.pe-insp-tabs button{flex:1;border:0;background:transparent;padding:16px 0;font-size:13.5px;font-weight:600;color:var(--pe-mut);border-bottom:2px solid transparent}
+.pe-insp-tabs button{flex:1;border:0;background:transparent;padding:16px 0;font-size:13.5px;font-weight:600;color:var(--pe-mut);border-bottom:2px solid transparent;cursor:pointer;transition:color .16s cubic-bezier(.16,1,.3,1),border-color .16s cubic-bezier(.16,1,.3,1)}
 .pe-insp-tabs button.on{color:var(--pe-ink);border-bottom-color:var(--pe-accent)}
 .pe-insp-body{flex:1;overflow:auto;padding:20px}
 .pe-sec-label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--pe-mut);font-weight:700;margin:4px 0 14px}
@@ -588,7 +588,7 @@ button{font-family:inherit;cursor:pointer}
 .pe-ced-photo.pe-ced-empty:hover::after{opacity:1}
 /* плавающая мини-панель быстрых действий над выбранным элементом (как в референсе) */
 .pe-canvas{position:relative}
-.pe-floatbar{position:absolute;z-index:40;display:none;align-items:center;gap:2px;background:#fff;border:1px solid var(--pe-line);border-radius:10px;padding:4px;box-shadow:0 6px 22px rgba(20,16,12,.18);white-space:nowrap}
+.pe-floatbar{position:absolute;z-index:40;display:none;align-items:center;gap:2px;background:#fff;border:1px solid var(--pe-line);border-radius:10px;padding:4px;box-shadow:0 6px 22px rgba(20,16,12,.18);white-space:nowrap;animation:pe-fb-in .17s cubic-bezier(.16,1,.3,1)}
 .pe-fb-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--pe-ink);font:600 12.5px/1 'Inter',system-ui,sans-serif;padding:7px 10px;border-radius:7px;cursor:pointer}
 .pe-fb-btn:hover{background:var(--pe-hi)}
 .pe-fb-btn svg{width:15px;height:15px;flex:none}
@@ -631,7 +631,18 @@ button{font-family:inherit;cursor:pointer}
 .pe-img-loading::after{content:"";position:absolute;inset:0;z-index:3;border-radius:inherit;background:color-mix(in srgb,var(--pe-panel,#fff) 52%,transparent);-webkit-backdrop-filter:blur(1.5px);backdrop-filter:blur(1.5px)}
 .pe-img-loading::before{content:"";position:absolute;z-index:4;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:2.5px solid color-mix(in srgb,var(--pe-ink) 16%,transparent);border-top-color:var(--pe-sel);animation:pe-spin .7s linear infinite}
 @keyframes pe-spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.pe-img-loading::before{animation:none}}
+/* ── плавные переходы редактора (стиль Lumen: мягкий ease-out, без «нарезки») ── */
+@keyframes pe-fb-in{from{opacity:0;transform:translateY(4px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes pe-insp-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* содержимое правой панели не «щёлкает» при смене выбора/вкладки — поля плавно всплывают с лёгким стаггером */
+.pe-insp-body>*{animation:pe-insp-in .3s cubic-bezier(.16,1,.3,1) both}
+.pe-insp-body>*:nth-child(1){animation-delay:0s}
+.pe-insp-body>*:nth-child(2){animation-delay:.03s}
+.pe-insp-body>*:nth-child(3){animation-delay:.06s}
+.pe-insp-body>*:nth-child(4){animation-delay:.09s}
+.pe-insp-body>*:nth-child(5){animation-delay:.12s}
+.pe-insp-body>*:nth-child(n+6){animation-delay:.15s}
+@media (prefers-reduced-motion:reduce){.pe-img-loading::before{animation:none}.pe-floatbar{animation:none}.pe-insp-body>*{animation:none}}
 
 /* ===== РЕДИЗАЙН ВКЛАДОК СТИЛЬ / КОМПОЗИЦИЯ (референс клиента) ===== */
 .pe-sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:20px 0 12px}
