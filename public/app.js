@@ -17163,12 +17163,24 @@ PAGES.numbers = async (root) => {
     const done = all.filter(o => o.stage === 'done');
     const stepper = (o) => { const steps = o.steps || ['Оплачено', 'Готовим', 'Готово']; const cur = o.step || 1; return `<div style="display:flex;gap:5px;align-items:center;margin-top:7px;flex-wrap:wrap">${steps.map((s, i) => { const dn = i < cur - 1, now = i === cur - 1; return `<span style="font-size:10px;padding:2px 8px;border-radius:8px;white-space:nowrap;${dn ? 'background:var(--accent);color:#fff' : now ? 'background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700' : 'background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink-3,#8a8a8a)'}">${dn ? '✓ ' : now ? '● ' : ''}${esc(s)}</span>`; }).join('<span style="color:var(--ink-3,#bbb);font-size:10px">→</span>')}</div>`; };
     const isOwner = STATE && STATE.me && STATE.me.role === 'owner';
-    const row = (o) => { const nums = (o.numbers || []); const act = o.stage === 'connect' && nums.length ? `<button class="btn btn-sm btn-accent" data-noconnect="${esc(nums[0])}" style="margin-top:9px">Подключить по QR</button>` : (o.canRetry && isOwner ? `<button class="btn btn-sm btn-ghost" data-noretry="${esc(o.id)}" style="margin-top:9px">${o.provisionError ? 'Повторить выдачу' : 'Выдать номер'}</button>` : ''); return `<div class="set-row" style="align-items:flex-start"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес — <b style="color:var(--accent)">${esc(o.stageLabel || 'в обработке')}</b></div><div class="sd">${esc(o.detail || '')}${o.detail ? ' · ' : ''}${new Date(o.at).toLocaleDateString('ru-RU')}</div>${stepper(o)}${act}</div></div>`; };
+    const row = (o) => { const nums = (o.numbers || []); const act = o.stage === 'connect' && nums.length ? `<button class="btn btn-sm btn-accent" data-noconnect="${esc(nums[0])}">Подключить по QR</button>` : (o.canRetry && isOwner ? `<button class="btn btn-sm btn-ghost" data-noretry="${esc(o.id)}">${o.provisionError ? 'Повторить выдачу' : 'Выдать номер'}</button>` : '');
+      /* отмена незавершённого заказа (владелец): не одобрил / клиент передумал → уходит из списка, деньги назад */
+      const canCancel = isOwner && o.stage !== 'done' && o.status !== 'fulfilled';
+      const cancelBtn = canCancel ? `<button class="btn btn-sm btn-ghost" data-nocancel="${esc(o.id)}" style="color:#C0453B">Отменить заказ</button>` : '';
+      const actions = (act || cancelBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:9px">${act}${cancelBtn}</div>` : '';
+      return `<div class="set-row" style="align-items:flex-start"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес — <b style="color:var(--accent)">${esc(o.stageLabel || 'в обработке')}</b></div><div class="sd">${esc(o.detail || '')}${o.detail ? ' · ' : ''}${new Date(o.at).toLocaleDateString('ru-RU')}</div>${stepper(o)}${actions}</div></div>`; };
     box.innerHTML = `<div style="margin-top:14px;border-top:1px solid var(--stroke);padding-top:12px">
       ${active.length ? `<div class="lp-sec" style="margin:0 0 8px">Мои заказы номеров</div>${active.map(row).join('')}` : ''}
       ${done.length ? `<details class="num-done" ${active.length ? '' : 'open'} style="margin-top:${active.length ? '10' : '0'}px"><summary style="cursor:pointer;font-size:12px;color:var(--ink-3,#8a8a8a);user-select:none;list-style:none;display:flex;align-items:center;gap:6px">${ic(I.check)}Подключённые номера · ${done.length} <span style="color:var(--ink-3,#bbb)">— развернуть</span></summary><div style="margin-top:8px;opacity:.82">${done.map(row).join('')}</div></details>` : ''}
     </div>`;
     $$('[data-noconnect]', box).forEach(b => b.addEventListener('click', () => window.openYesimActivate && window.openYesimActivate(b.dataset.noconnect)));
+    $$('[data-nocancel]', box).forEach(b => b.addEventListener('click', async () => {
+      if (!(await uiConfirm('Отменить заказ?', 'Заказ уйдёт из списка. Списанные деньги вернутся на баланс. Уже подключённый работающий номер так отменить нельзя.', { ok: 'Отменить заказ', cancel: 'Назад' }))) return;
+      b.disabled = true; b.textContent = 'Отменяю…';
+      try { const r = await api.post('/numbers/order/cancel', { orderId: b.dataset.nocancel }); if (r.ok) toast('Заказ отменён', r.refunded ? `Возврат $${r.refunded} на баланс` : '', true); else toast('Не вышло', r.error || 'ошибка', false); }
+      catch (e) { toast('Ошибка', (e && e.message) || 'не удалось', false); }
+      finally { loadNumberOrders(); }
+    }));
     $$('[data-noretry]', box).forEach(b => b.addEventListener('click', async () => {
       b.disabled = true; const t0 = b.textContent; b.textContent = 'Покупаем номер…';
       try { const r = await api.post('/numbers/order/provision', { orderId: b.dataset.noretry }); if (r.ok) { toast('Номер выдан', ((r.order && r.order.numbers) || []).join(', ') + ' — подключите по QR', true); } else { toast('Не вышло', (r.error || 'ошибка Yesim') + ' — попробуйте ещё раз', false); } }

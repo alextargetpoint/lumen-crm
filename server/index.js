@@ -8164,6 +8164,34 @@ const server = http.createServer(async (req, res) => {
       const ok = order.status === 'ready' || order.status === 'fulfilled';
       return json(res, ok ? 200 : 400, { ok, order, error: order.provisionError || null });
     }
+    /* ⭐ОТМЕНА ЗАКАЗА: владелец сам отменяет незавершённый заказ (не одобрил / клиент передумал) —
+       заказ уходит из интерфейса, деньги возвращаются на баланс. Подключённый работающий номер отменить нельзя. */
+    if (p === '/api/numbers/order/cancel' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'недоступно для брокера' });
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const bl = db.settings.billing || {};
+      const order = (bl.numberOrders || []).find(o => o.id === b.orderId);
+      if (!order) return json(res, 404, { error: 'заказ не найден' });
+      if (order.status === 'cancelled') return json(res, 200, { ok: true, already: true, balance: bl.balance || 0 });
+      const grayNums = ((db.settings.waGray || {}).numbers || []);
+      const numConnected = (ph) => { const d = String(ph).replace(/\D/g, ''); const rec = grayNums.find(n => String(n.phone).replace(/\D/g, '').slice(-9) === d.slice(-9)); return !!(rec && (rec.connectedAt || (rec.live && rec.live.status === 'connected'))); };
+      if (order.status === 'fulfilled' || (Array.isArray(order.numbers) && order.numbers.some(numConnected))) return json(res, 400, { error: 'номер уже подключён и работает — отмена невозможна (деактивируйте/замените номер в «Номерах»)' });
+      /* byod с уже купленным, но НЕ подключённым номером → убираем его из списка серых (клиент передумал до подключения) */
+      if (Array.isArray(order.numbers) && order.numbers.length && db.settings.waGray) {
+        db.settings.waGray.numbers = (db.settings.waGray.numbers || []).filter(n => !order.numbers.some(ph => String(n.phone).replace(/\D/g, '').slice(-9) === String(ph).replace(/\D/g, '').slice(-9) && !(n.connectedAt || (n.live && n.live.status === 'connected'))));
+      }
+      /* возврат средств на баланс (симметрично списанию при заказе) */
+      const refund = +(order.cost || 0);
+      if (refund > 0) { bl.balance = +((bl.balance || 0) + refund).toFixed(2); bl.charges = bl.charges || []; bl.charges.unshift({ amount: -refund, reason: `Возврат за отмену заказа: ${order.qty}× ${order.label}`, at: Date.now(), balanceAfter: bl.balance }); }
+      /* managed: снять место из фермы (best-effort) */
+      if (order.edition === 'managed' && order.seatOrderId) { try { farmSvc.cancelSeatOrder && farmSvc.cancelSeatOrder(store.currentTid(), order.seatOrderId); } catch (_) {} }
+      order.status = 'cancelled'; order.cancelledAt = Date.now();
+      try { const reg = store.getRegistry(); if (reg.numberOrders) { delete reg.numberOrders[store.currentTid() + ':' + order.id]; store.saveRegistry(); } } catch (_) {}
+      notify(db, { type: 'billing', level: 'success', title: 'Заказ отменён', text: `${order.qty}× «${order.label}» отменён${refund > 0 ? `, возврат $${refund} на баланс` : ''}.`, email: false });
+      store.save();
+      return json(res, 200, { ok: true, refunded: refund, balance: bl.balance });
+    }
     /* мои заказы номеров (агентство видит статус) */
     if (p === '/api/numbers/orders' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
@@ -8181,7 +8209,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (_ordersChanged) store.save();
       /* детальный статус (без чёрного ящика): оплачено → готовим → готово → назначено/подключить */
-      const orders = (bl.numberOrders || []).slice(0, 30).map(o => {
+      const orders = (bl.numberOrders || []).filter(o => o.status !== 'cancelled').slice(0, 30).map(o => {
         const r = Object.assign({}, o);
         if (o.edition === 'managed') {
           r.steps = ['Оплачено', 'Готовим', 'Готово', 'Назначено'];
