@@ -38,6 +38,15 @@ const NUM_DIAGRAM = `<div style="border:1px solid rgba(128,128,128,.22);border-r
 const NUM_SHOT_LIST = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Номера</b><small>готовы «под ключ» · раздел в Lumen</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a" style="background:#25D366"></span><span class="m"><b>+971 50 123 45 67</b><i>WhatsApp + Telegram · на связи</i></span><span class="badge2" style="background:#2fae60">✓</span></div><div class="tgapp-row"><span class="a" style="background:#25D366"></span><span class="m"><b>+34 600 11 22 33</b><i>WhatsApp + Telegram · на связи</i></span><span class="badge2" style="background:#2fae60">✓</span></div><div class="tgapp-row"><span class="a" style="background:#128C7E"></span><span class="m"><b>+971 55 987 65 43</b><i>прогрев · 2/3 дня</i></span></div></div></div>`;
 const NUM_SHOT_PHONES = `<div class="tgph"><div class="tgph-hd"><div class="av">📱</div><div><b>Ваш Android</b><small>до 3 номеров на одном телефоне</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a" style="background:#25D366"></span><span class="m"><b>WhatsApp · номер 1</b><i>основной</i></span></div><div class="tgapp-row"><span class="a" style="background:#128C7E"></span><span class="m"><b>WhatsApp (клон) · номер 2</b><i>Dual Messenger</i></span></div><div class="tgapp-row"><span class="a" style="background:#0088cc"></span><span class="m"><b>Telegram · номера 1–3</b><i>аккаунты в одном приложении</i></span></div></div></div>`;
 const NUM_SHOT_QR = `<div class="tgph"><div class="tgph-hd"><div class="av">🔗</div><div><b>Привязка по QR</b><small>Связанные устройства</small></div></div><div class="tgph-body" style="align-items:center"><div style="width:132px;height:132px;border-radius:12px;background:repeating-conic-gradient(#111 0 25%, #fff 0 50%) 50%/22px 22px;border:6px solid #fff;box-shadow:0 6px 18px -8px rgba(0,0,0,.4);margin:8px auto 4px"></div><div class="tg-bub in">WhatsApp → Связанные устройства → Привязка устройства → наведите камеру на этот QR</div></div></div>`;
+const BRIDGE_DIAGRAM = `<div style="border:1px solid rgba(128,128,128,.22);border-radius:14px;padding:15px;background:rgba(128,128,128,.05);margin:2px 0 4px">
+  <div style="display:flex;align-items:stretch;gap:10px;justify-content:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:130px;text-align:center;border:1px solid rgba(128,128,128,.22);border-radius:12px;padding:12px 10px;background:rgba(128,128,128,.05)"><div style="font-size:22px">🌫</div><div style="font-weight:700;font-size:13px;margin-top:3px">Серый номер</div><div style="opacity:.7;font-size:11px;margin-top:2px">холодные касания, квалификация — высокий риск бана</div></div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:120px;opacity:.75;font-size:11px;text-align:center"><div style="font-size:18px">→</div>клиент ответил —<br>передача менеджеру</div>
+    <div style="flex:1;min-width:130px;text-align:center;border:1px solid rgba(37,211,102,.4);border-radius:12px;padding:12px 10px;background:rgba(37,211,102,.07)"><div style="font-size:22px">✓</div><div style="font-weight:700;font-size:13px;margin-top:3px">Чистый номер менеджера</div><div style="opacity:.7;font-size:11px;margin-top:2px">весь дальнейший диалог, без рассылок — почти нулевой риск бана</div></div>
+  </div>
+</div>`;
+const BRIDGE_SHOT_CHAT = `<div class="tgph"><div class="tgph-hd"><div class="av">💬</div><div><b>Как видит клиент</b><small>перевод на чистый номер</small></div></div><div class="tgph-body" style="gap:7px"><div class="tg-day">со старого номера</div><div class="tg-bub in">Передаю вас менеджеру Алексею — он продолжит в этом чате с нового рабочего номера. 🙌</div><div class="tg-day">с нового номера</div><div class="tg-bub in">Здравствуйте! Это Алексей, Target Point. Подхватываю ваш вопрос.</div><div class="tg-bub in">Вы интересовались 2-к в Marina с рассрочкой — всё верно? Пришлю подборку.</div><div class="tg-bub in"><span style="display:inline-block;width:100%;height:46px;border-radius:8px;background:repeating-linear-gradient(135deg,rgba(128,128,128,.14) 0 8px,rgba(128,128,128,.06) 8px 16px);margin-bottom:4px"></span>📷 скрин вашей переписки — чтобы вы узнали, что это продолжение, а не чужой номер.</div></div></div>`;
+const BRIDGE_SHOT_SETUP = `<div class="tgph"><div class="tgph-hd"><div class="av">🛡</div><div><b>Готовность менеджеров</b><small>Автоматизации → Анти-бан → Мост</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a" style="background:#2fae60"></span><span class="m"><b>Илья Игнатик</b><i>+44 7441 42 94 29 · чистый ✓</i></span></div><div class="tgapp-row"><span class="a" style="background:#C9821A"></span><span class="m"><b>Дарья</b><i>есть номер — «Пометить чистым»</i></span></div><div class="tgapp-row"><span class="a" style="background:rgba(128,128,128,.4)"></span><span class="m"><b>Пётр</b><i>нет своего — выбрать номер из списка</i></span></div><div style="margin-top:4px;font-size:11px;opacity:.8;border-top:1px dashed rgba(128,128,128,.3);padding-top:7px">⭐ Основной чистый номер: <b>+971 50 123 45 67</b> — выбирается селектом прямо здесь</div></div></div>`;
 const GUIDES = {
   tgsetup: {
     icon: 'chat', title: 'Telegram-бот: подключение', tagline: 'Пошагово, с экранами — за 3 минуты',
@@ -90,6 +99,40 @@ const GUIDES = {
       ] },
     ],
     outro: 'Массовые «белые» рассылки — только через официальный <b>WhatsApp Cloud API</b> (отдельный гайд). С личных номеров рассылать «в холодную» нельзя — это главный триггер бана. Если баланс закончится, номера и доступ к перепискам приостанавливаются автоматически — это следствие неоплаты.',
+  },
+  bridge: {
+    icon: 'shield', title: 'Мост: серый → чистый номер', tagline: 'Как клиент переезжает на номер менеджера — без банов',
+    intro: 'Первые холодные касания и квалификацию ведут <b>«серые» номера</b> — у них высокий риск бана. Как только клиент ответил и его передают менеджеру, диалог <b>«переезжает» на чистый номер</b> этого менеджера: чистый номер не делает рассылок, поэтому почти не банится. Чтобы новый номер не приняли за мошенника, клиенту уходит честная связка из трёх сообщений + скрин прошлой переписки. Настраивается в <b>Автоматизации → Анти-бан WhatsApp → Мост: серый → чистый</b>.',
+    diagram: BRIDGE_DIAGRAM,
+    sections: [
+      { badge: '1 · Зачем это нужно', steps: [
+        ['Серый жжём, чистый бережём', 'Серые номера делают массовые первые касания — их не жалко, их легко заменить. Чистый номер менеджера держит только живые разговоры → почти нулевой риск блокировки.'],
+        ['Доверие клиента', 'Клиент уже общался — резкая смена номера пугает. Поэтому мост отправляет мягкое предупреждение, представление менеджера и <b>скрин переписки</b>, чтобы человек узнал продолжение своего диалога.'],
+      ] },
+      { badge: '2 · Что видит клиент', shot: BRIDGE_SHOT_CHAT, steps: [
+        ['① Бридж — со старого номера', '«Передаю вас менеджеру…» — мягкое предупреждение, что дальше пишет новый рабочий номер.'],
+        ['② Интро + рекап — с нового номера', 'Менеджер представляется и напоминает, на чём остановились (переменная <code>{quote}</code> — последняя реплика клиента).'],
+        ['③ Скрин переписки (анти-мошенник)', 'С нового номера уходит картинка прошлого диалога — клиент видит, что это продолжение, а не чужой человек. Можно выключить, но не рекомендуем.'],
+      ] },
+      { badge: '3 · Настройте чистые номера', shot: BRIDGE_SHOT_SETUP, steps: [
+        ['Пометьте номер «чистым»', 'В блоке «Готовность менеджеров»: у менеджера с номером нажмите <b>«Пометить чистым»</b> — номер исключается из холодных касаний и держит только диалоги. Или в профиле номера — тумблер «Только для диалогов».'],
+        ['Закрепите номер за менеджером', 'У кого нет своего чистого — выберите номер <b>прямо в строке</b> из выпадающего списка: он закрепится за этим менеджером (без захода в «Номера»).'],
+        ['⭐ Основной чистый номер', 'Селектором внизу выберите <b>основной</b> номер — на него уходят клиенты менеджеров, у которых нет своего чистого. Основной всегда один; выбор нового снимает отметку с прежнего.'],
+      ] },
+      { badge: '4 · Включите перевод', steps: [
+        ['Авто-перевод при передаче', 'Тумблер <b>«Автоматически переводить при передаче менеджеру»</b>: как только лид уходит менеджеру (handover) — три сообщения уходят сами.'],
+        ['Или вручную', 'Если тумблер выключен — переводите кнопкой <b>«На чистый номер»</b> в карточке лида, когда сами решите.'],
+      ] },
+      { badge: '5 · Тексты перевода', steps: [
+        ['Редактор сообщений', 'Кнопка «Редактировать» открывает все три текста + подпись к скрину. Переменные (кликните — вставится): <code>{name}</code>, <code>{broker}</code>, <code>{agency}</code>, <code>{target}</code>, <code>{quote}</code>.'],
+        ['Готовые стили', 'Набор «Дружелюбный / Деловой / Короткий» подставит тон одним кликом — потом правьте под себя.'],
+      ] },
+      { badge: '6 · Проверьте на себе', steps: [
+        ['Тест на свой WhatsApp', 'Блок «Проверить на себе»: впишите свой номер → «Отправить тест». Придут реальные сообщения текущими текстами (демо-данные). Нужен хотя бы один номер «на связи».'],
+        ['Сохраните', 'Кнопка «Сохранить мост» фиксирует тексты и настройки.'],
+      ] },
+    ],
+    outro: 'Чистых номеров должно хватать: у каждого активного менеджера — свой, плюс один основной на подхвате. Скрин переписки в тестовом прогоне не прикрепляется (приходит только в реальном переводе). Если у менеджера нет чистого номера и основной не назначен — лид уйдёт «на общий», и перевод может не сработать.',
   },
   calendar: {
     icon: 'cal', title: 'Синхронизация календаря', tagline: 'Чтобы клиентам не предлагали занятое время',
@@ -353,7 +396,7 @@ GUIDES.notetaker = {
 const CATEGORIES = [
   { key: 'broker',   icon: 'user',  title: 'Брокеру',                  desc: 'Полный гайд: от входа до сделки, на живых экранах', guides: ['broker'] },
   { key: 'start',    icon: 'spark', title: 'Начало работы',            desc: 'Подключите бота и мобильный пульт брокера',        guides: ['tgsetup', 'botpanel'] },
-  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, Instagram, Viber, телефония, нотетейкер и ИИ',  guides: ['wanumbers', 'wacloud', 'tgchannel', 'meta-inbound', 'viber', 'telephony', 'notetaker', 'waagent'] },
+  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, Instagram, Viber, телефония, нотетейкер и ИИ',  guides: ['wanumbers', 'bridge', 'wacloud', 'tgchannel', 'meta-inbound', 'viber', 'telephony', 'notetaker', 'waagent'] },
   { key: 'leads',    icon: 'user',  title: 'Лиды и продажи',           desc: 'Воронка, карточка лида и автодожим касаниями',     guides: ['leads', 'chains'] },
   { key: 'ops',      icon: 'doc',   title: 'Планирование и документы', desc: 'Календарь, медиапланы, договоры и КП',             guides: ['calendar', 'mediaplan', 'docs'] },
 ];
