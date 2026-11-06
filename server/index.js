@@ -10723,6 +10723,8 @@ const server = http.createServer(async (req, res) => {
           return { id: String((v && v.id) || '').slice(0, 40) || ('fv_' + crypto.randomBytes(3).toString('hex')), name: String((v && v.name) || '').slice(0, 40), f: cf };
         }).filter(v => v.name);
       }
+      /* настраиваемые колонки таблицы лидов (пер-агентство); пустой массив = все колонки (дефолт) */
+      if (Array.isArray(b.leadCols)) db.settings.leadCols = b.leadCols.filter(k => typeof k === 'string' && /^[a-z]+$/.test(k)).slice(0, 20);
       if (_replyDelayChanged) { try { const n = engine.rescheduleDueReplies(db); if (n) console.log('[reply-delay] пересчитано сроков ответа:', n); } catch (e) { console.error('[reschedule]', e && e.message); } }
       if (b.baseCurrency) db.settings.baseCurrency = String(b.baseCurrency).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);   /* базовая валюта кабинета для показа «≈ в моей валюте» */
       /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */

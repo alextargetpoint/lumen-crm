@@ -5350,6 +5350,26 @@ PAGES.funnel = async (root) => {
   const activeSeqs = (STATE.sequences || []).filter(s => s.active);
   const launchable = leads.filter(l => ['new', 'touch', 'sleeping'].includes(l.stage));
 
+  /* ⭐НАСТРАИВАЕМЫЕ КОЛОНКИ ТАБЛИЦЫ (пер-агентство): реестр всех колонок + их ячейки.
+     Чекбокс и действия — служебные, всегда есть. Выбор хранится в settings.leadCols. */
+  const LEAD_COLS = [
+    { key: 'name', label: 'Лид', cell: (l) => `<td><div class="tbl-lead">${avaHtml(l, 30)}<div class="tbl-lead-b"><b>${esc(l.name)}${icpBadge(l)}</b><span class="tbl-lead-ph">${esc(l.phone)}${phInvBadge(l)}</span></div></div></td>` },
+    { key: 'ch', label: 'Каналы', noSort: true, cell: (l) => `<td>${tblCh(l)}</td>` },
+    { key: 'stage', label: 'Стадия', cell: (l) => `<td><span class="tbl-stage ${stageCls(l.stage)}">${stageName(l.stage)}</span></td>` },
+    { key: 'geo', label: 'Гео', cell: (l) => `<td class="tbl-geo">${esc(l.geoName || '—')}</td>` },
+    { key: 'budget', label: 'Бюджет', cell: (l) => `<td class="tbl-bud">${(l.quals.budget || {}).value ? '<b>' + esc(fmtBudget(l.quals.budget, l.geo)) + '</b>' : '<span class="muted">—</span>'}</td>` },
+    { key: 'axes', label: 'Квал', cell: (l) => `<td><div class="tbl-qual"><div class="axes" style="width:48px;margin:0">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div><span class="tbl-qn">${l.axesFilled}/4</span></div></td>` },
+    { key: 'icp', label: 'Профиль', cell: (l) => `<td class="tbl-icp">${(l.icpMatch && l.icpMatch.score != null && !['deal', 'lost'].includes(l.stage)) ? `<span class="tbl-icpv ${l.icpMatch.score >= 60 ? 'hi' : l.icpMatch.score >= 40 ? 'mid' : ''}" title="Совпадение с профилем квал/закрытых${l.icpMatch.matched && l.icpMatch.matched.length ? ': ' + l.icpMatch.matched.join(', ') : ''}">${l.icpMatch.score}%</span>` : '<span class="muted">—</span>'}</td>` },
+    { key: 'source', label: 'Источник', cell: (l) => `<td>${l.source ? `<span class="tbl-src">${esc(srcName[l.source] || l.source)}</span>` : '<span class="muted">—</span>'}</td>` },
+    { key: 'broker', label: 'Брокер', cell: (l) => `<td class="tbl-brk">${l.brokerName ? esc(l.brokerName.split(' ')[0]) : '<span class="muted">—</span>'}</td>` },
+    { key: 'last', label: 'Активность', cell: (l) => `<td class="tbl-act">${tblAct(l)}</td>` },
+    { key: 'next', label: 'Следующий шаг', cell: (l) => `<td class="tbl-nextc">${tblNext(l)}</td>` },
+  ];
+  const ALL_COL_KEYS = LEAD_COLS.map(c => c.key);
+  const savedCols = ((STATE.settings.leadCols || []).filter(k => ALL_COL_KEYS.includes(k)));
+  const enabledCols = savedCols.length ? savedCols : ALL_COL_KEYS;   /* пусто = все (дефолт) */
+  const colDefs = enabledCols.map(k => LEAD_COLS.find(c => c.key === k)).filter(Boolean);
+
   root.innerHTML = `
     ${(() => { const activeN = ['funnelGeo', 'funnelSrc', 'funnelVendor', 'funnelBroker', 'funnelCreated', 'funnelActivity', 'funnelChan'].filter(k => F[k]).length; const drawerOpen = !!F.funnelFiltersOpen || activeN > 0; return `
     <div class="filters">
@@ -5364,6 +5384,7 @@ PAGES.funnel = async (root) => {
       <button class="btn btn-sm btn-icon" id="importBtn" title="Импорт лидов">${ic(I.doc)}</button>
       <button class="btn btn-sm btn-icon" id="dupesBtn" title="Найти дубли">${ic(I.copy)}</button>
       <span class="muted" style="font-size:12px">${leads.length} из ${all.length}</span>
+      ${view === 'table' ? `<button class="btn btn-sm btn-icon" id="tblColsBtn" title="Настроить колонки таблицы">${ic(I.grid || I.doc)}</button>` : ''}
       <div class="seg-toggle">
         <button class="seg-btn ${view === 'kanban' ? 'on' : ''}" data-view="kanban" title="Канбан">${ic(I.grid)}</button>
         <button class="seg-btn ${view === 'table' ? 'on' : ''}" data-view="table" title="Таблица">${ic(I.doc)}</button>
@@ -5446,7 +5467,7 @@ PAGES.funnel = async (root) => {
     <div class="glass card lead-tbl-card">
       <div class="lead-tbl-wrap"><table class="tbl lead-tbl lead-tbl-x"><thead><tr>
         <th class="tbl-cb"><span class="lc-check tbl" id="tblSelAll" title="Выделить всё">${ic(I.check, 2)}</span></th>
-        ${[['name', 'Лид'], ['ch', 'Каналы', 1], ['stage', 'Стадия'], ['geo', 'Гео'], ['budget', 'Бюджет'], ['axes', 'Квал'], ['icp', 'Профиль'], ['source', 'Источник'], ['broker', 'Брокер'], ['last', 'Активность'], ['next', 'Следующий шаг']].map(([k, n, noSort]) => noSort ? `<th>${n}</th>` : `<th data-sort="${k}" class="tbl-srt ${F.funnelSort === k ? 'act' : ''}">${n}<span class="tbl-arr">${F.funnelSort === k ? (F.funnelSortDir === 'asc' ? '↑' : '↓') : ''}</span></th>`).join('')}
+        ${colDefs.map(c => c.noSort ? `<th>${c.label}</th>` : `<th data-sort="${c.key}" class="tbl-srt ${F.funnelSort === c.key ? 'act' : ''}">${c.label}<span class="tbl-arr">${F.funnelSort === c.key ? (F.funnelSortDir === 'asc' ? '↑' : '↓') : ''}</span></th>`).join('')}
         <th class="tbl-acth"></th>
       </tr></thead><tbody>
         ${(() => { const dir = F.funnelSortDir === 'asc' ? -1 : 1; const key = (l) => { const k = F.funnelSort;
@@ -5463,17 +5484,7 @@ PAGES.funnel = async (root) => {
           return leads.slice().sort((a, b) => { const ka = key(a), kb = key(b); const c = typeof ka === 'number' ? ka - kb : String(ka).localeCompare(String(kb)); return c * dir; }); })()
         .map(l => `<tr data-row="${l.id}" class="${selSet("funnel").has(l.id) ? "sel" : ""}">
           <td class="tbl-cb"><span class="lc-check tbl" data-check title="Выделить">${ic(I.check, 2)}</span></td>
-          <td><div class="tbl-lead">${avaHtml(l, 30)}<div class="tbl-lead-b"><b>${esc(l.name)}${icpBadge(l)}</b><span class="tbl-lead-ph">${esc(l.phone)}${phInvBadge(l)}</span></div></div></td>
-          <td>${tblCh(l)}</td>
-          <td><span class="tbl-stage ${stageCls(l.stage)}">${stageName(l.stage)}</span></td>
-          <td class="tbl-geo">${esc(l.geoName || '—')}</td>
-          <td class="tbl-bud">${(l.quals.budget || {}).value ? '<b>' + esc(fmtBudget(l.quals.budget, l.geo)) + '</b>' : '<span class="muted">—</span>'}</td>
-          <td><div class="tbl-qual"><div class="axes" style="width:48px;margin:0">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div><span class="tbl-qn">${l.axesFilled}/4</span></div></td>
-          <td class="tbl-icp">${(l.icpMatch && l.icpMatch.score != null && !['deal', 'lost'].includes(l.stage)) ? `<span class="tbl-icpv ${l.icpMatch.score >= 60 ? 'hi' : l.icpMatch.score >= 40 ? 'mid' : ''}" title="Совпадение с профилем квал/закрытых${l.icpMatch.matched && l.icpMatch.matched.length ? ': ' + l.icpMatch.matched.join(', ') : ''}">${l.icpMatch.score}%</span>` : '<span class="muted">—</span>'}</td>
-          <td>${l.source ? `<span class="tbl-src">${esc(srcName[l.source] || l.source)}</span>` : '<span class="muted">—</span>'}</td>
-          <td class="tbl-brk">${l.brokerName ? esc(l.brokerName.split(' ')[0]) : '<span class="muted">—</span>'}</td>
-          <td class="tbl-act">${tblAct(l)}</td>
-          <td class="tbl-nextc">${tblNext(l)}</td>
+          ${colDefs.map(c => c.cell(l)).join('')}
           <td class="tbl-acts"><button class="tbl-ab" data-rowopen="${l.id}" title="Открыть карточку">${ic(I.user)}</button>${l.phone ? `<a class="tbl-ab" href="https://wa.me/${esc(l.phone.replace(/\\D/g, ''))}" target="_blank" title="WhatsApp" onclick="event.stopPropagation()">${ic(I.chat)}</a>` : ''}</td>
         </tr>`).join('')}
       </tbody></table></div>
@@ -5496,6 +5507,21 @@ PAGES.funnel = async (root) => {
   $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', (F.funnelFlag === b.dataset.flag && b.dataset.flag) ? '' : b.dataset.flag)));
   $$('[data-fstage]', root).forEach(b => b.addEventListener('click', () => setF('funnelStage', F.funnelStage === b.dataset.fstage ? '' : b.dataset.fstage)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
+  /* ⭐пикер колонок таблицы (пер-агентство): чекбоксы, ≥1 колонка, сохранение в settings.leadCols */
+  $('#tblColsBtn', root)?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelector('.col-pick')?.remove();
+    const pop = el(`<div class="col-pick glass"><div class="col-pick-h">Колонки таблицы</div><div class="col-pick-list">${LEAD_COLS.map(c => `<label class="col-pick-row"><input type="checkbox" data-col="${c.key}" ${enabledCols.includes(c.key) ? 'checked' : ''}><span>${esc(c.label)}</span></label>`).join('')}</div><button type="button" class="col-pick-reset" data-colreset>Показать все</button></div>`);
+    document.body.appendChild(pop);
+    const r = e.currentTarget.getBoundingClientRect();
+    pop.style.top = (r.bottom + 6) + 'px'; pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+    /* применяем при ЗАКРЫТИИ (мультивыбор без рушащего ре-рендера на каждый клик) */
+    let applied = false;
+    const apply = async () => { if (applied) return; applied = true; const chosen = ALL_COL_KEYS.filter(k => pop.querySelector(`[data-col="${k}"]`)?.checked); if (!chosen.length) { toast('Нужна хотя бы одна колонка', 'Вернул все', false); STATE.settings.leadCols = []; } else { STATE.settings.leadCols = (chosen.length === ALL_COL_KEYS.length ? [] : chosen); } try { await api.patch('/settings', { leadCols: STATE.settings.leadCols }); } catch (_) {} render(); };
+    $('[data-colreset]', pop)?.addEventListener('click', () => { pop.querySelectorAll('[data-col]').forEach(cb => cb.checked = true); });
+    const close = (ev) => { if (!pop.contains(ev.target) && ev.target !== e.currentTarget) { document.removeEventListener('mousedown', close); pop.remove(); apply(); } };
+    setTimeout(() => document.addEventListener('mousedown', close), 0);
+  });
   $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => {
     const k = h.dataset.sort;
     if (PAGE_STATE.funnelSort === k) PAGE_STATE.funnelSortDir = (PAGE_STATE.funnelSortDir === 'asc' ? 'desc' : 'asc');
