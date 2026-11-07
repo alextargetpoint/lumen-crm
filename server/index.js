@@ -3910,6 +3910,22 @@ async function autoQrOnDrop(db, n, who) {
         else await tgbridge.notify(db, cid, `⚠️ «${esc(who)}» отвалился, QR пока не готов. Отправьте в бот <code>/qr ${esc(who)}</code> или откройте CRM → «Номера».`);
       } catch (_) {}
     }
+    /* МЕНЕДЖЕРСКИЙ БОТ: любой активный брокер должен ВИДЕТЬ, что номер отвалился, и сам пересканировать (/qr),
+       не дожидаясь владельца/почты. Шлём лёгкий ТЕКСТ-алерт ОСТАЛЬНЫМ привязанным брокерам (не из targets) — без
+       QR-картинки: QR = полный доступ к WhatsApp, его отдаём только владельцу и брокеру-владельцу номера выше.
+       Рескан им уже разрешён (handleOwnerWaQr пускает активных брокеров), поэтому это оповещение, а не новое право.
+       Уважаем autoQrOptOut и тот же рейт-лимит (функция уже отработала n._autoQrAt), так что без спама. */
+    try {
+      for (const b of (db.brokers || [])) {
+        if (b.active === false || b.autoQrOptOut) continue;
+        for (const c of tgbridge.brokerChatIds(b)) {
+          const cid = String(c);
+          if (targets.has(cid)) continue;   /* владельцу/брокеру-владельцу уже ушёл QR выше — не дублируем */
+          targets.add(cid);
+          try { await tgbridge.notify(db, cid, `📱 Номер <b>«${esc(who)}»</b> отвалился от WhatsApp. Кто рядом с устройством — пересканируйте прямо с телефона: <code>/qr ${esc(who)}</code> — пришлю свежий QR сюда. (уведомление менеджеру)`); } catch (_) {}
+        }
+      }
+    } catch (_) {}
   } catch (_) {}
 }
 
