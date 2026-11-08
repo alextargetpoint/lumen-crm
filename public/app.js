@@ -11744,6 +11744,10 @@ PAGES.automations = async (root) => {
   const applyAg = (g) => {
     if (!ALL_SECTIONS.includes(g)) g = 'overview';
     PAGE_STATE.funnelAg = g;   /* запоминаем активную секцию — сохранение внутри неё не выкидывает в другую */
+    /* любой переход сбрасывает активный фильтр поиска — иначе навигация в секцию оставляла бы левое меню
+       свёрнутым (все пункты .hide), и выйти обратно можно было только перезагрузкой. */
+    const _s = root.querySelector('#accSearch');
+    if (_s && _s.value) { _s.value = ''; $$('.acc-nav-i', root).forEach(b => b.classList.remove('hide')); $$('.acc-nav-lbl', root).forEach(l => l.classList.remove('hide')); }
     $$('.acc-nav-i', root).forEach(b => b.classList.toggle('on', b.dataset.ag === g));
     let shown = 0;
     $$('[data-ag]', autoGrid).forEach(c => { const v = c.dataset.ag === g; c.style.display = v ? '' : 'none'; if (v) shown++; });
@@ -11768,7 +11772,7 @@ PAGES.automations = async (root) => {
     const navItems = $$('.acc-nav-i', root);
     /* обогащаем индекс поиска текстом ВСЕХ настроек секции → поиск находит по названиям полей/значений, не только по секции */
     navItems.forEach(nav => { const k = nav.dataset.ag; const txt = $$('.acc-work > [data-ag="' + k + '"]', root).map(c => (c.textContent || '').toLowerCase().replace(/\s+/g, ' ')).join(' '); nav.dataset.kw = ((nav.dataset.kw || '') + ' ' + txt).slice(0, 2000); });
-    const doFilter = () => { const q = accSearch.value.trim().toLowerCase(); let firstK = null; navItems.forEach(b => { const hit = !q || ((b.dataset.kw || '') + ' ' + (b.dataset.ag || '')).includes(q); b.classList.toggle('hide', !hit); if (hit && !firstK) firstK = b.dataset.ag; }); $$('.acc-nav-lbl', root).forEach(l => l.classList.toggle('hide', !!q)); return firstK; };
+    const doFilter = () => { const q = accSearch.value.trim().toLowerCase(); const hits = navItems.map(b => !q || ((b.dataset.kw || '') + ' ' + (b.dataset.ag || '')).includes(q)); const anyHit = hits.some(Boolean); let firstK = null; navItems.forEach((b, i) => { const hit = !anyHit || hits[i]; b.classList.toggle('hide', !hit); if (hits[i] && !firstK) firstK = b.dataset.ag; }); $$('.acc-nav-lbl', root).forEach(l => l.classList.toggle('hide', !!q && anyHit)); return firstK; };   /* ничего не нашлось → показываем всё меню целиком (не оставляем пустую свёрнутую колонку — пользователь не должен застревать) */
     const jumpHighlight = (k, q) => { const card = root.querySelector('.acc-work > [data-ag="' + k + '"]'); if (!card) return; let tgt = null; if (q) { tgt = [...card.querySelectorAll('.set-row,.form-row,.cg-row,.acc-summary')].find(r => (r.textContent || '').toLowerCase().includes(q)); } const el = tgt || card; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('acc-hit'); setTimeout(() => el.classList.remove('acc-hit'), 1300); };
     accSearch.addEventListener('input', doFilter);
     accSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const q = accSearch.value.trim().toLowerCase(); const k = doFilter(); if (k) { applyAg(k); accSearch.value = ''; doFilter(); setTimeout(() => jumpHighlight(k, q), 60); } } });
