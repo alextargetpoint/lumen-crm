@@ -183,6 +183,18 @@ function resolveLead(db, broker, msg, chatId) {
 
 /* ---------- ВХОДЯЩИЙ апдейт из Telegram (брокер → WhatsApp) ---------- */
 async function handleUpdate(db, update) {
+  /* ⭐inline-кнопка «Показать QR-код» (callback_data «qr:<phone>») — номер отвалился, клиент жмёт кнопку
+     прямо в боте → подтягиваем свежий QR тем же потоком, что и /qr. Решает «QR живёт минуту, не успел». */
+  if (update && update.callback_query) {
+    const cq = update.callback_query;
+    const cbChat = String((cq.message && cq.message.chat && cq.message.chat.id) || (cq.from && cq.from.id) || '');
+    const data = String(cq.data || '');
+    try { await safeApi(db, 'answerCallbackQuery', { callback_query_id: cq.id, text: data.startsWith('qr:') ? 'Готовлю свежий QR…' : '' }); } catch (_) {}
+    if (data.startsWith('qr:') && waQr && cbChat) {
+      try { await waQr(db, cbChat, '/qr ' + data.slice(3) + ' !'); } catch (e) { console.error('[tgbridge] cb qr', e.message); }
+    }
+    return { callback: data };
+  }
   const msg = (update && (update.message || update.edited_message)) || null;
   if (!msg || !msg.chat) return { skip: 'no message' };
   const chatId = String(msg.chat.id);
@@ -370,7 +382,7 @@ async function setupWebhook(db, baseUrl) {
   return api(db, 'setWebhook', {
     url,
     secret_token: cfg(db).secret,
-    allowed_updates: ['message', 'edited_message'],
+    allowed_updates: ['message', 'edited_message', 'callback_query'],   /* callback_query — для inline-кнопок (напр. «Показать QR-код») */
     drop_pending_updates: true,
   });
 }
@@ -384,7 +396,7 @@ async function setupPlatformWebhook(baseUrl) {
   const tok = platformToken();
   if (!tok) return { ok: false, error: 'нет токена центрального бота' };
   const base = baseUrl.replace(/\/$/, '');
-  const r = await tgApiRaw(tok, 'setWebhook', { url: base + '/tg/webhook', secret_token: platformSecret(), allowed_updates: ['message', 'edited_message'], drop_pending_updates: true });
+  const r = await tgApiRaw(tok, 'setWebhook', { url: base + '/tg/webhook', secret_token: platformSecret(), allowed_updates: ['message', 'edited_message', 'callback_query'], drop_pending_updates: true });
   /* сохраняем мини-апп: кнопка-меню бота открывает мессенджер брокера (/tgapp) — иначе при переносе
      существующего бота (напр. Lumen Messenger) в мост пропала бы его кнопка «Чаты» */
   try { await tgApiRaw(tok, 'setChatMenuButton', { menu_button: { type: 'web_app', text: '💬 Чаты', web_app: { url: base + '/tgapp' } } }); } catch (_) {}
@@ -409,15 +421,19 @@ async function setMenuButton(db, baseUrl) {
 }
 
 /* прямое уведомление в чат Telegram (для алертов делегату контроля) */
-async function notify(db, chatId, text) {
+async function notify(db, chatId, text, replyMarkup) {
   if (!chatId || !token(db)) return;
-  try { await api(db, 'sendMessage', { chat_id: chatId, text, parse_mode: 'HTML' }); } catch (e) { console.error('[tg-notify]', e.message); }
+  const body = { chat_id: chatId, text, parse_mode: 'HTML' };
+  if (replyMarkup) body.reply_markup = replyMarkup;   /* inline-кнопки (напр. «Показать QR-код») */
+  try { await api(db, 'sendMessage', body); } catch (e) { console.error('[tg-notify]', e.message); }
 }
+/* быстрый конструктор inline-клавиатуры «Показать QR-код» для номера */
+function qrButton(phone) { return { inline_keyboard: [[{ text: '📷 Показать QR-код', callback_data: 'qr:' + String(phone).replace(/[^0-9]/g, '').slice(0, 20) }]] }; }
 
 module.exports = {
   ready, cfg, token, handleUpdate, forwardInbound, forwardAiReply, forwardHandover, bindBroker,
   setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl, notify,
   central, platformSecret, setupPlatformWebhook, platformBotUsername, webhookInfo,
   brokerChatIds, addBrokerChat, removeBrokerChat,
-  setWaQr, sendDataUrlPhoto,
+  setWaQr, sendDataUrlPhoto, qrButton,
 };

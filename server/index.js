@@ -3881,51 +3881,33 @@ async function autoQrOnDrop(db, n, who) {
     if ((db.settings.automations || {}).autoQrOnDrop === false) return;
     if (!waWorkerReady(db) || !tgbridge.ready(db)) return;
     const nowT = Date.now();
-    if (n._autoQrAt && nowT - n._autoQrAt < 30 * 60e3) return;   /* не чаще раза в 30 мин */
-    const targets = new Set();
-    if (db.settings.ownerTgChatId) targets.add(String(db.settings.ownerTgChatId));   /* основатель/админ — всегда */
-    const br = n.brokerId ? (db.brokers || []).find(b => b.id === n.brokerId) : null;
-    if (br && !br.autoQrOptOut) { try { for (const c of tgbridge.brokerChatIds(br)) targets.add(String(c)); } catch (_) {} }   /* брокер-владелец номера (если сам не отключил) */
-    if (!targets.size) return;
-    n._autoQrAt = nowT; store.save();
-    let qr = '', connected = false;
-    /* если у воркера УЖЕ готов QR (статус qr) — шлём его СРАЗУ, без logout/start: мгновенно и не прерываем скан */
-    try { const s0 = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(n.phone)); const ss0 = (s0 && s0.session) || {}; if (ss0.status === 'connected') connected = true; else if (ss0.status === 'qr' && ss0.qr) qr = ss0.qr; } catch (_) {}
-    if (!qr && !connected) {   /* нет готового QR → пересобираем сессию */
-      await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/logout').catch(() => {});
-      await waGrayApi(db, 'POST', '/sessions/' + waGraySid(n.phone) + '/start');
-      for (let i = 0; i < 20; i++) {
-        await new Promise(r => setTimeout(r, 1500));
-        let s; try { s = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(n.phone)); } catch (_) { continue; }
-        const ss = (s && s.session) || {};
-        if (ss.status === 'connected') { connected = true; break; }
-        if (ss.status === 'qr' && ss.qr) { qr = ss.qr; break; }
-      }
-    }
+    if (n._autoQrAt && nowT - n._autoQrAt < 30 * 60e3) return;   /* не чаще раза в 30 мин на номер (анти-флап) */
     const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    for (const cid of targets) {
-      try {
-        if (connected) await tgbridge.notify(db, cid, `🟢 «${esc(who)}» переподключился сам — QR не нужен.`);
-        else if (qr) await tgbridge.sendDataUrlPhoto(db, cid, qr, `📷 Номер «${esc(who)}» отвалился — вот новый QR. WhatsApp → Связанные устройства → Привязать устройство.\n⏱ QR живёт ~минуту. Не успели — пришлите <code>/qr ${esc(who)}</code> за свежим. (прислан автоматически)`);
-        else await tgbridge.notify(db, cid, `⚠️ «${esc(who)}» отвалился, QR пока не готов. Отправьте в бот <code>/qr ${esc(who)}</code> или откройте CRM → «Номера».`);
-      } catch (_) {}
+    /* ⭐НОВОЕ: вместо авто-пуша QR (который живёт ~минуту и часто «не успевал») — мгновенное НАДЁЖНОЕ
+       уведомление об отвале + inline-кнопка «📷 Показать QR-код». Клик → свежий QR подтягивается по
+       требованию (тот же поток, что /qr). Так клиент получает QR РОВНО когда готов сканировать. */
+    const btn = tgbridge.qrButton(n.phone);
+    const sent = new Set();
+    /* владелец + брокер-владелец номера */
+    const prime = new Set();
+    if (db.settings.ownerTgChatId) prime.add(String(db.settings.ownerTgChatId));
+    const br = n.brokerId ? (db.brokers || []).find(b => b.id === n.brokerId) : null;
+    if (br && !br.autoQrOptOut) { try { for (const c of tgbridge.brokerChatIds(br)) prime.add(String(c)); } catch (_) {} }
+    for (const cid of prime) {
+      try { await tgbridge.notify(db, cid, `📱 Номер <b>«${esc(who)}»</b> отвалился от WhatsApp — нужно пересканировать.\n\nНажмите кнопку ниже — пришлю <b>свежий QR</b> прямо сюда (сканируйте сразу: WhatsApp → Связанные устройства → Привязать устройство). Можно и командой <code>/qr ${esc(who)}</code>.`, btn); sent.add(cid); } catch (_) {}
     }
-    /* МЕНЕДЖЕРСКИЙ БОТ: любой активный брокер должен ВИДЕТЬ, что номер отвалился, и сам пересканировать (/qr),
-       не дожидаясь владельца/почты. Шлём лёгкий ТЕКСТ-алерт ОСТАЛЬНЫМ привязанным брокерам (не из targets) — без
-       QR-картинки: QR = полный доступ к WhatsApp, его отдаём только владельцу и брокеру-владельцу номера выше.
-       Рескан им уже разрешён (handleOwnerWaQr пускает активных брокеров), поэтому это оповещение, а не новое право.
-       Уважаем autoQrOptOut и тот же рейт-лимит (функция уже отработала n._autoQrAt), так что без спама. */
+    /* остальные активные брокеры — тоже кнопка (рескан им уже разрешён в handleOwnerWaQr) */
     try {
       for (const b of (db.brokers || [])) {
         if (b.active === false || b.autoQrOptOut) continue;
         for (const c of tgbridge.brokerChatIds(b)) {
           const cid = String(c);
-          if (targets.has(cid)) continue;   /* владельцу/брокеру-владельцу уже ушёл QR выше — не дублируем */
-          targets.add(cid);
-          try { await tgbridge.notify(db, cid, `📱 Номер <b>«${esc(who)}»</b> отвалился от WhatsApp. Кто рядом с устройством — пересканируйте прямо с телефона: <code>/qr ${esc(who)}</code> — пришлю свежий QR сюда. (уведомление менеджеру)`); } catch (_) {}
+          if (sent.has(cid)) continue;
+          try { await tgbridge.notify(db, cid, `📱 Номер <b>«${esc(who)}»</b> отвалился. Кто рядом с устройством — нажмите кнопку для свежего QR или <code>/qr ${esc(who)}</code>.`, btn); sent.add(cid); } catch (_) {}
         }
       }
     } catch (_) {}
+    if (sent.size) { n._autoQrAt = nowT; store.save(); }   /* рейт-лимит ставим только если реально уведомили */
   } catch (_) {}
 }
 
