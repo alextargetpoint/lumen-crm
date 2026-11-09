@@ -719,6 +719,18 @@
   }
 
   @media(prefers-reduced-motion:reduce){.hero .halo,.scrollcue i,.hero video{animation:none}.lnw .ln>span{transform:none}#load .lmk,#load .lbar::after{animation:none}}
+
+  /* ── data layer: stat tiles with mono labels (digitized, in our warm palette) ── */
+  .datarow{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);border-radius:14px;overflow:hidden;margin-top:clamp(40px,6vw,64px)}
+  .dtile{background:var(--cell);padding:clamp(22px,3vw,30px) clamp(20px,2.6vw,28px);display:flex;flex-direction:column;gap:10px;position:relative}
+  .dtile .dl{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3)}
+  .dtile .dn{font-family:var(--sans);font-weight:700;font-size:clamp(40px,5.4vw,58px);line-height:.95;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+  .dtile .dn em{font-style:normal;font-weight:600;font-size:.42em;color:var(--ink3);margin-left:4px}
+  .dtile .dbar{height:4px;border-radius:3px;background:var(--line2);overflow:hidden;margin-top:2px}
+  .dtile .dbar>i{display:block;height:100%;background:linear-gradient(90deg,rgba(214,199,168,.9),rgba(214,199,168,.45));border-radius:3px}
+  .dtile .ds{font-size:13px;line-height:1.45;color:var(--ink2)}
+  .dpill{display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#e6dcc6;background:rgba(214,199,168,.1);border:1px solid rgba(214,199,168,.26);border-radius:999px;padding:4px 10px}
+  @media(max-width:720px){.datarow{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -873,6 +885,28 @@
       <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5c0 8 6.5 14.5 14.5 14.5a2 2 0 002-2v-2.3a1.4 1.4 0 00-1.1-1.4l-3.2-.7a1.4 1.4 0 00-1.4.5l-1 1.2A11 11 0 018.9 9.7l1.2-1a1.4 1.4 0 00.5-1.4l-.7-3.2A1.4 1.4 0 008.5 3H6.2a2 2 0 00-2.2 2z"/></svg></span><div><b>The AI calls on its own</b><span>By voice in the client's language, at a natural pace, prioritizing who's closest to a deal. 24/7, no call-center.</span></div></div>
       <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/></svg></span><div><b>And writes in chat</b><span>WhatsApp and Telegram in parallel — sequences that respect quiet hours and stop on first reply.</span></div></div>
       <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/></svg></span><div><b>Hot ones to the broker</b><span>With a call transcript, a scorecard and the next step ready. The broker only takes those back in play.</span></div></div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="datarow" data-r>
+      <div class="dtile">
+        <span class="dl">01 / dormant base</span>
+        <div class="dn">60<em>%+</em></div>
+        <div class="dbar"><i style="width:62%"></i></div>
+        <div class="ds">of leads aren't a "no" — they're a "not now". They simply stopped being touched.</div>
+      </div>
+      <div class="dtile">
+        <span class="dl">02 / working mode</span>
+        <div class="dn">24/7</div>
+        <div class="dbar"><i style="width:100%"></i></div>
+        <div class="ds">voice and chat, no days off, no call-center — the agent never tires or burns out.</div>
+      </div>
+      <div class="dtile">
+        <span class="dl">03 / cost to revive</span>
+        <div class="dn">$0 <span class="dpill">no ad spend</span></div>
+        <div class="dbar"><i style="width:8%"></i></div>
+        <div class="ds">we wake the leads you already paid for. No new traffic — revenue from a "dead" CRM.</div>
+      </div>
     </div>
   </div>
 </section>
