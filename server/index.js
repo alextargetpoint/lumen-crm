@@ -1409,7 +1409,7 @@ function clientIp(req) {
    долгоживущий токен + список кабинетов → сохраняем в tenant.settings.metaAds. App ID/Secret из env
    (META_APP_ID/META_APP_SECRET). Права — ровно под подачу App Review. client_secret только на сервере. */
 const META_GRAPH_V = 'v21.0';
-const META_SCOPES = 'ads_read,business_management,pages_show_list,pages_read_engagement,leads_retrieval';
+const META_SCOPES = 'ads_read,business_management,pages_show_list,pages_read_engagement';   /* leads_retrieval — только когда на Meta добавлен use-case «Lead Ads» (иначе FB: Invalid Scopes) */
 const _metaOAuthStates = new Map();   /* nonce → {tid, at}; TTL 10 мин, одноразовый (CSRF + привязка к тенанту) */
 function metaOAuthMakeState(tid) {
   const nonce = crypto.randomBytes(16).toString('hex');
