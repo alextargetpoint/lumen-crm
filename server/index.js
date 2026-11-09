@@ -5950,6 +5950,18 @@ const server = http.createServer(async (req, res) => {
           if (tid) { reg.tgChatIndex[chatId] = tid; store.saveRegistry(); }
         } else {
           tid = reg.tgChatIndex[chatId] || null;
+          if (!tid) {
+            /* ⭐чат НЕ в индексе (индекс пишется только при /start): брокер/владелец мог привязаться иначе
+               (миграция, перепривязка, старый per-tenant бот) — уведомления ему шлются по tgChatIds/ownerTgChatId
+               напрямую, а ВХОДЯЩИЙ клик по кнопке/ответ молча терялся (tid=null). Находим тенант по владельцу
+               chatId и кэшируем — теперь клик «Показать QR-код» работает независимо от способа привязки. */
+            tid = findTenant(() => {
+              const d = store.get();
+              if (String((d.settings && d.settings.ownerTgChatId) || '') === chatId) return true;
+              return (d.brokers || []).some(b => tgbridge.brokerChatIds(b).includes(chatId));
+            });
+            if (tid) { reg.tgChatIndex[chatId] = tid; store.saveRegistry(); }
+          }
         }
         if (!tid) {
           if (cq) return json(res, 200, { ok: true });   /* незнакомый чат нажал кнопку — тихо игнорируем (спиннер в TG сам погаснет) */
