@@ -7059,7 +7059,17 @@ async function openLeadModal(id, backScope) {
     catch (er) { btn.disabled = false; toast('Не вышло', er.message); }
   });
   $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });
-  $('#mBroker', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { broker: e.target.value || null }); });
+  $('#mBroker', bd).addEventListener('change', async (e) => {   /* передать лида другому брокеру/ментору — с подтверждением и обновлением списков (#867) */
+    const prev = l.broker || null, nv = e.target.value || null;
+    if (nv === prev) return;
+    try {
+      const r = await api.patch('/leads/' + l.id, { broker: nv });
+      l.broker = nv; l.brokerName = (r && r.brokerName !== undefined) ? r.brokerName : ((STATE.brokers.find(b => b.id === nv) || {}).name || null);
+      const bn = (STATE.brokers.find(b => b.id === nv) || {}).name || '';
+      toast(nv ? 'Лид передан' : 'Брокер снят', nv ? `Теперь ведёт ${bn} · уведомление отправлено` : 'лид без закрепления', true);
+      if (['funnel', 'overview', 'inbox'].includes(CUR)) render();
+    } catch (er) { e.target.value = prev || ''; toast('Не вышло', er.message); }
+  });
   $('#mVendor', bd)?.addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { vendorId: e.target.value }); toast('Подрядчик назначен', e.target.value ? vendorName(e.target.value) : 'снят', true); if (['funnel', 'overview', 'inbox'].includes(CUR)) render(); });
   $('#lcAi', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { ai: { enabled: e.target.checked } }); openLeadModal(id); });
   const rebuildSummary = async (btn) => {
