@@ -8666,7 +8666,7 @@ PAGES.sequences = async (root) => {
   const chLabel = k => (SEQ_CHANNELS.find(s => s[0] === k) || [k, k])[1];
   const vndName = id => ((LUMEN_VENDORS || []).find(v => v.id === id) || {}).name || id;
   const brName = id => ((STATE.brokers || []).find(b => b.id === id) || {}).name || id;
-  const seqFiltersOf = (sq) => { const f = sq.filters || {}; return { geos: Array.isArray(f.geos) ? f.geos : (sq.geo && sq.geo !== 'all' ? [sq.geo] : []), sources: Array.isArray(f.sources) ? f.sources : [], channels: Array.isArray(f.channels) ? f.channels : [], contractors: Array.isArray(f.contractors) ? f.contractors : [], brokers: (f.brokers === 'all' || Array.isArray(f.brokers)) ? f.brokers : 'all' }; };
+  const seqFiltersOf = (sq) => { const f = sq.filters || {}; return { geos: Array.isArray(f.geos) ? f.geos : (sq.geo && sq.geo !== 'all' ? [sq.geo] : []), sources: Array.isArray(f.sources) ? f.sources : [], channels: Array.isArray(f.channels) ? f.channels : [], contractors: Array.isArray(f.contractors) ? f.contractors : [], ads: Array.isArray(f.ads) ? f.ads : [], brokers: (f.brokers === 'all' || Array.isArray(f.brokers)) ? f.brokers : 'all' }; };
   const targetingSummary = (sq) => {
     const f = seqFiltersOf(sq); const parts = [];
     parts.push(f.geos.length ? f.geos.map(geoName).join(', ') : 'Все гео');
@@ -8678,7 +8678,7 @@ PAGES.sequences = async (root) => {
   };
   const targetingShort = (sq) => {
     const f = seqFiltersOf(sq); const g = f.geos.length ? f.geos.map(geoName).join(',') : 'Все гео';
-    const ex = []; if (f.sources.length) ex.push(f.sources.length + ' ист.'); if (f.channels.length) ex.push(f.channels.length + ' кан.'); if (f.contractors.length) ex.push(f.contractors.length + ' подр.'); if (f.brokers !== 'all') ex.push((Array.isArray(f.brokers) ? f.brokers.length : 0) + ' бр.');
+    const ex = []; if (f.sources.length) ex.push(f.sources.length + ' ист.'); if (f.channels.length) ex.push(f.channels.length + ' кан.'); if (f.contractors.length) ex.push(f.contractors.length + ' подр.'); if ((f.ads || []).length) ex.push('креатив: ' + f.ads.slice(0, 2).join('/')); if (f.brokers !== 'all') ex.push((Array.isArray(f.brokers) ? f.brokers.length : 0) + ' бр.');
     return g + (ex.length ? ' · ' + ex.join(' · ') : '');
   };
   const openSeqTargeting = () => {
@@ -8693,6 +8693,7 @@ PAGES.sequences = async (root) => {
           <div class="seq-tg-sec"><div class="seq-tg-h">Гео<span>пусто = все направления</span></div><div class="seq-tg-chips">${chipRow(geos.map(g => [g, STATE.settings.geoNames[g] || g]), f.geos, 'tgeo') || '<span class="muted" style="font-size:12px">Нет направлений</span>'}</div></div>
           <div class="seq-tg-sec"><div class="seq-tg-h">Источник заявки<span>откуда пришёл лид</span></div><div class="seq-tg-chips">${chipRow(SEQ_SOURCES, f.sources, 'tsrc')}</div></div>
           <div class="seq-tg-sec"><div class="seq-tg-h">Канал<span>в каком мессенджере лид</span></div><div class="seq-tg-chips">${chipRow(SEQ_CHANNELS, f.channels, 'tch')}</div></div>
+          <div class="seq-tg-sec"><div class="seq-tg-h">Объявление / креатив<span>лид с этого объявления → эта цепочка</span></div><input id="tgAds" value="${esc((f.ads || []).join(', '))}" placeholder="напр. Laya Resort, Radisson — имена объявлений через запятую (подстрока)" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--stroke);border-radius:9px;background:var(--card);color:var(--ink);font-size:13px;outline:none"><div class="muted" style="font-size:11px;margin-top:5px">Матч по части имени кампании/группы/объявления (или точному ID). Лид с креатива «Laya Resort» получит именно эту воронку. Самый узкий таргет — перебивает гео/источник.</div></div>
           ${vendors.length ? `<div class="seq-tg-sec"><div class="seq-tg-h">Подрядчики<span>несколько сразу</span></div><div class="seq-tg-chips">${chipRow(vendors.map(v => [v.id, v.name]), f.contractors, 'tvnd')}</div></div>` : ''}
           <div class="seq-tg-sec"><div class="seq-tg-h">Брокеры</div>
             <div class="seq-tg-chips" style="margin-bottom:7px"><button type="button" class="seq-chip ${f.brokers === 'all' ? 'on' : ''}" id="tgBrAll">${ic(I.check)}Все брокеры</button></div>
@@ -8702,7 +8703,8 @@ PAGES.sequences = async (root) => {
       actions: [{ label: 'Сохранить таргетинг', cls: 'btn-accent', onClick: async () => {
         const pick = (attr) => $$(`[data-${attr}]`, md).filter(x => x.classList.contains('on')).map(x => x.dataset[attr]);
         const brAll = $('#tgBrAll', md).classList.contains('on');
-        const filters = { geos: pick('tgeo'), sources: pick('tsrc'), channels: pick('tch'), contractors: pick('tvnd'), brokers: brAll ? 'all' : pick('tbr') };
+        const adsRaw = (($('#tgAds', md) || {}).value || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 30);
+        const filters = { geos: pick('tgeo'), sources: pick('tsrc'), channels: pick('tch'), contractors: pick('tvnd'), ads: adsRaw, brokers: brAll ? 'all' : pick('tbr') };
         await api.patch('/sequences/' + seq.id, { filters });
         toast('Таргетинг сохранён', targetingSummary({ filters }), true);
         await loadState(); render();

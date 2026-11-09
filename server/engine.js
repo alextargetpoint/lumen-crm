@@ -313,12 +313,22 @@ function brokerOnShift(b) {
   return true;
 }
 
+function brokerSpeaks(b, lang) {
+  if (!lang) return true;
+  const L = b && b.langs;
+  const arr = Array.isArray(L) ? L : (L ? String(L).split(/[,\s]+/).filter(Boolean) : []);
+  return arr.length ? arr.includes(lang) : false;   /* язык НЕ задан у брокера → не считаем, что говорит (чтобы приоритет работал только у настроенных) */
+}
 function pickBroker(db, lead) {
   const mode = (db.settings.automations || {}).assignMode || 'load';
   const avail = b => b.active !== false && !b.away;   /* дежурство: отсутствующим и отключённым новых не даём */
   let pool = db.brokers.filter(b => b.geo === lead.geo && avail(b));
   if (!pool.length) pool = db.brokers.filter(avail);
   if (!pool.length) pool = db.brokers.slice();   /* совсем некому — лид не виснет */
+  /* ⭐маршрут по языку (запрос SFG): лид на языке X → предпочитаем брокеров, кто говорит на X (broker.langs).
+     Никто в пуле не говорит на языке лида → fallback на весь пул (лид не виснет). Если ни у кого язык не задан — без эффекта. */
+  const lang = lead.lang || '';
+  if (lang) { const speak = pool.filter(b => brokerSpeaks(b, lang)); if (speak.length) pool = speak; }
   if (mode === 'shift') {
     const onShift = pool.filter(brokerOnShift);
     if (onShift.length) pool = onShift; // вне смен — fallback на всех, лид не виснет
@@ -416,6 +426,7 @@ function seqFilters(seq) {
     sources: arr(f.sources),
     channels: arr(f.channels),
     contractors: arr(f.contractors),
+    ads: arr(f.ads),   /* ⭐таргет по рекламному креативу/объявлению: подстрока имени кампании/группы/объявления ИЛИ точный adId */
     brokers: (f.brokers === 'all' || Array.isArray(f.brokers)) ? f.brokers : 'all',
   };
 }
@@ -425,12 +436,20 @@ function seqMatchesLead(seq, lead) {
   if (f.sources.length && !f.sources.includes(lead.source)) return false;
   if (f.channels.length && !f.channels.includes(lead.channel || lead.activeChannel || 'wa')) return false;
   if (f.contractors.length && !f.contractors.includes(lead.vendorId || lead.vendor || lead.contractor || '')) return false;   /* хук пишет vendorId — раньше фильтр по подрядчику НИКОГДА не матчил (проверял lead.vendor) */
+  /* ⭐цепочка под конкретный креатив (запрос SFG): лид с объявления «Laya Resort» → своя воронка.
+     Матч по подстроке имени (кампания/группа/объявление) ИЛИ точному adId. */
+  if (f.ads.length) {
+    const a = lead.ads || {};
+    const hay = [a.campaignName, a.adsetName, a.adName, a.name].filter(Boolean).join('  ').toLowerCase();
+    const adId = String(a.adId || '');
+    if (!f.ads.some(x => { const s = String(x || '').trim().toLowerCase(); return s && (hay.includes(s) || (adId && adId === String(x).trim())); })) return false;
+  }
   if (f.brokers !== 'all' && Array.isArray(f.brokers) && !f.brokers.includes(lead.broker)) return false;
   return true;
 }
 function seqSpecificity(seq) {
   const f = seqFilters(seq);
-  return (f.geos.length ? 1 : 0) + (f.sources.length ? 1 : 0) + (f.channels.length ? 1 : 0) + (f.contractors.length ? 1 : 0) + (f.brokers !== 'all' ? 1 : 0);
+  return (f.geos.length ? 1 : 0) + (f.sources.length ? 1 : 0) + (f.channels.length ? 1 : 0) + (f.contractors.length ? 1 : 0) + (f.ads.length ? 2 : 0) + (f.brokers !== 'all' ? 1 : 0);
 }
 
 /* ПРЕВЬЮ СЛЕДУЮЩЕГО КАСАНИЯ для диалога: какая цепочка/шаг у лида сейчас активны, когда уйдёт и что за текст.

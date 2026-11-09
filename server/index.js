@@ -10436,6 +10436,7 @@ const server = http.createServer(async (req, res) => {
           sources: strArr(b.filters.sources, 40),
           channels: strArr(b.filters.channels, 20),
           contractors: strArr(b.filters.contractors, 200),
+          ads: strArr(b.filters.ads, 60),   /* ⭐таргет по креативу/объявлению (имя-подстрока или adId) */
           brokers,
         };
         /* seq.geo (legacy) синхронно: один гео → он, иначе 'all' */
