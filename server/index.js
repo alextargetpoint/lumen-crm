@@ -844,6 +844,22 @@ function matchAd(db, lead) {
   } else lead.ads.matched = false;
 }
 
+/* ⭐Добор ИМЁН кампании/группы/объявления по ad_id через Meta API, когда matchAd не нашёл объявление в синке
+   db.ads (интегратор прислал один ad_id, а объявление вне окна синка). Нужны ads_read + подключённый кабинет.
+   Best-effort и идемпотентно: имена, что уже есть, не затираем пустыми; кэш внутри metaads.resolveAdNames. */
+async function enrichAdNamesViaApi(db, lead) {
+  if (!(lead && lead.ads && lead.ads.adId) || lead.ads.matched || !metaads.ready(db)) return;
+  try {
+    const nm = await metaads.resolveAdNames(db, lead.ads.adId);
+    if (nm) {
+      if (nm.adName && !lead.ads.adName) lead.ads.adName = nm.adName;
+      if (nm.adsetName && !lead.ads.adsetName) lead.ads.adsetName = nm.adsetName;
+      if (nm.campaignName && !lead.ads.campaignName) lead.ads.campaignName = nm.campaignName;
+      if (nm.adName || nm.campaignName || nm.adsetName) { lead.ads.matched = true; lead.ads.nameSource = 'api'; }
+    }
+  } catch (_) {}
+}
+
 /* ── Маршрутизация ВХОДЯЩИХ лидов на брокера ──
    settings.automations.leadRouting = { default: brokerId|'', bySource: { <source>: brokerId } }
    Приоритет: правило по источнику лида > дефолтный брокер > null (тогда брокера позже даст движок по загрузке/гео).
@@ -6856,7 +6872,7 @@ const server = http.createServer(async (req, res) => {
         if (Object.keys(customFields).length) lead.custom = Object.assign(lead.custom || {}, customFields);
         if (qVendorId && !lead.vendorId) { lead.vendorId = qVendorId; if (qVendorName) lead.tags = [...new Set([...(lead.tags || []), qVendorName])]; }
         if (qSrc && (!lead.source || lead.source === 'meta_form')) lead.source = qSrc;
-        if (!(lead.ads && (lead.ads.adId || lead.ads.campaignName))) { const a = adsFromBody(); if (a) { lead.ads = a; matchAd(db, lead); } }
+        if (!(lead.ads && (lead.ads.adId || lead.ads.campaignName))) { const a = adsFromBody(); if (a) { lead.ads = a; matchAd(db, lead); await enrichAdNamesViaApi(db, lead); } }
         ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Повторная заявка: ${lead.name} — дубль не создан, карточка обогащена` });
       } else {
         lead = {
@@ -6876,6 +6892,7 @@ const server = http.createServer(async (req, res) => {
           ads: adsFromBody(),
         };
         matchAd(db, lead);
+        await enrichAdNamesViaApi(db, lead);   /* ⭐имена из ad_id через API, если интегратор прислал только ID */
         /* МАРШРУТИЗАЦИЯ: если владелец задал «входящие → брокеру» — сразу назначаем, иначе брокера даст движок.
            Иначе лид с broker=null не виден scoped-брокеру (canSeeLead: только свои) — и «лиды не подгружаются». */
         const routed = routeIntakeBroker(db, lead);

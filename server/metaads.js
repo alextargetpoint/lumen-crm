@@ -303,4 +303,34 @@ async function sync(db, deps, opts = {}) {
   return out;
 }
 
-module.exports = { ready, apiEnabled, verify, sync, syncInsights, syncLeads, acctId, cfg, dedupeByName };
+/* ⭐РЕЗОЛВ ИМЁН ПО ad_id через Graph API (ads_read). Интеграторы (Albato/Zapier/Make и пр.) часто шлют лид
+   с ОДНИМ ad_id без названий кампании/группы/объявления; matchAd подставит имена только если объявление уже
+   попало в синк db.ads. Если его там нет (0 показов за период / вне окна) — тянем напрямую:
+   GET /{ad_id}?fields=name,adset{name},campaign{name}. Кэш в cfg.adNameCache (7 дней, ≤2000 записей), чтобы
+   не дёргать API на каждый повторный лид. Возвращает {adName,adsetName,campaignName} или null. Бесплатно у Meta. */
+async function resolveAdNames(db, adId) {
+  const id = String(adId || '').replace(/\D/g, '');
+  if (!id) return null;
+  const c = cfg(db);
+  if (!c.token) return null;
+  c.adNameCache = c.adNameCache || {};
+  const hit = c.adNameCache[id];
+  if (hit && hit.names && (Date.now() - (hit.at || 0)) < 7 * 86400e3) return hit.names;
+  try {
+    const j = await graphGet(id, c.token, { fields: 'name,adset{name},campaign{name}' });
+    const names = {
+      adName: (j && j.name) || null,
+      adsetName: (j && j.adset && j.adset.name) || null,
+      campaignName: (j && j.campaign && j.campaign.name) || null,
+    };
+    if (names.adName || names.campaignName || names.adsetName) {
+      c.adNameCache[id] = { names, at: Date.now() };
+      const keys = Object.keys(c.adNameCache);
+      if (keys.length > 2000) delete c.adNameCache[keys[0]];   /* не растём бесконечно */
+      return names;
+    }
+  } catch (_) { /* нет доступа к ad_id / удалён — молча, не ломаем приём лида */ }
+  return null;
+}
+
+module.exports = { ready, apiEnabled, verify, sync, syncInsights, syncLeads, resolveAdNames, acctId, cfg, dedupeByName };
