@@ -364,11 +364,30 @@ async function sendDataUrlPhoto(db, chatId, dataUrl, caption) {
   const m = /^data:(image\/[a-z0-9.+-]+)?;base64,(.+)$/i.exec(String(dataUrl || ''));
   if (!m) throw new Error('не data:URL');
   const buf = Buffer.from(m[2], 'base64');
-  const ext = ((m[1] || 'image/png').split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
-  const saved = saveMedia(buf, ext);
-  const body = { chat_id: chatId, photo: absUrl(saved.url) };
-  if (caption) body.caption = String(caption).slice(0, 1024);
-  return api(db, 'sendPhoto', body);
+  const mime = m[1] || 'image/png';
+  const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+  const t = token(db);
+  if (!t) throw new Error('нет botToken моста');
+  /* ⭐ЗАГРУЖАЕМ QR ФАЙЛОМ (multipart/InputFile), а НЕ ссылкой. Раньше слали photo:absUrl(/media/..) и
+     Telegram пытался САМ СКАЧАТЬ наш media-URL — на проде это падало «failed to get HTTP URL content»
+     (media-хост Telegram'у недоступен/относительный путь), и QR по кнопке не доходил до клиента.
+     Загрузка байтами не зависит от доступности media-хоста — работает всегда. */
+  try {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    if (caption) form.append('caption', String(caption).slice(0, 1024));
+    form.append('photo', new Blob([buf], { type: mime }), 'qr.' + ext);
+    const r = await fetch(`https://api.telegram.org/bot${t}/sendPhoto`, { method: 'POST', body: form });
+    const j = await r.json().catch(() => ({}));
+    if (j && j.ok) return j;
+    throw new Error(`telegram sendPhoto (upload): ${(j && j.description) || r.status}`);
+  } catch (e) {
+    /* запасной путь — прежняя отправка по публичному URL (вдруг media-хост доступен) */
+    const saved = saveMedia(buf, ext);
+    const body = { chat_id: chatId, photo: absUrl(saved.url) };
+    if (caption) body.caption = String(caption).slice(0, 1024);
+    return api(db, 'sendPhoto', body);
+  }
 }
 
 /* поставить вебхук у Telegram на наш /tg/webhook с секрет-токеном */
