@@ -5928,10 +5928,16 @@ const server = http.createServer(async (req, res) => {
          последующие апдейты роутим по этому индексу. Включено только если задан LUMEN_TG_BRIDGE_TOKEN. */
       if (tgbridge.central() && _tgGot && _tgGot === tgbridge.platformSecret()) {
         const body = await readBody(req);
-        const msg = (body && (body.message || body.edited_message)) || null;
-        if (!msg || !msg.chat) return json(res, 200, { ok: true });
-        const chatId = String(msg.chat.id);
-        const text = String(msg.text || msg.caption || '').trim();
+        /* ⭐inline-кнопка (напр. «📷 Показать QR-код»): у callback_query НЕТ body.message — данные лежат в
+           body.callback_query. Раньше роутер брал только message/edited_message и ронял клик (→ 200, тишина),
+           поэтому кнопка приходила, а QR по клику НЕ приходил. Теперь роутим и callback_query по тому же индексу. */
+        const cq = (body && body.callback_query) || null;
+        const msg = (body && (body.message || body.edited_message)) || (cq && cq.message) || null;
+        const chatId = cq
+          ? String((cq.message && cq.message.chat && cq.message.chat.id) || (cq.from && cq.from.id) || '')
+          : (msg && msg.chat ? String(msg.chat.id) : '');
+        if (!chatId) return json(res, 200, { ok: true });
+        const text = cq ? '' : String(msg.text || msg.caption || '').trim();
         const reg = store.getRegistry(); reg.tgChatIndex = reg.tgChatIndex || {};
         let tid = null;
         if (text.startsWith('/start')) {
@@ -5946,6 +5952,7 @@ const server = http.createServer(async (req, res) => {
           tid = reg.tgChatIndex[chatId] || null;
         }
         if (!tid) {
+          if (cq) return json(res, 200, { ok: true });   /* незнакомый чат нажал кнопку — тихо игнорируем (спиннер в TG сам погаснет) */
           try { await tgbridge.notify({ settings: {} }, chatId, 'Здравствуйте! Отправьте свой ключ агентства: /start &lt;ключ&gt;\nКлюч — в CRM → Настройки → Мост Telegram.'); } catch (_) {}
           return json(res, 200, { ok: true });
         }
