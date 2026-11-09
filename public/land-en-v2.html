@@ -724,11 +724,9 @@
   .datarow{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);border-radius:14px;overflow:hidden;margin-top:clamp(40px,6vw,64px)}
   .dtile{background:var(--cell);padding:clamp(22px,3vw,30px) clamp(20px,2.6vw,28px);display:flex;flex-direction:column;gap:10px;position:relative}
   .dtile .dl{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3)}
-  .dtile .dn{font-family:var(--sans);font-weight:700;font-size:clamp(40px,5.4vw,58px);line-height:.95;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
-  .dtile .dn em{font-style:normal;font-weight:600;font-size:.42em;color:var(--ink3);margin-left:4px}
-  .dtile .dbar{height:4px;border-radius:3px;background:var(--line2);overflow:hidden;margin-top:2px}
-  .dtile .dbar>i{display:block;height:100%;background:linear-gradient(90deg,rgba(214,199,168,.9),rgba(214,199,168,.45));border-radius:3px}
-  .dtile .ds{font-size:13px;line-height:1.45;color:var(--ink2)}
+  .dtile .dn{font-family:var(--serif);font-weight:300;font-size:clamp(48px,6.2vw,72px);line-height:.9;letter-spacing:-.03em;color:var(--ink);display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+  .dtile .dn em{font-style:normal;font-weight:400;font-size:.4em;color:var(--ink3);margin-left:2px}
+  .dtile .ds{font-size:13px;line-height:1.5;color:var(--ink2);font-weight:300}
   .dpill{display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#e6dcc6;background:rgba(214,199,168,.1);border:1px solid rgba(214,199,168,.26);border-radius:999px;padding:4px 10px}
   @media(max-width:720px){.datarow{grid-template-columns:1fr}}
 /* ── ROI-калькулятор реанимации (оцифровка · наша тёплая палитра) ── */
@@ -738,7 +736,7 @@
   .roi-field{display:flex;flex-direction:column;gap:11px}
   .roi-field .rf-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
   .roi-field .rf-l{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
-  .roi-field .rf-v{font-family:var(--sans);font-weight:700;font-size:20px;letter-spacing:-.01em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .roi-field .rf-v{font-family:var(--serif);font-weight:500;font-size:27px;letter-spacing:-.01em;color:var(--ink)}
   .roi-field .rf-h{font-size:11.5px;color:var(--ink3);margin-top:-2px}
   input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;background:var(--line2);outline:none;cursor:pointer}
   input[type=range].rng::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:#e6dcc6;border:3px solid var(--cell);box-shadow:0 0 0 1px rgba(214,199,168,.5);cursor:pointer;transition:transform .15s var(--ease)}
@@ -750,10 +748,10 @@
   .ro-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .ro-tile{border:1px solid var(--line);border-radius:12px;padding:15px 16px;display:flex;flex-direction:column;gap:5px}
   .ro-tile .rl{font-size:11px;color:var(--ink3)}
-  .ro-tile .rv{font-family:var(--sans);font-weight:700;font-size:28px;line-height:1;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .ro-tile .rv{font-family:var(--serif);font-weight:300;font-size:clamp(34px,4.2vw,44px);line-height:1;letter-spacing:-.02em;color:var(--ink)}
   .ro-hero{margin-top:2px;border:1px solid rgba(214,199,168,.3);background:rgba(214,199,168,.07);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:3px}
   .ro-hero .rh-l{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
-  .ro-hero .rh-v{font-family:var(--serif);font-weight:500;font-size:clamp(40px,5.2vw,56px);line-height:1;letter-spacing:-.01em;color:#e6dcc6;font-variant-numeric:tabular-nums}
+  .ro-hero .rh-v{font-family:var(--serif);font-weight:400;font-size:clamp(46px,5.8vw,64px);line-height:1;letter-spacing:-.02em;color:#e6dcc6}
   .ro-hero .rh-s{font-size:12px;color:var(--ink2);margin-top:4px}
   .ro-hero .rh-s b{color:var(--ink)}
   .roi-note{padding:0 clamp(26px,3.4vw,40px) clamp(22px,2.6vw,30px);font-size:11.5px;color:var(--ink3);line-height:1.5}
@@ -919,19 +917,16 @@
       <div class="dtile">
         <span class="dl">01 / dormant base</span>
         <div class="dn">60<em>%+</em></div>
-        <div class="dbar"><i style="width:62%"></i></div>
         <div class="ds">of leads aren't a "no" — they're a "not now". They simply stopped being touched.</div>
       </div>
       <div class="dtile">
         <span class="dl">02 / working mode</span>
         <div class="dn">24/7</div>
-        <div class="dbar"><i style="width:100%"></i></div>
         <div class="ds">voice and chat, no days off, no call-center — the agent never tires or burns out.</div>
       </div>
       <div class="dtile">
         <span class="dl">03 / cost to revive</span>
         <div class="dn">$0 <span class="dpill">no ad spend</span></div>
-        <div class="dbar"><i style="width:8%"></i></div>
         <div class="ds">we wake the leads you already paid for. No new traffic — revenue from a "dead" CRM.</div>
       </div>
     </div>
