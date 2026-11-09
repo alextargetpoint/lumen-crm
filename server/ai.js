@@ -106,11 +106,16 @@ function screen(db, lead) {
   /* ⭐РЕЖИМ ФИЛЬТРА (клиент #843): ИИ не додавливает до всех 4 осей, а передаёт менеджеру по ВОВЛЕЧЁННОСТИ —
      клиент ответил на пул вопросов (даже «не знаю») → интерес есть → квалифицируем. В «Спящих»/«Перестал
      отвечать» остаются молчуны. Включается тумблером в «Обучение ИИ». Иначе — классика: все 4 оси. */
-  const filterMode = !!(((db.settings.ai && db.settings.ai.training) || {}).filterMode);
+  const _tr = (db.settings.ai && db.settings.ai.training) || {};
+  const filterMode = !!_tr.filterMode;
   /* ⭐анти-спам: агрессивного/мусорного лида (abuseFlag) НЕ тащим в квалификацию по вовлечённости —
      тролль, приславший 3 бредовых сообщения, иначе получал бы статус «квалифицирован» и уходил брокеру */
   const abusive = !!(lead.abuseFlag && (lead.abuseFlag.count || 0) > 0) && filled < 2;
-  const engaged = filterMode && (filled >= 2 || inbound.length >= 3) && !abusive;   /* ответил на ≥2 оси ИЛИ ≥3 реплики = вовлечён */
+  /* ⭐«передавать менеджеру сразу после первого ответа» (модель клиента: квалификатор = только фильтр
+     ответил/не ответил). Включено → ПЕРВАЯ содержательная реплика = вовлечён → qualified → (autoHandover) →
+     handover → (migrateOnHandover) мост. Выключено — классика фильтра: ≥2 оси или ≥3 реплики. */
+  const replyThreshold = _tr.handoverOnFirstReply ? 1 : 3;
+  const engaged = filterMode && (filled >= 2 || inbound.length >= replyThreshold) && !abusive;   /* вовлечён */
   if (filled === 4 || engaged) { lead.stage = 'qualified'; lead.stagePeakQual = true; }   /* durable-флаг квала: иначе правка/обнуление оси задним числом «теряет» квал в отчётах */
   else if (inbound.length > 0) lead.stage = 'dialog';
   else if (lead.ai.chainStep > 0) lead.stage = 'touch';
