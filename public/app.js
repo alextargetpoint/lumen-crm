@@ -13505,7 +13505,8 @@ PAGES.ads = async (root) => {
           <div class="card-title" data-fold="1"><span class="setup-step">2</span>${ic(I.target)}Рекламные кабинеты (Meta API)<span class="sub">прямое чтение расхода/лидов из кабинетов</span>
             <span class="ma-status">${okCount ? `${ic(I.check)}${okCount} ${plural(okCount, 'кабинет', 'кабинета', 'кабинетов')}${ma.lastSyncAt ? ' · синк ' + tmm(ma.lastSyncAt) : ''}` : 'нет кабинетов'}</span>
             <label class="switch" style="margin-left:10px"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите один или несколько кабинетов Meta — данные (расход/кампании/лиды) сведутся в аналитику и «План/Факт по направлениям». Требует постоянного токена System User (для лидов — права Страницы; см. гайд в приёме лидов).</div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите кабинет(ы) Meta — расход/кампании/лиды сведутся в аналитику и «План/Факт по направлениям». Проще всего — <b>через Facebook</b> (вход, выбор кабинета, без ручного токена). Либо вручную токеном System User ниже.</div>
+          <button type="button" class="btn btn-sm btn-accent" id="maConnectFb" style="margin:0 0 12px;display:inline-flex;align-items:center;gap:7px">${ic(I.target)}Подключить через Facebook</button>
           <div class="ma-accts" id="maAccts">${accts.map(acctRow).join('')}</div>
           <button class="btn btn-sm" id="maAddAcct" style="margin:2px 0 10px">${ic(I.plus)}Добавить кабинет</button>
           <div class="form-row"><label>Access token (System User) — один на все кабинеты бизнеса</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
@@ -13761,6 +13762,7 @@ PAGES.ads = async (root) => {
   $$('[data-acctdel]', root).forEach(b => b.addEventListener('click', () => b.closest('[data-acctrow]').remove()));
   $('#maAddAcct', root)?.addEventListener('click', maAddAcctRow);
   $('#metaAdsOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { metaAds: { enabled: e.target.checked } }); toast(e.target.checked ? 'Кабинеты Meta включены' : 'Кабинеты Meta выключены', e.target.checked ? 'Синк расхода и лидов пойдёт по расписанию' : null, true); await loadState(); });
+  $('#maConnectFb')?.addEventListener('click', () => { location.href = '/auth/meta/start'; });   /* серверный OAuth: вход в FB → выбор кабинета → токен сохранится сам */
   $('#maSave')?.addEventListener('click', async () => { await api.patch('/settings', { metaAds: maPatch() }); toast('Сохранено', 'Кабинеты и настройки применены', true); await loadState(); render(); });
   $('#maVerifyBtn')?.addEventListener('click', async () => { const out = $('#maVerify'); out.textContent = 'Проверяю…'; const accs = maAccounts(); try { const results = []; for (const a of accs.slice(0, 8)) { const r = await api.post('/metaads/verify', { token: ($('#maToken')?.value || '').trim(), adAccountId: a.id }); results.push(r.ok ? `<span style="color:var(--ok)">✓ ${esc(r.name || a.id)} · ${esc(r.currency || '')}</span>` : `<span style="color:var(--bad)">✕ ${esc(a.id)}: ${esc(r.error || '')}</span>`); } out.innerHTML = results.join('<br>') || 'нет кабинетов'; } catch (e) { out.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; } });
   $('#maBackfill', root)?.addEventListener('click', async () => { maSyncProgress(true, 'Догружаю историю за весь период — это дольше, тяну частями…'); try { await api.patch('/settings', { metaAds: maPatch() }); const r = await api.post('/metaads/sync', { backfill: true }); maSyncProgress(false); toast(r.ok ? 'История догружена' : 'Ошибка', r.ok ? `Объявлений обновлено: ${(r.insights ? r.insights.updated + r.insights.added : 0)}` : (r.error || ''), r.ok); await loadState(); render(); } catch (er) { maSyncProgress(false); toast('Не удалось', er.message); } });
@@ -20935,7 +20937,13 @@ window.addEventListener('popstate', () => {
     else if (qp.get('zoom') === 'error') { toast('Zoom не подключён', 'Согласие не получено или истёк срок — попробуйте ещё раз в «Подключениях»'); }
     if (qp.get('gmeet') === 'connected') { toast('Google Meet подключён', 'Видео-встречи теперь создаются как Meet под вашим аккаунтом', true); }
     else if (qp.get('gmeet') === 'error') { toast('Google Meet не подключён', 'Согласие не получено — попробуйте ещё раз в «Подключениях»'); }
-    if (qp.has('zoom') || qp.has('gmeet')) history.replaceState(null, '', location.pathname + location.hash);
+    const _m = qp.get('meta');
+    if (_m === 'connected') { toast('Рекламный кабинет Meta подключён', 'Кабинеты и токен получены — синк расхода/кампаний пойдёт по расписанию', true); }
+    else if (_m === 'denied') { toast('Доступ к Meta не выдан', 'Вы не подтвердили доступ в окне Facebook — попробуйте ещё раз в «Настройках рекламы»'); }
+    else if (_m === 'noapp') { toast('Подключение Meta не настроено', 'На сервере не заданы ключи приложения Meta — обратитесь к поддержке'); }
+    else if (_m === 'auth') { toast('Нужен вход владельца', 'Подключить рекламный кабинет может только владелец агентства'); }
+    else if (_m === 'error') { toast('Не удалось подключить Meta', 'Попробуйте ещё раз в «Настройках рекламы»'); }
+    if (qp.has('zoom') || qp.has('gmeet') || qp.has('meta')) history.replaceState(null, '', location.pathname + location.hash);
   } catch (_) {}
   mountFab();
   mountAssistant();   /* «Помощник брокера» — плавающее окно подсказок над воронкой */

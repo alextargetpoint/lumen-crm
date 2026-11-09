@@ -1404,6 +1404,27 @@ function clientIp(req) {
   const xf = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   return xf || (req.socket && req.socket.remoteAddress) || '';
 }
+/* ═══ Meta (Facebook) OAuth — подключение рекламного кабинета агентством в 1 клик ═══
+   Серверный Facebook Login: /auth/meta/start (владелец) → диалог FB → /auth/meta/callback → обмен code на
+   долгоживущий токен + список кабинетов → сохраняем в tenant.settings.metaAds. App ID/Secret из env
+   (META_APP_ID/META_APP_SECRET). Права — ровно под подачу App Review. client_secret только на сервере. */
+const META_GRAPH_V = 'v21.0';
+const META_SCOPES = 'ads_read,business_management,pages_show_list,pages_read_engagement,leads_retrieval';
+const _metaOAuthStates = new Map();   /* nonce → {tid, at}; TTL 10 мин, одноразовый (CSRF + привязка к тенанту) */
+function metaOAuthMakeState(tid) {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  _metaOAuthStates.set(nonce, { tid, at: Date.now() });
+  if (_metaOAuthStates.size > 500) { const now = Date.now(); for (const [k, v] of _metaOAuthStates) if (now - v.at > 600000) _metaOAuthStates.delete(k); }
+  return nonce;
+}
+function metaOAuthConsume(nonce) {
+  const v = _metaOAuthStates.get(String(nonce || ''));
+  if (!v) return null;
+  _metaOAuthStates.delete(nonce);
+  return (Date.now() - v.at > 600000) ? null : v;   /* одноразовый, 10 мин */
+}
+function metaRedirectUri() { return (process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || '').replace(/\/$/, '') + '/auth/meta/callback'; }
+function metaOAuthReady() { return !!(process.env.META_APP_ID && process.env.META_APP_SECRET); }
 /* SEC: простой in-memory rate-limit для публичных auth-роутов (регистрация/сброс) — анти-спам/DoS */
 const _rl = new Map();
 function rateLimited(key, max, windowMs) {
@@ -1908,7 +1929,7 @@ function publicSettings(db) {
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
-  if (s.metaAds) { if (s.metaAds.token) { s.metaAds.tokenSet = true; delete s.metaAds.token; } if (s.metaAds.log) s.metaAds.log = s.metaAds.log.slice(0, 12); }
+  if (s.metaAds) { if (s.metaAds.token) { s.metaAds.tokenSet = true; delete s.metaAds.token; } delete s.metaAds.adNameCache; if (s.metaAds.log) s.metaAds.log = s.metaAds.log.slice(0, 12); }
   /* SEC: long-lived токен amoCRM — секрет, наружу только флаг tokenSet + статус connected */
   if (s.integrations && s.integrations.amo) { const a = s.integrations.amo; if (a.token) { a.tokenSet = true; delete a.token; } a.connected = !!a.lastOkAt; }
   /* SEC: вебхук-URL Bitrix содержит токен в пути — секрет. Наружу только флаг + статус */
@@ -7617,6 +7638,51 @@ const server = http.createServer(async (req, res) => {
         await store.runInTenant(stG.tid, async () => { const tdb = store.get(); const holder = stG.brokerId ? (tdb.brokers || []).find(b => b.id === stG.brokerId) : null; await gmeet.exchangeCode(tdb, code, holder || tdb.settings); });
         res.writeHead(302, { Location: '/?gmeet=connected' }); return res.end();
       } catch (e) { console.error('[gmeet callback]', e.message); res.writeHead(302, { Location: '/?gmeet=error' }); return res.end(); }
+    }
+    /* ---------------- Meta OAuth: агентство подключает свой рекламный кабинет кнопкой «Continue with Facebook» ---------------- */
+    if (p === '/auth/meta/start' && req.method === 'GET') {
+      const role = sessionRole(req);
+      if (!role || role.role !== 'owner') { res.writeHead(302, { Location: '/?meta=auth#settings' }); return res.end(); }  /* подключает только владелец */
+      if (!metaOAuthReady()) { res.writeHead(302, { Location: '/?meta=noapp#settings' }); return res.end(); }
+      const nonce = metaOAuthMakeState(store.currentTid());
+      const params = new URLSearchParams({
+        client_id: process.env.META_APP_ID,
+        redirect_uri: metaRedirectUri(),
+        state: nonce,
+        response_type: 'code',
+        scope: META_SCOPES,
+      });
+      res.writeHead(302, { Location: `https://www.facebook.com/${META_GRAPH_V}/dialog/oauth?${params.toString()}` });
+      return res.end();
+    }
+    if (p === '/auth/meta/callback' && req.method === 'GET') {
+      const code = u.searchParams.get('code') || '';
+      const stM = metaOAuthConsume(u.searchParams.get('state') || '');
+      const denied = u.searchParams.get('error_reason') || u.searchParams.get('error') || '';
+      if (!code || !stM || !stM.tid) { res.writeHead(302, { Location: '/?meta=' + (denied ? 'denied' : 'error') + '#settings' }); return res.end(); }
+      try {
+        const g = `https://graph.facebook.com/${META_GRAPH_V}`;
+        const redirect = metaRedirectUri();
+        /* code → краткоживущий токен */
+        const tr = await (await fetch(`${g}/oauth/access_token?` + new URLSearchParams({ client_id: process.env.META_APP_ID, client_secret: process.env.META_APP_SECRET, redirect_uri: redirect, code }))).json();
+        if (!tr || !tr.access_token) throw new Error((tr && tr.error && tr.error.message) || 'нет токена от Meta');
+        let token = tr.access_token;
+        /* краткий → долгоживущий (~60 дней) */
+        try { const lr = await (await fetch(`${g}/oauth/access_token?` + new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: process.env.META_APP_ID, client_secret: process.env.META_APP_SECRET, fb_exchange_token: token }))).json(); if (lr && lr.access_token) token = lr.access_token; } catch (_) {}
+        /* рекламные кабинеты пользователя */
+        let accounts = [];
+        try { const ar = await (await fetch(`${g}/me/adaccounts?` + new URLSearchParams({ fields: 'id,name,currency,account_status', limit: '50', access_token: token }))).json(); accounts = ((ar && ar.data) || []).map(a => ({ id: metaads.acctId(a.id), name: String(a.name || '').slice(0, 80), currency: a.currency || '' })).filter(a => a.id); } catch (_) {}
+        await store.runInTenant(stM.tid, async () => {
+          const tdb = store.get();
+          const c = tdb.settings.metaAds = tdb.settings.metaAds || {};
+          c.token = token; c.tokenSet = true;
+          if (accounts.length) c.accounts = accounts.slice(0, 20);
+          c.enabled = true; if (!c.mode) c.mode = 'both';
+          c.connectedVia = 'facebook_login'; c.connectedAt = Date.now();
+          store.save();
+        });
+        res.writeHead(302, { Location: '/?meta=connected#settings' }); return res.end();
+      } catch (e) { console.error('[meta callback]', e.message); res.writeHead(302, { Location: '/?meta=error#settings' }); return res.end(); }
     }
     /* ---------------- Супер-админ платформы (основатель) ---------------- */
     if (p === '/auth/admin-login' && req.method === 'POST') {
