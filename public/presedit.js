@@ -409,6 +409,24 @@
       var mem = (S.brokers || []).filter(function (b) { return b.active !== false; }).slice(0, 6).map(function (b) { return { name: b.name || '', role: b.role || 'Брокер', photo: b.avatar || b.photo || '' }; });
       return { eyebrow: ov('Команда'), title: ov('Наша команда'), members: ov(mem) };
     }
+    if (fam === 'broker') {
+      /* страница брокера читает ctx.c.profile — сидируем из ВЫБРАННОГО (S.pres.brokerId) или дефолтного брокера
+         (1-в-1 с server/presentation.js brandFor). Был баг: кейса не было → страница создавалась пустой. */
+      var bid = S.pres && S.pres.brokerId;
+      var b = (bid && (S.brokers || []).filter(function (x) { return x.id === bid; })[0]) || br || {};
+      if (!b.name && (S.brokers || []).length) b = (S.brokers.filter(function (x) { return x.active !== false; })[0]) || b;
+      var ch = {};
+      if (b.phone) { ch.phone = b.phone; ch.whatsapp = String(b.phone).replace(/[^0-9]/g, ''); }
+      if (b.email) ch.email = b.email;
+      if (b.telegram) ch.telegram = b.telegram;
+      var site = ag.site || b.site; if (site) ch.site = site;
+      return { profile: ov({
+        name: b.name || '', role: b.title || b.role || 'Ваш брокер по недвижимости',
+        agency: ag.name ? (ag.name + ' REAL ESTATE').toUpperCase() : (brand.logoText || ''),
+        photo: b.photo || b.avatar || '', bio: b.bio || '', headline: 'Ваш эксперт',
+        contactHeadline: 'Связаться с брокером', points: [], channels: ch
+      }) };
+    }
     return { title: ov(FAM_LABEL[fam] || 'Блок') };
   }
   function insertBlock(fam) {
