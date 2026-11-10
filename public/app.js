@@ -312,9 +312,17 @@ function openPop(wrap, btn, pop) {
   pop.classList.add('show');
   const w = pop.offsetWidth, h = pop.offsetHeight;
   pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 12)) + 'px';
-  const below = innerHeight - r.bottom;
-  /* не влезает вниз — переворачиваем над кнопкой */
-  pop.style.top = (below > h + 14 || r.top < h + 14 ? r.bottom + 6 : r.top - h - 6) + 'px';
+  const below = innerHeight - r.bottom, above = r.top;
+  /* подбор места + анти-обрезка: если попап не влезает ни вниз, ни вверх (длинный календарь на
+     коротком экране — жалоба #871), кладём на сторону с бóльшим запасом и ограничиваем высоту со
+     скроллом, иначе нижние строки месяца уезжают за кромку экрана без возможности прокрутить. */
+  let top, avail;
+  if (below > h + 14) { top = r.bottom + 6; avail = below - 14; }          /* влезает вниз */
+  else if (above > h + 14) { top = r.top - h - 6; avail = above - 14; }    /* влезает вверх */
+  else if (below >= above) { top = r.bottom + 6; avail = below - 16; }     /* не влезает — большая сторона вниз */
+  else { avail = above - 16; top = r.top - Math.min(h, avail) - 6; }       /* ...или вверх */
+  if (h > avail) { pop.style.maxHeight = avail + 'px'; pop.style.overflowY = 'auto'; }
+  pop.style.top = top + 'px';
   pop.style.visibility = '';
   wrap.classList.add('open');
   CUR_POP = { wrap, pop };
