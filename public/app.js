@@ -6328,19 +6328,23 @@ function buildIntakeCard(l) {
     return `<div><i>${esc(labelOf(k))}</i><b>${esc(showVal(k, v))}</b></div>`;
   }).join('')}</div>` : '';
   const hasEmail = (l.contacts || []).some(c => c.kind === 'email') || !!l.email;
+  /* лид «тронут» = уже была коммуникация → карточку показываем в режиме САММАРИ (меньше шума перед брокером) */
+  const touched = !!(l.lastDir || (l.ai && l.ai.chainStep > 0) || !['new', 'touch'].includes(l.stage));
   let prefRow = '';
   if (plan) {
     const line = [plan.chLabel ? 'связаться ' + plan.chLabel : '', plan.when ? 'в ' + plan.when : ''].filter(Boolean).join(' · ');
     const tzTxt = plan.clientTzLabel ? `${plan.clientTzLabel}${plan.tzSource ? ' · ' + plan.tzSource : ''}` : '';
     const brokerTxt = plan.targetUTC && !plan.sameTz ? `<div class="lc-ik-when">${ic(I.clock)}У вас это <b>${esc(plan.brokerLocal)}</b>${tzTxt ? ` <span>(клиент ${esc(tzTxt)})</span>` : ''}</div>`
       : plan.targetUTC ? `<div class="lc-ik-when">${ic(I.clock)}Время <b>${esc(plan.brokerLocal)}</b>${tzTxt ? ` <span>(${esc(tzTxt)})</span>` : ''}</div>`
-      : (tzTxt ? `<div class="lc-ik-when muted">${ic(I.clock)}Пояс клиента: ${esc(tzTxt)} — точное время не распознано</div>` : '');
+      : (tzTxt && !touched ? `<div class="lc-ik-when muted">${ic(I.clock)}Пояс клиента: ${esc(tzTxt)} — точное время не распознано</div>` : '');
     const isCall = plan.channel === 'call' || !plan.channel;
     const acts = [];
     if (plan.channel === 'email' && hasEmail) acts.push(`<button class="btn btn-sm" data-cprefemail>${ic(I.doc)}E-mail</button>`);
     acts.push(`<button class="btn btn-sm ${isCall ? 'btn-accent' : ''}" data-plancall title="Напоминание брокеру подготовиться и позвонить в это время">${ic(I.phone)}Напомнить о звонке</button>`);
     acts.push(`<button class="btn btn-sm ${isCall ? '' : 'btn-accent'}" data-planmsg title="Запланировать отправку сообщения в это время — уйдёт автоматически">${ic(I.send)}Отложить сообщение</button>`);
-    prefRow = `<div class="lc-ik-pref"><div class="lc-ik-pref-hd">${ic(I.spark)}<b>Просьба клиента${line ? ': ' + esc(line) : ' по времени/каналу'}</b></div><i class="lc-ik-pref-q">«${esc(plan.raw.slice(0, 140))}»</i>${brokerTxt}<div class="lc-ik-pref-acts">${acts.join('')}</div></div>`;
+    /* тронутый лид → без дословной цитаты формы (шум для брокера в диалоге): только суть + время + действия */
+    const qLine = touched ? '' : `<i class="lc-ik-pref-q">«${esc(plan.raw.slice(0, 140))}»</i>`;
+    prefRow = `<div class="lc-ik-pref${touched ? ' compact' : ''}"><div class="lc-ik-pref-hd">${ic(I.spark)}<b>Просьба клиента${line ? ': ' + esc(line) : ' по времени/каналу'}</b></div>${qLine}${brokerTxt}<div class="lc-ik-pref-acts">${acts.join('')}</div></div>`;
   }
   const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
   const leadIdLine = metaLeadId ? `<div class="lc-ik-leadid" title="ID заявки из лид-формы Meta — для сверки с рекламным кабинетом, поддержки и Conversions API"><span>Lead ID</span><code data-copy="${esc(metaLeadId)}">${esc(metaLeadId)}</code></div>` : '';
@@ -6350,7 +6354,6 @@ function buildIntakeCard(l) {
   const detailHtml = `${adBlock}${crea}${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}${leadIdLine}`;
   const hasDetail = !!(adBlock || crea || qa || leadIdLine);
   const ikKey = 'ikOpen_' + l.id;
-  const touched = !!(l.lastDir || (l.ai && l.ai.chainStep > 0) || !['new', 'touch'].includes(l.stage));
   const collapsed = hasDetail && (PAGE_STATE[ikKey] !== undefined ? !PAGE_STATE[ikKey] : touched);
   const collapseBtn = hasDetail ? `<button type="button" class="lc-ik-collapse" data-ik-toggle="${esc(l.id)}" aria-label="Свернуть/развернуть детали заявки" title="Свернуть/развернуть источник и детали заявки">${ic(I.chev)}</button>` : '';
   const summary = hasDetail ? `<button type="button" class="lc-ik-summary" data-ik-toggle="${esc(l.id)}" title="Показать источник и детали заявки">${ic(I.target)}<span>${esc(adPathLine(l) || 'Источник и детали заявки')}</span></button>` : '';
