@@ -102,17 +102,33 @@
   function restore(str) { var o = JSON.parse(str); S.pres.orderedSections = o.o; S.pres.theme = o.t; S.pres.defaultFormat = o.f; S.pres.brokerAppendix = o.a; if ('i' in o) S.pres.projectIds = o.i; if ('ca' in o) S.pres.collectionAssets = o.ca; if ('ro' in o) S.pres.reusedObjectPres = o.ro; if ('cn' in o) S.pres.clientName = o.cn; if ('sc' in o) S.pres.showClientName = o.sc; if ('b' in o) S.pres.brokerId = o.b; }
   function mutate(fn, opts) { pushUndo(); fn(); scheduleSave(); if (!opts || opts.render !== false) render(); revalidate(); }
   /* переупорядочивание страниц (drag в навигаторе): сдвигаем секцию from→to (до/после), селект следует */
+  /* страницы одного объекта (o<k>_*) обязаны идти подряд — иначе в PDF объект A влезет внутрь объекта B.
+     Проверяем, что каждый префикс образует непрерывный отрезок (для плоских презентаций префиксов нет → всегда true). */
+  function collGroupsContiguous(arr) {
+    var seen = {};
+    for (var i = 0; i < arr.length; i++) {
+      var m = String(arr[i].id || '').match(/^o(\d+)_/); if (!m) continue;
+      var k = m[1]; if (seen[k] == null) seen[k] = { min: i, max: i, n: 1 }; else { seen[k].max = i; seen[k].n++; }
+    }
+    for (var k2 in seen) { if (seen[k2].max - seen[k2].min + 1 !== seen[k2].n) return false; }
+    return true;
+  }
   function reorderPages(from, to, after) {
     if (from == null || from === to && !after) return;
+    var arr = sections();
+    if (from < 0 || from >= arr.length) return;
+    var insertAt = to + (after ? 1 : 0);
+    if (from < insertAt) insertAt--;
+    insertAt = Math.max(0, Math.min(arr.length - 1, insertAt));
+    /* симулируем перестановку и валидируем контигуозность объектов ДО mutate (без лишней записи в undo) */
+    var cand = arr.slice(); var mv = cand.splice(from, 1)[0]; cand.splice(insertAt, 0, mv);
+    if (S.isColl && !collGroupsContiguous(cand)) {
+      toast('Так переместить нельзя', 'Страница объекта должна оставаться внутри своего объекта. Чтобы изменить порядок объектов — перетащите объект целиком за его заголовок.', true);
+      return;
+    }
     mutate(function () {
-      var arr = sections();
-      if (from < 0 || from >= arr.length) return;
-      var insertAt = to + (after ? 1 : 0);
-      var moved = arr.splice(from, 1)[0];
-      if (from < insertAt) insertAt--;
-      insertAt = Math.max(0, Math.min(arr.length, insertAt));
-      arr.splice(insertAt, 0, moved);
-      S.pageIdx = Math.max(0, Math.min(arr.length - 1, insertAt));
+      var a = sections(); var m2 = a.splice(from, 1)[0]; a.splice(insertAt, 0, m2);
+      S.pageIdx = Math.max(0, Math.min(a.length - 1, insertAt));
     });
   }
   /* DnD в структуре подборки: перетащить ВЕСЬ объект (блок его страниц o<k>_*) на место другого объекта.
