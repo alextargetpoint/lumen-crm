@@ -7645,13 +7645,15 @@ const server = http.createServer(async (req, res) => {
       if (!role || role.role !== 'owner') { res.writeHead(302, { Location: '/?meta=auth#settings' }); return res.end(); }  /* подключает только владелец */
       if (!metaOAuthReady()) { res.writeHead(302, { Location: '/?meta=noapp#settings' }); return res.end(); }
       const nonce = metaOAuthMakeState(store.currentTid());
-      const params = new URLSearchParams({
-        client_id: process.env.META_APP_ID,
-        redirect_uri: metaRedirectUri(),
-        state: nonce,
-        response_type: 'code',
-        scope: META_SCOPES,
-      });
+      /* ⚠️ Facebook Login for Business ТРЕБУЕТ config_id: классический scope= в диалоге игнорируется, и FB
+         выдаёт только public_profile (экран согласия «получит имя и фото», без ads_read/pages_*). Поэтому если
+         задан META_LOGIN_CONFIG_ID — используем config_id (права берутся из конфигурации FB Login for Business).
+         Фолбэк на scope= оставлен для классического Facebook Login (если приложение переведут). */
+      const cfgId = process.env.META_LOGIN_CONFIG_ID || '';
+      const base = { client_id: process.env.META_APP_ID, redirect_uri: metaRedirectUri(), state: nonce, response_type: 'code' };
+      const params = new URLSearchParams(cfgId
+        ? Object.assign(base, { config_id: cfgId, override_default_response_type: 'true' })
+        : Object.assign(base, { scope: META_SCOPES }));
       res.writeHead(302, { Location: `https://www.facebook.com/${META_GRAPH_V}/dialog/oauth?${params.toString()}` });
       return res.end();
     }
