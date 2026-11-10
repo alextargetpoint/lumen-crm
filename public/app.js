@@ -19997,25 +19997,84 @@ function tplListHtml(list) {
 /* ---------------- РОЛИ И ДОСТУПЫ (отдельная подстраница Настроек) ---------------- */
 /* ── КАРТА ДОСТУПОВ: живая mind-карта команды (Агентство → роли → люди), тумблеры разделов прямо на узлах,
    перетаскивание узлов (мудборд, позиции в localStorage). Пишет в те же эндпоинты, что и список. ── */
-function rbacMapSecsHtml(b) {
-  const rt = b.roleType || 'broker'; const defHide = roleTplHide(rt);
-  const ind = b.hidePages || [], shw = b.showPages || [];
+const RMAP_EMOJI = ['🏢', '💼', '📣', '🎯', '🛟', '💰', '🧭', '🤝', '📊', '🎓', '⚙️', '🌍', '🏗️', '🔑', '📞', '🧩', '🚀', '🛡️'];
+const RMAP_COLORS = ['#2563EB', '#2FA98C', '#8B7BD8', '#E0912F', '#C0556B', '#4F7DFF', '#1E7A64', '#7C5CFF'];
+function rmapDepts() { return (STATE.settings && STATE.settings.departments) || []; }
+function rmapExpanded(id) { return !!(PAGE_STATE.rmapExp && PAGE_STATE.rmapExp[id]); }
+/* компактная сводка доступа: плотность (20 сегментов) + N/M — сворачивает все чипы, раскрытие по клику (не занимает место) */
+function rmapAccessBlock(nodeId, isVis, chipsHtml) {
+  const shown = RBAC_SECTIONS.filter(isVis).length, total = RBAC_SECTIONS.length, exp = rmapExpanded(nodeId);
+  const bar = RBAC_SECTIONS.map(s => `<i class="${isVis(s) ? 'on' : ''}"></i>`).join('');
+  return `<button type="button" class="rmap-acc${exp ? ' open' : ''}" data-accexp title="Доступ к разделам — клик, чтобы раскрыть"><span class="rmap-acc-bar">${bar}</span><span class="rmap-acc-n">${shown}/${total}</span><span class="rmap-acc-chev">${ic(I.chev)}</span></button><div class="rmap-secs"${exp ? '' : ' hidden'}>${chipsHtml}</div>`;
+}
+function rbacMapPersonAccess(b, nodeId) {
+  const rt = b.roleType || 'broker', defHide = roleTplHide(rt), ind = b.hidePages || [], shw = b.showPages || [];
   const isVis = (s) => !((defHide.includes(s) || ind.includes(s)) && !shw.includes(s));
-  return RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const vis = isVis(s); const granted = byRole && shw.includes(s); return `<button class="rmap-sec ${vis ? 'on' : 'off'}${byRole ? ' byrole' : ''}${granted ? ' granted' : ''}" data-sec="${s}" title="${esc((NAV[s] || {}).name || s)}${byRole ? ' · закрыт ролью' : ''}">${esc((NAV[s] || {}).name || s)}</button>`; }).join('');
+  const chips = RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s), vis = isVis(s), granted = byRole && shw.includes(s); return `<button class="rmap-sec ${vis ? 'on' : 'off'}${byRole ? ' byrole' : ''}${granted ? ' granted' : ''}" data-sec="${s}" title="${esc((NAV[s] || {}).name || s)}${byRole ? ' · закрыт ролью' : ''}">${esc((NAV[s] || {}).name || s)}</button>`; }).join('');
+  return rmapAccessBlock(nodeId, isVis, chips);
+}
+function rbacMapRoleAccess(role, nodeId) {
+  const defHide = roleTplHide(role); const isVis = (s) => !defHide.includes(s);
+  const chips = RBAC_SECTIONS.map(s => `<button class="rmap-sec ${defHide.includes(s) ? 'off' : 'on'}" data-tplsec="${s}" data-role="${role}" title="${esc((NAV[s] || {}).name || s)}">${esc((NAV[s] || {}).name || s)}</button>`).join('');
+  return rmapAccessBlock(nodeId, isVis, chips);
 }
 function rbacMapHtml() {
   const members = STATE.brokers || [];
-  const order = ['manager', 'analyst', 'marketer', 'assistant', 'broker'];
+  const group = PAGE_STATE.rmapGroup || 'role';
   const inits = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const agencyNm = (STATE.settings.agency && STATE.settings.agency.name) || 'Агентство';
+  const depts = rmapDepts();
+  const personNode = (b, pgroup) => {
+    const nodeId = 'p:' + b.id;
+    const deptSel = group === 'dept' ? `<select class="rmap-deptSel sh-sel" title="Отдел сотрудника">${['<option value="">— без отдела</option>'].concat(depts.map(d => `<option value="${d.id}" ${b.departmentId === d.id ? 'selected' : ''}>${esc(d.icon)} ${esc(d.name)}</option>`)).join('')}</select>` : '';
+    return `<div class="rmap-node rmap-person" data-rmid="${nodeId}" data-pid="${b.id}" data-pgroup="${pgroup}"><div class="rmap-p-hd"><span class="rmap-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><div class="rmap-p-id"><b>${esc(b.name || 'Сотрудник')}</b><select class="rmap-roleSel sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === (b.roleType || 'broker') ? 'selected' : ''}>${n}</option>`).join('')}</select></div><button class="rmap-del btn-ghost" title="Убрать сотрудника">${ic(I.x)}</button></div>${deptSel}${rbacMapPersonAccess(b, nodeId)}</div>`;
+  };
   let nodes = `<div class="rmap-node rmap-agency" data-rmid="agency"><div class="rmap-logo">${ic(I.users)}</div><div class="rmap-ag-nm"><b>${esc(agencyNm)}</b><i>${members.length} чел · владелец видит всё</i></div></div>`;
-  for (const role of order) {
-    const ms = members.filter(b => (b.roleType || 'broker') === role); if (!ms.length) continue;
-    const defHide = roleTplHide(role); const openN = RBAC_SECTIONS.filter(s => !defHide.includes(s)).length;
-    nodes += `<div class="rmap-node rmap-role" data-rmid="role:${role}" data-role="${role}"><div class="rmap-role-hd"><b>${RBAC_ROLES[role]}</b><span>${ms.length}</span></div><i class="rmap-role-sub">шаблон роли · ${openN}/${RBAC_SECTIONS.length} разделов</i><div class="rmap-secs rmap-tplsecs">${RBAC_SECTIONS.map(s => `<button class="rmap-sec ${defHide.includes(s) ? 'off' : 'on'}" data-tplsec="${s}" data-role="${role}" title="${esc((NAV[s] || {}).name || s)}">${esc((NAV[s] || {}).name || s)}</button>`).join('')}</div></div>`;
-    for (const b of ms) nodes += `<div class="rmap-node rmap-person" data-rmid="p:${b.id}" data-pid="${b.id}" data-role="${role}"><div class="rmap-p-hd"><span class="rmap-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><div class="rmap-p-id"><b>${esc(b.name || 'Сотрудник')}</b><select class="rmap-roleSel sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === (b.roleType || 'broker') ? 'selected' : ''}>${n}</option>`).join('')}</select></div><button class="rmap-del btn-ghost" title="Убрать сотрудника">${ic(I.x)}</button></div><div class="rmap-secs">${rbacMapSecsHtml(b)}</div></div>`;
+  if (group === 'role') {
+    const order = ['manager', 'analyst', 'marketer', 'assistant', 'broker'];
+    for (const role of order) {
+      const ms = members.filter(b => (b.roleType || 'broker') === role); if (!ms.length) continue;
+      const gid = 'role:' + role, openN = RBAC_SECTIONS.filter(s => !roleTplHide(role).includes(s)).length;
+      nodes += `<div class="rmap-node rmap-group rmap-role" data-rmid="${gid}" data-role="${role}"><div class="rmap-role-hd"><span class="rmap-role-ic">${ic(I.users)}</span><b>${RBAC_ROLES[role]}</b><span class="rmap-cnt">${ms.length}</span></div><i class="rmap-role-sub">шаблон роли · ${openN}/${RBAC_SECTIONS.length} открыто</i>${rbacMapRoleAccess(role, gid)}</div>`;
+      for (const b of ms) nodes += personNode(b, gid);
+    }
+  } else {
+    for (const d of depts) {
+      const gid = 'dept:' + d.id, ms = members.filter(b => b.departmentId === d.id);
+      nodes += `<div class="rmap-node rmap-group rmap-dept" data-rmid="${gid}" data-deptid="${d.id}" style="--dept:${esc(d.color || '#2563EB')}"><div class="rmap-dept-hd"><span class="rmap-dept-emoji">${esc(d.icon || '🏢')}</span><b class="rmap-dept-nm">${esc(d.name)}</b><span class="rmap-cnt">${ms.length}</span><button class="rmap-dept-menu btn-ghost" data-deptedit="${d.id}" title="Отдел: переименовать · иконка · цвет · удалить">${ic(I.gear)}</button></div></div>`;
+      for (const b of ms) nodes += personNode(b, gid);
+    }
+    const unassigned = members.filter(b => !b.departmentId || !depts.some(d => d.id === b.departmentId));
+    nodes += `<div class="rmap-node rmap-group rmap-dept rmap-dept-none" data-rmid="dept:__none" data-deptid="__none" style="--dept:#8b8983"><div class="rmap-dept-hd"><span class="rmap-dept-emoji">👥</span><b class="rmap-dept-nm">Без отдела</b><span class="rmap-cnt">${unassigned.length}</span></div><i class="rmap-dept-hint">перетащи сюда или выбери отдел в карточке</i></div>`;
+    for (const b of unassigned) nodes += personNode(b, 'dept:__none');
   }
-  return `<div class="rmap-wrap"><div class="rmap-hint">${ic(I.spark)}<span>Живая карта: тяни узлы, кликай разделы — открыть/скрыть. Узел роли меняет шаблон роли, узел человека — лично. Пунктир = закрыто ролью, можно открыть кликом.</span><button class="btn btn-sm rmap-reset" data-rmapreset>${ic(I.refresh || I.x)}Сбросить расположение</button></div><div class="rmap-canvas" id="rmapCanvas"><svg class="rmap-links" id="rmapLinks"></svg>${nodes}</div></div>`;
+  const groupBar = `<div class="rmap-groupbar"><span class="rmap-gl">Группировать:</span><div class="seg-toggle"><button class="seg-btn ${group === 'role' ? 'on' : ''}" data-rmapgroup="role">${ic(I.users)}Роли</button><button class="seg-btn ${group === 'dept' ? 'on' : ''}" data-rmapgroup="dept">${ic(I.layers)}Отделы</button></div>${group === 'dept' ? `<button class="btn btn-sm btn-accent" data-deptadd>${ic(I.plus)}Отдел</button>` : ''}</div>`;
+  return `<div class="rmap-wrap"><div class="rmap-hint">${ic(I.spark)}<span>Живая карта: тяни узлы, кликай сводку доступа — раскрыть разделы. Узел роли = шаблон роли, узел человека = лично.${group === 'dept' ? ' Перетащи человека на отдел — назначить.' : ''}</span><button class="btn btn-sm rmap-reset" data-rmapreset>${ic(I.refresh || I.x)}Сброс</button></div>${groupBar}<div class="rmap-canvas" id="rmapCanvas"><svg class="rmap-links" id="rmapLinks"></svg>${nodes}</div></div>`;
+}
+/* модалка создания/редактирования отдела: имя + эмодзи-иконка + цвет (+ удалить) */
+function rmapDeptModal(deptId) {
+  const depts = rmapDepts(), d = deptId ? depts.find(x => x.id === deptId) : null;
+  const picked = { icon: (d && d.icon) || RMAP_EMOJI[0], color: (d && d.color) || RMAP_COLORS[0] };
+  const body = `<div class="dept-ed">
+    <label class="lc-lbl">Название отдела</label>
+    <input id="deptNm" class="lc-inp" value="${esc((d && d.name) || '')}" placeholder="Напр. Продажи, Маркетинг, Поддержка" maxlength="40">
+    <label class="lc-lbl" style="margin-top:12px">Иконка</label>
+    <div class="dept-emoji-grid" id="deptEmoji">${RMAP_EMOJI.map(em => `<button type="button" class="dept-em ${em === picked.icon ? 'on' : ''}" data-em="${em}">${em}</button>`).join('')}</div>
+    <label class="lc-lbl" style="margin-top:12px">Цвет</label>
+    <div class="dept-color-grid" id="deptColor">${RMAP_COLORS.map(c => `<button type="button" class="dept-col ${c === picked.color ? 'on' : ''}" data-col="${c}" style="background:${c}"></button>`).join('')}</div>
+  </div>`;
+  const actions = [];
+  if (d) actions.push({ label: 'Удалить отдел', cls: 'btn-danger', onClick: async () => { const arr = depts.filter(x => x.id !== d.id); try { await api.patch('/settings', { departments: arr }); STATE.settings.departments = arr; toast('Отдел удалён', 'сотрудники стали «без отдела»', true); render(); } catch (e) { toast('Не вышло', e.message); return false; } } });
+  actions.push({ label: d ? 'Сохранить' : 'Создать', cls: 'btn-accent', onClick: async () => {
+    const nm = (document.getElementById('deptNm').value || '').trim(); if (!nm) { toast('Впиши название', null, false); return false; }
+    const arr = d ? depts.map(x => x.id === d.id ? Object.assign({}, x, { name: nm, icon: picked.icon, color: picked.color }) : x) : [...depts, { id: 'dp_' + Math.random().toString(36).slice(2, 8), name: nm, icon: picked.icon, color: picked.color }];
+    try { await api.patch('/settings', { departments: arr }); STATE.settings.departments = arr; toast(d ? 'Отдел обновлён' : 'Отдел создан', null, true); render(); } catch (e) { toast('Не вышло', e.message); return false; }
+  } });
+  modal({ title: d ? 'Отдел' : 'Новый отдел', body, actions });
+  setTimeout(() => {
+    document.querySelectorAll('#deptEmoji .dept-em').forEach(b => b.addEventListener('click', () => { picked.icon = b.dataset.em; document.querySelectorAll('#deptEmoji .dept-em').forEach(x => x.classList.toggle('on', x === b)); }));
+    document.querySelectorAll('#deptColor .dept-col').forEach(b => b.addEventListener('click', () => { picked.color = b.dataset.col; document.querySelectorAll('#deptColor .dept-col').forEach(x => x.classList.toggle('on', x === b)); }));
+  }, 30);
 }
 function wireRbacMap(root) {
   const canvas = $('#rmapCanvas', root); if (!canvas) return;
@@ -20023,69 +20082,92 @@ function wireRbacMap(root) {
   let saved = {}; try { saved = JSON.parse(localStorage.getItem('lumenRmapPos') || '{}'); } catch (_) {}
   const all = [...canvas.querySelectorAll('.rmap-node')];
   const agency = canvas.querySelector('[data-rmid="agency"]');
-  const roleNodes = all.filter(n => n.dataset.rmid.startsWith('role:'));
+  const groupNodes = all.filter(n => n.classList.contains('rmap-group'));
+  const peopleOf = (gn) => all.filter(n => n.classList.contains('rmap-person') && n.dataset.pgroup === gn.dataset.rmid);
   const col1 = 24, col2 = 300, col3 = 650, gap = 16;
-  /* авто-layout по колонкам (роль центрируется против своих людей) */
   all.forEach(n => { n.style.position = 'absolute'; });
   agency.style.left = col1 + 'px';
   let y = 18, mids = [];
-  roleNodes.forEach(rn => {
-    const role = rn.dataset.role; rn.style.left = col2 + 'px';
-    const people = all.filter(n => n.dataset.rmid.startsWith('p:') && n.dataset.role === role);
+  groupNodes.forEach(gn => {
+    gn.style.left = col2 + 'px';
+    const people = peopleOf(gn);
     let py = y; people.forEach(pn => { pn.style.left = col3 + 'px'; pn.style.top = py + 'px'; py += pn.offsetHeight + gap; });
-    const blockH = people.length ? (py - y - gap) : rn.offsetHeight;
-    rn.style.top = Math.round(y + blockH / 2 - rn.offsetHeight / 2) + 'px';
+    const blockH = people.length ? (py - y - gap) : gn.offsetHeight;
+    gn.style.top = Math.round(y + blockH / 2 - gn.offsetHeight / 2) + 'px';
     mids.push(y + blockH / 2);
-    y += Math.max(blockH, rn.offsetHeight) + gap * 1.8;
+    y += Math.max(blockH, gn.offsetHeight) + gap * 1.8;
   });
   agency.style.top = Math.round(mids.length ? (mids[0] + mids[mids.length - 1]) / 2 - agency.offsetHeight / 2 : 18) + 'px';
-  /* сохранённые (перетащенные) позиции поверх авто-layout */
   all.forEach(n => { const s = saved[n.dataset.rmid]; if (s) { n.style.left = s.x + 'px'; n.style.top = s.y + 'px'; } });
   const aR = n => ({ x: n.offsetLeft + n.offsetWidth, y: n.offsetTop + n.offsetHeight / 2 });
   const aL = n => ({ x: n.offsetLeft, y: n.offsetTop + n.offsetHeight / 2 });
   function draw() {
     const links = [];
-    roleNodes.forEach(rn => { links.push([agency, rn]); const role = rn.dataset.role; all.filter(n => n.dataset.rmid.startsWith('p:') && n.dataset.role === role).forEach(pn => links.push([rn, pn])); });
+    groupNodes.forEach(gn => { links.push([agency, gn]); peopleOf(gn).forEach(pn => links.push([gn, pn])); });
     let w = 0, h = 0; all.forEach(n => { w = Math.max(w, n.offsetLeft + n.offsetWidth); h = Math.max(h, n.offsetTop + n.offsetHeight); });
     svg.style.width = (w + 40) + 'px'; svg.style.height = (h + 40) + 'px';
     svg.innerHTML = links.map(([a, b]) => { const p1 = aR(a), p2 = aL(b); const dx = Math.max(32, (p2.x - p1.x) / 2); return `<path d="M${p1.x} ${p1.y} C${p1.x + dx} ${p1.y} ${p2.x - dx} ${p2.y} ${p2.x} ${p2.y}" class="rmap-link"/>`; }).join('');
     canvas.style.minHeight = (h + 40) + 'px';
   }
   draw();
-  /* перетаскивание узлов (мудборд) */
+  /* раскрыть/свернуть сводку доступа (без ре-рендера; высота узла меняется → перерисовываем связи) */
+  canvas.querySelectorAll('[data-accexp]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation(); const node = btn.closest('.rmap-node'); const secs = node.querySelector('.rmap-secs'); if (!secs) return;
+    const open = secs.hasAttribute('hidden'); if (open) secs.removeAttribute('hidden'); else secs.setAttribute('hidden', '');
+    btn.classList.toggle('open', open);
+    PAGE_STATE.rmapExp = PAGE_STATE.rmapExp || {}; PAGE_STATE.rmapExp[node.dataset.rmid] = open;
+    draw();
+  }));
+  /* перетаскивание узлов + (режим отделов) назначение на отдел по дропу */
+  const deptMode = (PAGE_STATE.rmapGroup || 'role') === 'dept';
+  const deptNodeAt = (x, y2) => groupNodes.find(gn => { if (!gn.classList.contains('rmap-dept')) return false; const r = gn.getBoundingClientRect(); return x >= r.left && x <= r.right && y2 >= r.top && y2 <= r.bottom; });
   let drag = null;
   all.forEach(n => {
     n.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button, select, .rmap-sec')) return;
-      e.preventDefault(); drag = { n, sx: e.clientX, sy: e.clientY, ox: n.offsetLeft, oy: n.offsetTop };
+      if (e.target.closest('button, select, .rmap-sec, [contenteditable]')) return;
+      e.preventDefault(); drag = { n, sx: e.clientX, sy: e.clientY, ox: n.offsetLeft, oy: n.offsetTop, person: n.classList.contains('rmap-person') };
       n.classList.add('dragging'); try { n.setPointerCapture(e.pointerId); } catch (_) {}
     });
   });
-  canvas.addEventListener('pointermove', (e) => { if (!drag) return; drag.n.style.left = Math.max(0, drag.ox + (e.clientX - drag.sx)) + 'px'; drag.n.style.top = Math.max(0, drag.oy + (e.clientY - drag.sy)) + 'px'; draw(); });
-  const endDrag = () => { if (!drag) return; saved[drag.n.dataset.rmid] = { x: drag.n.offsetLeft, y: drag.n.offsetTop }; try { localStorage.setItem('lumenRmapPos', JSON.stringify(saved)); } catch (_) {} drag.n.classList.remove('dragging'); drag = null; };
-  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    drag.n.style.left = Math.max(0, drag.ox + (e.clientX - drag.sx)) + 'px'; drag.n.style.top = Math.max(0, drag.oy + (e.clientY - drag.sy)) + 'px'; draw();
+    if (deptMode && drag.person) { const t = deptNodeAt(e.clientX, e.clientY); groupNodes.forEach(g => g.classList.toggle('droptarget', g === t)); }
+  });
+  const endDrag = async (e) => {
+    if (!drag) return; const d = drag; drag = null; d.n.classList.remove('dragging'); groupNodes.forEach(g => g.classList.remove('droptarget'));
+    let assigned = false;
+    if (deptMode && d.person && e) { const t = deptNodeAt(e.clientX, e.clientY); if (t) { const did = t.dataset.deptid === '__none' ? '' : t.dataset.deptid; const pid = d.n.dataset.pid; const b = (STATE.brokers || []).find(x => x.id === pid); if (b && (b.departmentId || '') !== did) { assigned = true; try { await api.patch('/brokers/' + pid, { departmentId: did || null }); b.departmentId = did || null; toast('Отдел назначен', null, true); render(); } catch (err) { toast('Не вышло', err.message); } } } }
+    if (!assigned) { saved[d.n.dataset.rmid] = { x: d.n.offsetLeft, y: d.n.offsetTop }; try { localStorage.setItem('lumenRmapPos', JSON.stringify(saved)); } catch (_) {} }
+  };
+  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', () => endDrag());
   $('[data-rmapreset]', root)?.addEventListener('click', () => { try { localStorage.removeItem('lumenRmapPos'); } catch (_) {} render(); });
-  /* смена роли у человека */
+  $$('[data-rmapgroup]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.rmapGroup = b.dataset.rmapgroup; render(); }));
+  $('[data-deptadd]', root)?.addEventListener('click', () => rmapDeptModal(null));
+  canvas.querySelectorAll('[data-deptedit]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); rmapDeptModal(btn.dataset.deptedit); }));
+  /* смена роли / отдела у человека */
   canvas.querySelectorAll('.rmap-roleSel').forEach(sel => sel.addEventListener('change', async (e) => { e.stopPropagation(); const pid = sel.closest('.rmap-person').dataset.pid; try { await api.patch('/brokers/' + pid, { roleType: sel.value }); toast('Роль обновлена', RBAC_ROLES[sel.value] || '', true); await loadState(); render(); } catch (err) { toast('Не вышло', err.message); } }));
+  canvas.querySelectorAll('.rmap-deptSel').forEach(sel => sel.addEventListener('change', async (e) => { e.stopPropagation(); const pid = sel.closest('.rmap-person').dataset.pid; const b = (STATE.brokers || []).find(x => x.id === pid); try { await api.patch('/brokers/' + pid, { departmentId: sel.value || null }); if (b) b.departmentId = sel.value || null; render(); } catch (err) { toast('Не вышло', err.message); } }));
   /* удалить человека */
   canvas.querySelectorAll('.rmap-del').forEach(btn => btn.addEventListener('click', async (e) => { e.stopPropagation(); const pid = btn.closest('.rmap-person').dataset.pid; if (!await uiConfirm('Убрать сотрудника из системы?', 'Доступ к CRM для него закроется.', { ok: 'Убрать', danger: true })) return; try { const r = await fetch('/api/brokers/' + pid, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } }));
-  /* тумблер раздела у ЧЕЛОВЕКА (персонально, через hide/show сверх роли) */
+  const updDensity = (node, s, nowVis) => { const idx = RBAC_SECTIONS.indexOf(s); const bar = node.querySelector('.rmap-acc-bar'); if (bar && bar.children[idx]) bar.children[idx].classList.toggle('on', nowVis); const nEl = node.querySelector('.rmap-acc-n'); if (nEl) nEl.textContent = node.querySelectorAll('.rmap-acc-bar i.on').length + '/' + RBAC_SECTIONS.length; };
+  /* тумблер раздела у ЧЕЛОВЕКА (персонально) */
   canvas.querySelectorAll('.rmap-person .rmap-sec').forEach(chip => chip.addEventListener('click', async (e) => {
-    e.stopPropagation(); const pid = chip.closest('.rmap-person').dataset.pid; const b = (STATE.brokers || []).find(x => x.id === pid); if (!b) return;
+    e.stopPropagation(); const node = chip.closest('.rmap-person'), pid = node.dataset.pid, b = (STATE.brokers || []).find(x => x.id === pid); if (!b) return;
     const s = chip.dataset.sec, defHide = roleTplHide(b.roleType || 'broker');
     const hide = new Set(b.hidePages || []), show = new Set(b.showPages || []), byRole = defHide.includes(s);
     const curVis = !((byRole || hide.has(s)) && !show.has(s));
     if (curVis) { if (show.has(s)) show.delete(s); if (!byRole) hide.add(s); } else { if (byRole) show.add(s); else hide.delete(s); }
     const hArr = [...hide], sArr = [...show], nowVis = !((byRole || hArr.includes(s)) && !sArr.includes(s));
-    chip.classList.toggle('on', nowVis); chip.classList.toggle('off', !nowVis); chip.classList.toggle('granted', byRole && sArr.includes(s));
+    chip.classList.toggle('on', nowVis); chip.classList.toggle('off', !nowVis); chip.classList.toggle('granted', byRole && sArr.includes(s)); updDensity(node, s, nowVis);
     try { await api.patch('/brokers/' + pid, { hidePages: hArr, showPages: sArr }); b.hidePages = hArr; b.showPages = sArr; } catch (err) { toast('Не вышло', err.message); chip.classList.toggle('on', curVis); chip.classList.toggle('off', !curVis); }
   }));
-  /* тумблер раздела у РОЛИ (шаблон роли → наследуют новые сотрудники) */
-  canvas.querySelectorAll('.rmap-tplsecs .rmap-sec').forEach(chip => chip.addEventListener('click', async (e) => {
-    e.stopPropagation(); const rt = chip.dataset.role, s = chip.dataset.tplsec;
-    const hide = new Set(roleTplHide(rt)); if (hide.has(s)) hide.delete(s); else hide.add(s); const arr = [...hide];
-    chip.classList.toggle('off'); chip.classList.toggle('on');
-    try { await api.patch('/settings', { roleTemplates: { [rt]: { hidePages: arr } } }); STATE.settings.roleTemplates = STATE.settings.roleTemplates || {}; STATE.settings.roleTemplates[rt] = { hidePages: arr }; } catch (err) { toast('Не вышло', err.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
+  /* тумблер раздела у РОЛИ (шаблон роли) */
+  canvas.querySelectorAll('.rmap-role .rmap-sec').forEach(chip => chip.addEventListener('click', async (e) => {
+    e.stopPropagation(); const node = chip.closest('.rmap-role'), rt = chip.dataset.role, s = chip.dataset.tplsec;
+    const hide = new Set(roleTplHide(rt)); if (hide.has(s)) hide.delete(s); else hide.add(s); const arr = [...hide], nowVis = !arr.includes(s);
+    chip.classList.toggle('off', !nowVis); chip.classList.toggle('on', nowVis); updDensity(node, s, nowVis);
+    try { await api.patch('/settings', { roleTemplates: { [rt]: { hidePages: arr } } }); STATE.settings.roleTemplates = STATE.settings.roleTemplates || {}; STATE.settings.roleTemplates[rt] = { hidePages: arr }; } catch (err) { toast('Не вышло', err.message); chip.classList.toggle('off', nowVis); chip.classList.toggle('on', !nowVis); }
   }));
 }
 PAGES.roles = async (root) => {

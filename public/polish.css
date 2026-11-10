@@ -1102,3 +1102,47 @@ input[type=number] { -moz-appearance: textfield; }
 .rmap-sec.off{opacity:.5}
 .rmap-sec.byrole{border-style:dashed}
 .rmap-sec.granted{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 34%,var(--stroke));color:var(--accent);border-style:solid}
+
+/* ── Карта доступов v2: компактные узлы + отделы ── */
+.rmap-secs[hidden]{display:none}
+.rmap-groupbar{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+.rmap-groupbar .rmap-gl{font-size:12px;color:var(--muted)}
+.rmap-groupbar .seg-toggle{flex:none}
+.rmap-groupbar [data-deptadd]{margin-left:auto}
+/* сводка доступа (плотность + N/M), сворачивает чипы */
+.rmap-acc{display:flex;align-items:center;gap:8px;width:100%;margin-top:9px;padding:6px 8px;border:1px solid var(--stroke);border-radius:9px;background:var(--bg-2);cursor:pointer;transition:border-color .12s,background .12s}
+.rmap-acc:hover{border-color:color-mix(in srgb,var(--accent) 30%,var(--stroke))}
+.rmap-acc-bar{display:flex;gap:1.5px;flex:1;min-width:0;height:14px;align-items:center}
+.rmap-acc-bar i{flex:1;height:100%;border-radius:1.5px;background:color-mix(in srgb,var(--ink-3,#999) 22%,transparent)}
+.rmap-acc-bar i.on{background:#2FA98C}
+.rmap-acc-n{flex:none;font-size:11px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.rmap-acc-chev{flex:none;display:grid;place-items:center;color:var(--muted);transition:transform .15s}
+.rmap-acc-chev svg{width:13px;height:13px}
+.rmap-acc.open .rmap-acc-chev{transform:rotate(180deg)}
+/* общий узел-группа (роль/отдел) */
+.rmap-cnt{font-size:11px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border-radius:20px;padding:1px 7px;font-weight:600;margin-left:auto}
+.rmap-role-ic{display:grid;place-items:center;color:var(--accent)}
+.rmap-role-ic svg{width:15px;height:15px}
+.rmap-role-hd{display:flex;align-items:center;gap:7px}
+/* отдел */
+.rmap-dept{width:238px;border-left:3px solid var(--dept,#2563EB)}
+.rmap-dept-hd{display:flex;align-items:center;gap:8px}
+.rmap-dept-emoji{font-size:19px;line-height:1;background:none;border:0;padding:0;cursor:default}
+.rmap-dept-nm{font-size:14px;color:var(--ink-1);outline:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.rmap-dept-menu{flex:none;opacity:.5;padding:2px}
+.rmap-dept-menu:hover{opacity:1;color:var(--accent)}
+.rmap-dept-menu svg{width:14px;height:14px}
+.rmap-dept-none{border-left-style:dashed;opacity:.92}
+.rmap-dept-hint{display:block;font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+.rmap-node.droptarget{box-shadow:0 0 0 3px color-mix(in srgb,var(--dept,#2563EB) 60%,transparent);border-color:var(--dept,#2563EB)}
+.rmap-deptSel{margin-top:8px;width:100%;font-size:11px}
+/* модалка отдела */
+.dept-ed .lc-lbl{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:5px;font-weight:600}
+.dept-emoji-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:5px}
+.dept-em{font-size:19px;line-height:1;aspect-ratio:1;border:1px solid var(--stroke);border-radius:9px;background:var(--bg-2);cursor:pointer;transition:border-color .1s,background .1s}
+.dept-em:hover{background:var(--card)}
+.dept-em.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.dept-color-grid{display:flex;gap:8px;flex-wrap:wrap}
+.dept-col{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:0 0 0 1px var(--stroke)}
+.dept-col.on{border-color:var(--card);box-shadow:0 0 0 2px var(--ink-2)}
+.btn.btn-danger{background:color-mix(in srgb,#c0392b 14%,transparent);color:#c0392b;border-color:color-mix(in srgb,#c0392b 30%,var(--stroke))}

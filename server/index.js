@@ -10253,6 +10253,7 @@ const server = http.createServer(async (req, res) => {
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
       if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
       if (Array.isArray(b.showPages)) br.showPages = b.showPages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное ОТКРЫТИЕ разделов сверх роли (редактируемо после приглашения) */
+      if (b.departmentId !== undefined) br.departmentId = b.departmentId ? String(b.departmentId).slice(0, 40) : null;  /* отдел сотрудника (карта доступов) */
       if (typeof b.busyIcsUrl === 'string') { br.busyIcsUrl = b.busyIcsUrl.trim().slice(0, 500); refreshIcsBusy(br); }   /* личный ICS-календарь → занятость для ИИ */
       /* ручные повторяющиеся блоки занятости: [{dow:1..7, from:'HH:MM', to:'HH:MM', label?}] — «не ставить созвоны в это окно» */
       if (Array.isArray(b.busyBlocks)) {
@@ -10864,6 +10865,8 @@ const server = http.createServer(async (req, res) => {
       if (b.customFields) { const CF_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'phone', 'url', 'email', 'select', 'multiselect', 'bool', 'rating']; db.settings.customFields = b.customFields.slice(0, 40).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: CF_TYPES.includes(f.type) ? f.type : 'text', options: (f.options || []).slice(0, 30).map(v => String(v).slice(0, 60)).filter(Boolean), unit: String(f.unit || '').slice(0, 12) })).filter(f => f.key && f.label); }
       /* какие поля лида СКРЫТЬ от брокеров (гибкая приватность: подрядчик/источник/путь рекламы/доп-поля) */
       if (Array.isArray(b.brokerHiddenFields)) db.settings.brokerHiddenFields = b.brokerHiddenFields.map(x => String(x).slice(0, 60)).slice(0, 80);
+      /* отделы/департаменты команды (карта доступов): имя + эмодзи-иконка + цвет */
+      if (Array.isArray(b.departments)) db.settings.departments = b.departments.slice(0, 24).map(d => ({ id: String((d && d.id) || '').slice(0, 40) || ('dp_' + crypto.randomBytes(3).toString('hex')), name: String((d && d.name) || '').slice(0, 40), icon: String((d && d.icon) || '🏢').slice(0, 8), color: /^#[0-9a-fA-F]{3,8}$/.test((d && d.color) || '') ? d.color : '#2563EB' })).filter(d => d.name);
       /* ШАБЛОНЫ ПРАВ ПО РОЛЯМ: { broker:{hidePages:[...]}, assistant:{...} } — применяются к новым сотрудникам */
       if (b.roleTemplates && typeof b.roleTemplates === 'object') {
         db.settings.roleTemplates = db.settings.roleTemplates || {};
