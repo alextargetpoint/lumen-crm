@@ -645,6 +645,10 @@ const SRC_LABEL = {
 function srcDisp(k) { return k ? (SRC_LABEL[k] || k) : 'Прямые / другое'; }
 /* бейдж «профильный лид»: совпадение с профилем квал/закрытых клиентов (ICP). Не показываем на закрытых. */
 function icpBadge(l) { const m = l && l.icpMatch; return (m && m.score >= 60 && !['deal', 'lost'].includes(l.stage)) ? ` <span class="icp-b" title="Совпадение с профилем ваших квалифицированных и закрытых лидов${m.matched && m.matched.length ? ': ' + m.matched.join(', ') : ''}. Такие лиды чаще доходят до квала — звоните в первую очередь.">${ic(I.star)}профиль ${m.score}%</span>` : ''; }
+/* МИНИ-маркеры для ПЛОТНОЙ таблицы лидов: без слов «профиль»/«невалидный №» (они дублируют колонку ПРОФИЛЬ
+   и крадут внимание) — только иконка-маркер, детали в title. Полные бейджи остаются в шапке чата/карточке. */
+function icpDot(l) { const m = l && l.icpMatch; return (m && m.score >= 60 && !['deal', 'lost'].includes(l.stage)) ? ` <span class="icp-dot ${m.score >= 75 ? 'hi' : 'mid'}" title="Профильный лид — похож на ваших квал/закрытых (${m.score}%)${m.matched && m.matched.length ? ': ' + m.matched.join(', ') : ''}. Звоните в первую очередь.">${ic(I.star)}</span>` : ''; }
+function phInvDot(l) { return (l && l.phoneInvalid) ? ` <span class="ph-dot" title="Невалидный номер (E.164): операторы могут резать звук при звонке и доставку сообщений. Проверьте источник или пометьте «Спам / неверный номер».">${ic(I.flag)}</span>` : ''; }
 
 /* ---------- api ---------- */
 async function apiReq(method, p, b) {
@@ -5342,13 +5346,16 @@ PAGES.funnel = async (root) => {
   const inCreated = (l) => { if (!F.funnelCreated) return true; const c = l.createdAt || 0; if (!c) return false; if (F.funnelCreated === 'today') return c >= _tStart; if (F.funnelCreated === '7d') return _NOW - c < 7 * _DAY; if (F.funnelCreated === '30d') return _NOW - c < 30 * _DAY; if (F.funnelCreated === '90d') return _NOW - c < 90 * _DAY; return true; };
   const inActivity = (l) => { if (!F.funnelActivity) return true; const a = l.lastMsgAt || l.createdAt || 0; const age = _NOW - a; if (F.funnelActivity === 'today') return a >= _tStart; if (F.funnelActivity === '7d') return age < 7 * _DAY; if (F.funnelActivity === 'stale14') return age >= 14 * _DAY; if (F.funnelActivity === 'stale30') return age >= 30 * _DAY; return true; };
   const inChan = (l) => { if (!F.funnelChan) return true; const ch = l.channels || {}; const hasWa = ch.wa === 'yes', hasTg = ch.tg === 'yes' || l.activeChannel === 'tg'; if (F.funnelChan === 'wa') return hasWa; if (F.funnelChan === 'tg') return hasTg; if (F.funnelChan === 'none') return !hasWa && !hasTg; return true; };
+  /* здоровье профиля (ICP-скор совпадения с квал/закрытыми) + валидность номера — градация для «супер-здоровых» */
+  const inHealth = (l) => { if (!F.funnelHealth) return true; const s = (l.icpMatch && l.icpMatch.score != null) ? l.icpMatch.score : -1; if (F.funnelHealth === 'super') return s >= 75; if (F.funnelHealth === 'good') return s >= 60 && s < 75; if (F.funnelHealth === 'mid') return s >= 40 && s < 60; if (F.funnelHealth === 'low') return s >= 0 && s < 40; return true; };
+  const inValid = (l) => { if (!F.funnelValid) return true; if (F.funnelValid === 'valid') return !l.phoneInvalid; if (F.funnelValid === 'invalid') return !!l.phoneInvalid; return true; };
   const leads = all.filter(l =>
     (!F.funnelStage || l.stage === F.funnelStage) &&
     (!F.funnelGeo || l.geo === F.funnelGeo) &&
     (!F.funnelSrc || l.source === F.funnelSrc) &&
     (!F.funnelVendor || (F.funnelVendor === '__none' ? !l.vendorId : l.vendorId === F.funnelVendor)) &&
     (!F.funnelBroker || (F.funnelBroker === '__none' ? !l.broker : l.broker === F.funnelBroker)) &&
-    inCreated(l) && inActivity(l) && inChan(l) &&
+    inCreated(l) && inActivity(l) && inChan(l) && inHealth(l) && inValid(l) &&
     (!q || l.name.toLowerCase().includes(q) || l.phone.includes(q)) &&
     (!F.funnelFlag ||
       (F.funnelFlag === 'overdue' && l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()) ||
@@ -5374,7 +5381,7 @@ PAGES.funnel = async (root) => {
   /* ⭐НАСТРАИВАЕМЫЕ КОЛОНКИ ТАБЛИЦЫ (пер-агентство): реестр всех колонок + их ячейки.
      Чекбокс и действия — служебные, всегда есть. Выбор хранится в settings.leadCols. */
   const LEAD_COLS = [
-    { key: 'name', label: 'Лид', cell: (l) => `<td><div class="tbl-lead">${avaHtml(l, 30)}<div class="tbl-lead-b"><b>${esc(l.name)}${icpBadge(l)}</b><span class="tbl-lead-ph">${esc(l.phone)}${phInvBadge(l)}</span></div></div></td>` },
+    { key: 'name', label: 'Лид', cell: (l) => `<td><div class="tbl-lead">${avaHtml(l, 30)}<div class="tbl-lead-b"><b>${esc(l.name)}${icpDot(l)}</b><span class="tbl-lead-ph">${esc(l.phone)}${phInvDot(l)}</span></div></div></td>` },
     { key: 'ch', label: 'Каналы', noSort: true, cell: (l) => `<td>${tblCh(l)}</td>` },
     { key: 'stage', label: 'Стадия', cell: (l) => `<td><span class="tbl-stage ${stageCls(l.stage)}">${stageName(l.stage)}</span></td>` },
     { key: 'geo', label: 'Гео', cell: (l) => `<td class="tbl-geo">${esc(l.geoName || '—')}</td>` },
@@ -5392,7 +5399,7 @@ PAGES.funnel = async (root) => {
   const colDefs = enabledCols.map(k => LEAD_COLS.find(c => c.key === k)).filter(Boolean);
 
   root.innerHTML = `
-    ${(() => { const activeN = ['funnelGeo', 'funnelSrc', 'funnelVendor', 'funnelBroker', 'funnelCreated', 'funnelActivity', 'funnelChan'].filter(k => F[k]).length; const drawerOpen = !!F.funnelFiltersOpen || activeN > 0; return `
+    ${(() => { const activeN = ['funnelGeo', 'funnelSrc', 'funnelVendor', 'funnelBroker', 'funnelCreated', 'funnelActivity', 'funnelChan', 'funnelHealth', 'funnelValid'].filter(k => F[k]).length; const drawerOpen = !!F.funnelFiltersOpen || activeN > 0; return `
     <div class="filters">
       <input id="fQ" placeholder="Имя или номер…" value="${esc(F.funnelQ || '')}" style="width:170px">
       <button class="btn btn-sm f-toggle ${activeN ? 'on' : ''}" id="fToggle" title="Фильтры: направление, источник, подрядчик, брокер">${ic(I.funnel)}Фильтры${activeN ? ` · ${activeN}` : ''}</button>
@@ -5405,7 +5412,7 @@ PAGES.funnel = async (root) => {
       <button class="btn btn-sm btn-icon" id="importBtn" title="Импорт лидов">${ic(I.doc)}</button>
       <button class="btn btn-sm btn-icon" id="dupesBtn" title="Найти дубли">${ic(I.copy)}</button>
       <span class="muted" style="font-size:12px">${leads.length} из ${all.length}</span>
-      ${view === 'table' ? `<button class="btn btn-sm btn-icon" id="tblColsBtn" title="Настроить колонки таблицы">${ic(I.grid || I.doc)}</button>` : ''}
+      ${view === 'table' ? `<button class="btn btn-sm" id="tblColsBtn" title="Добавить или убрать колонки таблицы">${ic(I.grid || I.doc)}Столбцы</button>` : ''}
       <div class="seg-toggle">
         <button class="seg-btn ${view === 'kanban' ? 'on' : ''}" data-view="kanban" title="Канбан">${ic(I.grid)}</button>
         <button class="seg-btn ${view === 'table' ? 'on' : ''}" data-view="table" title="Таблица">${ic(I.doc)}</button>
@@ -5419,6 +5426,8 @@ PAGES.funnel = async (root) => {
       <select id="fCreated" title="Когда лид создан"><option value="">Создан: любой срок</option>${[['today', 'Создан сегодня'], ['7d', 'Создан за 7 дней'], ['30d', 'Создан за 30 дней'], ['90d', 'Создан за 90 дней']].map(([v, n]) => `<option value="${v}" ${F.funnelCreated === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <select id="fActivity" title="Последняя активность по лиду"><option value="">Активность: любая</option>${[['today', 'Актив сегодня'], ['7d', 'Актив за 7 дней'], ['stale14', 'Молчит 14 дней+'], ['stale30', 'Молчит 30 дней+']].map(([v, n]) => `<option value="${v}" ${F.funnelActivity === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <select id="fChan" title="Канал связи с лидом"><option value="">Канал: любой</option>${[['wa', 'Есть WhatsApp'], ['tg', 'Есть Telegram'], ['none', 'Без контакта']].map(([v, n]) => `<option value="${v}" ${F.funnelChan === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <select id="fHealth" title="Здоровье профиля: насколько лид похож на ваших квалифицированных/закрытых клиентов (ICP)"><option value="">Профиль: любой</option>${[['super', '⭐ Супер (≥75%)'], ['good', 'Хороший (60–74%)'], ['mid', 'Средний (40–59%)'], ['low', 'Слабый (<40%)']].map(([v, n]) => `<option value="${v}" ${F.funnelHealth === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <select id="fValid" title="Валидность номера лида (E.164)"><option value="">Номер: любой</option>${[['valid', 'Валидный номер'], ['invalid', 'Невалидный номер']].map(([v, n]) => `<option value="${v}" ${F.funnelValid === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
       ${activeN ? `<button class="btn btn-sm" id="fClear">${ic(I.x)}Сбросить</button>` : ''}
     </div>`; })()}
     <div class="cc-panel glass" id="ccPanel" ${PAGE_STATE.funnelChainOpen ? '' : 'hidden'}>
@@ -5516,8 +5525,10 @@ PAGES.funnel = async (root) => {
   $('#fViews')?.addEventListener('click', (e) => openFunnelViews(e));
   /* «Статистика по стадиям»: клик-тумблер (пин) вместо открытия по случайному hover — больше не «скачет» */
   $('#fnlStatsToggle')?.addEventListener('click', () => { PAGE_STATE.funnelStatsOpen = !(PAGE_STATE.funnelStatsOpen || PAGE_STATE.funnelStage); render(); });
-  $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; PAGE_STATE.funnelCreated = ''; PAGE_STATE.funnelActivity = ''; PAGE_STATE.funnelChan = ''; render(); });
-  $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => setF('funnelQ', e.target.value), 350); });
+  $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; PAGE_STATE.funnelCreated = ''; PAGE_STATE.funnelActivity = ''; PAGE_STATE.funnelChan = ''; PAGE_STATE.funnelHealth = ''; PAGE_STATE.funnelValid = ''; render(); });
+  $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => { PAGE_STATE._focusFQ = true; setF('funnelQ', e.target.value); }, 350); });
+  /* поиск терял фокус: debounce→render пересобирал поле. Возвращаем фокус+каретку в конец после ре-рендера (как на «Объектах»). */
+  if (PAGE_STATE._focusFQ) { PAGE_STATE._focusFQ = false; const qi = $('#fQ'); if (qi) { qi.focus(); const v = qi.value; qi.value = ''; qi.value = v; } }
   $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));
   $('#fSrc').addEventListener('change', (e) => setF('funnelSrc', e.target.value));
   $('#fVendor')?.addEventListener('change', (e) => setF('funnelVendor', e.target.value));
@@ -5525,6 +5536,8 @@ PAGES.funnel = async (root) => {
   $('#fCreated')?.addEventListener('change', (e) => setF('funnelCreated', e.target.value));
   $('#fActivity')?.addEventListener('change', (e) => setF('funnelActivity', e.target.value));
   $('#fChan')?.addEventListener('change', (e) => setF('funnelChan', e.target.value));
+  $('#fHealth')?.addEventListener('change', (e) => setF('funnelHealth', e.target.value));
+  $('#fValid')?.addEventListener('change', (e) => setF('funnelValid', e.target.value));
   $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', (F.funnelFlag === b.dataset.flag && b.dataset.flag) ? '' : b.dataset.flag)));
   $$('[data-fstage]', root).forEach(b => b.addEventListener('click', () => setF('funnelStage', F.funnelStage === b.dataset.fstage ? '' : b.dataset.fstage)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
