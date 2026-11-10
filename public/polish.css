@@ -1063,3 +1063,42 @@ input[type=number] { -moz-appearance: textfield; }
 /* спиннер на кнопке покупки номера (предохранитель от двойного клика) */
 .nc-spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ncSpin .7s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes ncSpin{to{transform:rotate(360deg)}}
+
+/* ── Карта доступов (mind-карта команды) ── */
+.roles-viewbar{display:flex;justify-content:flex-end;margin:0 0 12px}
+.rmap-wrap{margin-top:2px}
+.rmap-hint{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-bottom:11px;line-height:1.5}
+.rmap-hint>svg{width:15px;height:15px;color:var(--accent);flex:none}
+.rmap-hint>span{flex:1;min-width:200px}
+.rmap-reset{flex:none}
+.rmap-canvas{position:relative;overflow:auto;border:1px solid var(--stroke);border-radius:16px;min-height:420px;background:radial-gradient(circle at 1px 1px, color-mix(in srgb,var(--ink-1,#222) 9%,transparent) 1px, transparent 0) 0 0/22px 22px, var(--bg-2)}
+.rmap-links{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:0}
+.rmap-link{fill:none;stroke:color-mix(in srgb,var(--accent) 42%,var(--stroke));stroke-width:2}
+.rmap-node{position:absolute;width:258px;box-sizing:border-box;background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:11px 12px;box-shadow:0 8px 20px -13px rgba(16,24,48,.3);z-index:1;touch-action:none}
+.rmap-node:hover{box-shadow:0 10px 24px -12px rgba(16,24,48,.38)}
+.rmap-node.dragging{box-shadow:0 18px 38px -10px rgba(16,24,48,.45);z-index:6;opacity:.98;cursor:grabbing}
+.rmap-agency{width:204px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 13%,var(--card)),var(--card));border-color:color-mix(in srgb,var(--accent) 30%,var(--stroke))}
+.rmap-logo{width:30px;height:30px;border-radius:9px;background:color-mix(in srgb,var(--accent) 16%,transparent);display:grid;place-items:center;color:var(--accent);margin-bottom:7px}
+.rmap-logo svg{width:17px;height:17px}
+.rmap-ag-nm b{display:block;font-size:14px;color:var(--ink-1)}
+.rmap-ag-nm i{font-size:10.5px;color:var(--muted)}
+.rmap-role{width:232px}
+.rmap-role-hd{display:flex;align-items:center;gap:7px}
+.rmap-role-hd b{font-size:13.5px;color:var(--ink-1)}
+.rmap-role-hd span{font-size:11px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border-radius:20px;padding:1px 7px;font-weight:600}
+.rmap-role-sub{display:block;font-size:10.5px;color:var(--muted);margin:3px 0 7px}
+.rmap-p-hd{display:flex;align-items:center;gap:8px}
+.rmap-ava{width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font-size:11px;font-weight:700;display:grid;place-items:center;overflow:hidden;flex:none}
+.rmap-ava img{width:100%;height:100%;object-fit:cover}
+.rmap-p-id{flex:1;min-width:0}
+.rmap-p-id b{display:block;font-size:13px;color:var(--ink-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rmap-roleSel{font-size:10.5px;padding:1px 5px;margin-top:2px;max-width:100%}
+.rmap-del{flex:none;opacity:.45;padding:2px}
+.rmap-del:hover{opacity:1;color:var(--bad,#c0392b)}
+.rmap-del svg{width:13px;height:13px}
+.rmap-secs{display:flex;flex-wrap:wrap;gap:4px;margin-top:9px}
+.rmap-sec{font-size:10px;padding:2px 7px;border-radius:7px;border:1px solid var(--stroke);background:var(--bg-2);color:var(--ink-2);cursor:pointer;line-height:1.55;transition:background .1s,border-color .1s,color .1s,opacity .1s;white-space:nowrap}
+.rmap-sec.on{background:color-mix(in srgb,#129b6e 12%,transparent);border-color:color-mix(in srgb,#129b6e 32%,var(--stroke));color:#0f7a56}
+.rmap-sec.off{opacity:.5}
+.rmap-sec.byrole{border-style:dashed}
+.rmap-sec.granted{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 34%,var(--stroke));color:var(--accent);border-style:solid}

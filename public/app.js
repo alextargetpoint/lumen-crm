@@ -18667,6 +18667,14 @@ PAGES.brokers = async (root) => {
               <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...(b.langs || [])])].map(lg => `<button type="button" class="chip-t lang-chip ${(b.langs || []).includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
                 <span class="chip-add"><input id="langAddInp" placeholder="+ язык" style="width:76px"><button class="chip-plus" id="langAddBtn">${ic(I.plus)}</button></span>
               </div></div>
+            ${(() => {
+              const rt = b.roleType || 'broker', defHide = roleTplHide(rt), ind = b.hidePages || [], shw = b.showPages || [];
+              const isVis = (s) => !((defHide.includes(s) || ind.includes(s)) && !shw.includes(s));
+              const shown = RBAC_SECTIONS.filter(isVis).length;
+              return `<div class="pd-fact" style="margin-top:12px"><label class="lc-lbl">Доступ к разделам <span class="muted" style="font-weight:400">· ${shown}/${RBAC_SECTIONS.length} открыто · синхронно с «Роли и доступы»</span></label>
+              <div class="be-secs rmap-secs" style="margin-top:5px">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s), vis = isVis(s), granted = byRole && shw.includes(s); return `<button type="button" class="rmap-sec be-sec ${vis ? 'on' : 'off'}${byRole ? ' byrole' : ''}${granted ? ' granted' : ''}" data-besec="${s}" title="${esc((NAV[s] || {}).name || s)}${byRole ? ' · закрыт ролью' : ''}">${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
+              <div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.45">Клик — открыть/скрыть раздел <b>персонально</b>. Пунктир = закрыто ролью (можно открыть). Те же данные, что в «Роли и доступы».</div></div>`;
+            })()}
           </div>
           <div>
             <label class="lc-lbl">Дни смен · у каждого дня свой интервал</label>
@@ -18799,6 +18807,17 @@ PAGES.brokers = async (root) => {
     };
     eb.querySelector('#langAddBtn').addEventListener('click', lAdd);
     eb.querySelector('#langAddInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); lAdd(); } });
+    /* доступ к разделам прямо в редакторе брокера — те же hidePages/showPages, что и «Роли и доступы» (сразу PATCH, без общего «Сохранить») */
+    eb.querySelectorAll('.be-sec').forEach(chip => chip.addEventListener('click', async () => {
+      const id = eb.dataset.bredit, bb = (STATE.brokers || []).find(x => x.id === id); if (!bb) return;
+      const s = chip.dataset.besec, defHide = roleTplHide(bb.roleType || 'broker');
+      const hide = new Set(bb.hidePages || []), show = new Set(bb.showPages || []), byRole = defHide.includes(s);
+      const curVis = !((byRole || hide.has(s)) && !show.has(s));
+      if (curVis) { if (show.has(s)) show.delete(s); if (!byRole) hide.add(s); } else { if (byRole) show.add(s); else hide.delete(s); }
+      const hArr = [...hide], sArr = [...show], nowVis = !((byRole || hArr.includes(s)) && !sArr.includes(s));
+      chip.classList.toggle('on', nowVis); chip.classList.toggle('off', !nowVis); chip.classList.toggle('granted', byRole && sArr.includes(s));
+      try { await api.patch('/brokers/' + id, { hidePages: hArr, showPages: sArr }); bb.hidePages = hArr; bb.showPages = sArr; } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('on', curVis); chip.classList.toggle('off', !curVis); }
+    }));
     eb.querySelector('[data-brsave]').addEventListener('click', async () => {
       const pinVal = eb.querySelector('[data-be="pin"]').value.trim();
       await api.patch('/brokers/' + eb.dataset.bredit, {
@@ -19976,9 +19995,102 @@ function tplListHtml(list) {
   return list.map(t => `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>${esc(t.name)}</b> <span class="muted">· ${esc(t.language)} · ${esc((t.category || '').toLowerCase())}</span></span>${badge(t.status)}</div>`).join('');
 }
 /* ---------------- РОЛИ И ДОСТУПЫ (отдельная подстраница Настроек) ---------------- */
+/* ── КАРТА ДОСТУПОВ: живая mind-карта команды (Агентство → роли → люди), тумблеры разделов прямо на узлах,
+   перетаскивание узлов (мудборд, позиции в localStorage). Пишет в те же эндпоинты, что и список. ── */
+function rbacMapSecsHtml(b) {
+  const rt = b.roleType || 'broker'; const defHide = roleTplHide(rt);
+  const ind = b.hidePages || [], shw = b.showPages || [];
+  const isVis = (s) => !((defHide.includes(s) || ind.includes(s)) && !shw.includes(s));
+  return RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const vis = isVis(s); const granted = byRole && shw.includes(s); return `<button class="rmap-sec ${vis ? 'on' : 'off'}${byRole ? ' byrole' : ''}${granted ? ' granted' : ''}" data-sec="${s}" title="${esc((NAV[s] || {}).name || s)}${byRole ? ' · закрыт ролью' : ''}">${esc((NAV[s] || {}).name || s)}</button>`; }).join('');
+}
+function rbacMapHtml() {
+  const members = STATE.brokers || [];
+  const order = ['manager', 'analyst', 'marketer', 'assistant', 'broker'];
+  const inits = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const agencyNm = (STATE.settings.agency && STATE.settings.agency.name) || 'Агентство';
+  let nodes = `<div class="rmap-node rmap-agency" data-rmid="agency"><div class="rmap-logo">${ic(I.users)}</div><div class="rmap-ag-nm"><b>${esc(agencyNm)}</b><i>${members.length} чел · владелец видит всё</i></div></div>`;
+  for (const role of order) {
+    const ms = members.filter(b => (b.roleType || 'broker') === role); if (!ms.length) continue;
+    const defHide = roleTplHide(role); const openN = RBAC_SECTIONS.filter(s => !defHide.includes(s)).length;
+    nodes += `<div class="rmap-node rmap-role" data-rmid="role:${role}" data-role="${role}"><div class="rmap-role-hd"><b>${RBAC_ROLES[role]}</b><span>${ms.length}</span></div><i class="rmap-role-sub">шаблон роли · ${openN}/${RBAC_SECTIONS.length} разделов</i><div class="rmap-secs rmap-tplsecs">${RBAC_SECTIONS.map(s => `<button class="rmap-sec ${defHide.includes(s) ? 'off' : 'on'}" data-tplsec="${s}" data-role="${role}" title="${esc((NAV[s] || {}).name || s)}">${esc((NAV[s] || {}).name || s)}</button>`).join('')}</div></div>`;
+    for (const b of ms) nodes += `<div class="rmap-node rmap-person" data-rmid="p:${b.id}" data-pid="${b.id}" data-role="${role}"><div class="rmap-p-hd"><span class="rmap-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><div class="rmap-p-id"><b>${esc(b.name || 'Сотрудник')}</b><select class="rmap-roleSel sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === (b.roleType || 'broker') ? 'selected' : ''}>${n}</option>`).join('')}</select></div><button class="rmap-del btn-ghost" title="Убрать сотрудника">${ic(I.x)}</button></div><div class="rmap-secs">${rbacMapSecsHtml(b)}</div></div>`;
+  }
+  return `<div class="rmap-wrap"><div class="rmap-hint">${ic(I.spark)}<span>Живая карта: тяни узлы, кликай разделы — открыть/скрыть. Узел роли меняет шаблон роли, узел человека — лично. Пунктир = закрыто ролью, можно открыть кликом.</span><button class="btn btn-sm rmap-reset" data-rmapreset>${ic(I.refresh || I.x)}Сбросить расположение</button></div><div class="rmap-canvas" id="rmapCanvas"><svg class="rmap-links" id="rmapLinks"></svg>${nodes}</div></div>`;
+}
+function wireRbacMap(root) {
+  const canvas = $('#rmapCanvas', root); if (!canvas) return;
+  const svg = $('#rmapLinks', canvas);
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem('lumenRmapPos') || '{}'); } catch (_) {}
+  const all = [...canvas.querySelectorAll('.rmap-node')];
+  const agency = canvas.querySelector('[data-rmid="agency"]');
+  const roleNodes = all.filter(n => n.dataset.rmid.startsWith('role:'));
+  const col1 = 24, col2 = 300, col3 = 650, gap = 16;
+  /* авто-layout по колонкам (роль центрируется против своих людей) */
+  all.forEach(n => { n.style.position = 'absolute'; });
+  agency.style.left = col1 + 'px';
+  let y = 18, mids = [];
+  roleNodes.forEach(rn => {
+    const role = rn.dataset.role; rn.style.left = col2 + 'px';
+    const people = all.filter(n => n.dataset.rmid.startsWith('p:') && n.dataset.role === role);
+    let py = y; people.forEach(pn => { pn.style.left = col3 + 'px'; pn.style.top = py + 'px'; py += pn.offsetHeight + gap; });
+    const blockH = people.length ? (py - y - gap) : rn.offsetHeight;
+    rn.style.top = Math.round(y + blockH / 2 - rn.offsetHeight / 2) + 'px';
+    mids.push(y + blockH / 2);
+    y += Math.max(blockH, rn.offsetHeight) + gap * 1.8;
+  });
+  agency.style.top = Math.round(mids.length ? (mids[0] + mids[mids.length - 1]) / 2 - agency.offsetHeight / 2 : 18) + 'px';
+  /* сохранённые (перетащенные) позиции поверх авто-layout */
+  all.forEach(n => { const s = saved[n.dataset.rmid]; if (s) { n.style.left = s.x + 'px'; n.style.top = s.y + 'px'; } });
+  const aR = n => ({ x: n.offsetLeft + n.offsetWidth, y: n.offsetTop + n.offsetHeight / 2 });
+  const aL = n => ({ x: n.offsetLeft, y: n.offsetTop + n.offsetHeight / 2 });
+  function draw() {
+    const links = [];
+    roleNodes.forEach(rn => { links.push([agency, rn]); const role = rn.dataset.role; all.filter(n => n.dataset.rmid.startsWith('p:') && n.dataset.role === role).forEach(pn => links.push([rn, pn])); });
+    let w = 0, h = 0; all.forEach(n => { w = Math.max(w, n.offsetLeft + n.offsetWidth); h = Math.max(h, n.offsetTop + n.offsetHeight); });
+    svg.style.width = (w + 40) + 'px'; svg.style.height = (h + 40) + 'px';
+    svg.innerHTML = links.map(([a, b]) => { const p1 = aR(a), p2 = aL(b); const dx = Math.max(32, (p2.x - p1.x) / 2); return `<path d="M${p1.x} ${p1.y} C${p1.x + dx} ${p1.y} ${p2.x - dx} ${p2.y} ${p2.x} ${p2.y}" class="rmap-link"/>`; }).join('');
+    canvas.style.minHeight = (h + 40) + 'px';
+  }
+  draw();
+  /* перетаскивание узлов (мудборд) */
+  let drag = null;
+  all.forEach(n => {
+    n.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button, select, .rmap-sec')) return;
+      e.preventDefault(); drag = { n, sx: e.clientX, sy: e.clientY, ox: n.offsetLeft, oy: n.offsetTop };
+      n.classList.add('dragging'); try { n.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+  });
+  canvas.addEventListener('pointermove', (e) => { if (!drag) return; drag.n.style.left = Math.max(0, drag.ox + (e.clientX - drag.sx)) + 'px'; drag.n.style.top = Math.max(0, drag.oy + (e.clientY - drag.sy)) + 'px'; draw(); });
+  const endDrag = () => { if (!drag) return; saved[drag.n.dataset.rmid] = { x: drag.n.offsetLeft, y: drag.n.offsetTop }; try { localStorage.setItem('lumenRmapPos', JSON.stringify(saved)); } catch (_) {} drag.n.classList.remove('dragging'); drag = null; };
+  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+  $('[data-rmapreset]', root)?.addEventListener('click', () => { try { localStorage.removeItem('lumenRmapPos'); } catch (_) {} render(); });
+  /* смена роли у человека */
+  canvas.querySelectorAll('.rmap-roleSel').forEach(sel => sel.addEventListener('change', async (e) => { e.stopPropagation(); const pid = sel.closest('.rmap-person').dataset.pid; try { await api.patch('/brokers/' + pid, { roleType: sel.value }); toast('Роль обновлена', RBAC_ROLES[sel.value] || '', true); await loadState(); render(); } catch (err) { toast('Не вышло', err.message); } }));
+  /* удалить человека */
+  canvas.querySelectorAll('.rmap-del').forEach(btn => btn.addEventListener('click', async (e) => { e.stopPropagation(); const pid = btn.closest('.rmap-person').dataset.pid; if (!await uiConfirm('Убрать сотрудника из системы?', 'Доступ к CRM для него закроется.', { ok: 'Убрать', danger: true })) return; try { const r = await fetch('/api/brokers/' + pid, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } }));
+  /* тумблер раздела у ЧЕЛОВЕКА (персонально, через hide/show сверх роли) */
+  canvas.querySelectorAll('.rmap-person .rmap-sec').forEach(chip => chip.addEventListener('click', async (e) => {
+    e.stopPropagation(); const pid = chip.closest('.rmap-person').dataset.pid; const b = (STATE.brokers || []).find(x => x.id === pid); if (!b) return;
+    const s = chip.dataset.sec, defHide = roleTplHide(b.roleType || 'broker');
+    const hide = new Set(b.hidePages || []), show = new Set(b.showPages || []), byRole = defHide.includes(s);
+    const curVis = !((byRole || hide.has(s)) && !show.has(s));
+    if (curVis) { if (show.has(s)) show.delete(s); if (!byRole) hide.add(s); } else { if (byRole) show.add(s); else hide.delete(s); }
+    const hArr = [...hide], sArr = [...show], nowVis = !((byRole || hArr.includes(s)) && !sArr.includes(s));
+    chip.classList.toggle('on', nowVis); chip.classList.toggle('off', !nowVis); chip.classList.toggle('granted', byRole && sArr.includes(s));
+    try { await api.patch('/brokers/' + pid, { hidePages: hArr, showPages: sArr }); b.hidePages = hArr; b.showPages = sArr; } catch (err) { toast('Не вышло', err.message); chip.classList.toggle('on', curVis); chip.classList.toggle('off', !curVis); }
+  }));
+  /* тумблер раздела у РОЛИ (шаблон роли → наследуют новые сотрудники) */
+  canvas.querySelectorAll('.rmap-tplsecs .rmap-sec').forEach(chip => chip.addEventListener('click', async (e) => {
+    e.stopPropagation(); const rt = chip.dataset.role, s = chip.dataset.tplsec;
+    const hide = new Set(roleTplHide(rt)); if (hide.has(s)) hide.delete(s); else hide.add(s); const arr = [...hide];
+    chip.classList.toggle('off'); chip.classList.toggle('on');
+    try { await api.patch('/settings', { roleTemplates: { [rt]: { hidePages: arr } } }); STATE.settings.roleTemplates = STATE.settings.roleTemplates || {}; STATE.settings.roleTemplates[rt] = { hidePages: arr }; } catch (err) { toast('Не вышло', err.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
+  }));
+}
 PAGES.roles = async (root) => {
-  root.innerHTML = `
-    <button class="btn btn-sm set-back" data-ovgo="settings">${ic(I.chev)}Назад в Подключения</button>
+  const view = PAGE_STATE.rolesView || 'list';
+  const introAndList = `
     <div class="glass card mb roles-intro">
       <div class="card-title">${ic(I.users)}Как это работает<span class="sub">права применяются на сервере, не только прячутся в интерфейсе</span></div>
       <div class="roles-steps">
@@ -19990,9 +20102,13 @@ PAGES.roles = async (root) => {
     ${rbacCardHtml()}
     ${rbacTemplatesCardHtml()}
     ${brokerHiddenFieldsCardHtml()}`;
-  wireRbac(root);
-  wireRbacTemplates(root);
-  wireBrokerHiddenFields(root);
+  root.innerHTML = `
+    <button class="btn btn-sm set-back" data-ovgo="settings">${ic(I.chev)}Назад в Подключения</button>
+    <div class="roles-viewbar"><div class="seg-toggle"><button class="seg-btn ${view === 'list' ? 'on' : ''}" data-rolesview="list">${ic(I.doc)}Список</button><button class="seg-btn ${view === 'map' ? 'on' : ''}" data-rolesview="map">${ic(I.layers || I.share)}Карта</button></div></div>
+    ${view === 'map' ? rbacMapHtml() : introAndList}`;
+  if (view === 'map') wireRbacMap(root);
+  else { wireRbac(root); wireRbacTemplates(root); wireBrokerHiddenFields(root); }
+  $$('[data-rolesview]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.rolesView = b.dataset.rolesview; render(); }));
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
 };
 
