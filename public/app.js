@@ -316,12 +316,17 @@ function openPop(wrap, btn, pop) {
   /* подбор места + анти-обрезка: если попап не влезает ни вниз, ни вверх (длинный календарь на
      коротком экране — жалоба #871), кладём на сторону с бóльшим запасом и ограничиваем высоту со
      скроллом, иначе нижние строки месяца уезжают за кромку экрана без возможности прокрутить. */
-  let top, avail;
-  if (below > h + 14) { top = r.bottom + 6; avail = below - 14; }          /* влезает вниз */
-  else if (above > h + 14) { top = r.top - h - 6; avail = above - 14; }    /* влезает вверх */
-  else if (below >= above) { top = r.bottom + 6; avail = below - 16; }     /* не влезает — большая сторона вниз */
-  else { avail = above - 16; top = r.top - Math.min(h, avail) - 6; }       /* ...или вверх */
-  if (h > avail) { pop.style.maxHeight = avail + 'px'; pop.style.overflowY = 'auto'; }
+  let top;
+  if (below > h + 14) top = r.bottom + 6;             /* влезает вниз от якоря */
+  else if (above > h + 14) top = r.top - h - 6;       /* влезает вверх от якоря */
+  else {
+    /* не влезает впритык ни вниз, ни вверх — НЕ режем высоту (иначе нижние строки месяца уезжают
+       за кромку: «календарь обрезается на 22 числе», SFG 10.11), а СДВИГАЕМ попап в пределах экрана,
+       чтобы он поместился целиком рядом с якорем. */
+    top = Math.max(8, Math.min(r.bottom + 6, innerHeight - h - 8));
+  }
+  /* крайний случай: попап выше ВСЕГО экрана (очень длинный список) — только тогда ограничиваем+скроллим */
+  if (h > innerHeight - 16) { pop.style.maxHeight = (innerHeight - 16) + 'px'; pop.style.overflowY = 'auto'; top = 8; }
   pop.style.top = top + 'px';
   pop.style.visibility = '';
   wrap.classList.add('open');
