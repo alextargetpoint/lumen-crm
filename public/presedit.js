@@ -391,9 +391,28 @@
   function newSecId(pfx) { return (pfx || '') + 's' + Math.random().toString(16).slice(2, 8); }
   function isObjHero(sec) { return S.isColl && sec && sec.family === 'hero' && /^o\d+_/.test(String(sec.id || '')); }
   /* дефолт-контент новых закрывающих страниц (чтобы не были пустыми) — из бренда/брокеров/агентства */
-  function seedBlockContent(fam) {
+  /* блоки объекта — пер-объектный контент (в отличие от закрывающих agency/cta/team/broker). */
+  var OBJ_FAMS = { hero: 1, editorial: 1, metrics: 1, gallery: 1, location: 1, floorplan: 1, units: 1, payment: 1, benefits: 1, custom: 1 };
+  function clone(o) { try { return JSON.parse(JSON.stringify(o)); } catch (e) { return o; } }
+  function seedBlockContent(fam, pfx) {
     var ov = function (v) { return { mode: 'override', value: v }; };
     var brand = S.brand || {}, ag = brand.agency || {}, br = S.broker || (brand.broker || {});
+    /* ⭐ блок объекта: клонируем контент+ассеты из СУЩЕСТВУЮЩЕЙ секции того же семейства в ЭТОМ объекте —
+       так новый блок подтягивает данные объекта 1-в-1 (metrics/units/payment/gallery и т.п. считаются
+       сервером из записи объекта; клиенту их не пересобрать). Был баг: добавленный блок получал {title}
+       и оставался пустым. Если такой секции в объекте нет — исходные привязки name/description. */
+    if (pfx && OBJ_FAMS[fam]) {
+      var twin = sections().filter(function (s) {
+        return s.family === fam && String(s.id || '').indexOf(pfx) === 0;
+      })[0];
+      if (twin) { return { __clone: true, contentBindings: clone(twin.contentBindings || {}), assetRefs: clone(twin.assetRefs || []) }; }
+      var src = function (path, cached) { return { mode: 'source', sourcePath: path, sourceRevision: 'crm', cachedValue: cached || '' }; };
+      if (fam === 'hero') return { title: src('name'), subtitle: ov('') };
+      if (fam === 'editorial') return { eyebrow: ov('О проекте'), title: ov('О проекте'), body: src('description') };
+      /* остальные семейства объекта считаются сервером из записи объекта — без твина даём только заголовок,
+         данные пользователь наполнит/вернёт восстановлением объекта */
+      return { eyebrow: ov(FAM_LABEL[fam] || ''), title: ov(FAM_LABEL[fam] || 'Блок') };
+    }
     if (fam === 'agency') {
       return { eyebrow: ov('Агентство'), title: ov(brand.logoText || ag.name || 'Наше агентство'),
         body: ov(ag.about || 'Мы помогаем клиентам находить и покупать недвижимость под их задачи — от подбора до сделки под ключ.'),
@@ -433,7 +452,10 @@
     mutate(function () {
       var at = Math.min(sections().length, S.pageIdx + 1);
       var pfx = S.isColl ? objPrefixOf(sections()[S.pageIdx]) : '';   // на странице объекта → блок уходит в ЭТОТ объект, а не в сироты
-      var ns = { id: newSecId(pfx), family: fam, enabled: true, assetRefs: [], contentBindings: seedBlockContent(fam) };
+      var seed = seedBlockContent(fam, pfx);
+      var ns = { id: newSecId(pfx), family: fam, enabled: true,
+        assetRefs: (seed && seed.__clone) ? seed.assetRefs : [],
+        contentBindings: (seed && seed.__clone) ? seed.contentBindings : seed };
       sections().splice(at, 0, ns); S.pageIdx = at;
     });
     S.addMode = false; render();
