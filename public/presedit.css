@@ -839,3 +839,13 @@ button{font-family:inherit;cursor:pointer}
 .lm-btns i{width:28px;height:9px;border-radius:999px;background:color-mix(in srgb,var(--pe-sel) 35%,transparent)}
 .pe-lib-desc{font-size:11.5px;color:var(--pe-mut);line-height:1.35}
 @media (max-width:560px){.pe-lib-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* DnD в СТРУКТУРЕ ПОДБОРКИ: грипы + drop-индикаторы на страницах/объектах/одиночных */
+.pe-pgrow-grip,.pe-grp-grip{flex:0 0 auto;color:var(--pe-mut);opacity:0;cursor:grab;display:inline-flex;align-items:center;transition:opacity .12s}
+.pe-pgrow:hover .pe-pgrow-grip,.pe-grp-hd:hover .pe-grp-grip,.pe-grp-single:hover .pe-grp-grip{opacity:.5}
+.pe-pgrow-grip:hover,.pe-grp-grip:hover{opacity:1}
+.pe-pgrow-grip:active,.pe-grp-grip:active{cursor:grabbing}
+.pe-pgrow-grip svg,.pe-grp-grip svg{width:14px;height:14px}
+.pe-pgrow.pe-dragging,.pe-grp-single.pe-dragging,.pe-grp-hd.pe-dragging{opacity:.4}
+.pe-pgrow.pe-drop-before,.pe-grp-single.pe-drop-before,.pe-grp-hd.pe-drop-before{box-shadow:0 -3px 0 -1px var(--pe-accent2)}
+.pe-pgrow.pe-drop-after,.pe-grp-single.pe-drop-after,.pe-grp-hd.pe-drop-after{box-shadow:0 3px 0 -1px var(--pe-accent2)}

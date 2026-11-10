@@ -115,6 +115,25 @@
       S.pageIdx = Math.max(0, Math.min(arr.length - 1, insertAt));
     });
   }
+  /* DnD в структуре подборки: перетащить ВЕСЬ объект (блок его страниц o<k>_*) на место другого объекта.
+     Переписываем живой массив секций на месте (sections() держит ссылку — как и reorderPages). */
+  function reorderObjGroup(fromK, toK, after) {
+    if (fromK == null || toK == null || String(fromK) === String(toK)) return;
+    mutate(function () {
+      var arr = sections();
+      var pre = 'o' + fromK + '_', preTo = 'o' + toK + '_';
+      var block = arr.filter(function (s) { return String(s.id || '').indexOf(pre) === 0; });
+      if (!block.length) return;
+      var rest = arr.filter(function (s) { return String(s.id || '').indexOf(pre) !== 0; });
+      var toFirst = -1; for (var i = 0; i < rest.length; i++) { if (String(rest[i].id || '').indexOf(preTo) === 0) { toFirst = i; break; } }
+      if (toFirst < 0) return;
+      var toLast = toFirst; while (toLast + 1 < rest.length && String(rest[toLast + 1].id || '').indexOf(preTo) === 0) toLast++;
+      var insertAt = after ? toLast + 1 : toFirst;
+      rest.splice.apply(rest, [insertAt, 0].concat(block));
+      arr.length = 0; Array.prototype.push.apply(arr, rest);   /* перезаписать живой массив на месте */
+      S.pageIdx = Math.max(0, Math.min(arr.length - 1, insertAt));
+    });
+  }
   function doUndo() { if (!S.undo.length) return; S.redo.push(snapshotState()); restore(S.undo.pop()); scheduleSave(); render(); revalidate(); }
   function doRedo() { if (!S.redo.length) return; S.undo.push(snapshotState()); restore(S.redo.pop()); scheduleSave(); render(); revalidate(); }
   function onKey(e) {
@@ -230,13 +249,13 @@
         var hasSel = g.idx.indexOf(S.pageIdx) >= 0;
         var reused = S.pres.reusedObjectPres && S.pres.reusedObjectPres[g.k];
         var sub = open ? '<div class="pe-grp-pages">' + g.idx.map(function (i) {
-          return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '"><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(pageNavLabel(sections()[i])) + '</span></div>';
+          return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '" draggable="true"><span class="pe-pgrow-grip" title="Перетащить">' + ic('grip') + '</span><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(pageNavLabel(sections()[i])) + '</span></div>';
         }).join('') + '</div>' : '';
         return '<div class="pe-grp' + (open ? ' open' : '') + (hasSel ? ' act' : '') + '">' +
-          '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '"><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b>' + (reused ? '<span class="pe-grp-reuse" title="Собрано из готовой презентации объекта">' + ic('check') + '</span>' : '') + '<span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
+          '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '" data-objgrp="' + g.k + '" draggable="true"><span class="pe-grp-grip" title="Перетащить объект">' + ic('grip') + '</span><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b>' + (reused ? '<span class="pe-grp-reuse" title="Собрано из готовой презентации объекта">' + ic('check') + '</span>' : '') + '<span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
       }
       var i0 = g.idx[0];
-      return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + '" data-pg="' + i0 + '">' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span></div>';
+      return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + '" data-pg="' + i0 + '" draggable="true"><span class="pe-grp-grip" title="Перетащить">' + ic('grip') + '</span>' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span></div>';
     }).join('');
     var hasBroker = false; groups.forEach(function (g) { if (g.type === 'broker') hasBroker = true; });
     if (S.pres.brokerAppendix && S.pres.brokerAppendix.enabled && !hasBroker) {
@@ -931,6 +950,21 @@
       el.addEventListener('dragover', function (e) { if (S._dragFrom == null) return; e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (_) {} var r = el.getBoundingClientRect(); var after = e.clientY > r.top + r.height / 2; el.classList.toggle('pe-drop-after', after); el.classList.toggle('pe-drop-before', !after); });
       el.addEventListener('dragleave', function () { el.classList.remove('pe-drop-before', 'pe-drop-after'); });
       el.addEventListener('drop', function (e) { e.preventDefault(); var to = +el.getAttribute('data-pg'); var after = el.classList.contains('pe-drop-after'); el.classList.remove('pe-drop-before', 'pe-drop-after'); reorderPages(S._dragFrom, to, after); S._dragFrom = null; });
+    });
+    /* ⭐DnD в СТРУКТУРЕ ПОДБОРКИ: страницы объекта и одиночные (вступление/сравнение/брокер) — reorderPages; заголовок объекта — перетащить ВЕСЬ объект (block-move reorderObjGroup) */
+    root.querySelectorAll('.pe-pgrow[draggable="true"],.pe-grp-single[draggable="true"]').forEach(function (el) {
+      el.addEventListener('dragstart', function (e) { e.stopPropagation(); S._dragFrom = +el.getAttribute('data-pg'); S._dragObjK = null; el.classList.add('pe-dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(S._dragFrom)); } catch (_) {} });
+      el.addEventListener('dragend', function () { el.classList.remove('pe-dragging'); root.querySelectorAll('.pe-drop-before,.pe-drop-after').forEach(function (n) { n.classList.remove('pe-drop-before', 'pe-drop-after'); }); });
+      el.addEventListener('dragover', function (e) { if (S._dragFrom == null) return; e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (_) {} var r = el.getBoundingClientRect(); var after = e.clientY > r.top + r.height / 2; el.classList.toggle('pe-drop-after', after); el.classList.toggle('pe-drop-before', !after); });
+      el.addEventListener('dragleave', function () { el.classList.remove('pe-drop-before', 'pe-drop-after'); });
+      el.addEventListener('drop', function (e) { e.preventDefault(); if (S._dragFrom == null) return; var to = +el.getAttribute('data-pg'); var after = el.classList.contains('pe-drop-after'); el.classList.remove('pe-drop-before', 'pe-drop-after'); reorderPages(S._dragFrom, to, after); S._dragFrom = null; });
+    });
+    root.querySelectorAll('.pe-grp-hd[data-objgrp]').forEach(function (el) {
+      el.addEventListener('dragstart', function (e) { if (e.target && e.target.closest && e.target.closest('[data-act="objmenu"]')) { e.preventDefault(); return; } S._dragObjK = el.getAttribute('data-objgrp'); S._dragFrom = null; el.classList.add('pe-dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'obj'); } catch (_) {} });
+      el.addEventListener('dragend', function () { el.classList.remove('pe-dragging'); root.querySelectorAll('.pe-drop-before,.pe-drop-after').forEach(function (n) { n.classList.remove('pe-drop-before', 'pe-drop-after'); }); S._dragObjK = null; });
+      el.addEventListener('dragover', function (e) { if (S._dragObjK == null || S._dragObjK === el.getAttribute('data-objgrp')) return; e.preventDefault(); var r = el.getBoundingClientRect(); var after = e.clientY > r.top + r.height / 2; el.classList.toggle('pe-drop-after', after); el.classList.toggle('pe-drop-before', !after); });
+      el.addEventListener('dragleave', function () { el.classList.remove('pe-drop-before', 'pe-drop-after'); });
+      el.addEventListener('drop', function (e) { e.preventDefault(); if (S._dragObjK == null) return; var toK = el.getAttribute('data-objgrp'); var after = el.classList.contains('pe-drop-after'); el.classList.remove('pe-drop-before', 'pe-drop-after'); reorderObjGroup(S._dragObjK, toK, after); S._dragObjK = null; });
     });
     // format tabs
     root.querySelectorAll('[data-fmt]').forEach(function (el) { el.addEventListener('click', function () { S.fmt = el.getAttribute('data-fmt'); S.pres.defaultFormat = S.fmt; scheduleSave(); render(); revalidate(); }); });
