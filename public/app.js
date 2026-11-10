@@ -3367,8 +3367,15 @@ async function render() {
         const isWave = !!go._wave; go._wave = false;      /* смена раздела → волна входа */
         const silent = !!render._silent; render._silent = false;  /* фоновый poll → без анимации и без скачка скролла */
         const prevScroll = c0.scrollTop;
+        /* ⭐ воронка-канбан: горизонтальный скролл доски и вертикальный скролл колонок живут НЕ на #content,
+           а на .kanban / .kb-cards. Тихий poll-ре-рендер (каждые 7с) и смена фильтра пересобирают innerHTML →
+           эти позиции обнулялись → доску откидывало на ПЕРВУЮ стадию посреди бокового скролла (жалоба клиента:
+           «скроллю воронку вбок — принудительно возвращает на первый столбец»). Снимаем до свопа, вернём после. */
+        let _kbScroll = null;
+        if (page === 'funnel') { const kb = c0.querySelector('.kanban'); if (kb) { _kbScroll = { left: kb.scrollLeft, cols: {} }; kb.querySelectorAll('.kb-col').forEach(col => { const cc = col.querySelector('.kb-cards'); if (cc && cc.scrollTop) _kbScroll.cols[col.dataset.stage] = cc.scrollTop; }); } }
         c0.classList.remove('anim', 'soft');              /* снимаем прошлые классы ДО замены DOM — старый контент не мигает */
         await fn(c0);
+        if (_kbScroll) { const kb = c0.querySelector('.kanban'); if (kb) { kb.scrollLeft = _kbScroll.left; kb.querySelectorAll('.kb-col').forEach(col => { const cc = col.querySelector('.kb-cards'); const sv = _kbScroll.cols[col.dataset.stage]; if (cc && sv) cc.scrollTop = sv; }); } }
         /* плашка «в доработке» на самой странице — только в demo/betaAll на скрытых-для-агентств разделах */
         if (_isBeta() && _isDevPage(page)) { const rb = el(`<div class="dev-ribbon">${ic(I.spark)}<span>Раздел <b>в доработке</b> — виден только вам (демо-аккаунт). У зарегистрированных агентств он скрыт.</span></div>`); c0.insertBefore(rb, c0.firstChild); }
         injectWorkspaceTabs(c0, page);
