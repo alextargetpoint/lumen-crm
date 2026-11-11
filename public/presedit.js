@@ -239,9 +239,11 @@
     '</div>';
   }
 
+  /* блокирующая ошибка валидации у секции (по sectionId, incl. неймспейс o<k>_ в подборке) */
+  function secErr(s) { return !!(s && S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; })); }
   function thumbRow(s, i) {
     var title = pageNavLabel(s);
-    var err = S.chk && S.chk.issues && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; });
+    var err = secErr(s);
     var msel = S.multiMode && (S.multiSel || []).indexOf(i) >= 0;
     return '<div class="pe-thumb' + (i === S.pageIdx && !S.multiMode ? ' sel' : '') + (s.enabled === false ? ' off' : '') + (err ? ' err' : '') + (overflowInfo(s) ? ' ov' : '') + (S.multiMode ? ' multi' : '') + (msel ? ' msel' : '') + '" data-pg="' + i + '"' + (S.multiMode ? '' : ' draggable="true"') + '>' +
       (S.multiMode ? '<span class="pe-thumb-cb">' + (msel ? ic('check') : '') + '</span>' : '') +
@@ -273,14 +275,16 @@
         var open = S.openGroups && S.openGroups[g.k];
         var hasSel = g.idx.indexOf(S.pageIdx) >= 0;
         var reused = S.pres.reusedObjectPres && S.pres.reusedObjectPres[g.k];
+        var grpErr = g.idx.some(function (i) { return secErr(sections()[i]); });
         var sub = open ? '<div class="pe-grp-pages">' + g.idx.map(function (i) {
-          return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '" draggable="true"><span class="pe-pgrow-grip" title="Перетащить">' + ic('grip') + '</span><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(pageNavLabel(sections()[i])) + '</span></div>';
+          return '<div class="pe-pgrow' + (i === S.pageIdx ? ' sel' : '') + (secErr(sections()[i]) ? ' err' : '') + (overflowInfo(sections()[i]) ? ' ov' : '') + '" data-pg="' + i + '" draggable="true"><span class="pe-pgrow-grip" title="Перетащить">' + ic('grip') + '</span><span class="pe-pgrow-n">' + pad(i + 1) + '</span><span class="pe-pgrow-t">' + esc(pageNavLabel(sections()[i])) + '</span></div>';
         }).join('') + '</div>' : '';
-        return '<div class="pe-grp' + (open ? ' open' : '') + (hasSel ? ' act' : '') + '">' +
+        return '<div class="pe-grp' + (open ? ' open' : '') + (hasSel ? ' act' : '') + (grpErr ? ' err' : '') + '">' +
           '<div class="pe-grp-hd" data-act="grptoggle" data-gk="' + g.k + '" data-objgrp="' + g.k + '" draggable="true"><span class="pe-grp-grip" title="Перетащить объект">' + ic('grip') + '</span><span class="pe-grp-car">' + ic('chev') + '</span><b>' + esc(g.label) + '</b>' + (reused ? '<span class="pe-grp-reuse" title="Собрано из готовой презентации объекта">' + ic('check') + '</span>' : '') + '<span class="pe-grp-n">' + g.idx.length + '</span><span class="pe-grp-menu" data-act="objmenu" data-gk="' + g.k + '">' + ic('dots') + '</span></div>' + sub + '</div>';
       }
       var i0 = g.idx[0];
-      return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + '" data-pg="' + i0 + '" draggable="true"><span class="pe-grp-grip" title="Перетащить">' + ic('grip') + '</span>' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span></div>';
+      var sErr = g.idx.some(function (i) { return secErr(sections()[i]); });
+      return '<div class="pe-grp-single' + (i0 === S.pageIdx ? ' sel' : '') + (sErr ? ' err' : '') + '" data-pg="' + i0 + '" draggable="true"><span class="pe-grp-grip" title="Перетащить">' + ic('grip') + '</span>' + grpIcon(g.type) + '<b>' + esc(g.label) + '</b><span class="pe-grp-n">' + g.idx.length + '</span></div>';
     }).join('');
     var hasBroker = false; groups.forEach(function (g) { if (g.type === 'broker') hasBroker = true; });
     if (S.pres.brokerAppendix && S.pres.brokerAppendix.enabled && !hasBroker) {
@@ -1232,7 +1236,7 @@
         break;
       case 'undo': doUndo(); break;
       case 'redo': doRedo(); break;
-      case 'preview': window.open('/pres/' + ID + '/print?format=' + S.fmt, '_blank'); break;
+      case 'preview': flushSave(function () { window.open('/pres/' + ID + '/print?format=' + S.fmt, '_blank'); }); break;   /* досылаем правки, иначе предпросмотр/печать по устаревшему доку */
       case 'agencySettings': try { if (window.self !== window.top) window.parent.postMessage('lumen:editor-agency', '*'); else location.href = '/#agency'; } catch (_) {} break;
       case 'export': openExport(); break;
       case 'openStyle': openStyle(); break;
@@ -1942,7 +1946,18 @@
   }
 
   function paintNavTitle() { var el = document.querySelector('.pe-thumb[data-pg="' + S.pageIdx + '"] .pe-thumb-t'); if (el) el.textContent = pageNavLabel(curSection()); mountNavMinis(); }
-  function paintNavErrors() { sections().forEach(function (s, i) { var el = document.querySelector('.pe-thumb[data-pg="' + i + '"]'); if (!el) return; var err = S.chk && S.chk.issues.some(function (x) { return x.sectionId === s.id && x.severity === 'blocking'; }); el.classList.toggle('err', !!err); }); }
+  function paintNavErrors() {
+    if (!S.chk || !S.chk.issues) return;
+    if (!S.isColl) { sections().forEach(function (s, i) { var el = document.querySelector('.pe-thumb[data-pg="' + i + '"]'); if (el) el.classList.toggle('err', secErr(s)); }); return; }
+    /* подборка: ошибки на строках объекта (pe-pgrow), заголовке объекта (pe-grp) и одиночных (pe-grp-single) */
+    collectionGroups().forEach(function (g) {
+      var anyErr = g.idx.some(function (i) { return secErr(sections()[i]); });
+      if (g.type === 'object') {
+        var hd = document.querySelector('.pe-grp-hd[data-objgrp="' + g.k + '"]'); var grp = hd && hd.closest('.pe-grp'); if (grp) grp.classList.toggle('err', anyErr);
+        g.idx.forEach(function (i) { var el = document.querySelector('.pe-pgrow[data-pg="' + i + '"]'); if (el) el.classList.toggle('err', secErr(sections()[i])); });
+      } else { var s1 = document.querySelector('.pe-grp-single[data-pg="' + g.idx[0] + '"]'); if (s1) s1.classList.toggle('err', anyErr); }
+    });
+  }
   function paintReadiness() { var el = document.getElementById('peReady'); if (el && S.tab === 'content') { var tmp = document.createElement('div'); tmp.innerHTML = readinessCard(); if (tmp.firstChild) el.replaceWith(tmp.firstChild); } }
   function plPages(n) { var a = n % 10, b = n % 100; if (a === 1 && b !== 11) return 'страница'; if (a >= 2 && a <= 4 && (b < 10 || b >= 20)) return 'страницы'; return 'страниц'; }
   function updatePageCount() { var el = document.getElementById('pePageCount'); if (el && S.chk) el.textContent = S.chk.pageCount + ' ' + plPages(S.chk.pageCount); }
@@ -2405,11 +2420,13 @@
   function puFmt(v) { if (v == null || v === '') return 'Нет данных'; if (typeof v === 'number') return v.toLocaleString('ru-RU'); var s = String(v); return s.length > 72 ? s.slice(0, 72) + '…' : s; }
   function reloadPres() { clearTimeout(S._saveT); S._pending = false; S._afterSave = null; api('GET', '/' + ID + '?full=1').then(function (r) { if (r.status === 200) { S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {}; S.projects = r.json.projects || S.projects; S.undo = []; S.redo = []; render(); revalidate(); } }); }   /* гасим незавершённый автосейв (иначе затрёт reload) · серверная операция сменила состав → старые undo не применимы */
   function openObjectUpdates(k) {
+    flushSave(function () {   /* сверяем обновления против СВЕЖЕГО черновика, не против несохранённого состояния */
     api('POST', '/' + ID + '/object-updates', { index: k }).then(function (r) {
       if (r.status !== 200) { toast('Не удалось', (r.json && r.json.error) || ''); return; }
       var data = r.json;
       if (!data.diffs || !data.diffs.length) { toast('Обновлений нет', 'Данные подборки совпадают с карточкой', true); return; }
       updatesModal(k, data);
+    });
     });
   }
   function updatesModal(k, data) {
@@ -2441,7 +2458,7 @@
     ov.querySelector('[data-puapply]').addEventListener('click', function () {
       var fields = []; ov.querySelectorAll('[data-pukey]').forEach(function (s) { if (s.getAttribute('data-puval') === 'update') fields.push(s.getAttribute('data-pukey')); });
       if (!fields.length) { close(); return; }
-      api('POST', '/' + ID + '/apply-updates', { index: k, fields: fields }).then(function (r) { close(); if (r.status === 200) { toast('Обновлено', 'Применено к черновику', true); reloadPres(); } else toast('Не удалось'); });
+      flushSave(function () { api('POST', '/' + ID + '/apply-updates', { index: k, fields: fields }).then(function (r) { close(); if (r.status === 200) { toast('Обновлено', 'Применено к черновику', true); reloadPres(); } else toast('Не удалось'); }); });
     });
   }
   function addPageMenu(anchor) {
@@ -2514,6 +2531,7 @@
 
   function openExport() {
     var fmt = S.fmt, quality = 'standard', method = 'pdf', published = null;
+    var exChk = null;   /* валидация под ВЫБРАННЫЙ в модалке формат (overflow формат-зависим); null → берём S.chk (формат канвы) */
     var ov = document.createElement('div'); ov.className = 'pe-overlay'; ov.id = 'peExportOv';
     /* №8 «Выдача»: статус публикации + версии + ссылки (из S.pres — snapshots/publicToken/publishedAt уже в full-payload) */
     function pubBlock() {
@@ -2536,13 +2554,13 @@
       return h;
     }
     function body() {
-      var chk = S.chk || { issues: [], pageCount: 0, ok: true };
+      var chk = exChk || S.chk || { issues: [], pageCount: 0, ok: true };
       var checks = buildChecks(chk);
       return '<div class="pe-ov-top"><button class="pe-iconbtn" data-x>' + ic('x') + '</button><div class="t">Выдача документа</div><div class="pe-top-sp" style="flex:1"></div></div>' +
         '<div class="pe-ov-body"><div class="pe-ov-mid"><div class="pe-exprev" id="peExPrev"></div></div>' +
         '<div class="pe-ov-right">' +
           pubBlock() +
-          '<div class="pe-hd">Выбранный формат</div>' + sel2Ad(TOK.FORMATS.map(function (f) { return { v: f.id, t: f.label }; }), fmt, function (v) { fmt = v; refresh(); }, 'pe-sel2-field') +
+          '<div class="pe-hd">Выбранный формат</div>' + sel2Ad(TOK.FORMATS.map(function (f) { return { v: f.id, t: f.label }; }), fmt, function (v) { fmt = v; if (v === S.fmt) { exChk = null; refresh(); } else { exChk = null; refresh(); api('POST', '/' + ID + '/validate', { format: v }).then(function (r) { if (r.status === 200 && fmt === v) { exChk = r.json; refresh(); } }); } }, 'pe-sel2-field') +
           '<div class="pe-hd">Проверка содержимого</div>' + checks +
           '<div class="pe-hd">Способ экспорта</div>' +
             '<div class="pe-radio' + (method === 'pdf' ? ' on' : '') + '" data-method="pdf"><div class="r"></div><div><b>PDF</b><span>Готовый файл для скачивания</span></div></div>' +
@@ -2578,17 +2596,19 @@
       ov.querySelectorAll('[data-x]').forEach(function (b) { b.onclick = function () { ov.remove(); }; });
       ov.querySelectorAll('[data-method]').forEach(function (m) { m.onclick = function () { method = m.getAttribute('data-method'); refresh(); }; });
       ov.querySelectorAll('[data-q]').forEach(function (q) { q.onclick = function () { quality = q.getAttribute('data-q'); refresh(); }; });
-      var dl = ov.querySelector('[data-dl]'); if (dl) dl.onclick = function () { window.open('/pres/' + ID + '/print?format=' + fmt + '&q=' + quality + '&dl=1', '_blank'); };
-      var lk = ov.querySelector('[data-link]'); if (lk) lk.onclick = function () { lk.textContent = 'Публикуем…'; api('POST', '/' + ID + '/publish', { format: fmt }).then(function (r) { if (r.status === 200) { published = r.json.url; refresh(); } else { toast(r.json && r.json.error === 'PREFLIGHT_FAILED' ? 'Исправьте ошибки перед публикацией' : 'Ошибка публикации'); refresh(); } }); };
+      var dl = ov.querySelector('[data-dl]'); if (dl) dl.onclick = function () { flushSave(function () { window.open('/pres/' + ID + '/print?format=' + fmt + '&dl=1', '_blank'); }); };   /* экспорт — после досыла правок */
+      var lk = ov.querySelector('[data-link]'); if (lk) lk.onclick = function () { lk.textContent = 'Публикуем…'; flushSave(function () { api('POST', '/' + ID + '/publish', { format: fmt }).then(function (r) { if (r.status === 200) { published = r.json.url; refresh(); } else { toast(r.json && r.json.error === 'PREFLIGHT_FAILED' ? 'Исправьте ошибки перед публикацией' : 'Ошибка публикации'); refresh(); } }); }); };
       var cp = ov.querySelector('[data-copy]'); if (cp) cp.onclick = function () { navigator.clipboard && navigator.clipboard.writeText(published); cp.textContent = 'Скопировано'; };
       var pb = ov.querySelector('[data-pub]'); if (pb) pb.onclick = function () {
         pb.disabled = true; var o = pb.innerHTML; pb.textContent = 'Публикуем…';
+        flushSave(function () {   /* КРИТично: публикация морозит снимок клиенту — сперва досылаем незаписанные правки */
         api('POST', '/' + ID + '/publish', { format: fmt }).then(function (r) {
           if (r.status === 200) {
             S.pres.publicToken = r.json.token || S.pres.publicToken;
             S.pres.snapshots = (S.pres.snapshots || []).concat({ id: r.json.snapshotId || 's', at: Date.now() });
             S.pres.publishedAt = Date.now(); published = r.json.url; toast('Опубликовано — ссылка готова'); refresh();
           } else { pb.disabled = false; pb.innerHTML = o; toast(r.json && r.json.error === 'PREFLIGHT_FAILED' ? 'Исправьте ошибки перед публикацией' : 'Ошибка публикации'); }
+        });
         });
       };
       ov.querySelectorAll('[data-copyurl]').forEach(function (b) { b.onclick = function () { try { navigator.clipboard.writeText(b.getAttribute('data-copyurl')); } catch (_) {} b.classList.add('ok'); toast('Ссылка скопирована'); }; });
