@@ -20746,12 +20746,18 @@ PAGES.settings = async (root) => {
             <button class="btn" id="bxSync" ${bx.connected ? '' : 'disabled title="сначала подключите Bitrix"'}>${ic(I.refresh || I.spark)}Синхронизировать сейчас</button>
             <span id="bxStat" class="muted" style="font-size:11.5px">${bx.lastPullAt ? 'последний синк: ' + new Date(bx.lastPullAt).toLocaleString('ru-RU') : ''}</span>
           </div>`;
+  const setCats = [['team', I.users, 'Команда'], ['channels', I.chat, 'Каналы'], ['ai', I.spark, 'ИИ'], ['data', I.shield, 'Данные'], ['listings', I.link, 'Объекты'], ['look', I.gear, 'Оформление']];
   root.innerHTML = `
+    <nav class="set-nav" id="setNav">${setCats.map((c, i) => `<button class="set-navi${i === 0 ? ' on' : ''}" data-cat="${c[0]}" type="button">${ic(c[1])}<span>${c[2]}</span></button>`).join('')}</nav>
+    <div class="set-panes">
+    <section class="set-cat" data-cat="team">
     <div class="set-sec-h">${ic(I.users)}Аккаунт и команда</div>
     ${linkCard('data-ovgo="roles"', I.users, 'Роли и доступы', 'Кто из команды что видит и какие карточки лидов — права на сервере', `${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}`)}
     ${linkCard('onclick="window.openMigration&&window.openMigration()"', I.doc, 'Миграция из другой CRM', 'Быстрый перенос базы из amoCRM · Bitrix24 · HubSpot · Excel с маппингом колонок')}
     ${linkCard('onclick="window.openPlanManager&&window.openPlanManager()"', I.spark, 'Тариф и лимиты', 'Текущий план агентства: брокеры, лиды, номера WhatsApp')}
+    </section>
 
+    <section class="set-cat" data-cat="channels" hidden>
     <div class="set-sec-h">${ic(I.chat)}Каналы связи</div>
     ${'' /* WhatsApp-номера (QR/воркер) переехали в единый раздел «Номера» — не плодим места */}
     ${coll(`${ic(I.chat)}WhatsApp Cloud API — официальный канал Meta`, waCloudForm, { open: false })}
@@ -20769,23 +20775,31 @@ PAGES.settings = async (root) => {
           <a class="btn btn-sm" href="/help/notetaker" target="_blank" style="text-decoration:none">Справочник</a>
         </div>
       </div>`, { open: false })}
+    </section>
 
+    <section class="set-cat" data-cat="ai" hidden>
     <div class="set-sec-h">${ic(I.spark)}ИИ и автоматизация</div>
     ${coll(`${ic(I.spark)}Движок ИИ`, aiForm, { open: false })}
     ${coll(`${ic(I.mic || I.phone)}Голос брокера · ElevenLabs`, voiceForm, { open: false })}
+    </section>
 
+    <section class="set-cat" data-cat="data" hidden>
     <div class="set-sec-h">${ic(I.shield)}Данные и безопасность</div>
     ${linkCard('onclick="window.openHealthPanel&&window.openHealthPanel()"', I.shield, 'Состояние системы', 'Реальный статус: Telegram-бот, WhatsApp, e-mail, ИИ, оплата — зелёный/красный')}
     ${linkCard('onclick="window.openBackups&&window.openBackups()"', I.shield, 'Резервные копии', 'Авто-снимки базы каждые 6ч + перед подозрительным стиранием · восстановление одним кликом')}
     ${linkCard('onclick="window.openDataPrivacy&&window.openDataPrivacy()"', I.doc, 'Данные и приватность', 'Экспорт всех данных · юр-документы · удаление аккаунта (GDPR)')}
+    </section>
 
+    <section class="set-cat" data-cat="listings" hidden>
     <div class="set-sec-h">${ic(I.link)}Объекты и листинги</div>
     ${coll(`${ic(I.link)}Источники инвентаря и листинги`, inventoryForm, { open: false })}
 
     <div class="set-sec-h">${ic(I.link)}Внешние CRM · двусторонний синк</div>
     ${coll(`${ic(I.link)}amoCRM — работаем поверх, статусы и поля зеркалим${amo.connected ? ' <span class="badge ok" style="margin-left:6px">подключён</span>' : ''}`, amoForm, { open: false })}
     ${coll(`${ic(I.link)}Bitrix24 — работаем поверх, лиды → сделки${bx.connected ? ' <span class="badge ok" style="margin-left:6px">подключён</span>' : ''}`, bitrixForm, { open: false })}
+    </section>
 
+    <section class="set-cat" data-cat="look" hidden>
     <div class="set-sec-h">${ic(I.gear)}Оформление и обучение</div>
     <div class="glass card">
       <div class="card-title">${ic(I.gear)}${t('Оформление','Appearance')}<span class="sub">${t('тема интерфейса и мастер настройки','interface theme and setup wizard')}</span></div>
@@ -20796,7 +20810,23 @@ PAGES.settings = async (root) => {
       <button class="btn" data-onboard style="width:100%;justify-content:center;margin-top:12px">${ic(I.spark)}${t('Мастер настройки Lumen','Lumen setup wizard')}</button>
     </div>
     ${linkCard('id="setGuides" onclick="window.openGuideCenter&&window.openGuideCenter()"', I.doc, 'Инструкции и гайды', 'Подключение Telegram-бота с экранами, воронка, WhatsApp-агент и другое')}
-    ${coll(`${ic(I.eye)}Демо-режим`, demoForm, { open: false })}`;
+    ${coll(`${ic(I.eye)}Демо-режим`, demoForm, { open: false })}
+    </section>
+    </div>`;
+  /* категорийная навигация: показываем ОДНУ категорию за раз (всё остальное в DOM — хендлеры целы) */
+  (function wireSetNav() {
+    const nav = $('#setNav', root); if (!nav) return;
+    const show = (cat) => {
+      $$('.set-navi', root).forEach(b => b.classList.toggle('on', b.dataset.cat === cat));
+      $$('.set-cat', root).forEach(s => { s.hidden = (s.dataset.cat !== cat); });
+      const active = nav.querySelector('.set-navi.on'); if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
+      try { localStorage.setItem('lumen_set_cat', cat); } catch (e) {}
+    };
+    let saved = 'team'; try { saved = localStorage.getItem('lumen_set_cat') || 'team'; } catch (e) {}
+    if (!$(`.set-cat[data-cat="${saved}"]`, root)) saved = 'team';
+    $$('.set-navi', root).forEach(b => b.addEventListener('click', () => show(b.dataset.cat)));
+    show(saved);
+  })();
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
   /* ── amoCRM: сохранить конфиг + проверить связь, затем ручной синк ── */
   $('#amoSave', root)?.addEventListener('click', async () => {
@@ -20864,16 +20894,23 @@ PAGES.settings = async (root) => {
         ? `<div class="lc-hint warn" style="margin-bottom:12px">${ic(I.shield)}<span><b>Центральный бот${d.centralBot ? ' @' + esc(d.centralBot) : ''} ещё не подключён</b>${(!d.central && d.tokenSet === false) ? ' — у бота не задан токен' : ' — вебхук не настроен'}, поэтому команда <code>/start</code> и привязка по ключу пока не сработают (бот не получает сообщения). Генерация нового ключа это не исправит. ${s.isPrimary ? 'Подключите токен центрального бота ниже или задайте <b>LUMEN_TG_BRIDGE_TOKEN</b> на сервисе lumen-crm в Railway.' : 'Нужно действие оператора платформы — подключить токен центрального бота. Ваши ключи при этом сохранятся.'}</span></div>`
         : '';
       const deepLink = (code) => d.central && d.centralBot ? `https://t.me/${d.centralBot}?start=${code}` : null;
-      const rows = (d.brokers || []).map(b => { const dl = deepLink(b.code); return `<div class="set-row" style="padding:7px 0">
-          <div class="sp"><div class="sl">${esc(b.name)}</div><div class="sd">${b.bound ? 'привязан к Telegram' : 'ещё не привязан'}</div></div>
-          ${dl ? `<button class="btn btn-sm" data-tgblink="${esc(dl)}" title="Скопировать ссылку-приглашение для брокера">${ic(I.link)}Ссылка</button>` : ''}
-          <code class="pill" style="padding:6px 9px;cursor:pointer" data-tgbcode="${esc(b.code)}" title="Скопировать команду для брокера">/start ${esc(b.code)}</code>
-          ${b.bound ? `<button class="btn btn-sm" data-tgbunbind="${b.id}" title="Отвязать">${ic(I.x)}</button>` : `<span class="badge">ждёт</span>`}
+      const ini2 = (n) => esc(((String(n || '?').trim().split(/\s+/).map(w => w[0] || '').slice(0, 2).join('')) || '?').toUpperCase());
+      const bnd = (d.brokers || []).filter(b => b.bound).length, tot = (d.brokers || []).length;
+      const rows = (d.brokers || []).map(b => { const dl = deepLink(b.code); return `<div class="tgb-brow${b.bound ? ' is-bound' : ''}">
+          <span class="tgb-ava">${ini2(b.name)}</span>
+          <div class="tgb-bi"><b>${esc(b.name)}</b><span class="tgb-bst">${b.bound ? 'привязан к Telegram' : 'ещё не привязан — отдайте ему ключ'}</span></div>
+          <code class="tgb-code pill" data-tgbcode="${esc(b.code)}" title="Скопировать команду /start для брокера">/start ${esc(b.code)}</code>
+          <div class="tgb-bact">
+            ${dl ? `<button class="tgb-ic" data-tgblink="${esc(dl)}" title="Скопировать ссылку-приглашение (привязка в один клик)">${ic(I.link)}</button>` : ''}
+            ${b.bound ? `<button class="tgb-ic danger" data-tgbunbind="${b.id}" title="Отвязать от Telegram">${ic(I.x)}</button>` : '<span class="tgb-wait">ждёт</span>'}
+          </div>
         </div>`; }).join('');
-      box.innerHTML = `<div style="margin-bottom:8px">Вебхук: <code class="pill" style="padding:6px 9px">${esc(d.webhookUrl)}</code> ${d.ready ? '<span class="badge ok">готов</span>' : '<span class="badge warn">включите мост и настройте вебхук</span>'}</div>
-        <div class="sl" style="margin:10px 0 4px">Коды привязки брокеров</div>
-        <div class="muted" style="font-size:11.5px;margin-bottom:6px">Дайте брокеру его команду — он отправит её боту в Telegram и привяжется. После этого все его лиды приходят ему в личку.</div>
-        ${rows || '<span class="muted">Нет активных брокеров</span>'}`;
+      box.innerHTML = `
+        ${tot ? `<div class="tgb-sum">Привязано <b>${bnd}</b> из <b>${tot}</b></div>` : ''}
+        <div class="tgb-blist">${rows || '<div class="muted" style="font-size:12px;padding:8px 2px">Нет активных брокеров в команде</div>'}</div>
+        <details class="tgb-tech"><summary>Технические детали</summary>
+          <div class="tgb-tech-in">Вебхук платформы: <code class="pill">${esc(d.webhookUrl)}</code> ${d.ready ? '<span class="badge ok">готов</span>' : '<span class="badge warn">включите мост и настройте вебхук</span>'}</div>
+        </details>`;
       box.querySelectorAll('[data-tgbcode]').forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText('/start ' + c.dataset.tgbcode); toast('Скопировано', 'Отправьте брокеру — пусть напишет это боту', true); }));
       box.querySelectorAll('[data-tgblink]').forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText(c.dataset.tgblink); toast('Ссылка скопирована', 'Отправьте брокеру — он перейдёт и привяжется в один клик', true); }));
       box.querySelectorAll('[data-tgbunbind]').forEach(btn => btn.addEventListener('click', async () => { await api.post('/brokers/' + btn.dataset.tgbunbind + '/tg-unbind', {}); toast('Отвязан', null, true); tgbRenderBrokers(); }));

@@ -980,6 +980,32 @@ textarea { resize: vertical; min-height: 70px; }
 .tgb-key:hover { background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
 .tgb-key svg { width: 15px; height: 15px; color: var(--accent); flex: 0 0 auto; }
 .tgb-key code { font-size: 13px; font-weight: 700; color: var(--text); }
+/* Список брокеров моста — опрятные строки с инициалами + статусом */
+.tgb-sum { font-size: 11.5px; color: var(--muted); margin: 2px 0 9px; }
+.tgb-sum b { color: var(--text); font-weight: 800; }
+.tgb-blist { display: flex; flex-direction: column; gap: 6px; }
+.tgb-brow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--stroke); flex-wrap: wrap; }
+.tgb-brow.is-bound { border-color: color-mix(in srgb, var(--accent) 24%, var(--stroke)); }
+.tgb-ava { flex: 0 0 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; color: var(--muted); background: color-mix(in srgb, var(--muted) 16%, transparent); }
+.tgb-brow.is-bound .tgb-ava { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.tgb-bi { flex: 1 1 120px; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tgb-bi > b { font-size: 12.8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tgb-bst { font-size: 10.8px; color: var(--muted); }
+.tgb-brow.is-bound .tgb-bst { color: color-mix(in srgb, var(--accent) 75%, var(--text)); }
+.tgb-code { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; padding: 5px 9px; cursor: pointer; flex: 0 0 auto; transition: background .15s; }
+.tgb-code:hover { background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.tgb-bact { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+.tgb-ic { width: 29px; height: 29px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; border: 1px solid var(--stroke); background: var(--card); cursor: pointer; color: var(--muted); transition: .15s; }
+.tgb-ic:hover { color: var(--text); border-color: var(--accent); }
+.tgb-ic.danger:hover { color: #e5484d; border-color: #e5484d; }
+.tgb-ic svg { width: 14px; height: 14px; }
+.tgb-wait { font-size: 10.5px; color: var(--muted); padding: 0 5px; }
+.tgb-tech { margin-top: 11px; }
+.tgb-tech > summary { font-size: 11px; color: var(--muted); cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 5px; }
+.tgb-tech > summary::-webkit-details-marker { display: none; }
+.tgb-tech > summary::before { content: '▸'; font-size: 9px; transition: transform .15s; }
+.tgb-tech[open] > summary::before { transform: rotate(90deg); }
+.tgb-tech-in { font-size: 11px; color: var(--muted); margin-top: 7px; word-break: break-all; }
 /* Пост-звонковое касание — готовый черновик после дозвона */
 .lc-postcall { margin-bottom: 10px; border: 1px solid color-mix(in srgb, #16a34a 30%, var(--stroke)); border-radius: 14px; padding: 11px 13px; background: color-mix(in srgb, #16a34a 7%, var(--card)); animation: cwIn .3s ease both; }
 .lc-pc-hd { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
@@ -6848,19 +6874,31 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .set-sec-h { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin: 30px 2px 14px; padding-bottom: 9px; border-bottom: 1.5px solid var(--stroke); }
 .set-sec-h:first-child { margin-top: 6px; }
 .set-sec-h svg { width: 15px; height: 15px; color: var(--accent); }
+/* Настройки: категорийная навигация + панели — показываем ОДНУ категорию за раз (вместо простыни) */
+.set-nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 6px 2px 12px; margin: 2px 0 16px; position: sticky; top: 0; z-index: 6; background: var(--bg); -webkit-overflow-scrolling: touch; }
+.set-nav::-webkit-scrollbar { display: none; }
+.set-navi { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 12px; border: 1px solid var(--stroke); background: var(--card); color: var(--ink-2); font-family: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: background .15s, border-color .15s, color .15s; white-space: nowrap; }
+.set-navi svg { width: 15px; height: 15px; }
+.set-navi:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--stroke)); color: var(--text); }
+.set-navi.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.set-navi.on svg { color: #fff; }
+.set-cat[hidden] { display: none; }
+.set-cat > .set-sec-h:first-child { margin-top: 2px; }
 /* карточки-ссылки и сворачиваемые блоки на бежевом фоне должны ЯВНО отделяться от фона:
    более плотная рамка + мягкая тень (эффект «приподнятости» над кремовым полотном). */
 :root[data-page="settings"] #content > .set-link,
-:root[data-page="settings"] #content > .glass.card { border: 1px solid var(--stroke); box-shadow: 0 1px 2px rgba(20,19,17,.04), 0 6px 18px rgba(20,19,17,.05); }
+:root[data-page="settings"] #content > .glass.card,
+.set-cat > .set-link,
+.set-cat > .glass.card { border: 1px solid var(--stroke); box-shadow: 0 1px 2px rgba(20,19,17,.04), 0 6px 18px rgba(20,19,17,.05); }
 /* Сворачиваемые интеграции (Каналы связи, ИИ) — стили НЕ привязаны к data-page:
    `.coll` как прямой потомок #content встречается только на настройках, а привязка к
    data-page давала мигание-сжатие карточек при переключении подвкладок (data-page менялся
    раньше, чем перерисовывался контент → карточки на кадр теряли оформление). */
-#content > .coll { border: 1px solid var(--stroke); box-shadow: 0 1px 2px rgba(20,19,17,.04), 0 6px 18px rgba(20,19,17,.05); margin: 0 0 12px; background: var(--card); }
-#content > .coll > .coll-head { padding: 15px 18px; font-size: 14.5px; font-weight: 700; }
-#content > .coll > .coll-head .ch-t { display: flex; align-items: center; gap: 12px; }
-#content > .coll > .coll-head .ch-t svg { width: 19px; height: 19px; color: var(--accent); }
-#content > .coll.open { box-shadow: 0 2px 4px rgba(20,19,17,.05), 0 12px 30px rgba(20,19,17,.08); }
+#content > .coll, .set-cat > .coll { border: 1px solid var(--stroke); box-shadow: 0 1px 2px rgba(20,19,17,.04), 0 6px 18px rgba(20,19,17,.05); margin: 0 0 12px; background: var(--card); }
+#content > .coll > .coll-head, .set-cat > .coll > .coll-head { padding: 15px 18px; font-size: 14.5px; font-weight: 700; }
+#content > .coll > .coll-head .ch-t, .set-cat > .coll > .coll-head .ch-t { display: flex; align-items: center; gap: 12px; }
+#content > .coll > .coll-head .ch-t svg, .set-cat > .coll > .coll-head .ch-t svg { width: 19px; height: 19px; color: var(--accent); }
+#content > .coll.open, .set-cat > .coll.open { box-shadow: 0 2px 4px rgba(20,19,17,.05), 0 12px 30px rgba(20,19,17,.08); }
 
 /* ═══ Премиум-индикатор смены оформления («церемония» в палитре новой темы) ═══ */
 .theme-loader { position: fixed; inset: 0; z-index: 4000; display: grid; place-items: center; background: var(--bg); opacity: 0; transition: opacity .4s var(--ease-soft); }
