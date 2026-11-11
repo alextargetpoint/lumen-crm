@@ -209,6 +209,7 @@ function buildComparison(db, props) {
     const areaRange = areas.length ? { from: Math.min(...areas), to: Math.max(...areas), unit: 'm2' } : null;
     return {
       seq: k + 1,
+      pid: pr.id || null,   /* стабильный ключ колонки: переименование объекта/дубли имён больше не роняют правки */
       name: pr.name || 'Объект',
       image: (pr.images && pr.images[0]) || null,   /* фото обложки объекта → шапка колонки сравнения */
       values: {
@@ -236,9 +237,16 @@ function syncComparison(db, cmp, props) {
     cmp.contentBindings.objects = ov(fresh.objects);
     return;
   }
+  /* edited-путь: состав/порядок колонок как прежде ведёт состав подборки, но правки пользователя
+     сопоставляем по СТАБИЛЬНОМУ pid (fallback на имя — легаси). Раньше ключ был по имени: переименование
+     объекта в CRM или дубли имён роняли ручные правки колонки. Фото/номер освежаем, values сохраняем. */
   const curObjs = (cmp.contentBindings.objects && cmp.contentBindings.objects.value) || [];
-  const byName = {}; curObjs.forEach(o => { if (o && o.name) byName[o.name] = o; });
-  const merged = fresh.objects.map(fo => { const ex = byName[fo.name]; return ex ? Object.assign({}, ex, { seq: fo.seq, image: fo.image }) : fo; });
+  const byPid = {}, byName = {};
+  curObjs.forEach(o => { if (o) { if (o.pid != null) byPid[o.pid] = o; if (o.name) byName[o.name] = o; } });
+  const merged = fresh.objects.map(fo => {
+    const ex = (fo.pid != null && byPid[fo.pid]) || byName[fo.name];
+    return ex ? Object.assign({}, ex, { pid: fo.pid, seq: fo.seq, image: fo.image }) : fo;
+  });
   cmp.contentBindings.objects = ov(merged);   /* criteria/values пользователя сохраняем как есть */
 }
 
