@@ -3923,7 +3923,13 @@ async function autoQrOnDrop(db, n, who) {
     if ((db.settings.automations || {}).autoQrOnDrop === false) return;
     if (!waWorkerReady(db) || !tgbridge.ready(db)) return;
     const nowT = Date.now();
-    if (n._autoQrAt && nowT - n._autoQrAt < 30 * 60e3) return;   /* не чаще раза в 30 мин на номер (анти-флап) */
+    /* ⭐ЭСКАЛИРУЮЩИЙ БЭКОФФ (анти-спам): раньше слали уведомление каждые 30 мин — мёртвый/висящий в QR номер
+       флудил менеджеру ~190 сообщений/сутки (несколько номеров × 48/день). Теперь пара быстрых напоминаний,
+       дальше РЕЗКО реже: 0→сразу · 1→30м · 2→2ч · 3→6ч · ≥4→раз в сутки. Стрик сбрасывается при реконнекте
+       (см. _autoQrStreak=0 рядом с _autoQrAt=0) → свежий отвал после успешного подключения снова шлёт сразу. */
+    const _bk = [0, 30 * 60e3, 2 * 3600e3, 6 * 3600e3, 24 * 3600e3];
+    const waitMs = _bk[Math.min(n._autoQrStreak || 0, _bk.length - 1)];
+    if (n._autoQrAt && nowT - n._autoQrAt < waitMs) return;
     const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     /* ⭐НОВОЕ: вместо авто-пуша QR (который живёт ~минуту и часто «не успевал») — мгновенное НАДЁЖНОЕ
        уведомление об отвале + inline-кнопка «📷 Показать QR-код». Клик → свежий QR подтягивается по
@@ -3949,7 +3955,7 @@ async function autoQrOnDrop(db, n, who) {
         }
       }
     } catch (_) {}
-    if (sent.size) { n._autoQrAt = nowT; store.save(); }   /* рейт-лимит ставим только если реально уведомили */
+    if (sent.size) { n._autoQrAt = nowT; n._autoQrStreak = Math.min((n._autoQrStreak || 0) + 1, 4); store.save(); }   /* рейт-лимит+стрик ставим только если реально уведомили */
   } catch (_) {}
 }
 
@@ -4426,7 +4432,7 @@ async function waDropWatch() {
           /* ⭐АВТО-ПОДОЗРЕНИЕ НА БАН: номер не возвращается >24ч → вероятно заблокирован WhatsApp. Ставим флаг
              (бейдж в UI + кнопка «Заменить») и ОДИН мягкий алерт. НЕ списываем деньги сами — замену клиент
              подтверждает кнопкой (покупка нового за свой баланс). Восстановление/бан-замена сбрасывают флаг. */
-          if (cur === 'connected' || n.banned) { n._downSince = null; if (n.suspectBanned) n.suspectBanned = false; n._autoQrAt = 0; }   /* ⭐ сброс рейт-лимита авто-QR при возврате на связь: номер «падает несколько раз в день» — КАЖДЫЙ новый отвал после успешного реконнекта шлёт свежий QR (30-мин лимит глушит только номер, что СТОИТ в отвале/флапе, не восстановившись) */
+          if (cur === 'connected' || n.banned) { n._downSince = null; if (n.suspectBanned) n.suspectBanned = false; n._autoQrAt = 0; n._autoQrStreak = 0; }   /* ⭐ сброс рейт-лимита+стрика авто-QR при возврате на связь: номер «падает несколько раз в день» — КАЖДЫЙ новый отвал после успешного реконнекта шлёт свежий QR (30-мин лимит глушит только номер, что СТОИТ в отвале/флапе, не восстановившись) */
           else { if (!n._downSince) n._downSince = Date.now();
             const _downMs = Date.now() - n._downSince;
             /* ⭐ЗАЛИП: номер застрял не-connected (reconnecting/qr/none) >20 мин — воркер явно не восстановился сам.
@@ -11479,7 +11485,7 @@ const server = http.createServer(async (req, res) => {
       /* ⭐САМОЛЕЧЕНИЕ «возможно забанен»: если воркер прямо сейчас отдаёт connected — номер доказанно НЕ забанен,
          гасим подозрение немедленно (не ждём 10-мин waDropWatch). Был баг: после реконнекта плашка не уходила. */
       let _glChanged = false;
-      for (const n of (g.numbers || [])) { const lv = live[waGraySid(n.phone)]; if (lv && lv.status === 'connected' && (n.suspectBanned || n._downSince || n._autoQrAt)) { n.suspectBanned = false; n._downSince = null; n._autoQrAt = 0; _glChanged = true; } }
+      for (const n of (g.numbers || [])) { const lv = live[waGraySid(n.phone)]; if (lv && lv.status === 'connected' && (n.suspectBanned || n._downSince || n._autoQrAt)) { n.suspectBanned = false; n._downSince = null; n._autoQrAt = 0; n._autoQrStreak = 0; _glChanged = true; } }
       if (_glChanged) store.save();
       const numbers = (g.numbers || []).map(n => { const lv = live[waGraySid(n.phone)] || { status: 'none' }; return Object.assign({}, n, { live: lv, realPhone: lv.phone || null, newToday: grayNewToday(n), newCap: grayNewLeadCap(db), warm: grayWarmScore(n) }); });
       const platform = waWorkerPlatform();
@@ -12200,7 +12206,7 @@ const server = http.createServer(async (req, res) => {
            connectedAt + live.status. По нему заказ сам доедет до «Готово» и уйдёт из активного списка. */
         if (r && r.session && r.session.status === 'connected') {
           const rec = ((db.settings.waGray || {}).numbers || []).find(n => String(n.phone).replace(/\D/g, '') === phone || (n.live && String(n.live.phone || '').replace(/\D/g, '') === phone));
-          if (rec) { if (!rec.connectedAt) rec.connectedAt = Date.now(); rec.live = Object.assign({}, rec.live || {}, { status: 'connected', phone: r.session.phone || (rec.live && rec.live.phone) || null }); if (rec.suspectBanned) rec.suspectBanned = false; rec._downSince = null; rec._autoQrAt = 0; store.save(); }
+          if (rec) { if (!rec.connectedAt) rec.connectedAt = Date.now(); rec.live = Object.assign({}, rec.live || {}, { status: 'connected', phone: r.session.phone || (rec.live && rec.live.phone) || null }); if (rec.suspectBanned) rec.suspectBanned = false; rec._downSince = null; rec._autoQrAt = 0; rec._autoQrStreak = 0; store.save(); }
         }
         return json(res, 200, { ok: true, session: r.session });
       }

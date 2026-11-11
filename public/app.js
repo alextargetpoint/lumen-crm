@@ -3515,6 +3515,11 @@ async function render() {
         const isWave = !!go._wave; go._wave = false;      /* смена раздела → волна входа */
         const silent = !!render._silent; render._silent = false;  /* фоновый poll → без анимации и без скачка скролла */
         const prevScroll = c0.scrollTop;
+        /* ⭐СМЕНА СЕКЦИИ → всегда с её верха. Иначе #content наследовал скролл прошлой страницы, и на воронке
+           расчёт высоты доски (fit: innerHeight - boardTop) мерил boardTop относительно УЖЕ проскролленного
+           вьюпорта → высота кривая → доска выше экрана → #content залипал внизу (жалоба: «воронка застревает,
+           не скроллится»). Сбрасываем ДО рендера, чтобы fit() мерил с верного top. Тихий poll НЕ трогаем. */
+        if (isWave && !silent) c0.scrollTop = 0;
         /* ⭐ воронка-канбан: горизонтальный скролл доски и вертикальный скролл колонок живут НЕ на #content,
            а на .kanban / .kb-cards. Тихий poll-ре-рендер (каждые 7с) и смена фильтра пересобирают innerHTML →
            эти позиции обнулялись → доску откидывало на ПЕРВУЮ стадию посреди бокового скролла (жалоба клиента:
@@ -5671,13 +5676,16 @@ PAGES.funnel = async (root) => {
   /* «Статистика по стадиям»: клик-тумблер (пин) вместо открытия по случайному hover — больше не «скачет» */
   $('#fnlStatsToggle')?.addEventListener('click', () => { PAGE_STATE.funnelStatsOpen = !(PAGE_STATE.funnelStatsOpen || PAGE_STATE.funnelStage); render(); });
   $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; PAGE_STATE.funnelCreated = ''; PAGE_STATE.funnelActivity = ''; PAGE_STATE.funnelChan = ''; PAGE_STATE.funnelHealth = ''; PAGE_STATE.funnelValid = ''; render(); });
-  $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => { PAGE_STATE._focusFQ = true; setF('funnelQ', e.target.value); }, 350); });
+  /* ⚠️ВСЕ обработчики тулбара — через ?.: любой отсутствующий в текущем виде элемент (напр. #fGeo в
+     свёрнутом drawer на части тем/состояний) РАНЬШЕ кидал TypeError и рвал привязку НИЖЕ — тогда «Столбцы»
+     и сортировка колонок (идут после) переставали работать («кнопка Столбцы ничего не делает»). */
+  $('#fQ')?.addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => { PAGE_STATE._focusFQ = true; setF('funnelQ', e.target.value); }, 350); });
   /* поиск терял фокус: debounce→render пересобирал поле. Возвращаем фокус+каретку в конец после ре-рендера (как на «Объектах»). */
   if (PAGE_STATE._focusFQ) { PAGE_STATE._focusFQ = false; const qi = $('#fQ'); if (qi) { qi.focus(); const v = qi.value; qi.value = ''; qi.value = v; } }
-  $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));
-  $('#fSrc').addEventListener('change', (e) => setF('funnelSrc', e.target.value));
+  $('#fGeo')?.addEventListener('change', (e) => setF('funnelGeo', e.target.value));
+  $('#fSrc')?.addEventListener('change', (e) => setF('funnelSrc', e.target.value));
   $('#fVendor')?.addEventListener('change', (e) => setF('funnelVendor', e.target.value));
-  $('#fBroker').addEventListener('change', (e) => setF('funnelBroker', e.target.value));
+  $('#fBroker')?.addEventListener('change', (e) => setF('funnelBroker', e.target.value));
   $('#fCreated')?.addEventListener('change', (e) => setF('funnelCreated', e.target.value));
   $('#fActivity')?.addEventListener('change', (e) => setF('funnelActivity', e.target.value));
   $('#fChan')?.addEventListener('change', (e) => setF('funnelChan', e.target.value));
@@ -5843,9 +5851,12 @@ function wireKanbanScroll(root) {
   const board = $('.kanban', root);
   if (!board) return;
   const scrollable = () => board.scrollWidth > board.clientWidth + 4;
-  /* высота доски = остаток вьюпорта → колонки (.kb-cards) скроллятся вертикально ВНУТРИ, а не тянут страницу */
-  const fit = () => { const top = board.getBoundingClientRect().top; board.style.height = Math.max(340, window.innerHeight - top - 14) + 'px'; };
-  fit();
+  /* высота доски = остаток вьюпорта → колонки (.kb-cards) скроллятся вертикально ВНУТРИ, а не тянут страницу.
+     ⚠️Меряем top ТОЛЬКО когда он валиден (доска в пределах экрана): во время перехода/при унаследованном
+     скролле top бывал ≤0 → высота раздувалась → доска вылезала за экран → страница залипала. Повторяем на
+     следующем кадре и через 160мс — после инъекции вкладок воркспейса/шрифтов/пилюли Помощника. */
+  const fit = () => { const top = board.getBoundingClientRect().top; if (top < 40 || top > window.innerHeight) return; board.style.height = Math.max(340, window.innerHeight - top - 14) + 'px'; };
+  fit(); requestAnimationFrame(fit); setTimeout(fit, 160);
   if (!window._kbFitBound) { window._kbFitBound = true; window.addEventListener('resize', () => { const b = document.querySelector('.kanban'); if (b) { const t = b.getBoundingClientRect().top; b.style.height = Math.max(340, window.innerHeight - t - 14) + 'px'; } }); }
   board.addEventListener('wheel', (e) => {
     if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;   /* горизонтальный жест (трекпад) — не мешаем */
