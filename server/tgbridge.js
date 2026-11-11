@@ -191,7 +191,9 @@ async function handleUpdate(db, update) {
     const data = String(cq.data || '');
     try { await safeApi(db, 'answerCallbackQuery', { callback_query_id: cq.id, text: data.startsWith('qr:') ? 'Готовлю свежий QR…' : '' }); } catch (_) {}
     if (data.startsWith('qr:') && waQr && cbChat) {
-      try { await waQr(db, cbChat, '/qr ' + data.slice(3) + ' !'); } catch (e) { console.error('[tgbridge] cb qr', e.message); }
+      /* без форс-«!»: отвалившийся номер пересоберётся (он не connected), а по рабочему номеру придёт «уже на связи»
+         вместо разрушительного force-logout — безопасно для тап-панели по ВСЕМ номерам (клик по 🟢 не рвёт сессию). */
+      try { await waQr(db, cbChat, '/qr ' + data.slice(3)); } catch (e) { console.error('[tgbridge] cb qr', e.message); }
     }
     return { callback: data };
   }

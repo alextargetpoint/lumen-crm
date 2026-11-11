@@ -3869,10 +3869,12 @@ async function handleOwnerWaQr(db, chatId, text) {
   /* без аргумента — список номеров и как запросить QR */
   if (!arg) {
     const list = nums.map(n => `• <b>${esc(n.label || n.phone)}</b> (${esc(n.phone)}) — ${stText(n.phone)}`).join('\n');
-    const ex = nums[0].label || nums[0].phone;
+    /* ⭐ПАНЕЛЬ QR: кнопка под КАЖДЫМ номером — тап → свежий QR, без ввода «/qr имя». Удобно основателю выдать
+       QR любому менеджеру (напр. Алине) прямо в Telegram. Клик по 🟢 безопасен (callback без форс-«!»). */
+    const kb = { inline_keyboard: nums.slice(0, 24).map(n => { const s = (live[waGraySid(n.phone)] || {}).status; const dot = s === 'connected' ? '🟢' : s === 'qr' ? '🟡' : '🔴'; return [{ text: `${dot} ${n.label || n.phone} — QR`, callback_data: 'qr:' + String(n.phone).replace(/[^0-9]/g, '').slice(0, 20) }]; }) };
     const _myB = (db.brokers || []).find(x => x.active !== false && tgbridge.brokerChatIds(x).includes(String(chatId)));
     const _autoLine = (_isBroker && !_isOwner) ? `\n\n🔔 Авто-QR при отвале: ${_myB && _myB.autoQrOptOut ? 'выключен (<code>/qr on</code> — включить)' : 'включён — пришлю QR сюда сам'}.` : '';
-    await tgbridge.notify(db, chatId, `📱 <b>WhatsApp-номера</b>\n${list}\n\nЧтобы получить новый QR, отправьте:\n<code>/qr ${esc(ex)}</code>${_autoLine}`);
+    await tgbridge.notify(db, chatId, `📱 <b>WhatsApp-номера</b> — нажмите номер, пришлю свежий QR для пересканирования:\n${list}${_autoLine}`, kb);
     return true;
   }
   /* резолв номера: по цифрам (точно → подстрока) или по метке */
