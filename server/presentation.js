@@ -532,6 +532,8 @@ function syncCollectionConnectors(db, coll, opts) {
     const nm = (coll.showClientName !== false && coll.clientName) ? String(coll.clientName).trim() : '';
     if (nm) intro.contentBindings.locationLabel = ov(['Подготовлено для ' + nm]);
     else { const gi = geoInfo((propsByK[order[0]] || {}).geo); intro.contentBindings.locationLabel = ov([gi.region, gi.country].filter(Boolean)); }
+    // счётчик «N объектов» на обложке держим в актуальном состоянии по ВИДИМОМУ составу (раньше заморожен с создания)
+    if (M >= 1) intro.contentBindings.metrics = ov([{ value: String(M), label: ruPlural(M, 'объект', 'объекта', 'объектов'), icon: 'home' }]);
   }
   const toc0 = (coll.orderedSections || []).filter(s => s.family === 'contents')[0];
   const cmp = (coll.orderedSections || []).filter(s => s.family === 'comparison')[0];
@@ -544,7 +546,11 @@ function syncCollectionConnectors(db, coll, opts) {
       toc.contentBindings = toc.contentBindings || {};
       toc.contentBindings.items = ov(order.map((k, pos) => collContentsItem(propsByK[k] || {}, pos)));
       const sb = toc.contentBindings.subtitle;
-      if (!sb || sb.value == null || sb.value === '') toc.contentBindings.subtitle = ov('Мы подобрали ' + M + ' ' + ruPlural(M, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
+      const sbCur = sb && sb.value;
+      // регенерируем подводку ТОЛЬКО если она пуста или всё ещё авто-шаблонная «Мы подобрали N…» (иначе заморожен счётчик);
+      // кастомный текст пользователя (не по шаблону) не трогаем
+      const sbAuto = sbCur == null || sbCur === '' || /^Мы подобрали \d+ /.test(String(sbCur));
+      if (sbAuto) toc.contentBindings.subtitle = ov('Мы подобрали ' + M + ' ' + ruPlural(M, 'объект', 'объекта', 'объектов') + '. Ниже — коротко о каждом, далее — подробные страницы.');
     }
     order.forEach((k, pos) => tagObjectHeroSeq(objSectionsOf(coll, k), propsByK[k] || {}, pos, M));
     if (cmp) syncComparison(db, cmp, order.map(k => propsByK[k] || {}));
