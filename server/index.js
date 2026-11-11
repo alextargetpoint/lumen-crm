@@ -4097,7 +4097,17 @@ function pickGrayNumber(db, lead, live) {
     if (healthy.length) scope = healthy; }
   /* РАСПРЕДЕЛЕНИЕ по номерам БРОКЕРА: если за брокером закреплено НЕСКОЛЬКО номеров — раскидываем первые
      касания по кругу, а не шлём всё с одного. Так номера греются равномерно, отвал одного рвёт связь лишь с частью. */
-  if (lead.broker) { const mine = scope.filter(n => n.brokerId === lead.broker); if (mine.length) scope = mine; }
+  /* ⭐#6 ЗАЩИТА НОМЕРА МЕНЕДЖЕРА: если за брокером лида закреплён СВОЙ номер — сообщение уходит ТОЛЬКО с него.
+     Его номер разлогинен → НЕ подменяем чужим номером другого менеджера (клиент: «Алина написала — ушло с номера ЛН»),
+     а честно проваливаем с алертом «переподключи свой номер». Брокер без своего закреплённого номера — прежний пул-фолбэк. */
+  if (lead.broker) {
+    const assigned = (g.numbers || []).filter(n => n.brokerId === lead.broker);
+    if (assigned.length) {
+      const mine = scope.filter(n => n.brokerId === lead.broker);
+      if (mine.length) scope = mine;
+      else { lead._brokerNumOffline = (assigned[0].realPhone || assigned[0].phone); return null; }
+    }
+  }
   /* ⭐ТВЁРДЫЙ дневной потолок (прогрев): номер, исчерпавший суточный лимит отправок, НЕ берём. Если под лимитом
      нет ни одного — откладываем касание (анти-бан), а не шлём сверх нормы с перегретого номера. */
   const withBudget = scope.filter(n => graySentToday(n) < grayDailyCap(db, n));
@@ -4150,6 +4160,13 @@ engine.setGraySender((db, lead, m, _opts) => {
   }
   if (!num) {   /* был мок «delivered» — теперь честный провал. Диалог НЕ переносим на другой номер автоматически. */
     m.status = 'failed';
+    if (lead._brokerNumOffline) {   /* ⭐#6: номер самого менеджера разлогинен — не ушли на чужой, алерт менеджеру */
+      const bn = lead._brokerNumOffline; const brk = (db.brokers || []).find(b => b.id === lead.broker); delete lead._brokerNumOffline;
+      m.failReason = `Ваш номер +${bn} разлогинен — переподключите его по QR в «Номера», и сообщение уйдёт именно с него. На чужой номер мы его НЕ отправляем.`;
+      ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `⚠️ Ответ НЕ ушёл (${lead.name}): номер менеджера${brk ? ' ' + brk.name : ''} +${bn} разлогинен. Переподключите по QR — сообщение уйдёт с него же (на чужой номер не переносим).` });
+      try { if (brk && brk.tgChatId) tgbridge.notify(db, brk.tgChatId, `⚠️ Ваш WhatsApp-номер +${bn} разлогинен — сообщение клиенту ${lead.name} НЕ ушло. Переподключите номер по QR в «Номера», и переписка продолжится с него.`).catch(() => {}); } catch (_) {}
+      store.save(); return;
+    }
     m.failReason = lead.grayPhone
       ? `Номер диалога +${lead.grayPhone} не на связи (разлогинен) — переподключите его по QR в «Номера», переписка продолжится с него же`
       : 'Нет WhatsApp-номера на связи — переподключите по QR в «Номера»';

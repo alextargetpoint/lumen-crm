@@ -1443,7 +1443,11 @@
     if (!st || !st.me || !st.settings || !st.settings.agency) return false;
     const isOwner = st.me.role === 'owner' || st.me.role === 'master';
     const forced = location.hash === '#setup';   /* прямая ссылка на церемонию — открыть даже у «пройденных» */
-    if (isOwner && (forced || !st.settings.agency.onboarded)) { _autoShown = true; if (forced) history.replaceState(null, '', location.pathname); setTimeout(() => open({ auto: true }), forced ? 200 : 400); return true; }
+    /* ⭐ возврат из подключения интеграции (Meta/Zoom/Google/соцсети) делает полный редирект → перезагрузку.
+       НЕ навязываем приветственную церемонию в этот момент — владелец посреди настройки, а не на первом запуске
+       (клиент SFG: «после подключения постоянно запускается онбординг»). #setup по-прежнему открывает принудительно. */
+    const fromOAuth = /[?&](meta|zoom|gmeet|google|social|ig|fb|connected)=/.test(location.search);
+    if (isOwner && (forced || (!fromOAuth && !st.settings.agency.onboarded))) { _autoShown = true; if (forced) history.replaceState(null, '', location.pathname); setTimeout(() => open({ auto: true }), forced ? 200 : 400); return true; }
     return false;
   }
   // самополлинг — на случай, если app.js вызвал maybeAuto раньше нашей загрузки
