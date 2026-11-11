@@ -1410,6 +1410,16 @@ function clientIp(req) {
    (META_APP_ID/META_APP_SECRET). Права — ровно под подачу App Review. client_secret только на сервере. */
 const META_GRAPH_V = 'v21.0';
 const META_SCOPES = 'ads_read,business_management,pages_show_list,pages_read_engagement';   /* leads_retrieval — только когда на Meta добавлен use-case «Lead Ads» (иначе FB: Invalid Scopes) */
+/* ⭐УПРАВЛЕНИЕ КОММЕНТАРИЯМИ (IG + FB, под рекламой и обычными постами) — права под connect соцсетей.
+   Модуль server/comments.js: публичный ответ (comments/replies), скрытие (is_hidden), личный ответ
+   (private_replies/DM), приём комментов вебхуком (ingest). Соответствие прав Meta:
+   · FB-страница: pages_manage_engagement (ответ/скрыть/удалить коммент), pages_messaging (private_replies/DM),
+     pages_manage_metadata (подписка страницы на вебхук feed/comments). pages_show_list+pages_read_engagement — уже в META_SCOPES.
+   · Instagram: instagram_basic (доступ к IG-аккаунту), instagram_manage_comments (чтение/ответ/скрытие комментов,
+     в т.ч. под рекламой), instagram_manage_messages (private_replies/DM из комментария).
+   Запрашивать при OAuth-подключении соцсетей (отдельный config_id/волна App Review); токен кладётся в settings.social.{ig|fb}. */
+const META_COMMENT_SCOPES_FB = 'pages_show_list,pages_read_engagement,pages_manage_engagement,pages_messaging,pages_manage_metadata';
+const META_COMMENT_SCOPES_IG = 'instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement';
 const _metaOAuthStates = new Map();   /* nonce → {tid, at}; TTL 10 мин, одноразовый (CSRF + привязка к тенанту) */
 function metaOAuthMakeState(tid) {
   const nonce = crypto.randomBytes(16).toString('hex');
