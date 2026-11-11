@@ -490,11 +490,14 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   #bulkbar .bb-b .ic{width:15px;height:15px;display:inline-flex}#bulkbar .bb-b .ic svg{width:15px;height:15px;fill:currentColor}
   #bulkbar .bb-b:active{background:var(--acc);color:#fff;border-color:var(--acc)}
   /* ── нижний шит (передать брокеру) ── */
-  .sheet{position:fixed;inset:0;z-index:9500;display:none}.sheet.on{display:block}
+  /* ⚠️ ОВЕРЛЕЙ-ЛИСТЫ (фильтр лидов + передача лидов) — корневой класс .osheet, НЕ .sheet:
+     .sheet уже занят экшн-листом (строка ~191, transform:translateY(100%)); общий класс уводил
+     оверлей за экран (translateY оставался) и ломал вид. .sheet-bg/card/h/i/ava — уникальны, их не трогаем. */
+  .osheet{position:fixed;inset:0;z-index:9500;display:none}.osheet.on{display:block}
   .sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
   .sheet-card{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:20px 20px 0 0;border-top:1px solid var(--line);padding:14px 14px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;animation:sheetin .25s cubic-bezier(.2,.9,.3,1)}
   @keyframes sheetin{from{transform:translateY(100%)}to{transform:translateY(0)}}
-  .sheet-h{font-size:15px;font-weight:700;margin:2px 4px 12px}
+  .sheet-h{font-size:15px;font-weight:700;margin:2px 4px 12px;display:flex;align-items:center}
   .sheet-i{display:flex;align-items:center;gap:11px;width:100%;padding:11px 10px;border-radius:14px;border:0;background:transparent;color:var(--ink);font-size:14px;cursor:pointer;text-align:left}
   .sheet-i:active{background:rgba(255,255,255,.07)}
   .sheet-ava{width:34px;height:34px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto}
@@ -806,8 +809,10 @@ function numCss(){if(document.getElementById('numCss'))return;const st=document.
 .num-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .num-id b{font-size:15px}
 .num-id span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.num-st{font-size:11.5px;font-weight:600;white-space:nowrap;flex:none}
-.num-st.connected{color:#1f9d6b}.num-st.qr{color:#c98a0e}
+.num-st{font-size:11.5px;font-weight:600;white-space:nowrap;flex:none;display:inline-flex;align-items:center;color:var(--mut)}
+.num-dot{width:8px;height:8px;border-radius:50%;margin-right:6px;background:#d14b4b;flex:none}
+.num-st.connected{color:#1f9d6b}.num-st.connected .num-dot{background:#1f9d6b}
+.num-st.qr{color:#c98a0e}.num-st.qr .num-dot{background:#c98a0e}
 .num-qr{margin-top:11px;width:100%;padding:11px;border:0;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;background:var(--panel2,rgba(127,127,127,.1));color:var(--txt)}
 .num-qr.need{background:linear-gradient(135deg,#2f6bff,#1d4fd8);color:#fff;box-shadow:0 10px 22px -10px rgba(47,107,255,.6)}
 .num-qr:disabled{opacity:.6}
@@ -820,12 +825,12 @@ function numCss(){if(document.getElementById('numCss'))return;const st=document.
 .qr-close{width:100%;padding:12px;border:0;border-radius:12px;background:#111;color:#fff;font-weight:700;font-size:14px;cursor:pointer}
 `;document.head.appendChild(st);}
 async function loadNumbers(){numCss();const box=$('#numbers');box.innerHTML='<div class="load"><div class="sp"></div>Загрузка номеров…</div>';try{const d=await jget('/tgapp/api/numbers');renderNumbers(d);}catch(e){box.innerHTML='<div class="empty">Не удалось загрузить номера.<br>'+esc(e.message)+'</div>';}}
-function numStatusTxt(s){return s==='connected'?['🟢','на связи']:s==='qr'?['🟡','ждёт QR']:['🔴','не на связи'];}
+function numStatusTxt(s){return s==='connected'?'на связи':s==='qr'?'ждёт QR':'не на связи';}
 function renderNumbers(d){const box=$('#numbers');if(!d.workerReady){box.innerHTML='<div class="empty">WhatsApp-воркер не подключён — QR недоступен.<br>Проверьте настройки в CRM.</div>';return;}const nums=d.numbers||[];if(!nums.length){box.innerHTML='<div class="empty">Нет подключённых WhatsApp-номеров.<br>Добавьте номер в CRM → «Номера».</div>';return;}
   const hint='<div class="num-hint">Нажмите у номера — пришлём свежий QR для пересканирования. Сканировать: на телефоне WhatsApp → Связанные устройства → Привязать устройство.</div>';
-  box.innerHTML=hint+nums.map(n=>{const [dot,txt]=numStatusTxt(n.status);const need=n.status!=='connected';return '<div class="num-card"><div class="num-top"><div class="num-id"><b>'+esc(n.label)+'</b><span>'+esc(n.phone)+(n.broker?' · '+esc(n.broker):'')+'</span></div><span class="num-st '+esc(n.status)+'">'+dot+' '+txt+'</span></div><button class="num-qr '+(need?'need':'')+'" data-phone="'+esc(n.phone)+'" data-label="'+esc(n.label)+'">'+(need?'📷 Показать QR':'♻️ Пересканировать')+'</button></div>';}).join('');
+  box.innerHTML=hint+nums.map(n=>{const txt=numStatusTxt(n.status);const need=n.status!=='connected';return '<div class="num-card"><div class="num-top"><div class="num-id"><b>'+esc(n.label)+'</b><span>'+esc(n.phone)+(n.broker?' · '+esc(n.broker):'')+'</span></div><span class="num-st '+esc(n.status)+'"><span class="num-dot"></span>'+txt+'</span></div><button class="num-qr '+(need?'need':'')+'" data-phone="'+esc(n.phone)+'" data-label="'+esc(n.label)+'">'+(need?'Показать QR':'Пересканировать')+'</button></div>';}).join('');
   box.querySelectorAll('.num-qr').forEach(b=>b.onclick=()=>{hap();numQr(b.dataset.phone,b.dataset.label,b);});}
-async function numQr(phone,label,btn){const busy=tgBusy('Готовлю свежий QR для «'+label+'»…');if(btn)btn.disabled=true;try{const r=await jpost('/tgapp/api/numbers/qr',{phone});busy.close();if(r.connected){toast('🟢 «'+label+'» уже на связи — QR не нужен');loadNumbers();return;}if(r.pending){toast('⌛ QR пока не пришёл — нажмите ещё раз');return;}if(r.qr){showQr(r.qr,label);}}catch(e){busy.close();toast('Не вышло: '+e.message);}finally{if(btn)btn.disabled=false;}}
+async function numQr(phone,label,btn){const busy=tgBusy('Готовлю свежий QR для «'+label+'»…');if(btn)btn.disabled=true;try{const r=await jpost('/tgapp/api/numbers/qr',{phone});busy.close();if(r.connected){toast('«'+label+'» уже на связи — QR не нужен');loadNumbers();return;}if(r.pending){toast('QR пока не пришёл — нажмите ещё раз');return;}if(r.qr){showQr(r.qr,label);}}catch(e){busy.close();toast('Не вышло: '+e.message);}finally{if(btn)btn.disabled=false;}}
 function showQr(qr,label){let ov=$('#qrOv');if(ov)ov.remove();ov=document.createElement('div');ov.id='qrOv';ov.className='qr-ov';ov.innerHTML='<div class="qr-card"><div class="qr-h">QR для «'+esc(label)+'»</div><img src="'+esc(qr)+'" class="qr-img" alt="QR"><div class="qr-sub">На телефоне: WhatsApp → Настройки → Связанные устройства → Привязать устройство → наведите на этот QR.</div><button class="qr-close">Готово</button></div>';document.body.appendChild(ov);requestAnimationFrame(()=>ov.classList.add('on'));const close=()=>{ov.classList.remove('on');setTimeout(()=>ov.remove(),200);};ov.querySelector('.qr-close').onclick=close;ov.onclick=e=>{if(e.target===ov)close();};}
 async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){
   const stale=/no route|404/i.test(String(e.message));
@@ -1566,7 +1571,7 @@ async function doBulk(action,extra){const ids=extra.ids||[...SEL];try{
   toast(action==='ai_off'?'ИИ выключен · '+r.n:action==='ai_on'?'ИИ включён · '+r.n:'Передано · '+r.n);
   exitSel();if(MODE==='chats')loadChats();else loadLeads();
 }catch(e){toast(e.message||'не вышло')}}
-function openXferSheet(ids){let sh=$('#xfersheet');if(!sh){sh=document.createElement('div');sh.id='xfersheet';sh.className='sheet';document.body.appendChild(sh)}
+function openXferSheet(ids){let sh=$('#xfersheet');if(!sh){sh=document.createElement('div');sh.id='xfersheet';sh.className='osheet';document.body.appendChild(sh)}
   const brs=(ME.brokers||[]);
   sh.innerHTML='<div class="sheet-bg" data-close></div><div class="sheet-card"><div class="sheet-h">Передать '+ids.length+' '+_plur(ids.length,'лид','лида','лидов')+'</div><div class="sheet-list">'+
     '<button class="sheet-i" data-b="owner"><span class="sheet-ava">★</span>Себе (Основатель)</button>'+
@@ -1633,7 +1638,7 @@ function wireLeadTog(){
   const fb=$('#leads').querySelector('[data-act="lfopen"]'); if(fb)fb.onclick=openLeadFilters;
 }
 function openLeadFilters(){
-  let sh=$('#lfsheet');if(!sh){sh=document.createElement('div');sh.id='lfsheet';sh.className='sheet';document.body.appendChild(sh)}
+  let sh=$('#lfsheet');if(!sh){sh=document.createElement('div');sh.id='lfsheet';sh.className='osheet';document.body.appendChild(sh)}
   const uniq=(key,nameKey)=>{const m={};LEADS.forEach(l=>{const v=l[key];if(v)m[v]=(nameKey?l[nameKey]:'')||v});return Object.entries(m)};
   const vendors=uniq('vendorId','vendorName'), brokers=uniq('broker','brokerName');
   const geos=[...new Set(LEADS.map(l=>l.geoKey||l.geo).filter(Boolean))];
