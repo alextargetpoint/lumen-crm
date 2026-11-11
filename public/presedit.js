@@ -538,7 +538,7 @@
     var budget = S.fmt === 'portrait_a4' ? 640 : S.fmt === 'landscape_16_9' ? 440 : S.fmt === 'portrait_9_16' ? 400 : 540;
     if (body.length <= budget) return null;
     var paras = body.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
-    if (paras.length < 2) return null;    // один абзац не переносим — это задача сокращения/макета
+    if (paras.length < 2) return { paras: paras, fit: paras.length, over: 0, budget: budget, noSplit: true };    // один абзац не разбить — только сократить/сменить макет
     var acc = 0, fit = 0;
     for (var i = 0; i < paras.length; i++) { acc += paras[i].length + 2; if (acc <= budget || fit === 0) fit++; else break; }
     var over = paras.length - fit;
@@ -547,8 +547,12 @@
   }
   function overflowPanel() {
     var info = overflowInfo(curSection()); if (!info) { return '<div class="pe-add-hd"><b>Всё помещается</b><button class="pe-x" data-act="ovclose">' + ic('x') + '</button></div><div class="pe-ov-sub">Текст укладывается на странице.</div>'; }
-    var opt = S.ovOpt || 'continue';
-    var opts = [
+    var opt = S.ovOpt || (info.noSplit ? 'shorten' : 'continue');
+    if (info.noSplit && opt === 'continue') opt = 'shorten';   /* один абзац нельзя «продолжить» — переносим выбор на сокращение */
+    var opts = info.noSplit ? [
+      ['shorten', 'Предложить сокращение', 'Создать более короткий вариант текста с сохранением смысла.', true],
+      ['layout', 'Выбрать другой макет', 'Подобрать композицию с бо́льшим местом для текста.', false],
+    ] : [
       ['continue', 'Продолжить на новой странице', 'Текст будет перенесён на следующую страницу с таким же оформлением.', true],
       ['layout', 'Выбрать другой макет', 'Подобрать композицию с бо́льшим местом для текста.', false],
       ['shorten', 'Предложить сокращение', 'Создать более короткий вариант текста с сохранением смысла.', false],
@@ -563,7 +567,7 @@
       : '';
     var note = opt === 'shorten' ? ic('warn') + 'ИИ сократит текст — проверьте факты и цифры' : ic('check') + 'Текст будет сохранён полностью';
     return '<div class="pe-add-hd"><b>Текст не помещается</b><button class="pe-x" data-act="ovclose">' + ic('x') + '</button></div>' +
-      '<div class="pe-ov-sub">На странице закончилось место для текста. Нужно перенести ' + info.over + ' ' + plural(info.over, 'абзац', 'абзаца', 'абзацев') + '.</div>' +
+      '<div class="pe-ov-sub">' + (info.noSplit ? 'Этот абзац не помещается целиком, а разбить его нельзя. Сократите текст или выберите макет с бо́льшим полем.' : ('На странице закончилось место для текста. Нужно перенести ' + info.over + ' ' + plural(info.over, 'абзац', 'абзаца', 'абзацев') + '.')) + '</div>' +
       '<div class="pe-ov-opts">' + rows + '</div>' +
       prev +
       '<div class="pe-ov-foot"><button class="pe-btn pe-btn-primary" data-act="ovapply" data-ovopt="' + opt + '">' + applyLabel + '</button><button class="pe-btn pe-btn-ghost" data-act="ovclose">Отмена</button></div>' +
@@ -573,6 +577,7 @@
   function applyOverflow(opt) {
     var s = curSection(); var info = overflowInfo(s);
     if (!info) { S.ovMode = false; render(); return; }
+    if (info.noSplit && opt === 'continue') opt = 'shorten';   /* один абзац не разбить — «продолжить» невозможно */
     if (opt === 'layout') { S.ovMode = false; S.tab = 'composition'; render(); toast('Выберите макет', 'Во вкладке «Макет страницы» — композиции с бо́льшим полем под текст.', true); return; }
     if (opt === 'shorten') {
       var body = cval(s, 'body'); S.ovMode = false; render();
