@@ -6163,6 +6163,35 @@ const server = http.createServer(async (req, res) => {
         const teamList = isOwner ? (db.brokers || []).filter(b => b.active !== false).map(b => ({ id: b.id, name: b.name })) : [];
         return json(res, 200, { role: auser.role, brokerId: abroker && abroker.id, name: auser.role === 'owner' ? 'Основатель' : (abroker && abroker.name) || '', agency: (db.settings.agency && db.settings.agency.name) || '', brokers: teamList });
       }
+      /* ⭐#7 УПРАВЛЕНИЕ НОМЕРАМИ в мини-аппе: список WhatsApp-номеров со статусом (владелец — все, брокер — свои) */
+      if (p === '/tgapp/api/numbers' && req.method === 'GET') {
+        const nums = ((db.settings.waGray || {}).numbers) || [];
+        const mine = isOwner ? nums : nums.filter(n => n.brokerId === (abroker && abroker.id));
+        let live = {}; if (waWorkerReady(db)) { try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) {} }
+        const bn = id => (db.brokers.find(b => b.id === id) || {}).name || '';
+        const out = mine.map(n => ({ phone: n.phone, label: n.label || n.phone, broker: n.brokerId ? bn(n.brokerId) : '', status: (live[waGraySid(n.phone)] || {}).status || 'none' }));
+        return json(res, 200, { numbers: out, workerReady: waWorkerReady(db), owner: isOwner });
+      }
+      /* рескан → свежий QR для показа прямо в мини-аппе (owner — любой номер; брокер — только свой) */
+      if (p === '/tgapp/api/numbers/qr' && req.method === 'POST') {
+        const b = await readBody(req);
+        const q = String(b.phone || '').replace(/\D/g, '');
+        const nums = ((db.settings.waGray || {}).numbers) || [];
+        const rec = nums.find(n => n.phone === q);
+        if (!rec) return json(res, 404, { error: 'номер не найден' });
+        if (!isOwner && rec.brokerId !== (abroker && abroker.id)) return json(res, 403, { error: 'можно пересканировать только свой номер' });
+        if (!waWorkerReady(db)) return json(res, 400, { error: 'WhatsApp-воркер не подключён' });
+        const sid = waGraySid(rec.phone);
+        const cur = await waGrayApi(db, 'GET', '/sessions/' + sid).then(s => (s && s.session) || {}).catch(() => ({}));
+        if (cur.status === 'connected' && !b.force) return json(res, 200, { connected: true });
+        try { await waGrayApi(db, 'POST', '/sessions/' + sid + '/logout').catch(() => {}); await waGrayApi(db, 'POST', '/sessions/' + sid + '/start'); }
+        catch (e) { return json(res, 500, { error: 'не удалось пересобрать сессию: ' + (e && e.message || '') }); }
+        let qr = '', connected = false;
+        for (let i = 0; i < 14; i++) { await new Promise(r => setTimeout(r, 1400)); let s; try { s = await waGrayApi(db, 'GET', '/sessions/' + sid); } catch (_) { continue; } const ss = (s && s.session) || {}; if (ss.status === 'connected') { connected = true; break; } if (ss.status === 'qr' && ss.qr) { qr = ss.qr; break; } }
+        if (connected) return json(res, 200, { connected: true });
+        if (!qr) return json(res, 200, { pending: true });
+        return json(res, 200, { qr });
+      }
       /* АНАЛИТИКА ДЛЯ ОСНОВАТЕЛЯ (сводка с телефона) */
       if (p === '/tgapp/api/analytics' && req.method === 'GET') {
         if (auser.role !== 'owner') return json(res, 403, { error: 'только для основателя' });

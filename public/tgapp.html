@@ -564,6 +564,7 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
       <div class="sub" id="sub">Загрузка…</div>
       <div class="viewseg" id="viewseg">
         <button data-v="analytics" id="segAnalytics" style="display:none"><span class="ic" data-ic="spark"></span>Аналитика</button>
+        <button data-v="numbers" id="segNumbers" style="display:none"><span class="ic" data-ic="call"></span>Номера</button>
         <button data-v="chats" class="on"><span class="ic" data-ic="chat"></span>Чаты<span class="vbadge" id="vbChats"></span></button>
         <button data-v="leads"><span class="ic" data-ic="user"></span>Лиды<span class="vbadge" id="vbLeads"></span></button>
         <button data-v="tasks"><span class="ic" data-ic="check"></span>Задачи<span class="vbadge" id="vbTasks"></span></button>
@@ -576,6 +577,7 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
     </div>
     <div id="chats"><div class="load"><div class="sp"></div>Загрузка чатов…</div></div>
     <div id="leads" class="hidden"></div>
+    <div id="numbers" class="hidden"></div>
     <div id="tasks" class="hidden"></div>
     <div id="meets" class="hidden"></div>
     <div id="ideas" class="hidden"></div>
@@ -780,21 +782,51 @@ let SELMODE=false, SEL=new Set();                   /* массовое выде
 window._leadView='list';                            /* 'list' | 'kanban' */
 const STG={new:['Новые','#8b93a7'],touch:['Первое касание','#6b8cff'],dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleeping:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
 const STG_ORDER=['new','touch','dialog','qualified','handover','viewing','deal','sleeping','lost'];
-const H1={chats:'Чаты',leads:'Лиды',tasks:'Задачи',meets:'Встречи',ideas:'Копилка идей',mood:'Карта желаний',analytics:'Аналитика'};
-const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark',mood:'img',analytics:'spark'};
+const H1={chats:'Чаты',leads:'Лиды',tasks:'Задачи',meets:'Встречи',ideas:'Копилка идей',mood:'Карта желаний',analytics:'Аналитика',numbers:'Номера'};
+const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark',mood:'img',analytics:'spark',numbers:'call'};
 function setSparkIcon(name){const sp=document.querySelector('.top h1 .spark');if(sp)sp.innerHTML=svg(name||'chat');}
 function setMode(m){if(SELMODE)clearSelQuiet();MODE=m;
   document.querySelectorAll('#viewseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===m));
   $('#h1t').textContent=H1[m]||'Пульт';
   setSparkIcon(IC_MODE[m]);
-  ['chats','leads','tasks','meets','ideas','mood','analytics'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
+  ['chats','leads','numbers','tasks','meets','ideas','mood','analytics'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
   const cont=$('#'+m); if(cont){cont.classList.remove('viewshow');void cont.offsetWidth;cont.classList.add('viewshow');}   /* плавный вход раздела */
   $('#segflt').style.display=m==='chats'?'':'none';
-  $('#q').closest('.search').style.display=(m==='meets'||m==='ideas'||m==='mood'||m==='analytics')?'none':'';
+  $('#q').closest('.search').style.display=(m==='meets'||m==='ideas'||m==='mood'||m==='analytics'||m==='numbers')?'none':'';
   $('#q').placeholder=m==='leads'?'Поиск лида или номера':m==='tasks'?'Поиск задачи':'Поиск';
-  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else if(m==='ideas')loadIdeas();else if(m==='mood')loadMood();else if(m==='analytics')loadAnalytics();else renderChats();
+  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else if(m==='ideas')loadIdeas();else if(m==='mood')loadMood();else if(m==='analytics')loadAnalytics();else if(m==='numbers')loadNumbers();else renderChats();
 }
 $('#viewseg')&&$('#viewseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();setMode(b.dataset.v)});
+/* ⭐#7 УПРАВЛЕНИЕ НОМЕРАМИ (визуальная секция): карточки номеров + статус + QR тапом */
+function numCss(){if(document.getElementById('numCss'))return;const st=document.createElement('style');st.id='numCss';st.textContent=`
+#numbers{padding:4px 2px 24px}
+.num-hint{font-size:12.5px;color:var(--mut);line-height:1.5;margin:2px 6px 14px}
+.num-card{background:var(--panel);border:1px solid var(--line,rgba(127,127,127,.14));border-radius:16px;padding:13px 14px;margin-bottom:11px;box-shadow:0 6px 18px -12px rgba(0,0,0,.25)}
+.num-top{display:flex;align-items:center;gap:10px}
+.num-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.num-id b{font-size:15px}
+.num-id span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.num-st{font-size:11.5px;font-weight:600;white-space:nowrap;flex:none}
+.num-st.connected{color:#1f9d6b}.num-st.qr{color:#c98a0e}
+.num-qr{margin-top:11px;width:100%;padding:11px;border:0;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;background:var(--panel2,rgba(127,127,127,.1));color:var(--txt)}
+.num-qr.need{background:linear-gradient(135deg,#2f6bff,#1d4fd8);color:#fff;box-shadow:0 10px 22px -10px rgba(47,107,255,.6)}
+.num-qr:disabled{opacity:.6}
+.qr-ov{position:fixed;inset:0;z-index:999;background:rgba(6,9,16,.72);display:grid;place-items:center;padding:20px;opacity:0;transition:opacity .2s}
+.qr-ov.on{opacity:1}
+.qr-card{background:#fff;border-radius:20px;padding:20px;max-width:340px;width:100%;text-align:center}
+.qr-h{font-size:16px;font-weight:700;color:#111;margin-bottom:12px}
+.qr-img{width:240px;height:240px;max-width:100%;border-radius:12px;image-rendering:pixelated}
+.qr-sub{font-size:12.5px;color:#555;line-height:1.5;margin:12px 0 14px}
+.qr-close{width:100%;padding:12px;border:0;border-radius:12px;background:#111;color:#fff;font-weight:700;font-size:14px;cursor:pointer}
+`;document.head.appendChild(st);}
+async function loadNumbers(){numCss();const box=$('#numbers');box.innerHTML='<div class="load"><div class="sp"></div>Загрузка номеров…</div>';try{const d=await jget('/tgapp/api/numbers');renderNumbers(d);}catch(e){box.innerHTML='<div class="empty">Не удалось загрузить номера.<br>'+esc(e.message)+'</div>';}}
+function numStatusTxt(s){return s==='connected'?['🟢','на связи']:s==='qr'?['🟡','ждёт QR']:['🔴','не на связи'];}
+function renderNumbers(d){const box=$('#numbers');if(!d.workerReady){box.innerHTML='<div class="empty">WhatsApp-воркер не подключён — QR недоступен.<br>Проверьте настройки в CRM.</div>';return;}const nums=d.numbers||[];if(!nums.length){box.innerHTML='<div class="empty">Нет подключённых WhatsApp-номеров.<br>Добавьте номер в CRM → «Номера».</div>';return;}
+  const hint='<div class="num-hint">Нажмите у номера — пришлём свежий QR для пересканирования. Сканировать: на телефоне WhatsApp → Связанные устройства → Привязать устройство.</div>';
+  box.innerHTML=hint+nums.map(n=>{const [dot,txt]=numStatusTxt(n.status);const need=n.status!=='connected';return '<div class="num-card"><div class="num-top"><div class="num-id"><b>'+esc(n.label)+'</b><span>'+esc(n.phone)+(n.broker?' · '+esc(n.broker):'')+'</span></div><span class="num-st '+esc(n.status)+'">'+dot+' '+txt+'</span></div><button class="num-qr '+(need?'need':'')+'" data-phone="'+esc(n.phone)+'" data-label="'+esc(n.label)+'">'+(need?'📷 Показать QR':'♻️ Пересканировать')+'</button></div>';}).join('');
+  box.querySelectorAll('.num-qr').forEach(b=>b.onclick=()=>{hap();numQr(b.dataset.phone,b.dataset.label,b);});}
+async function numQr(phone,label,btn){const busy=tgBusy('Готовлю свежий QR для «'+label+'»…');if(btn)btn.disabled=true;try{const r=await jpost('/tgapp/api/numbers/qr',{phone});busy.close();if(r.connected){toast('🟢 «'+label+'» уже на связи — QR не нужен');loadNumbers();return;}if(r.pending){toast('⌛ QR пока не пришёл — нажмите ещё раз');return;}if(r.qr){showQr(r.qr,label);}}catch(e){busy.close();toast('Не вышло: '+e.message);}finally{if(btn)btn.disabled=false;}}
+function showQr(qr,label){let ov=$('#qrOv');if(ov)ov.remove();ov=document.createElement('div');ov.id='qrOv';ov.className='qr-ov';ov.innerHTML='<div class="qr-card"><div class="qr-h">QR для «'+esc(label)+'»</div><img src="'+esc(qr)+'" class="qr-img" alt="QR"><div class="qr-sub">На телефоне: WhatsApp → Настройки → Связанные устройства → Привязать устройство → наведите на этот QR.</div><button class="qr-close">Готово</button></div>';document.body.appendChild(ov);requestAnimationFrame(()=>ov.classList.add('on'));const close=()=>{ov.classList.remove('on');setTimeout(()=>ov.remove(),200);};ov.querySelector('.qr-close').onclick=close;ov.onclick=e=>{if(e.target===ov)close();};}
 async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){
   const stale=/no route|404/i.test(String(e.message));
   $('#leads').innerHTML='<div class="empty">'+(stale?'Раздел «Лиды» ещё разворачивается на сервере — обновите приложение через минуту 🙌':'Не удалось загрузить лидов.<br>'+esc(e.message))+'</div>'}}
@@ -994,6 +1026,7 @@ async function applyRole(){
   if(ROLE==='owner'){
     /* владелец видит ВСЁ: аналитику + все чаты/лиды/диалоги (надзор) + ведёт своих. Вкладка «Аналитика» появляется. */
     const sa=$('#segAnalytics'); if(sa)sa.style.display='';
+    const sn=$('#segNumbers'); if(sn)sn.style.display='';
     setMode('analytics');
   }
 }
