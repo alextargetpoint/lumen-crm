@@ -1335,10 +1335,7 @@
     var s = curSection(); if (!s) { stage.innerHTML = ''; return; }
     var pages;
     try { pages = T.renderSection(withMirror(s), ctx()); } catch (e) { pages = ['<div class="lp-safe lp-empty">Ошибка макета</div>']; }
-    var f = TOK.format(S.fmt);
-    stage.innerHTML = pages.map(function (html) { return '<div style="margin-bottom:18px">' + wrapPage(html, f) + '</div>'; }).join('');
-    // actually wrapPage returns full .lp-page; set stage sizing on outer
-    stage.innerHTML = pages.map(function (html) { return html; }).join('');
+    stage.innerHTML = pages.join('');   /* секция рендерится в один или несколько .lp-page */
     fitCanvas();
     wireCanvasEditingOnce(); markCanvasEditable();
     // люкс-переход ТОЛЬКО при реальной смене страницы (не на каждой правке/ре-рендере)
@@ -1812,6 +1809,9 @@
       var el = e.target.closest('.pe-ced-photo'); if (!el || el.getAttribute('data-pe-gallery')) return;
       var idx = +(el.getAttribute('data-pe-idx') || 0);
       var s = curSection(); var ref = (s && s.assetRefs || [])[idx]; if (!ref || !ref.assetId) return;
+      /* у кадра задан кроп этого формата → рендер берёт кроп, а не focalPoint: пан «не держался» бы (прыжок назад).
+         Подсказываем кадрировать и не стартуем пан. */
+      if (ref.cropsByFormat && ref.cropsByFormat[S.fmt]) { toast('Фото кадрировано для этого формата', 'Здесь задан точный кадр (зум). Измените его кнопкой кадрирования — перетаскивание фокуса им перекрывается.', true); return; }
       var rect = el.getBoundingClientRect(); if (!rect.width) return;
       var sx = e.clientX, sy = e.clientY;
       var f0 = ref.focalPoint ? { x: ref.focalPoint.x, y: ref.focalPoint.y } : { x: 0.5, y: 0.5 };
