@@ -136,7 +136,7 @@ function fxConv(amount, from, to) {
 function curSym(c) { return ({ USD: '$', EUR: '€', AED: 'dh ', THB: '฿', IDR: 'Rp ', RUB: '₽', GBP: '£', TRY: '₺' })[c] || (c + ' '); }
 
 /* диапазон дат аналитики рекламы (пресеты + свой период) → {from,to} и query-string */
-const AD_RANGE_PRESETS = [['today', 'Сегодня'], ['yesterday', 'Вчера'], ['7d', '7 дней'], ['30d', '30 дней'], ['month', 'Этот месяц'], ['all', 'Всё']];
+const AD_RANGE_PRESETS = [['today', 'Сегодня', 'Today'], ['yesterday', 'Вчера', 'Yesterday'], ['7d', '7 дней', '7 days'], ['30d', '30 дней', '30 days'], ['month', 'Этот месяц', 'This month'], ['all', 'Всё', 'All']];
 function adRangeDates() {
   const r = PAGE_STATE.adRange || { preset: '30d' };   /* дефолт — последние 30 дней (посуточно, как в кабинете) */
   const ymd = (dt) => dt.toISOString().slice(0, 10);
@@ -13472,7 +13472,7 @@ PAGES.ads = async (root) => {
       return `<div class="glass card mb" id="adRangeBar">
         ${adContractors.length ? `<div class="ad-ct-filter" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><span class="muted" style="font-size:11.5px">Подрядчик:</span><select id="adCtFilter" style="min-width:190px"><option value="">Все подрядчики</option>${adContractors.map(c => `<option value="${esc(c.id)}" ${adCid === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>${adCid ? '<span class="mini-badge ai">аналитика только по этому подрядчику</span>' : ''}</div>` : ''}
         <div class="ad-range">
-          <div class="ad-range-presets">${AD_RANGE_PRESETS.map(([k, n]) => `<button class="ad-range-b ${r.preset === k ? 'on' : ''}" data-adrange="${k}">${n}</button>`).join('')}</div>
+          <div class="ad-range-presets">${AD_RANGE_PRESETS.map(([k, n, e]) => `<button class="ad-range-b ${r.preset === k ? 'on' : ''}" data-adrange="${k}">${LANG === 'en' ? e : n}</button>`).join('')}</div>
           <div class="ad-range-custom">
             <span class="muted" style="font-size:11px">Свой период:</span>
             <input type="date" id="adRangeFrom" value="${esc(dd.from || '')}"><span class="muted">—</span><input type="date" id="adRangeTo" value="${esc(dd.to || '')}">
@@ -13500,13 +13500,13 @@ PAGES.ads = async (root) => {
       }, { spend: 0, leadsMeta: 0, clicks: 0, impr: 0, quals: 0 });
       const tile = (lbl, val, sub, accent) => `<div class="ad-tile${accent ? ' accent' : ''}"><div class="at-lbl">${lbl}</div><div class="at-val">${val}</div><div class="at-sub">${sub || ''}</div></div>`;
       return `<div class="ad-kpis">
-        ${tile('Потрачено', cm(md.spend), `${(d.ads || []).length} объявл`)}
-        ${tile('Лиды (Meta)', md.leadsMeta.toLocaleString('ru-RU'), 'из лид-форм')}
-        ${tile('CPL средний', cm(md.leadsMeta ? md.spend / md.leadsMeta : 0), 'цена лида', true)}
-        ${tile('CPC', cm(md.clicks ? md.spend / md.clicks : 0), `${md.clicks.toLocaleString('ru-RU')} кликов`)}
-        ${tile('Клики', md.clicks.toLocaleString('ru-RU'), md.impr ? `CTR ${(md.clicks / md.impr * 100).toFixed(2)}%` : '')}
-        ${tile('Квал. лиды', md.quals, `${md.quals} / ${md.leadsMeta}`)}
-        ${tile('CPQL', cm(md.quals ? md.spend / md.quals : 0), 'цена квала', true)}
+        ${tile(t('Потрачено', 'Spent'), cm(md.spend), `${(d.ads || []).length} ${t('объявл', 'ads')}`)}
+        ${tile(t('Лиды (Meta)', 'Leads (Meta)'), md.leadsMeta.toLocaleString('ru-RU'), t('из лид-форм', 'from lead forms'))}
+        ${tile(t('CPL средний', 'Avg CPL'), cm(md.leadsMeta ? md.spend / md.leadsMeta : 0), t('цена лида', 'cost per lead'), true)}
+        ${tile('CPC', cm(md.clicks ? md.spend / md.clicks : 0), `${md.clicks.toLocaleString('ru-RU')} ${t('кликов', 'clicks')}`)}
+        ${tile(t('Клики', 'Clicks'), md.clicks.toLocaleString('ru-RU'), md.impr ? `CTR ${(md.clicks / md.impr * 100).toFixed(2)}%` : '')}
+        ${tile(t('Квал. лиды', 'Qualified leads'), md.quals, `${md.quals} / ${md.leadsMeta}`)}
+        ${tile('CPQL', cm(md.quals ? md.spend / md.quals : 0), t('цена квала', 'cost per qualified'), true)}
         ${tile('Конв. в квал.', `${md.leadsMeta ? Math.round(md.quals / md.leadsMeta * 100) : 0}%`, 'лид → квал')}
       </div>`; })()}
     ${(() => {
@@ -13645,9 +13645,9 @@ PAGES.ads = async (root) => {
       };
       const mtile = (v, lbl, hl) => `<div class="cta-m${hl ? ' hl' : ''}"><b>${v}</b><i>${lbl}</i></div>`;
       const metrics = (m, ids, title) => `<span class="cta-metrics">
-        ${mtile(cm(m.spend), 'расход')}<button class="cta-m cta-m-leads" data-nodeleads="${(ids || []).join(',')}" data-nodetitle="${esc(title || '')}" title="Показать лиды CRM и их статусы"><b>${m.leads} ↗</b><i>лиды</i></button>${mtile(m.leads ? cm(m.spend / m.leads) : '—', 'CPL', true)}
-        ${mtile(m.quals, 'квал')}${mtile(m.quals ? cm(m.spend / m.quals) : '—', 'CPQL', true)}
-        ${mtile(m.impr ? (m.clicks / m.impr * 100).toFixed(2) + '%' : '—', 'CTR')}${mtile(m.impr ? cm(m.spend / m.impr * 1000) : '—', 'CPM')}${mtile((m.clicks || 0).toLocaleString('ru-RU'), 'клики')}
+        ${mtile(cm(m.spend), t('расход', 'spend'))}<button class="cta-m cta-m-leads" data-nodeleads="${(ids || []).join(',')}" data-nodetitle="${esc(title || '')}" title="${t('Показать лиды CRM и их статусы', 'Show CRM leads and their statuses')}"><b>${m.leads} ↗</b><i>${t('лиды', 'leads')}</i></button>${mtile(m.leads ? cm(m.spend / m.leads) : '—', 'CPL', true)}
+        ${mtile(m.quals, t('квал', 'quals'))}${mtile(m.quals ? cm(m.spend / m.quals) : '—', 'CPQL', true)}
+        ${mtile(m.impr ? (m.clicks / m.impr * 100).toFixed(2) + '%' : '—', 'CTR')}${mtile(m.impr ? cm(m.spend / m.impr * 1000) : '—', 'CPM')}${mtile((m.clicks || 0).toLocaleString('ru-RU'), t('клики', 'clicks'))}
       </span>`;
       const aRow = (a) => `<div class="cta-row lvl-ad"><span class="cta-caret dim">·</span><span class="cta-name">${esc(a.name || a.adId)}${a.hasCreative ? ' <span class="ct-dot ok" title="креатив"></span>' : ''}</span>${spark(a.m.daily)}${metrics(a.m, [a.adId], a.name || a.adId)}</div>`;
       const sRow = (s) => `<div class="cta-node"><div class="cta-row lvl-set" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge set">Адсет</span><span class="cta-name">${esc(s.name)}</span>${spark(s.m.daily)}${metrics(s.m, s.ads.map(x => x.adId), s.name)}</div><div class="cta-kids" hidden>${s.ads.map(aRow).join('')}</div></div>`;
@@ -13663,20 +13663,20 @@ PAGES.ads = async (root) => {
         if (m.spend > (T.spend / Math.max(1, treeD.tree.length)) && !m.quals) signals.push(`«${c.name}»: расход ${cm(m.spend)} без квалов`);
       }
       const _tr = PAGE_STATE.adRange || { preset: '30d' };
-      const treeRange = `<span class="cta-range">${AD_RANGE_PRESETS.map(([k, n]) => `<button class="ad-range-b ${_tr.preset === k ? 'on' : ''}" data-adrange="${k}">${n}</button>`).join('')}</span>`;
-      const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}Дерево кабинета</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} лидов · <span class="mp-good">сходится со сводкой ✓</span></span><button class="btn btn-sm" id="ctaCollapseAll" style="margin-left:auto">Развернуть всё</button></div>
+      const treeRange = `<span class="cta-range">${AD_RANGE_PRESETS.map(([k, n, e]) => `<button class="ad-range-b ${_tr.preset === k ? 'on' : ''}" data-adrange="${k}">${LANG === 'en' ? e : n}</button>`).join('')}</span>`;
+      const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}${t('Дерево кабинета', 'Ad account tree')}</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} ${t('лидов', 'leads')} · <span class="mp-good">${t('сходится со сводкой ✓', 'matches the summary ✓')}</span></span><button class="btn btn-sm" id="ctaCollapseAll" style="margin-left:auto">${t('Развернуть всё', 'Expand all')}</button></div>
       <div class="cta-rangebar">${treeRange}</div>`;
-      const cabSignals = `<div class="cta-signals ${signals.length ? 'warn' : ''}" data-team>${signals.length ? ic(I.spark) + signals.slice(0, 5).map(esc).join(' · ') : '✓ Сигналов оптимизации нет — связки в норме (CPL/CTR/CPM/квалы)'}</div>`;
-      const modeSeg = `<span class="ct-modeseg"><button class="ct-mode-b ${treeMode === 'cabinet' ? 'on' : ''}" data-ctmode="cabinet">${ic(I.bars)}Кабинет</button><button class="ct-mode-b ${treeMode === 'creatives' ? 'on' : ''}" data-ctmode="creatives">${ic(I.image)}Креативы</button></span>`;
+      const cabSignals = `<div class="cta-signals ${signals.length ? 'warn' : ''}" data-team>${signals.length ? ic(I.spark) + signals.slice(0, 5).map(esc).join(' · ') : t('✓ Сигналов оптимизации нет — связки в норме (CPL/CTR/CPM/квалы)', '✓ No optimization signals — campaigns are healthy (CPL/CTR/CPM/quals)')}</div>`;
+      const modeSeg = `<span class="ct-modeseg"><button class="ct-mode-b ${treeMode === 'cabinet' ? 'on' : ''}" data-ctmode="cabinet">${ic(I.bars)}${t('Кабинет', 'Account')}</button><button class="ct-mode-b ${treeMode === 'creatives' ? 'on' : ''}" data-ctmode="creatives">${ic(I.image)}${t('Креативы', 'Creatives')}</button></span>`;
 
       return `<div class="glass card mb ct-wrap">
-        <div class="card-title">${ic(I.target)}Дерево ${treeMode === 'cabinet' ? 'кабинета' : 'креативов'}<span class="sub">${treeMode === 'cabinet' ? 'кампания › адсет › объявление — метрики и динамика' : 'креатив + тезисы на каждое объявление, раздача по одинаковым названиям'}</span>${modeSeg}</div>
+        <div class="card-title">${ic(I.target)}${treeMode === 'cabinet' ? t('Дерево кабинета', 'Ad account tree') : t('Дерево креативов', 'Creative tree')}<span class="sub">${treeMode === 'cabinet' ? t('кампания › адсет › объявление — метрики и динамика', 'campaign › ad set › ad — metrics and trends') : t('креатив + тезисы на каждое объявление, раздача по одинаковым названиям', 'creative + notes per ad, shared across identical names')}</span>${modeSeg}</div>
         ${treeMode === 'cabinet' ? `
           ${cabHdr}${cabSignals}
-          <div class="cta-tree">${treeD.tree && treeD.tree.length ? treeD.tree.map(cRow).join('') : '<div class="empty">Нет данных кабинета — подключите кабинет и синкните.</div>'}</div>`
+          <div class="cta-tree">${treeD.tree && treeD.tree.length ? treeD.tree.map(cRow).join('') : `<div class="empty">${t('Нет данных кабинета — подключите кабинет и синкните.', 'No ad-account data — connect an account and sync.')}</div>`}</div>`
         : `
-          <div class="muted ct-note">Список <b>по уникальным названиям креативов</b> — каждый показан <b>один раз</b> (не по объявлениям и не по кампаниям). Загрузи креатив+тезисы один раз на название — раздастся на ВСЕ связки с тем же неймингом, повторно грузить не нужно. <b>${nameGroups.filter(g => g.hasCreative).length}/${nameGroups.length}</b> названий с креативом.</div>
-          <div class="ct-names">${nameGroups.length ? nameGroups.map(nameCard).join('') : '<div class="empty">Пока нет объявлений — подключите кабинет и синкните.</div>'}</div>`}
+          <div class="muted ct-note">${t('Список <b>по уникальным названиям креативов</b> — каждый показан <b>один раз</b> (не по объявлениям и не по кампаниям). Загрузи креатив+тезисы один раз на название — раздастся на ВСЕ связки с тем же неймингом, повторно грузить не нужно.', 'List <b>by unique creative names</b> — each shown <b>once</b> (not per ad or per campaign). Upload a creative+notes once per name — it applies to ALL campaigns with the same naming, no need to re-upload.')} <b>${nameGroups.filter(g => g.hasCreative).length}/${nameGroups.length}</b> ${t('названий с креативом', 'names with a creative')}.</div>
+          <div class="ct-names">${nameGroups.length ? nameGroups.map(nameCard).join('') : `<div class="empty">${t('Пока нет объявлений — подключите кабинет и синкните.', 'No ads yet — connect an account and sync.')}</div>`}</div>`}
       </div>`;
     })()}
     <div class="two-col">
@@ -13722,34 +13722,34 @@ PAGES.ads = async (root) => {
             <span class="ma-acct-dot ${ma.lastSyncAt && a.id ? 'on' : ''}"></span>
             <input data-acc="id" value="${esc(a.id || '')}" placeholder="act_1234567890" style="flex:1.4">
             <input data-acc="name" value="${esc(a.name || '')}" placeholder="название (напр. Trust Phuket)" style="flex:1.4">
-            <select data-acc="currency" style="flex:0 0 90px"><option value="">валюта</option>${['AED', 'USD', 'EUR', 'THB', 'RUB'].map(c => `<option value="${c}" ${a.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
-            <button class="btn btn-sm" data-acctdel title="Убрать кабинет">${ic(I.x)}</button>
+            <select data-acc="currency" style="flex:0 0 90px"><option value="">${t('валюта', 'currency')}</option>${['AED', 'USD', 'EUR', 'THB', 'RUB'].map(c => `<option value="${c}" ${a.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+            <button class="btn btn-sm" data-acctdel title="${t('Убрать кабинет', 'Remove ad account')}">${ic(I.x)}</button>
           </div>`;
           return `<div class="glass card mb">
-          <div class="card-title" data-fold="1"><span class="setup-step">2</span>${ic(I.target)}Рекламные кабинеты (Meta API)<span class="sub">прямое чтение расхода/лидов из кабинетов</span>
-            <span class="ma-status">${okCount ? `${ic(I.check)}${okCount} ${plural(okCount, 'кабинет', 'кабинета', 'кабинетов')}${ma.lastSyncAt ? ' · синк ' + tmm(ma.lastSyncAt) : ''}` : 'нет кабинетов'}</span>
-            <label class="switch" style="margin-left:10px"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите кабинет(ы) Meta — расход/кампании/лиды сведутся в аналитику и «План/Факт по направлениям». Проще всего — <b>через Facebook</b> (вход, выбор кабинета, без ручного токена). Либо вручную токеном System User ниже.</div>
-          <button type="button" class="btn btn-sm btn-accent" id="maConnectFb" style="margin:0 0 12px;display:inline-flex;align-items:center;gap:7px">${ic(I.target)}Подключить через Facebook</button>
+          <div class="card-title" data-fold="1"><span class="setup-step">2</span>${ic(I.target)}${t('Рекламные кабинеты (Meta API)', 'Ad accounts (Meta API)')}<span class="sub">${t('прямое чтение расхода/лидов из кабинетов', 'direct read of spend/leads from ad accounts')}</span>
+            <span class="ma-status">${okCount ? `${ic(I.check)}${okCount} ${LANG === 'en' ? ('ad account' + (okCount > 1 ? 's' : '')) : plural(okCount, 'кабинет', 'кабинета', 'кабинетов')}${ma.lastSyncAt ? ' · ' + t('синк', 'synced') + ' ' + tmm(ma.lastSyncAt) : ''}` : t('нет кабинетов', 'no ad accounts')}</span>
+            <label class="switch" style="margin-left:10px"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><button type="button" class="intake-chev" title="${t('Свернуть/развернуть', 'Collapse/expand')}">${ic(I.chev, 2)}</button></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">${t('Подключите кабинет(ы) Meta — расход/кампании/лиды сведутся в аналитику и «План/Факт по направлениям». Проще всего — <b>через Facebook</b> (вход, выбор кабинета, без ручного токена). Либо вручную токеном System User ниже.', 'Connect your Meta ad account(s) — spend/campaigns/leads roll up into analytics and the “Plan vs. actual by region” view. Easiest is <b>with Facebook</b> (sign in, pick the account, no manual token). Or add a System User token manually below.')}</div>
+          <button type="button" class="btn btn-sm btn-accent" id="maConnectFb" style="margin:0 0 12px;display:inline-flex;align-items:center;gap:7px">${ic(I.target)}${t('Подключить через Facebook', 'Connect with Facebook')}</button>
           <div class="ma-accts" id="maAccts">${accts.map(acctRow).join('')}</div>
-          <button class="btn btn-sm" id="maAddAcct" style="margin:2px 0 10px">${ic(I.plus)}Добавить кабинет</button>
-          <div class="form-row"><label>Access token (System User) — один на все кабинеты бизнеса</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
+          <button class="btn btn-sm" id="maAddAcct" style="margin:2px 0 10px">${ic(I.plus)}${t('Добавить кабинет', 'Add ad account')}</button>
+          <div class="form-row"><label>${t('Access token (System User) — один на все кабинеты бизнеса', 'Access token (System User) — one for all business ad accounts')}</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? (LANG === 'en' ? '•••••• saved' : '•••••• сохранён') : 'EAAG…'}"></div>
           <div class="ma-mode-row">
-            <div class="form-row" style="margin:0"><label>Окно синка (глубина истории)</label>
-              <select id="maSyncDays">${[30, 60, 90, 180].map(d => `<option value="${d}" ${syncDays === d ? 'selected' : ''}>${d} дней</option>`).join('')}</select></div>
-            <div class="muted" style="font-size:11px;line-height:1.5;align-self:end">Отсюда тянется <b>аналитика кабинета</b> (расход/кампании/CPL/CTR…). Лиды через этот канал не тянутся — их приём настраивается в «Приём лидов через интегратор» выше.</div>
+            <div class="form-row" style="margin:0"><label>${t('Окно синка (глубина истории)', 'Sync window (history depth)')}</label>
+              <select id="maSyncDays">${[30, 60, 90, 180].map(d => `<option value="${d}" ${syncDays === d ? 'selected' : ''}>${d} ${t('дней', 'days')}</option>`).join('')}</select></div>
+            <div class="muted" style="font-size:11px;line-height:1.5;align-self:end">${t('Отсюда тянется <b>аналитика кабинета</b> (расход/кампании/CPL/CTR…). Лиды через этот канал не тянутся — их приём настраивается в «Приём лидов через интегратор» выше.', 'This pulls <b>ad-account analytics</b> (spend/campaigns/CPL/CTR…). Leads do not come through this channel — set up lead intake in “Lead intake via integrator” above.')}</div>
           </div>
           <div id="maVerify" class="muted" style="font-size:11.5px;margin-top:6px;min-height:0"></div>
           <div id="maSyncStatus" class="ma-sync-status" hidden></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
-            <button class="btn btn-accent btn-sm" id="maSave">Сохранить</button>
-            <button class="btn btn-sm" id="maVerifyBtn">${ic(I.spark)}Проверить</button>
-            <button class="btn btn-sm" id="maSyncBtn">${ic(I.send)}Обновить (синк)</button>
-            <button class="btn btn-sm" id="maBackfill" title="Подтянуть весь период (окно синка)">${ic(I.doc)}Догрузить историю</button>
-            <button class="btn btn-sm btn-danger" id="maReset" title="Удалить все данные, подтянутые из кабинета">${ic(I.x)}Полный сброс</button>
+            <button class="btn btn-accent btn-sm" id="maSave">${t('Сохранить', 'Save')}</button>
+            <button class="btn btn-sm" id="maVerifyBtn">${ic(I.spark)}${t('Проверить', 'Verify')}</button>
+            <button class="btn btn-sm" id="maSyncBtn">${ic(I.send)}${t('Обновить (синк)', 'Refresh (sync)')}</button>
+            <button class="btn btn-sm" id="maBackfill" title="${t('Подтянуть весь период (окно синка)', 'Pull the full period (sync window)')}">${ic(I.doc)}${t('Догрузить историю', 'Backfill history')}</button>
+            <button class="btn btn-sm btn-danger" id="maReset" title="${t('Удалить все данные, подтянутые из кабинета', 'Delete all data pulled from the ad account')}">${ic(I.x)}${t('Полный сброс', 'Full reset')}</button>
           </div>
-          <div class="muted" style="font-size:10.5px;margin-top:6px">Авто-долив каждые ~30 мин. «Обновить» — свежий долив сейчас. «Догрузить историю» — весь период (окно синка). «Полный сброс» — удалить данные кабинета.</div>
-          ${(ma.log || []).length ? coll('Журнал синков', (ma.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} синк · +${e.newLeads || 0} лид · ${e.ins || 0} объявл${e.capped ? ' · ⚠️ данные обрезаны (потолок страниц)' : ''}</div><div class="sd">${tmm(e.at)}${e.error ? ' · ' + esc(e.error) : ''}</div></div></div>`).join(''), { open: false, count: (ma.log || []).length, icon: I.doc }) : ''}
+          <div class="muted" style="font-size:10.5px;margin-top:6px">${t('Авто-долив каждые ~30 мин. «Обновить» — свежий долив сейчас. «Догрузить историю» — весь период (окно синка). «Полный сброс» — удалить данные кабинета.', 'Auto-sync every ~30 min. “Refresh” pulls fresh data now. “Backfill history” pulls the full period (sync window). “Full reset” deletes the ad-account data.')}</div>
+          ${(ma.log || []).length ? coll(t('Журнал синков', 'Sync log'), (ma.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} ${t('синк', 'sync')} · +${e.newLeads || 0} ${t('лид', 'lead')} · ${e.ins || 0} ${t('объявл', 'ads')}${e.capped ? ' · ' + t('⚠️ данные обрезаны (потолок страниц)', '⚠️ data truncated (page cap)') : ''}</div><div class="sd">${tmm(e.at)}${e.error ? ' · ' + esc(e.error) : ''}</div></div></div>`).join(''), { open: false, count: (ma.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
         <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
           <div class="card-title" data-fold="op"><span class="setup-step">1</span>${ic(I.link)}Приём лидов через интегратор (Albato)<span class="sub">рекомендуемый способ · Meta Lead Form → Albato → CRM</span><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
