@@ -1547,9 +1547,12 @@ function seatAudit(db) {
   active.forEach(x => { if (x.ip) (byIp[x.ip] = byIp[x.ip] || new Set()).add(x.who); });
   for (const [ip, set] of Object.entries(byIp)) if (set.size >= 2) findings.push({ kind: 'ip_multi', severity: 'high', ip, who: [...set].map(brokerName), text: `${set.size} разных аккаунта работают с одного IP прямо сейчас` });
   /* 2) один аккаунт — несколько IP одновременно (расшаренный доступ).
-     Учитываем квоту устройств сотрудника (broker.maxDevices, по умолч. 1): легитимный ПК+MacBook (2 IP)
-     при maxDevices=2 — НЕ флагим. Флаг только при превышении разрешённого числа устройств. */
-  const maxDevFor = (who) => { if (who === 'owner') return Math.max(1, +((db.settings.auth && db.settings.auth.ownerMaxDevices) || 1)); const br = db.brokers.find(b => b.id === who); return Math.max(1, +((br && br.maxDevices) || 1)); };
+     ⭐ПОЛИТИКА МЕСТ (ТЗ владельца): место = один приглашённый член команды (ЛЮБОЙ роли —
+     брокер/ассистент/маркетолог/аналитик/менеджер — все они строки в db.brokers и считаются
+     в лимит maxBrokers). Человек не может «разделить» свою функцию на нескольких людей, поэтому
+     ОДНОМУ члену разрешаем 2 устройства (личный + рабочий телефон/ПК) — это НЕ фрод, не флагим.
+     Флаг только при 3+ одновременных IP (это уже вход разных людей под одним аккаунтом). */
+  const maxDevFor = (who) => { if (who === 'owner') return Math.max(2, +((db.settings.auth && db.settings.auth.ownerMaxDevices) || 2)); const br = db.brokers.find(b => b.id === who); return Math.max(2, +((br && br.maxDevices) || 2)); };
   const byWho = {};
   active.forEach(x => { if (x.ip) (byWho[x.who] = byWho[x.who] || new Set()).add(x.ip); });
   for (const [who, set] of Object.entries(byWho)) { const allowed = maxDevFor(who); if (set.size > allowed) findings.push({ kind: 'acct_multi_ip', severity: 'high', who: [brokerName(who)], ips: [...set], text: `Аккаунт «${brokerName(who)}» активен с ${set.size} разных IP одновременно (разрешено устройств: ${allowed})` }); }
@@ -1562,7 +1565,7 @@ function seatAudit(db) {
     if (!findings.some(f => f.kind === 'ip_multi' && f.ip === ip)) findings.push({ kind: 'dev_shared', severity: 'med', ip, fp, who: [...set].map(brokerName), text: `За неделю с одного устройства (${fp}) заходили ${set.size} аккаунта` });
   }
   const seats = Object.values(byWho).length;
-  const ownerMaxDevices = Math.max(1, +((db.settings.auth && db.settings.auth.ownerMaxDevices) || 1));
+  const ownerMaxDevices = Math.max(2, +((db.settings.auth && db.settings.auth.ownerMaxDevices) || 2));
   return { active, findings, seats, brokersTotal: db.brokers.filter(b => b.active !== false).length, ownerMaxDevices, generatedAt: now };
 }
 /* роль сессии: owner (пароль агентства) | broker (личный PIN).

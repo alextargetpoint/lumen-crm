@@ -4722,16 +4722,17 @@ async function loadSeats() {
   box.innerHTML = `
     <div class="seat-sum">
       <div class="seat-kpi"><b>${d.seats}</b><i>активных мест сейчас</i></div>
-      <div class="seat-kpi"><b>${d.brokersTotal}</b><i>сотрудников в команде</i></div>
+      <div class="seat-kpi"><b>${d.brokersTotal}</b><i>мест занято · все роли</i></div>
       <div class="seat-kpi ${(d.findings || []).length ? 'bad' : 'ok'}"><b>${(d.findings || []).length || '✓'}</b><i>${(d.findings || []).length ? 'сигналов риска' : 'нарушений нет'}</i></div>
     </div>
+    <div class="seat-policy">${ic(I.check)}<span><b>Место = один приглашённый человек</b> (любой роли — брокер, маркетолог, таргетолог, ассистент: все считаются местом). Одному человеку разрешено <b>2 устройства</b> — личный + рабочий телефон/ПК, это не нарушение. Разделить функцию одного места на нескольких людей нельзя — поэтому второе устройство безопасно.</span></div>
     ${findings ? `<div class="seat-finds">${findings}</div>` : '<div class="seat-clean">' + ic(I.check) + 'Подозрительной активности не обнаружено. Каждый вход — с ожидаемого места.</div>'}
     ${active ? `<div class="seat-sub-t">Кто в системе сейчас</div><div class="seat-list">${active}</div>` : ''}
     <div class="seat-dev">
-      <div class="seat-dev-l"><b>${ic(I.shield)}Устройств у администратора</b><span>Сколько своих устройств админ может держать онлайн одновременно (ПК + ноутбук = 2). Входы в пределах не считаются нарушением.</span></div>
-      <div class="seat-dev-ctrl">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="seat-dev-b ${n === (d.ownerMaxDevices || 1) ? 'on' : ''}" data-ownerdev="${n}">${n}</button>`).join('')}</div>
+      <div class="seat-dev-l"><b>${ic(I.shield)}Устройств у администратора</b><span>Сколько своих устройств админ держит онлайн одновременно (личный + рабочий = 2 — норма). У каждого сотрудника тоже по 2 устройства по умолчанию. Входы в пределах — не нарушение.</span></div>
+      <div class="seat-dev-ctrl">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="seat-dev-b ${n === (d.ownerMaxDevices || 2) ? 'on' : ''}" data-ownerdev="${n}">${n}</button>`).join('')}</div>
     </div>
-    <div class="seat-note">Сигнал не блокирует вход автоматически — это подсказка владельцу. Массовый вход разных сотрудников с одного IP/устройства обычно означает передачу одного доступа на несколько человек в обход подписки.</div>`;
+    <div class="seat-note">Сигнал не блокирует вход — это подсказка владельцу. Флаг появляется только при <b>3+ разных устройствах/IP</b> на одном месте одновременно: это уже вход разных людей под одним доступом в обход подписки.</div>`;
   $$('[data-ownerdev]', box).forEach(b => b.addEventListener('click', async (e) => {
     const n = +e.currentTarget.dataset.ownerdev;
     try { await api.patch('/settings', { auth: { ownerMaxDevices: n } }); toast('Сохранено', 'Админу разрешено устройств: ' + n, true); loadSeats(); }
