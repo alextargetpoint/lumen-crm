@@ -4467,13 +4467,45 @@ const FEED_REACTS = ['👍', '❤️', '🔥', '👏', '🎉'];
 const FEED_PROV = { youtube: ['#FF0000', 'YouTube'], tiktok: ['#111', 'TikTok'], instagram: ['#E1306C', 'Instagram'], vk: ['#0077FF', 'VK'], telegram: ['#2AABEE', 'Telegram'], web: ['var(--accent)', ''] };
 /* заготовки постов по типу — быстрый красивый старт (вставляются в заголовок+текст) */
 const FEED_TEMPLATES = {
-  news: [['📈 Итоги недели', 'Итоги недели', 'За неделю: ___ новых лидов, ___ показов, ___ сделки. Спасибо команде — держим темп!'], ['🏙 Новый объект в базе', 'Новый объект: ___', 'Добавили в базу: ___. Цена ___, ___ м². Кому актуально для клиентов — забирайте в подборки.']],
+  news: [['📈 Итоги недели', 'Итоги недели', 'За неделю: ___ новых лидов, ___ показов, ___ сделки. Спасибо команде — держим темп!'], ['🏙 Новый объект в базе', 'Новый объект: ___', 'Добавили в базу: ___. Цена ___, ___ м². Кому актуально для клиентов — забирайте в подборки.', 'objpick']],
   material: [['📚 Полезный материал', 'Гайд: как ___', 'Собрал короткий разбор по теме «___». Внутри: ___. Пользуйтесь в диалогах с клиентами.'], ['🎬 Скрипт для Reels', 'Скрипт Reels: ___', 'Готовый сценарий на 15 сек: 1) хук ___ 2) ___ 3) призыв ___']],
   ref: [['🔗 Референс', 'Смотрите, как это делают', 'Нашёл сильный пример подачи. Обратите внимание на ___. Можем адаптировать под наши объекты.']],
   congrats: [['🏆 Поздравляем!', 'Поздравляем ___!', '___ закрыл(а) сделку по ___! Так держать 👏 Пример для всех нас.'], ['🎂 С днём рождения', 'С днём рождения, ___!', 'Команда поздравляет ___ 🎉 Желаем крупных сделок и лёгких клиентов!']],
   announce: [['📢 Важно', 'Объявление', 'Коллеги, ___. Просьба ознакомиться сегодня.'], ['📅 Планёрка', 'Планёрка ___ в ___', 'Собираемся ___. Повестка: разбор кейсов, план на неделю. Не опаздываем 🙌']],
 };
 let FEED_MEDIA = [], FEED_LINK = null, FEED_POLL = null, FEED_AUD = { mode: 'all', ids: [] };
+/* ⭐ЛЕНТА: быстрый пикер «Новый объект в базе» → собирает сводку + внутреннюю ссылку карточки и
+   кладёт в композер поста, чтобы разослать всей команде (клиент: «минималистичная поп-ап-форма,
+   выбрать из списка и отправить всем брокерам»). Источник — тот же /presentations/objects. */
+async function openFeedObjectPicker(root) {
+  const absU = u => (u && /^assets\//.test(u)) ? '/' + u : u;
+  const curSym = c => ({ USD: '$', EUR: '€', THB: '฿', AED: 'AED ', RUB: '₽', GBP: '£' }[c] || '$');
+  const priceOf = o => (o.priceFrom != null && o.priceFrom !== '') ? 'от ' + curSym(o.currency) + Number(o.priceFrom).toLocaleString('ru-RU') : '';
+  let objs = [];
+  const bd = modal({ title: 'Новый объект → в ленту', sub: 'Выберите объект — соберу сводку и внутреннюю ссылку для всей команды', body: '<div class="np-wrap"><div class="np-grid" id="fobjGrid"><div class="muted" style="padding:16px">Загружаю объекты…</div></div></div>', wide: true, actions: [{ label: 'Отмена' }] });
+  try { objs = (await api.get('/presentations/objects')).items || []; } catch (e) {}
+  const card = o => { const sub = [o.region, o.type].filter(Boolean).join(' · ') || '—'; const pr = priceOf(o); return `<button class="np-card" data-fobj="${esc(String(o.id))}" data-s="${esc((o.search || o.name || '').toLowerCase())}">
+      <span class="np-thumb"${o.image ? ` style="background-image:url('${esc(absU(o.image))}')"` : ''}>${o.image ? '' : ic(I.building)}</span>
+      <span class="np-main"><b>${esc(o.name)}</b><em>${esc(sub)}</em>${pr ? `<i class="np-price">${esc(pr)}</i>` : ''}</span>
+      <span class="np-meta"><i class="np-ph">${o.photos || 0} фото</i></span></button>`; };
+  const grid = $('#fobjGrid', bd);
+  if (grid) {
+    if (!objs.length) grid.innerHTML = '<div class="muted" style="padding:16px">В базе пока нет объектов — добавьте их в разделе «Объекты», потом вернитесь сюда.</div>';
+    else { grid.insertAdjacentHTML('beforebegin', `<div class="np-searchrow">${ic(I.search)}<input id="fobjQ" placeholder="Поиск объекта по названию…"></div>`); grid.innerHTML = objs.map(card).join(''); }
+  }
+  const q = $('#fobjQ', bd); if (q) { q.focus(); q.addEventListener('input', () => { const v = q.value.trim().toLowerCase(); $$('.np-card', bd).forEach(c => { c.style.display = (!v || (c.dataset.s || '').includes(v)) ? '' : 'none'; }); }); }
+  $$('[data-fobj]', bd).forEach(b => b.addEventListener('click', () => {
+    const o = objs.find(x => String(x.id) === b.dataset.fobj); if (!o) return;
+    const bits = [o.region, o.type, priceOf(o)].filter(Boolean).join(' · ');
+    const link = location.origin + '/#properties/' + o.id;
+    const ti = $('#fdTitle', root), tx = $('#fdText', root);
+    if (ti) ti.value = '🏙 Новый объект: ' + o.name;
+    if (tx) { tx.value = `Добавили в базу: ${o.name}.\n${bits}${o.photos ? ` · ${o.photos} фото` : ''}\n\nКому актуально клиентам — забирайте в подборки. Открыть карточку: ${link}`; tx.focus(); }
+    try { const tg = $('#fdTg', root); if (tg) tg.checked = true; } catch (_) {}   /* новый объект команде — по умолчанию пуш в Telegram */
+    closeModal();
+    toast('Объект добавлен в пост', 'Проверьте текст и нажмите «Опубликовать» — уйдёт всей команде', true);
+  }));
+}
 PAGES.feed = async (root) => {
   const data = await api.get('/feed').catch(() => ({ posts: [], board: [] }));
   const posts = data.posts || [], board = data.board || [];
@@ -4575,7 +4607,7 @@ PAGES.feed = async (root) => {
   $('#fdAttach', root).addEventListener('click', (e) => { const rm = e.target.closest('[data-attrm]'); if (rm) { FEED_MEDIA.splice(+rm.dataset.attrm, 1); renderAttach(); } if (e.target.closest('[data-linkrm]')) { FEED_LINK = null; renderAttach(); } });
   /* заготовки постов под текущий тип */
   const renderTpls = () => { const box = $('#fdTpls', root); if (!box) return; const tpls = FEED_TEMPLATES[curType] || []; box.innerHTML = tpls.map((t, i) => `<button class="fd-tpl" data-tpl="${i}">${esc(t[0])}</button>`).join(''); };
-  $('#fdTpls', root).addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; const tpl = (FEED_TEMPLATES[curType] || [])[+t.dataset.tpl]; if (!tpl) return; $('#fdTitle', root).value = tpl[1]; $('#fdText', root).value = tpl[2]; $('#fdText', root).focus(); });
+  $('#fdTpls', root).addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; const tpl = (FEED_TEMPLATES[curType] || [])[+t.dataset.tpl]; if (!tpl) return; if (tpl[3] === 'objpick') { openFeedObjectPicker(root); return; } $('#fdTitle', root).value = tpl[1]; $('#fdText', root).value = tpl[2]; $('#fdText', root).focus(); });
   $$('.fd-ct', root).forEach(b => b.addEventListener('click', () => { curType = b.dataset.ct; $$('.fd-ct', root).forEach(x => x.classList.toggle('on', x === b)); renderTpls(); }));
   renderTpls();
   /* диктовка: заголовок (яйка) + описание (через wireDictate) */
@@ -21296,7 +21328,7 @@ window.addEventListener('hashchange', () => {
   /* ⚠️ после выхода из редактора раздел перерисовываем ВСЕГДА (в #content остался iframe редактора):
      даже если p === CUR (раздел-основа под редактором был 'properties', CUR тоже 'properties') —
      иначе класс editor-mode снят, а контент так и держит iframe → сломанный экран. */
-  if (NAV[p]) { if (p !== CUR || wasEditor) go(p); }
+  if (NAV[p]) { if (p !== CUR || wasEditor) go(p); /* #properties/<id> → открыть карточку объекта (внутр. ссылка из Ленты) */ if (p === 'properties') { const oid = h.split('/')[1]; if (oid) { PAGE_STATE.propView = oid; render(); } } }
   else { history.replaceState(null, '', '#' + CUR); if (wasEditor && NAV[CUR]) go(CUR); }
 });
 
@@ -21356,7 +21388,10 @@ window.addEventListener('popstate', () => {
     await go('properties');                 /* раздел-основа под редактором: replaceState(#properties) */
     history.pushState(null, '', '#pres/' + _eid);   /* запись редактора поверх → «Назад» вернёт в Базу */
     _editorId = _eid; mountEditor();
-  } else await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
+  } else { await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
+    /* прямой вход по внутр. ссылке объекта из Ленты: #properties/<id> → открыть карточку */
+    if (_bootHash.split('/')[0] === 'properties' && _bootHash.split('/')[1]) { PAGE_STATE.propView = _bootHash.split('/')[1]; try { render(); } catch (_) {} }
+  }
   /* возврат с Zoom OAuth → тост + чистим query, чтобы не повторялось на F5 */
   try {
     const qp = new URLSearchParams(location.search);

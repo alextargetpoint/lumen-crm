@@ -9580,3 +9580,21 @@ body.client-view [data-team]{ display:none !important; }
 .lc-task-na.overdue { border-left-color:#C9821A; }
 .lc-task-steptag { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--accent,#2563EB); background:color-mix(in srgb,var(--accent) 13%,transparent); border-radius:5px; padding:1px 5px; margin-left:7px; vertical-align:middle; }
 .lc-task-na.overdue .lc-task-steptag { color:#B8701A; background:color-mix(in srgb,#C9821A 14%,transparent); }
+/* Глобальный объект-пикер (.np-*) — раньше инъектился инлайн в каждой модалке; вынесен сюда,
+   чтобы работал и в пикере «Новый объект → в ленту». */
+.np-wrap { display: flex; flex-direction: column; gap: 12px; }
+.np-searchrow { display: flex; align-items: center; gap: 9px; border: 1px solid var(--stroke); border-radius: 11px; padding: 10px 13px; background: var(--card, #fff); }
+.np-searchrow svg { width: 17px; height: 17px; color: var(--muted); flex: 0 0 auto; }
+.np-searchrow input { border: 0; outline: 0; background: transparent; font: inherit; width: 100%; color: var(--ink); }
+.np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; max-height: 52vh; overflow: auto; padding: 2px; }
+.np-card { display: flex; align-items: center; gap: 12px; text-align: left; border: 1px solid var(--stroke); border-radius: 13px; padding: 10px; background: var(--card, #fff); cursor: pointer; transition: border-color .14s, box-shadow .14s, transform .05s; }
+.np-card:hover { border-color: var(--accent, #2563EB); box-shadow: 0 4px 16px rgba(20, 16, 12, .08); }
+.np-card:active { transform: translateY(.5px); }
+.np-thumb { flex: 0 0 auto; width: 62px; height: 50px; border-radius: 9px; background: var(--hover, #f0ece6) center/cover no-repeat; border: 1px solid var(--stroke); display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.np-thumb svg { width: 20px; height: 20px; }
+.np-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.np-main b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-main em { font-style: normal; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-price { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.np-meta { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.np-ph { font-size: 11px; color: var(--muted); white-space: nowrap; }
