@@ -156,21 +156,29 @@
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
     if (e.key === 'Escape') { if (typeof ceCloseCtx === 'function') ceCloseCtx(); return; }
     var _t = e.target || {}, _inField = /^(INPUT|TEXTAREA|SELECT)$/.test(_t.tagName || '') || _t.isContentEditable;
-    /* ⭐горячие клавиши страницы (не в полях): ⌥↑/⌥↓ — переместить, ⌘⌫/⌘Del — удалить, ⌘⇧N — новая страница */
-    if (!_inField) {
+    /* ⭐горячие клавиши страницы (не в полях): ⌥↑/⌥↓ — переместить, ⌘⌫/⌘Del — удалить, ⌘⇧N — новая страница.
+       В режиме мультивыбора одиночные операции над невидимым S.pageIdx запрещены: ⌘⌫ → массовое удаление. */
+    if (!_inField && S.multiMode) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); if ((S.multiSel || []).length) bulkOp('del'); return; }
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); return; }
+    }
+    if (!_inField && !S.multiMode) {
       if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); pageMoveUp(S.pageIdx); return; }
       if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); pageMoveDown(S.pageIdx); return; }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); pageDelete(S.pageIdx); return; }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); openPageLibrary(); return; }
     }
-    // навигация по страницам стрелками — только когда не печатаем в поле/на холсте
-    var t = e.target || {}; if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || t.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
+    // навигация по страницам стрелками — только когда не печатаем в поле/на холсте и не в мультивыборе
+    var t = e.target || {}; if (S.multiMode || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || t.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
     var n = sections().length;
     if ((e.key === 'ArrowDown' || e.key === 'ArrowRight') && S.pageIdx < n - 1) { e.preventDefault(); S.pageIdx++; render(); }
     else if ((e.key === 'ArrowUp' || e.key === 'ArrowLeft') && S.pageIdx > 0) { e.preventDefault(); S.pageIdx--; render(); }
   }
 
   function scheduleSave() { setSave('saving'); S._pending = true; clearTimeout(S._saveT); S._saveT = setTimeout(save, 800); }
+  /* досылаем незаписанные правки ПЕРЕД серверной операцией над составом (move/replace/add), иначе операция
+     отработает по устаревшему документу, а reloadPres затрёт свежий ввод (тихая потеря правок). */
+  function flushSave(cb) { cb = cb || function () {}; if (!S._pending) { cb(); return; } S._afterSave = cb; clearTimeout(S._saveT); save(); }
   function save() {
     S._pending = false;
     var changes = { theme: S.pres.theme, defaultFormat: S.pres.defaultFormat, orderedSections: S.pres.orderedSections, brokerAppendix: S.pres.brokerAppendix, brokerId: S.pres.brokerId };
@@ -184,6 +192,7 @@
         if (!S._pending && r.json.orderedSections && JSON.stringify(r.json.orderedSections) !== sentJson) {
           S.pres.orderedSections = r.json.orderedSections; render(); revalidate();
         }
+        if (S._afterSave) { var _cb = S._afterSave; S._afterSave = null; _cb(); }   /* незаписанные правки досланы → можно запускать серверную операцию над составом */
       }
       else if (r.status === 409) {
         /* конфликт версий: РОВНО одна тихая попытка с новой ревизией; дальше — не долбим сервер, тянем свежую версию */
@@ -575,7 +584,8 @@
       var keep = info.paras.slice(0, info.fit).join('\n\n');
       var rest = info.paras.slice(info.fit).join('\n\n');
       setOverride(s, 'body', keep);
-      var ns = { id: 's' + Math.random().toString(16).slice(2, 8), family: 'editorial', enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: (cval(s, 'title') || 'О проекте') + ' · продолжение' }, body: { mode: 'override', value: rest } } };
+      /* id наследует префикс объекта (o<k>_), иначе страница-продолжение станет орфаном внутри объекта и порвёт контигуозность */
+      var ns = { id: newSecId(objPrefixOf(s)), family: 'editorial', enabled: true, assetRefs: [], contentBindings: { title: { mode: 'override', value: (cval(s, 'title') || 'О проекте') + ' · продолжение' }, body: { mode: 'override', value: rest } } };
       sections().splice(S.pageIdx + 1, 0, ns);
     });
     S.ovMode = false; render();
@@ -1481,9 +1491,10 @@
   function ceListBeginEdit(itemEl) {
     var map = ceListMap(itemEl); if (!map || !map.sub) return;
     var idx = +itemEl.getAttribute('data-pe-listidx'); var el = map.sub;
+    if (!isFinite(idx) || idx < 0) return;   /* без валидного индекса не правим — иначе arr[NaN] терял бы строку */
     if (el.getAttribute('contenteditable') === 'true') return;
     ceHideFloatbar();
-    var before = (el.innerText || '').trim();
+    var before = (el.innerText || '').replace(/\s+/g, ' ').trim();   /* нормализуем так же, как after — иначе «двойной пробел» давал ложное изменение */
     el.setAttribute('contenteditable', 'true'); el.classList.add('pe-editing'); el.spellcheck = false; el.focus();
     try { var r = document.createRange(); r.selectNodeContents(el); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r); } catch (_) {}
     function finish(commit) {
@@ -1940,21 +1951,34 @@
   function pageMenu(anchor, i) {
     var s = sections()[i];
     menu(anchor, [
-      { t: 'Дублировать', ic: 'copy', fn: function () { mutate(function () { var c = JSON.parse(JSON.stringify(s)); c.id = newSecId(objPrefixOf(s)); sections().splice(i + 1, 0, c); }); } },
+      { t: 'Дублировать', ic: 'copy', fn: function () { if (isObjHero(s)) { toast('Обложку объекта дублировать нельзя', 'У объекта одна обложка. Чтобы добавить страницу объекту — «Добавить страницу».'); return; } mutate(function () { var c = JSON.parse(JSON.stringify(s)); c.id = newSecId(objPrefixOf(s)); sections().splice(i + 1, 0, c); S.pageIdx = i + 1; }); } },
       { t: s.enabled === false ? 'Показать' : 'Скрыть', ic: 'eye', fn: function () { mutate(function () { s.enabled = s.enabled === false; }); } },
-      { t: 'Вверх', ic: 'up', fn: function () { if (i > 0) mutate(function () { sections().splice(i - 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i - 1; }); } },
-      { t: 'Вниз', ic: 'down', fn: function () { if (i < sections().length - 1) mutate(function () { sections().splice(i + 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i + 1; }); } },
+      { t: 'Вверх', ic: 'up', fn: function () { safeMove(i, i - 1); } },
+      { t: 'Вниз', ic: 'down', fn: function () { safeMove(i, i + 1); } },
       { sep: 1 },
       { t: 'Удалить', ic: 'trash', danger: 1, fn: function () { if (isObjHero(s)) { toast('Обложку объекта удалять нельзя', 'Чтобы убрать объект целиком — «Исключить из подборки» в меню объекта (⋯).'); return; } mutate(function () { sections().splice(i, 1); S.pageIdx = Math.max(0, S.pageIdx - (i <= S.pageIdx ? 1 : 0)); }); } },
     ]);
   }
   /* быстрые операции над текущей страницей (кнопки на холсте + горячие клавиши) */
-  function pageMoveUp(i) { if (i > 0) mutate(function () { sections().splice(i - 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i - 1; }); }
-  function pageMoveDown(i) { if (i < sections().length - 1) mutate(function () { sections().splice(i + 1, 0, sections().splice(i, 1)[0]); S.pageIdx = i + 1; }); }
+  /* контигуозно-безопасный сдвиг страницы на одну позицию (⌥↑/⌥↓, кнопки холста, меню «Вверх/Вниз»).
+     В подборке запрещаем ход, который вытащил бы страницу за пределы её объекта (как в reorderPages/DnD). */
+  function safeMove(i, j) {
+    var arr = sections();
+    if (i < 0 || i >= arr.length || j < 0 || j >= arr.length || i === j) return false;
+    var cand = arr.slice(); var m = cand.splice(i, 1)[0]; cand.splice(j, 0, m);
+    if (S.isColl && !collGroupsContiguous(cand)) {
+      toast('Так переместить нельзя', 'Страница объекта остаётся внутри своего объекта. Порядок объектов меняйте в меню объекта (⋯).', true);
+      return false;
+    }
+    mutate(function () { var a = sections(); var mv = a.splice(i, 1)[0]; a.splice(j, 0, mv); S.pageIdx = j; });
+    return true;
+  }
+  function pageMoveUp(i) { safeMove(i, i - 1); }
+  function pageMoveDown(i) { safeMove(i, i + 1); }
   function pageDelete(i) {
     var s = sections()[i]; if (!s) return;
     if (isObjHero(s)) { toast('Обложку объекта удалять нельзя', 'Убрать объект целиком — «Исключить из подборки» в меню объекта (⋯).'); return; }
-    if (enabledSections().length <= 1) { toast('Нельзя удалить единственную страницу'); return; }
+    if (s.enabled !== false && enabledSections().length <= 1) { toast('Нельзя удалить единственную страницу'); return; }   /* скрытую страницу удалять можно, даже если видимая осталась одна */
     mutate(function () { sections().splice(i, 1); S.pageIdx = Math.max(0, S.pageIdx - (i <= S.pageIdx ? 1 : 0)); });
   }
   function objMenu(anchor, k) {
@@ -1967,13 +1991,17 @@
     if (pos > 0) items.push({ t: 'Переместить выше', ic: 'up', fn: function () { moveObject(k, -1); } });
     if (pos >= 0 && pos < objGroups.length - 1) items.push({ t: 'Переместить ниже', ic: 'down', fn: function () { moveObject(k, 1); } });
     items.push({ t: 'Настроить страницы', ic: 'dots', fn: function () { S.openGroups = S.openGroups || {}; S.openGroups[k] = true; render(); } });
-    items.push({ t: 'Исключить из подборки', ic: 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = false; }); }); }); } });
+    var grp = collectionGroups().filter(function (g) { return g.type === 'object' && g.k === k; })[0];
+    var allHidden = grp && grp.idx.every(function (i) { return sections()[i].enabled === false; });   /* объект уже целиком исключён? → пункт возвращает его обратно */
+    items.push({ t: allHidden ? 'Вернуть в подборку' : 'Исключить из подборки', ic: allHidden ? 'eye' : 'trash', fn: function () { mutate(function () { collectionGroups().forEach(function (g) { if (g.type === 'object' && g.k === k) g.idx.forEach(function (i) { sections()[i].enabled = allHidden ? true : false; }); }); }); } });
     menu(anchor, items);
   }
   function moveObject(k, dir) {
-    api('POST', '/' + ID + '/move-object', { index: k, dir: dir }).then(function (r) {
-      if (r.status === 200) { toast('Объект перемещён', null, true); reloadPres(); }
-      else toast('Не удалось', (r.json && r.json.error) || '');
+    flushSave(function () {
+      api('POST', '/' + ID + '/move-object', { index: k, dir: dir }).then(function (r) {
+        if (r.status === 200) { toast('Объект перемещён', null, true); reloadPres(); }
+        else toast('Не удалось', (r.json && r.json.error) || '');
+      });
     });
   }
   /* ---------- Массовые действия (§7/§11) — одна отмена на всю операцию ---------- */
@@ -2306,7 +2334,7 @@
       ov.querySelectorAll('[data-roid]').forEach(function (b) { b.addEventListener('click', function () { selId = b.getAttribute('data-roid'); paint(); }); });
       ov.querySelectorAll('[data-puclose]').forEach(function (b) { b.addEventListener('click', close); });
       var ap = ov.querySelector('.ro-apply'); if (ap && selId) ap.addEventListener('click', function () {
-        api('POST', '/' + ID + '/replace-object', { oldProjectId: curPid, newProjectId: selId }).then(function (r) { close(); if (r.status === 200) { toast('Объект заменён', null, true); reloadPres(); } else toast('Не удалось', (r.json && r.json.error) || ''); });
+        flushSave(function () { api('POST', '/' + ID + '/replace-object', { oldProjectId: curPid, newProjectId: selId }).then(function (r) { close(); if (r.status === 200) { toast('Объект заменён', null, true); reloadPres(); } else toast('Не удалось', (r.json && r.json.error) || ''); }); });
       });
     }
     function close() { ov.remove(); }
@@ -2359,7 +2387,7 @@
       var ap = ov.querySelector('.ro-apply'); if (ap && selCount()) ap.addEventListener('click', function () {
         var ids = Object.keys(sel).filter(function (k) { return sel[k]; });
         ap.disabled = true;
-        api('POST', '/' + ID + '/add-objects', { projectIds: ids }).then(function (r) { close(); if (r.status === 200) { toast(ids.length > 1 ? 'Объекты добавлены' : 'Объект добавлен', null, true); reloadPres(); } else toast('Не удалось', (r.json && r.json.error) || ''); });
+        flushSave(function () { api('POST', '/' + ID + '/add-objects', { projectIds: ids }).then(function (r) { close(); if (r.status === 200) { toast(ids.length > 1 ? 'Объекты добавлены' : 'Объект добавлен', null, true); reloadPres(); } else toast('Не удалось', (r.json && r.json.error) || ''); }); });
       });
     }
     function close() { ov.remove(); }
@@ -2375,7 +2403,7 @@
 
   /* ---------- «Обновить данные объекта» — diff подборки ↔ карточка (макет) ---------- */
   function puFmt(v) { if (v == null || v === '') return 'Нет данных'; if (typeof v === 'number') return v.toLocaleString('ru-RU'); var s = String(v); return s.length > 72 ? s.slice(0, 72) + '…' : s; }
-  function reloadPres() { api('GET', '/' + ID + '?full=1').then(function (r) { if (r.status === 200) { S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {}; S.projects = r.json.projects || S.projects; S.undo = []; S.redo = []; render(); revalidate(); } }); }   /* серверная операция (replace/add/move) сменила состав → старые undo-снимки больше не применимы к новому состоянию */
+  function reloadPres() { clearTimeout(S._saveT); S._pending = false; S._afterSave = null; api('GET', '/' + ID + '?full=1').then(function (r) { if (r.status === 200) { S.pres = r.json.pres; S.source = r.json.source || {}; S.assets = r.json.assets || {}; S.projects = r.json.projects || S.projects; S.undo = []; S.redo = []; render(); revalidate(); } }); }   /* гасим незавершённый автосейв (иначе затрёт reload) · серверная операция сменила состав → старые undo не применимы */
   function openObjectUpdates(k) {
     api('POST', '/' + ID + '/object-updates', { index: k }).then(function (r) {
       if (r.status !== 200) { toast('Не удалось', (r.json && r.json.error) || ''); return; }
