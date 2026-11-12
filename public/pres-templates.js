@@ -645,7 +645,9 @@
     let inners;
     try { inners = fn(ctx); } catch (e) { inners = [`<div class="lp-safe lp-empty">Ошибка макета: ${esc(e.message)}</div>`]; }
     const footHtml = ctx.brand.footer || (ctx.brand.logoText ? `<span>${esc(ctx.brand.logoText)}</span>` : '');
-    const mstyle = moveStyleFor(section.id, section.elMove);
+    /* смещения текст-блоков хранятся ПО ФОРМАТУ (elMoveByFormat[fmt]), т.к. сырые px одного формата в другом
+       (напр. 16:9 ~1280px → 9:16 ~576px) выкидывали блок за край. Легаси плоский elMove — фолбэк. */
+    const mstyle = moveStyleFor(section.id, (section.elMoveByFormat && section.elMoveByFormat[fmt.id]) || section.elMove);
     const mir = section.styleOverrides && section.styleOverrides.mirror ? ' lp-mirror' : '';   /* зеркальный макет «фото слева/справа» (CSS разворачивает 2-колоночные land-раскладки) */
     return inners.map((inner, i) => pageShell(fmt, theme, mstyle + inner, {
       cls: `lp-fam-${section.family}` + (ctx0.altTint ? ' lp-alt-tint' : '') + (i>0?' lp-continuation':'') + mir,

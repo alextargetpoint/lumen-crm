@@ -196,7 +196,7 @@
       }
       else if (r.status === 409) {
         /* конфликт версий: РОВНО одна тихая попытка с новой ревизией; дальше — не долбим сервер, тянем свежую версию */
-        if ((S._409tries || 0) >= 1 || r.json.currentRevision == null) { S._409tries = 0; setSave('err'); toast('Документ изменён в другом месте', 'Подтянул актуальную версию — проверьте правки', true); reloadPres(); return; }
+        if ((S._409tries || 0) >= 1 || r.json.currentRevision == null) { S._409tries = 0; setSave('err'); var _pend = S._afterSave; S._afterSave = null; toast('Документ изменён в другом месте', _pend ? 'Действие не применилось, документ обновлён. Повторите.' : 'Подтянул актуальную версию — проверьте правки', true); reloadPres(); return; }
         S._409tries = (S._409tries || 0) + 1; S.pres.draftRevision = r.json.currentRevision; setTimeout(save, 400);
       }
       else setSave('err');
@@ -417,6 +417,16 @@
     var m = String((section || {}).id || '').match(/^o(\d+)_/);
     return m ? (S.pres.projectIds || [])[+m[1]] : null;
   }
+  /* смещения текст-блоков (свободное перетаскивание) ПО ФОРМАТУ: один и тот же px в другом формате выкидывал
+     блок за край. Пишем/читаем s.elMoveByFormat[S.fmt]; старый плоский s.elMove — фолбэк для легаси-доков. */
+  function elMoveGet(s, key) {
+    if (!s) return null;
+    var byf = s.elMoveByFormat && s.elMoveByFormat[S.fmt];
+    if (byf && byf[key]) return byf[key];
+    return (s.elMove && s.elMove[key]) || null;
+  }
+  function elMoveSet(s, key, v) { s.elMoveByFormat = s.elMoveByFormat || {}; s.elMoveByFormat[S.fmt] = s.elMoveByFormat[S.fmt] || {}; s.elMoveByFormat[S.fmt][key] = v; }
+  function elMoveDel(s, key) { if (s.elMoveByFormat && s.elMoveByFormat[S.fmt]) delete s.elMoveByFormat[S.fmt][key]; if (s.elMove) delete s.elMove[key]; }
   function newSecId(pfx) { return (pfx || '') + 's' + Math.random().toString(16).slice(2, 8); }
   function isObjHero(sec) { return S.isColl && sec && sec.family === 'hero' && /^o\d+_/.test(String(sec.id || '')); }
   /* дефолт-контент новых закрывающих страниц (чтобы не были пустыми) — из бренда/брокеров/агентства */
@@ -1396,8 +1406,11 @@
        Клик сам переключит на «Содержание» (cePhotoSelect/ceListSelect зовут ceOpenContentTab). */
     if (fam === 'gallery') {
       var gi = 0;
-      stage.querySelectorAll('img.lp-cover').forEach(function (el) {
+      /* и заполненные (img.lp-cover), и ПУСТЫЕ/неподгрузившиеся слоты (.lp-ph.lp-cover) в порядке DOM: пустую
+         галерею можно наполнить с холста, а индексы не разъезжаются с assetRefs, если одно фото не подгрузилось. */
+      stage.querySelectorAll('img.lp-cover, .lp-ph.lp-cover').forEach(function (el) {
         el.classList.add('pe-ced', 'pe-ced-photo'); el.setAttribute('data-pe-gallery', '1'); el.setAttribute('data-pe-idx', 'g' + (gi++));
+        if (el.classList.contains('lp-ph')) el.classList.add('pe-ced-empty');   /* пустой слот → клик открывает picker, можно бросить файл */
         /* ⭐DnD-перетаскивание порядка фото галереи прямо на холсте: бросил одно на другое → встаёт на его место
            (первое = крупное). Переупорядочиваем assetRefs. Листенеры на свежих узлах каждого рендера — не копятся. */
         el.setAttribute('draggable', 'true');
@@ -1627,7 +1640,7 @@
     }
     if (el.classList.contains('pe-ced-text')) {
       var tItems = [['edit', 'text', 'Изменить текст', { kbd: '2×' }], ['field', 'text', 'Править в панели']];
-      var key = el.getAttribute('data-pe-key'); var mv = s && s.elMove && s.elMove[key];
+      var key = el.getAttribute('data-pe-key'); var mv = elMoveGet(s, key);
       if (mv && (mv.dx || mv.dy)) { tItems.push(['__sep__'], ['resetmove', 'back', 'Вернуть на место']); }
       return tItems;
     }
@@ -1672,14 +1685,16 @@
   function ceCtxAction(a, el) {
     if (a === 'edit') { var t = el && el.classList.contains('pe-ced-text') ? el : (document.getElementById('peStage') || document).querySelector('.pe-ced-text.pe-sel'); if (t) ceBeginEdit(t, t.getAttribute('data-pe-key')); }
     else if (a === 'field') { if (S._ceSelKey) ceFocusField(S._ceSelKey); else if (S._ceSelPhoto != null) { var se = ceSelectedEl(); if (se) cePhotoSelect(se); } }
-    else if (a === 'resetmove') { var k = S._ceSelKey || (el && el.getAttribute('data-pe-key')); if (k) mutate(function () { var s = curSection(); if (s && s.elMove) { delete s.elMove[k]; } }); }
+    else if (a === 'resetmove') { var k = S._ceSelKey || (el && el.getAttribute('data-pe-key')); if (k) mutate(function () { var s = curSection(); if (s) elMoveDel(s, k); }); }
     else if (a === 'resetfocal') { mutate(function () { var s = curSection(); var ref = s && (s.assetRefs || [])[+(S._ceSelPhoto || 0)]; if (ref) { delete ref.focalPoint; } }); }
     else ceFloatAction(a);   /* replace/crop/enhance/pin/galfield — общие делегаты в инспектор */
   }
   function ceBeginEdit(el, key) {
     if (el.getAttribute('contenteditable') === 'true') return;
     ceHideFloatbar();
-    var before = (el.innerText || '').trim();
+    /* before нормализуем ТАК ЖЕ, как after (убрать nbsp, лишние переводы строк). Иначе рендерные неразрывные
+       пробелы после коротких предлогов давали after!==before на пустом клике → молчаливый override + отрыв от CRM. */
+    var before = (el.innerText || '').replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n').trim();
     el.setAttribute('contenteditable', 'true'); el.classList.add('pe-editing'); el.spellcheck = false;
     el.focus();
     try { var rg = document.createRange(); rg.selectNodeContents(el); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } catch (_) {}
@@ -1706,7 +1721,7 @@
     var ci = +el.getAttribute('data-cmp-crit');
     var oi = +el.getAttribute('data-cmp-oi'), key = el.getAttribute('data-cmp-ck');
     var placeholder = el.querySelector('span[style*="opacity"]');
-    var before = placeholder ? '' : (el.innerText || '').trim();
+    var before = placeholder ? '' : (el.innerText || '').replace(/\s+/g, ' ').trim();   /* нормализуем как after → пустой клик по ячейке не ставит cmpEdited */
     if (placeholder) el.textContent = '';   /* «Не указано» → пустое поле для ввода */
     el.setAttribute('contenteditable', 'true'); el.classList.add('pe-editing'); el.spellcheck = false; el.focus();
     try { var rg = document.createRange(); rg.selectNodeContents(el); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } catch (_) {}
@@ -1774,6 +1789,7 @@
       if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
       var el = e.target.closest && e.target.closest('.pe-ced-photo'); if (!el) return;
       e.preventDefault(); e.stopPropagation(); el.classList.remove('pe-filedrop');
+      if (e.dataTransfer.files.length > 1) toast('Добавлено одно фото', 'На один слот встаёт одно фото. Остальные добавьте в панели справа.', true);
       ceDropUploadToSlot(el, e.dataTransfer.files[0]);
     });
     stage.addEventListener('click', function (e) {
@@ -1850,7 +1866,7 @@
       if (el.getAttribute('contenteditable') === 'true') return;      /* идёт inline-правка — не двигаем */
       var key = el.getAttribute('data-pe-key'); if (['title', 'subtitle', 'body', 'eyebrow'].indexOf(key) < 0) return;
       var s = curSection(); if (!s) return;
-      var m0 = (s.elMove && s.elMove[key]) || { dx: 0, dy: 0 };
+      var m0 = elMoveGet(s, key) || { dx: 0, dy: 0 };
       var z = (typeof curZoom === 'function' && curZoom()) || 1; if (!z) z = 1;
       var sx = e.clientX, sy = e.clientY, moved = false, cur = { dx: m0.dx || 0, dy: m0.dy || 0 };
       var page = el.closest('.lp-page');
@@ -1886,7 +1902,7 @@
       function onUp() {
         document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
         el.classList.remove('pe-moving'); ceHideGuides();
-        if (moved) { S._justPanned = true; mutate(function () { s.elMove = s.elMove || {}; s.elMove[key] = { dx: Math.round(cur.dx), dy: Math.round(cur.dy) }; }); }
+        if (moved) { S._justPanned = true; mutate(function () { elMoveSet(s, key, { dx: Math.round(cur.dx), dy: Math.round(cur.dy) }); }); }
       }
       document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
     });
@@ -2029,7 +2045,7 @@
     var idxs = (S.multiSel || []).slice().sort(function (a, b) { return a - b; });
     if (!idxs.length) return;
     var skippedHeroes = 0;
-    if (op === 'del') { var keep = idxs.filter(function (i) { if (isObjHero(sections()[i])) { skippedHeroes++; return false; } return true; }); idxs = keep; }   // обложки объектов не удаляем массово — остался бы объект без обложки
+    if (op === 'del' || op === 'dup') { var keep = idxs.filter(function (i) { if (isObjHero(sections()[i])) { skippedHeroes++; return false; } return true; }); idxs = keep; }   // обложки объектов не удаляем и не дублируем массово (иначе объект без обложки / два хиро)
     mutate(function () {
       var secs = sections();
       if (op === 'hide') { idxs.forEach(function (i) { if (secs[i]) secs[i].enabled = false; }); }
@@ -2038,7 +2054,7 @@
         idxs.slice().reverse().forEach(function (i) { var s = secs[i]; if (!s) return; var c = JSON.parse(JSON.stringify(s)); c.id = newSecId(objPrefixOf(s)); secs.splice(i + 1, 0, c); });
       } else if (op === 'del') { idxs.slice().reverse().forEach(function (i) { secs.splice(i, 1); }); }
     });
-    if (skippedHeroes) toast('Обложки объектов пропущены', 'Чтобы убрать объект — «Исключить из подборки» в меню объекта (⋯).');
+    if (skippedHeroes) toast('Обложки объектов пропущены', 'Обложку объекта нельзя удалять или дублировать массово. Весь объект убирается через «Исключить из подборки» в меню объекта.');
     var n = idxs.length;
     S.multiSel = []; if (op === 'del') { S.multiMode = false; S.pageIdx = Math.min(S.pageIdx, sections().length - 1); }
     render();
@@ -2102,6 +2118,20 @@
   }
   function photoBrowserModal(s, idx, imgs) {
     var tab = 'card', sel = ((s.assetRefs || [])[idx] || {}).assetId || null;
+    /* регистрируем новое фото в пул С ТЕМ ЖЕ ключом, что ждёт рендерер/пикер: в подборке это <pfx>img<N> в
+       S.assets (а не 'imgN' в S.source) — иначе ассет не резолвился и слот оставался пустым. Как в ceDropUploadToSlot. */
+    function registerPoolPhoto(url) {
+      var id;
+      if (S.pres && S.pres.kind === 'collection') {
+        var pfx = objPrefixOf(s) || '';
+        var n = 0; Object.keys(S.assets || {}).forEach(function (k) { if (pfx && k.indexOf(pfx) !== 0) return; var mm = String(k).match(/img(\d+)$/); if (mm) n = Math.max(n, +mm[1] + 1); });
+        id = pfx + 'img' + n; S.assets = S.assets || {}; S.assets[id] = { url: url };
+      } else {
+        S.source = S.source || {}; S.source.images = S.source.images || []; S.source.images.push(url); id = 'img' + (S.source.images.length - 1);
+      }
+      imgs.push({ id: id, url: absU(url) });
+      return id;
+    }
     var web = { done: false, loading: false, enabled: true, note: '', items: [] };
     var ov = document.createElement('div'); ov.className = 'pu-overlay';
     function badge(url) {
@@ -2164,7 +2194,7 @@
         rd.onload = function () {
           apiRaw('POST', '/api/media/upload-photo', { propertyId: pid, dataUrl: rd.result, name: f.name }).then(function (r) {
             done++;
-            if (r.status === 200 && r.json.added) { ok++; S.source.images = S.source.images || []; S.source.images.push(r.json.url); imgs.push({ id: 'img' + (S.source.images.length - 1), url: absU(r.json.url) }); }
+            if (r.status === 200 && r.json.added) { ok++; registerPoolPhoto(r.json.url); }
             if (stat) stat.textContent = 'Загружено: ' + ok + ' из ' + arr.length;
             finish();
           }).catch(function () { done++; if (stat) stat.textContent = 'Ошибка сети при загрузке'; finish(); });
@@ -2175,10 +2205,10 @@
     }
     function importWeb(it, btn) {
       if (!it) return; if (btn) { btn.textContent = 'Проверяю…'; btn.disabled = true; }
-      apiRaw('POST', '/api/media/import-photo', { propertyId: S.pres.projectId, url: it.url, add: true }).then(function (r) {
+      var pid = sectionProjectId(s) || (S.pres && S.pres.projectIds && S.pres.projectIds[0]) || (S.pres && S.pres.projectId);
+      apiRaw('POST', '/api/media/import-photo', { propertyId: pid, url: it.url, add: true }).then(function (r) {
         if (r.status === 200 && r.json.added) {
-          S.source.images = S.source.images || []; S.source.images.push(r.json.url);
-          imgs.push({ id: 'img' + (S.source.images.length - 1), url: absU(r.json.url) });
+          registerPoolPhoto(r.json.url);
           toast('Фото добавлено в медиатеку', (r.json.analysis ? r.json.analysis.width + '×' + r.json.analysis.height : ''), true);
           tab = 'card'; paint();
         } else { if (btn) { btn.textContent = 'Не вышло'; btn.disabled = false; } toast('Не добавлено', (r.json && r.json.error) || ''); }
@@ -2201,7 +2231,8 @@
     ov.querySelectorAll('.pb-tab').forEach(function (t) { t.addEventListener('click', function () { tab = t.getAttribute('data-pbtab'); paint(); }); });
     ov.querySelector('.pb-modal') || ov; ov.querySelector('.pb-box').addEventListener('pbqual', function () { ov.querySelectorAll('[data-pburl]').forEach(function (el) { el.innerHTML = badge(el.getAttribute('data-pburl')); }); });
     ov.querySelector('.pb-apply').addEventListener('click', function () {
-      if (!sel) return; mutate(function () { s.assetRefs = s.assetRefs || []; s.assetRefs[idx] = Object.assign({}, s.assetRefs[idx], { assetId: sel }); });
+      if (!sel) return; var selUrl = (imgs.filter(function (x) { return x.id === sel; })[0] || {}).url || '';
+      mutate(function () { s.assetRefs = s.assetRefs || []; s.assetRefs[idx] = Object.assign({}, s.assetRefs[idx], { assetId: sel, url: selUrl }); });   /* url на ref = прямой фолбэк рендерера, гарантия показа и в подборке */
       close(); toast('Фото применено', null, true);
     });
     paint();
