@@ -621,7 +621,9 @@ function applyObjectUpdates(db, coll, k, fields) {
 /* История версий (ТЗ v3 §6, экран «История версий»). Версия пишется на КЛЮЧЕВЫХ действиях
    (публикация/замена/обновления/пресет/восстановление), не на каждом автосейве. */
 function snapOf(coll) {
-  return { orderedSections: JSON.parse(JSON.stringify(coll.orderedSections || [])), theme: JSON.parse(JSON.stringify(coll.theme || {})), title: coll.title || '', projectIds: (coll.projectIds || []).slice() };
+  /* ⚠️ снимок обязан включать collectionAssets и reusedObjectPres: иначе откат к версии до «Заменить объект»
+     вернёт старые секции/projectIds, но фото останутся от НОВОГО объекта (ассеты o<k>_ перезаписываются на месте). */
+  return { orderedSections: JSON.parse(JSON.stringify(coll.orderedSections || [])), theme: JSON.parse(JSON.stringify(coll.theme || {})), title: coll.title || '', projectIds: (coll.projectIds || []).slice(), collectionAssets: JSON.parse(JSON.stringify(coll.collectionAssets || {})), reusedObjectPres: JSON.parse(JSON.stringify(coll.reusedObjectPres || {})) };
 }
 function pushHistory(coll, type, by, label) {
   coll.history = coll.history || [];
@@ -660,6 +662,9 @@ function restoreVersion(coll, versionId) {
   coll.theme = JSON.parse(JSON.stringify(h.snap.theme || {}));
   coll.title = h.snap.title || coll.title;
   coll.projectIds = (h.snap.projectIds || []).slice();
+  /* ассеты и reused восстанавливаем из снимка (если он их содержит — легаси-снимки без них не трогаем) */
+  if (h.snap.collectionAssets) coll.collectionAssets = JSON.parse(JSON.stringify(h.snap.collectionAssets));
+  if (h.snap.reusedObjectPres) coll.reusedObjectPres = JSON.parse(JSON.stringify(h.snap.reusedObjectPres));
   coll.draftRevision = (coll.draftRevision || 1) + 1; coll.updatedAt = Date.now();
   return { ok: true, restored: versionId };
 }
