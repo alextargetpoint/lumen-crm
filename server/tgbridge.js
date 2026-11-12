@@ -177,8 +177,33 @@ function resolveLead(db, broker, msg, chatId) {
     const e = rt(db).replyMap[`${chatId}:${rep.message_id}`];
     if (e) { const l = db.leads.find(x => x.id === e.leadId); if (l) return l; }
   }
-  if (broker.tgActiveLeadId) return db.leads.find(x => x.id === broker.tgActiveLeadId) || null;
+  if (broker && broker.tgActiveLeadId) return db.leads.find(x => x.id === broker.tgActiveLeadId) || null;
+  if (!broker && db.settings.ownerTgActiveLeadId) return db.leads.find(x => x.id === db.settings.ownerTgActiveLeadId) || null;   /* основатель: последний активный лид (ответ без reply) */
   return null;
+}
+
+/* ⭐ПИКЕР НОМЕРА-ОТПРАВИТЕЛЯ в Telegram (запрос SFG 12.11): те же опции, что в веб-диалоге — общий пул / личный
+   номер. Анти-бан: личный номер залочен (🔒) до первого ответа клиента. Для брокера — его закреплённый номер,
+   для основателя (broker=null) — все личные номера. Два режима пула (waGray.showPoolNumbers). */
+function tgSenderOptions(db, lead, broker) {
+  const g = db.settings.waGray || {};
+  const nums = g.numbers || [];
+  const hasInbound = (db.messages || []).some(x => x.leadId === lead.id && x.dir === 'in' && !x.system);
+  const pool = nums.filter(n => !n.brokerId);
+  const brokerNm = (bid) => { const b = (db.brokers || []).find(x => x.id === bid); return b ? b.name : 'менеджер'; };
+  const myBid = broker ? broker.id : null;
+  const pers = nums.filter(n => n.brokerId && (!myBid || n.brokerId === myBid));
+  const opts = [];
+  if (g.showPoolNumbers && pool.length) { for (const n of pool) opts.push({ v: n.phone, label: 'Пул +' + (n.realPhone || n.phone) }); }
+  else opts.push({ v: '', label: 'Общий пул' });
+  for (const n of pers) opts.push({ v: n.phone, label: brokerNm(n.brokerId) + ' +' + (n.realPhone || n.phone), pers: true, locked: !hasInbound });
+  return opts;
+}
+function tgSenderKeyboard(db, lead, broker) {
+  const opts = tgSenderOptions(db, lead, broker);
+  if (opts.length < 2) return undefined;   /* нечего выбирать (только пул) — кнопки не нужны */
+  const cur = lead.tgSenderPhone || '';
+  return { inline_keyboard: opts.map(o => [{ text: (o.v === cur ? '✅ ' : '') + (o.pers ? '👤 ' : '📣 ') + o.label + (o.locked ? ' 🔒' : ''), callback_data: 'tgfrom:' + (o.v || 'pool') + ':' + lead.id }]) };
 }
 
 /* ---------- ВХОДЯЩИЙ апдейт из Telegram (брокер → WhatsApp) ---------- */
@@ -189,11 +214,28 @@ async function handleUpdate(db, update) {
     const cq = update.callback_query;
     const cbChat = String((cq.message && cq.message.chat && cq.message.chat.id) || (cq.from && cq.from.id) || '');
     const data = String(cq.data || '');
-    try { await safeApi(db, 'answerCallbackQuery', { callback_query_id: cq.id, text: data.startsWith('qr:') ? 'Готовлю свежий QR…' : '' }); } catch (_) {}
+    if (!data.startsWith('tgfrom:')) { try { await safeApi(db, 'answerCallbackQuery', { callback_query_id: cq.id, text: data.startsWith('qr:') ? 'Готовлю свежий QR…' : '' }); } catch (_) {} }
     if (data.startsWith('qr:') && waQr && cbChat) {
       /* без форс-«!»: отвалившийся номер пересоберётся (он не connected), а по рабочему номеру придёт «уже на связи»
          вместо разрушительного force-logout — безопасно для тап-панели по ВСЕМ номерам (клик по 🟢 не рвёт сессию). */
       try { await waQr(db, cbChat, '/qr ' + data.slice(3)); } catch (e) { console.error('[tgbridge] cb qr', e.message); }
+    }
+    /* ⭐ВЫБОР НОМЕРА-ОТПРАВИТЕЛЯ (кнопка под сообщением клиента): «tgfrom:<phone|pool>:<leadId>». */
+    if (data.startsWith('tgfrom:')) {
+      const _p = data.split(':'); const want = _p[1]; const leadId = _p.slice(2).join(':');
+      const lead = db.leads.find(l => l.id === leadId);
+      const brk = db.brokers.find(b => brokerChatIds(b).includes(cbChat)) || null;
+      let toastTxt = 'Готово';
+      if (!lead) toastTxt = 'Лид не найден';
+      else if (want === 'pool') { lead.tgSenderPhone = ''; store.save(); toastTxt = '📣 Пишем с общего пула'; }
+      else {
+        const picked = ((db.settings.waGray || {}).numbers || []).find(n => n.phone === want);
+        const hasIn = (db.messages || []).some(x => x.leadId === lead.id && x.dir === 'in' && !x.system);
+        if (picked && picked.brokerId && !hasIn) toastTxt = '🔒 Личный номер откроется после ответа клиента';
+        else { lead.tgSenderPhone = want; store.save(); toastTxt = '✅ Пишем с +' + (picked && picked.realPhone || want); }
+      }
+      try { await safeApi(db, 'answerCallbackQuery', { callback_query_id: cq.id, text: toastTxt }); } catch (_) {}
+      if (lead) { try { await safeApi(db, 'editMessageReplyMarkup', { chat_id: cbChat, message_id: cq.message && cq.message.message_id, reply_markup: tgSenderKeyboard(db, lead, brk) }); } catch (_) {} }
     }
     return { callback: data };
   }
@@ -232,19 +274,22 @@ async function handleUpdate(db, update) {
   }
 
   const broker = db.brokers.find(b => brokerChatIds(b).includes(chatId));
-  if (!broker) {
+  /* ⭐ОСНОВАТЕЛЬ тоже отвечает лидам из бота (запрос SFG 12.11 «для всех»): раньше не-брокеру отвечало
+     «вы не привязаны», и фаундер физически не мог ответить на зеркалируемые ему пул/SOLO-диалоги. */
+  const isOwner = !broker && String((db.settings || {}).ownerTgChatId || '') === chatId;
+  if (!broker && !isOwner) {
     await safeApi(db, 'sendMessage', { chat_id: chatId, text: 'Вы не привязаны к CRM. Отправьте /start <код> (код в CRM → Подключения → Мост Telegram).' });
     return { skip: 'unbound' };
   }
 
   /* брокер тоже может запросить новый QR номера прямо с телефона (/qr) — номер часто отваливается,
-     ждать владельца не нужно. handleOwnerWaQr сам пускает привязанных брокеров. */
-  if (waQr && /^\/(qr|rescan|пересканировать)\b/i.test(text)) {
+     ждать владельца не нужно. handleOwnerWaQr сам пускает привязанных брокеров. (у фаундера /qr перехвачен выше). */
+  if (broker && waQr && /^\/(qr|rescan|пересканировать)\b/i.test(text)) {
     try { if (await waQr(db, chatId, text)) return { brokerCmd: true }; }
     catch (e) { console.error('[tgbridge] waQr broker', e.message); }
   }
 
-  const lead = resolveLead(db, broker, msg, chatId);
+  const lead = resolveLead(db, broker || null, msg, chatId);
   if (!lead) {
     await safeApi(db, 'sendMessage', { chat_id: chatId, text: '↩️ Ответьте reply на сообщение клиента, чтобы я знал, кому переслать.\n\n📱 Отвалился номер WhatsApp? Отправьте /qr — пришлю список номеров и свежий QR для пересканирования (без входа в CRM).' });
     return { skip: 'no lead' };
@@ -258,17 +303,25 @@ async function handleUpdate(db, update) {
   }
   if (!media && !text) return { skip: 'empty' };
 
-  /* уходит клиенту в WhatsApp как ручное сообщение брокера (via='human') */
-  engine.send(db, lead, text, 'human', { channel: 'wa', media: media || undefined });
+  /* ⭐ВЫБРАННЫЙ НОМЕР-ОТПРАВИТЕЛЬ (кнопка под сообщением). Анти-бан guard: личный номер на ХОЛОДНОМ касании
+     (клиент не отвечал) → сбрасываем на пул, не жжём личный. Пусто = авто-выбор пула в pickGrayNumber. */
+  let _from = lead.tgSenderPhone || '';
+  if (_from) {
+    const _picked = ((db.settings.waGray || {}).numbers || []).find(n => n.phone === _from);
+    const _hasIn = (db.messages || []).some(x => x.leadId === lead.id && x.dir === 'in' && !x.system);
+    if (_picked && _picked.brokerId && !_hasIn) _from = '';
+  }
+  /* уходит клиенту в WhatsApp как ручное сообщение (via='human') */
+  engine.send(db, lead, text, 'human', { channel: 'wa', media: media || undefined, fromPhone: _from || undefined });
 
   /* человек перехватил — автопилот на паузе (правило autoOff.onHumanReply) */
   if (!db.settings.ai || !db.settings.ai.autoOff || db.settings.ai.autoOff.onHumanReply !== false) {
     lead.ai.enabled = false;
-    lead.ai.pausedBy = 'broker';
+    lead.ai.pausedBy = broker ? 'broker' : 'owner';
     lead.tags = [...new Set([...(lead.tags || []), 'ведёт брокер'])];
   }
-  broker.tgActiveLeadId = lead.id;
-  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${broker.name} ответил из Telegram${media ? ` (${media.type})` : ''}` });
+  if (broker) broker.tgActiveLeadId = lead.id; else db.settings.ownerTgActiveLeadId = lead.id;
+  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${broker ? broker.name : 'Основатель'} ответил из Telegram${media ? ` (${media.type})` : ''}` });
   store.save();
   return { sent: true, leadId: lead.id, media: media ? media.type : null };
 }
@@ -313,7 +366,9 @@ async function forwardInbound(db, lead, m) {
         sent = await sendMediaToBroker(db, chatId, m.media, capPlain);
       } else {
         const capHtml = `💬 <b>${who}</b>\n${esc(m.text || '')}\n<i>${foot}</i>`.trim();
-        sent = await api(db, 'sendMessage', { chat_id: chatId, text: capHtml, parse_mode: 'HTML' });
+        /* ⭐кнопка выбора номера-отправителя под сообщением клиента (общий пул / личный) — та же логика, что в вебе */
+        const _kb = tgSenderKeyboard(db, lead, broker);
+        sent = await api(db, 'sendMessage', { chat_id: chatId, text: capHtml, parse_mode: 'HTML', reply_markup: _kb });
       }
     } catch (e) { console.error('[tgbridge] forwardInbound', chatId, e.message); continue; }
     const mid = sent && sent.result && sent.result.message_id;
