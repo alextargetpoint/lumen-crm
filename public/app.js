@@ -20566,6 +20566,10 @@ PAGES.settings = async (root) => {
           <div class="muted" style="font-size:11.2px;line-height:1.5;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">${ic(I.x || I.spark)} В стартовые шаблоны вшита кнопка <b>«Отписаться»</b>: недовольный жмёт её вместо «Report spam» — жалоба не уходит (это главный триггер бана номера). Нажатие ловится вебхуком: лид помечается «отписался», рассылки и цепочки ему останавливаются автоматически.</div>
         </div>`;
   const aiForm = `
+          <div class="set-row ai-master-off${s.ai.paused ? ' on' : ''}">
+            <div class="sp"><div class="sl">${ic(I.pause || I.shield)}${t('Полностью остановить ИИ (перманентно)', 'Stop AI completely (permanent)')}</div><div class="sd">${t('Выключает ВСЕ авто-сообщения ассистента (ответы, цепочки, подхваты) на ВСЕХ лидах — даже там, где ИИ был включён у отдельного лида. Менеджеры пишут вручную. Включите обратно — ИИ продолжит работу.', 'Turns off ALL assistant auto-messages (replies, chains, pick-ups) on EVERY lead — even where AI was on per-lead. Managers write manually. Toggle back on to resume.')}</div></div>
+            <label class="switch"><input type="checkbox" id="aiPaused" ${s.ai.paused ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          </div>
           <div class="set-row">
             <div class="sp"><div class="sl">LLM (${s.ai.llmModel || 'Gemini'})</div><div class="sd">${s.ai.llmAvailable ? 'Ключ найден — живые ответы включены. Оси квалификации всё равно клампятся цитатами клиента.' : 'Ключ не задан (GEMINI_API_KEY в .env) — работает детерминированное ядро.'}</div></div>
             <span class="badge ${s.ai.llmAvailable ? 'ok' : 'warn'}">${s.ai.llmAvailable ? 'подключён' : 'нет ключа'}</span>
@@ -21047,6 +21051,11 @@ PAGES.settings = async (root) => {
     setTimeout(() => $('#waSyncTpl') && $('#waSyncTpl').click(), 1200);
   });
   $('#aiProv').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { provider: e.target.value } }); loadState(); });
+  $('#aiPaused')?.addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    try { await api.patch('/settings', { ai: { paused: on } }); toast(on ? 'ИИ полностью остановлен' : 'ИИ снова включён', on ? 'Авто-сообщения ассистента не отправляются — лидам пишут менеджеры вручную' : 'Ассистент продолжит отвечать и вести цепочки', true); await loadState(); PAGES.settings(root); }
+    catch (er) { toast('Не вышло', er.message); e.target.checked = !on; }
+  });
   $('#zoomConnect')?.addEventListener('click', async () => {
     try { const r = await api.get('/zoom/connect'); if (r.url) location.href = r.url; }
     catch (e) { toast('Не удалось начать подключение', e.message); }

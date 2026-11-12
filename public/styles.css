@@ -9598,3 +9598,8 @@ body.client-view [data-team]{ display:none !important; }
 .np-price { font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .np-meta { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .np-ph { font-size: 11px; color: var(--muted); white-space: nowrap; }
+/* Мастер-стоп ИИ (перманентная пауза) — заметная подсветка когда включён */
+.ai-master-off .sl { display: flex; align-items: center; gap: 7px; font-weight: 700; }
+.ai-master-off .sl svg { width: 15px; height: 15px; }
+.ai-master-off.on { border: 1px solid color-mix(in srgb, #e5484d 45%, var(--stroke)); background: color-mix(in srgb, #e5484d 7%, transparent); border-radius: 12px; padding: 11px 13px; margin: 0 0 4px; }
+.ai-master-off.on .sl { color: #d13b40; }
