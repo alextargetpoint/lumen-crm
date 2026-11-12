@@ -5732,6 +5732,11 @@ PAGES.funnel = async (root) => {
     document.querySelector('.col-pick')?.remove();
     const pop = el(`<div class="col-pick glass"><div class="col-pick-h">Колонки таблицы</div><div class="col-pick-list">${LEAD_COLS.map(c => `<label class="col-pick-row"><input type="checkbox" data-col="${c.key}" ${enabledCols.includes(c.key) ? 'checked' : ''}><span>${esc(c.label)}</span></label>`).join('')}</div><button type="button" class="col-pick-reset" data-colreset>Показать все</button></div>`);
     document.body.appendChild(pop);
+    /* ⚠️ БАГ «Столбцы не открываются»: класс .glass давал .col-pick вычисленный position:relative (перебивал
+       .col-pick{position:fixed}), из-за чего поповер падал в нормальный поток в конец body на ~y=1117 — НИЖЕ
+       вьюпорта → кнопка «работала», но меню было не видно. Форсим position:fixed ИНЛАЙНОМ (бьёт любой каскад)
+       ДО измерения offsetWidth — иначе full-width (следствие relative) схлопывал расчёт left в 8. */
+    pop.style.position = 'fixed'; pop.style.right = 'auto'; pop.style.bottom = 'auto';
     const r = e.currentTarget.getBoundingClientRect();
     pop.style.top = (r.bottom + 6) + 'px'; pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
     /* применяем при ЗАКРЫТИИ (мультивыбор без рушащего ре-рендера на каждый клик) */
