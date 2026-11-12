@@ -11652,9 +11652,9 @@ PAGES.automations = async (root) => {
             <option value="load" ${a.assignMode === 'load' ? 'selected' : ''}>По загрузке (меньше — берёт)</option>
             <option value="roundrobin" ${a.assignMode === 'roundrobin' ? 'selected' : ''}>По очереди</option>
             <option value="shift" ${a.assignMode === 'shift' ? 'selected' : ''}>По сменам + загрузке</option>
-            <option value="weighted" ${a.assignMode === 'weighted' ? 'selected' : ''}>Адаптивно (по весу брокера)</option>
+            <option value="weighted" ${a.assignMode === 'weighted' ? 'selected' : ''}>Адаптивно (кому сколько лидов)</option>
           </select>`, { v: 'right', hue: '#C05B8C' })}
-          <div id="assignWeightedHint" class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5;display:${a.assignMode === 'weighted' ? 'block' : 'none'}">Каждому брокеру в разделе «Брокеры» задаётся <b>вес</b> — доля входящего потока. Напр. опытному Илье вес <b>1</b>, новенькой Алине <b>3</b> → из каждых ~4 лидов ~3 уйдут Алине, 1 — Илье. Вес — это доля, а не потолок: новичку поднимают на разгон, потом возвращают к 1.</div>
+          <div id="assignWeightedHint" class="muted" style="font-size:11.5px;margin:-4px 0 10px;line-height:1.5;display:${a.assignMode === 'weighted' ? 'block' : 'none'}">Каждому брокеру в разделе «Брокеры» ставите, <b>сколько лидов ему давать</b> относительно других. Напр. опытному Илье <b>1</b>, новенькой Алине <b>3</b> → из каждых ~4 лидов ~3 уйдут Алине, 1 — Илье. Это доля потока, а не потолок: новичку ставите больше на разгон, потом возвращаете к 1.</div>
           ${swRow('Закреплять брокера сразу при входе', 'Новый лид сразу виден закреплённому брокеру (с первой секунды), а ИИ продолжает вести цепочку. Выкл — лид до квалификации в общем пуле', sw('assignOnNew', a.assignOnNew))}
           ${swRow('Авто-передача при квалификации', '4 оси закрыты → лид сам уходит брокеру с саммари и слотом, без ручного клика', sw('autoHandover', a.autoHandover))}
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
@@ -18836,7 +18836,7 @@ PAGES.brokers = async (root) => {
     <button class="btn btn-accent page-primary" id="brAdd">${ic(I.plus)}Брокер</button>
     <button class="btn" id="brInvite" style="margin-left:6px">Пригласить по e-mail</button>
     ${hint('brokers', 'Как ИИ выбирает брокера', [
-      ['Режим распределения', 'По загрузке, по очереди, по сменам или адаптивно (по весу брокера) — в «Автоматизациях»'],
+      ['Режим распределения', 'По загрузке, по очереди, по сменам или адаптивно (кому сколько лидов давать) — в «Автоматизациях»'],
       ['Саммари вместе с лидом', '4 оси с цитатами, источник, история диалога'],
       ['Авто-задача', '«Позвонить в течение 30 минут» при передаче']])}</div>
   <div class="broker-grid">
@@ -18868,7 +18868,7 @@ PAGES.brokers = async (root) => {
               <div class="pd-fact"><label class="lc-lbl">Лимит лидов</label><input class="gi" data-be="capacity" type="number" value="${b.capacity}"></div>
             </div>
             <div class="pds-grid c2" style="margin-top:10px">
-              <div class="pd-fact"><label class="lc-lbl">Вес выдачи ${(st.automations || {}).assignMode === 'weighted' ? '<span class="muted" style="font-weight:400">· активен</span>' : '<span class="muted" style="font-weight:400">· для режима «Адаптивно»</span>'}</label><input class="gi" data-be="weight" type="number" min="1" max="10" value="${b.weight || 1}"></div>
+              <div class="pd-fact"><label class="lc-lbl">Сколько лидов давать ${(st.automations || {}).assignMode === 'weighted' ? '<span class="muted" style="font-weight:400">· активно</span>' : '<span class="muted" style="font-weight:400">· для режима «Адаптивно»</span>'}</label><input class="gi" data-be="weight" type="number" min="1" max="10" value="${b.weight || 1}" title="Сколько лидов давать этому брокеру относительно других. 1 — обычная доля, 3 — втрое больше. Работает в режиме «Адаптивно»."></div>
               <div class="pd-fact" style="align-self:end"><span class="muted" style="font-size:11px;line-height:1.4">Доля входящего потока в режиме «Адаптивно». 1 = обычная доля; поставь выше, чтобы грузить новичка на разгоне больше (вес 3 → втрое больше лидов, чем у веса 1).</span></div>
             </div>
             <div class="pds-grid c2" style="margin-top:10px">
@@ -18941,7 +18941,7 @@ PAGES.brokers = async (root) => {
         <div class="br2-stats">
           <span><b>${b.deals90 || 0}</b> сделок · 90д</span>
           ${hot ? `<span class="hot"><b>${hot}</b> в работе</span>` : ''}
-          ${(st.automations || {}).assignMode === 'weighted' ? `<span title="Вес выдачи: доля входящего потока в адаптивном режиме">доля <b>×${b.weight || 1}</b></span>` : ''}
+          ${(st.automations || {}).assignMode === 'weighted' ? `<span title="Сколько лидов даём относительно других (× к обычной доле)">лидов <b>×${b.weight || 1}</b></span>` : ''}
           <span class="tb-spacer"></span>
           <span class="br2-sch" title="${daysStr} · ${sched}">${daysStr ? daysStr + ' · ' + sched : 'смены не заданы'}</span>
         </div>
