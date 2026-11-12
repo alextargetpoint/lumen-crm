@@ -511,7 +511,7 @@ function ensureTenantDefaults(db) {
   if (!db.settings.ai.autoOff) db.settings.ai.autoOff = { onHumanReply: true, onHumanRequest: true, onEscalation: true };
   /* автоматизации агентства */
   if (!db.settings.automations) db.settings.automations = {
-    assignMode: 'load',        // load | roundrobin | shift
+    assignMode: 'load',        // load | roundrobin | shift | weighted (адаптивная выдача по весу брокера)
     autoHandover: false,       // 4/4 закрыто → авто-передача брокеру
     assignOnNew: false,        // закреплять брокера СРАЗУ при входе лида (видимость с первой секунды; ИИ продолжает цепочку)
     meetingReminderHrs: 3,     // напоминание клиенту за N часов (0 = выкл)
@@ -10341,6 +10341,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (b.capacity != null) br.capacity = +b.capacity;
+      if (b.weight != null) br.weight = Math.max(1, Math.min(10, Math.round(+b.weight) || 1));   /* вес = доля входящего потока в режиме распределения 'weighted' (адаптивная выдача; 1 = обычная доля, выше = больше лидов) */
       if (b.maxDevices != null) br.maxDevices = Math.max(1, Math.min(5, Math.round(+b.maxDevices) || 1));   /* сколько устройств/IP одновременно разрешено этому сотруднику (ПК+MacBook=2) — аудит мест не флагит в пределах квоты */
       /* дежурство/замещение: «в отсутствии» — новых лидов не даём, владелец сохраняется, клиенты уходят заместителю */
       if (b.away !== undefined) { br.away = !!b.away; audit(db, req, br.away ? 'брокер в отсутствии' : 'брокер вернулся', { broker: br.name }); }
