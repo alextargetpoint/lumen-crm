@@ -4118,16 +4118,27 @@ function pickGrayNumber(db, lead, live) {
     if (healthy.length) scope = healthy; }
   /* РАСПРЕДЕЛЕНИЕ по номерам БРОКЕРА: если за брокером закреплено НЕСКОЛЬКО номеров — раскидываем первые
      касания по кругу, а не шлём всё с одного. Так номера греются равномерно, отвал одного рвёт связь лишь с частью. */
-  /* ⭐#6 ЗАЩИТА НОМЕРА МЕНЕДЖЕРА: если за брокером лида закреплён СВОЙ номер — сообщение уходит ТОЛЬКО с него.
-     Его номер разлогинен → НЕ подменяем чужим номером другого менеджера (клиент: «Алина написала — ушло с номера ЛН»),
-     а честно проваливаем с алертом «переподключи свой номер». Брокер без своего закреплённого номера — прежний пул-фолбэк. */
-  if (lead.broker) {
+  /* ⭐АНТИ-БАН ПЕРВОГО КАСАНИЯ (запрос SFG 12.11): ХОЛОДНЫЙ первый контакт (клиент ещё НЕ отвечал) НИКОГДА
+     не уходит с ЛИЧНОГО номера менеджера — WhatsApp мгновенно банит персональный номер за холодную рассылку
+     (реальный кейс: Алина обработала 1 лида → её номер в бане на 24ч). Поэтому: пока клиент не ответил —
+     строго ОБЩИЙ ПУЛ (номера без закрепа за брокером). Личный/закреплённый номер подключается ТОЛЬКО после
+     первого ответа клиента (тёплый диалог, где персональный номер уже безопасен). */
+  const hasInbound = (db.messages || []).some(x => x.leadId === lead.id && x.dir === 'in' && !x.system);
+  if (lead.broker && hasInbound) {
+    /* ⭐#6 ЗАЩИТА НОМЕРА МЕНЕДЖЕРА (только для ТЁПЛОГО диалога): за брокером закреплён свой номер → шлём ТОЛЬКО
+       с него; разлогинен → НЕ подменяем чужим, честно проваливаем с алертом. Без своего номера — пул-фолбэк. */
     const assigned = (g.numbers || []).filter(n => n.brokerId === lead.broker);
     if (assigned.length) {
       const mine = scope.filter(n => n.brokerId === lead.broker);
       if (mine.length) scope = mine;
       else { lead._brokerNumOffline = (assigned[0].realPhone || assigned[0].phone); return null; }
     }
+  } else {
+    /* холодное первое касание → ОБЩИЙ ПУЛ: только номера БЕЗ закрепа за брокером. Если пул пуст (все номера
+       закреплены за кем-то) — не блокируем жёстко, но это сигнал завести общий пул под первые касания. */
+    const poolNums = scope.filter(n => !n.brokerId);
+    if (poolNums.length) scope = poolNums;
+    else if (lead.broker) lead._coldNoPool = true;   /* нет пула под холодное касание — предупредим менеджера */
   }
   /* ⭐ТВЁРДЫЙ дневной потолок (прогрев): номер, исчерпавший суточный лимит отправок, НЕ берём. Если под лимитом
      нет ни одного — откладываем касание (анти-бан), а не шлём сверх нормы с перегретого номера. */
@@ -9687,10 +9698,25 @@ const server = http.createServer(async (req, res) => {
            l.adCreative), он уходит первым сообщением — как это делает автопилот на chainStep 0. */
         const cu = b.creativeUrl ? String(b.creativeUrl).slice(0, 500) : '';
         const _ch = ['wa', 'tg', 'viber', 'email'].includes(b.channel) ? b.channel : undefined;   /* явный выбор канала касания */
+        /* ⭐ВЫБОР НОМЕРА-ОТПРАВИТЕЛЯ (пикер в диалоге, запрос SFG 12.11): пусто → авто-выбор общего пула
+           (pickGrayNumber); конкретный номер → форс. GUARD анти-бан: ЛИЧНЫЙ (закреплённый за брокером) номер
+           на ХОЛОДНОМ первом касании запрещён — только после ответа клиента. */
+        let _fromPhone = b.fromPhone ? String(b.fromPhone).replace(/\D/g, '') : '';
+        if (_fromPhone) {
+          const _g = db.settings.waGray || {};
+          const _picked = (_g.numbers || []).find(n => n.phone === _fromPhone);
+          const _hasIn = db.messages.some(x => x.leadId === lead.id && x.dir === 'in' && !x.system);
+          if (_picked && _picked.brokerId && !_hasIn) {
+            return json(res, 400, { error: 'Первое касание можно отправить только с общего пула — личный номер откроется после ответа клиента (защита номера от бана).' });
+          }
+          /* успешная отправка с fromPhone сама перепривяжет lead.grayPhone к выбранному номеру (см. graySender),
+             поэтому переключение на личный «залипает» для последующих сообщений без доп. флагов. */
+        }
+        const _sopts = {}; if (_ch) _sopts.channel = _ch; if (_fromPhone) _sopts.fromPhone = _fromPhone;
         /* ПОРЯДОК: креатив (видео/фото) уходит ПЕРВЫМ и мы ДОЖИДАЕМСЯ его отправки, только потом текст —
            иначе лёгкий текст обгонял тяжёлое видео (у клиента приходил текст раньше видео). */
-        if (cu) { const cm = engine.send(db, lead, '', 'human', { channel: _ch, media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } }); try { if (cm && cm._sendP) await cm._sendP; } catch (_) {} }
-        if (b.text || !cu) engine.send(db, lead, b.text || '', 'human', _ch ? { channel: _ch } : undefined);
+        if (cu) { const cm = engine.send(db, lead, '', 'human', Object.assign({}, _sopts, { media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } })); try { if (cm && cm._sendP) await cm._sendP; } catch (_) {} }
+        if (b.text || !cu) engine.send(db, lead, b.text || '', 'human', Object.keys(_sopts).length ? _sopts : undefined);
         /* «дообучение под брокера»: отправленное из панели первого касания сообщение учим как СТИЛЬ пишущего */
         if (b.learnStyle && b.text) captureTouchStyle(db, IS_BROKER ? ROLE.brokerId : 'owner', b.text, (lead.ads && lead.ads.adName) || '');
         /* менеджер подхватил — ИИ на паузу (правило autoOff.onHumanReply) */
@@ -10881,6 +10907,13 @@ const server = http.createServer(async (req, res) => {
         db.settings.ai = db.settings.ai || {};
         db.settings.ai.training = Object.assign({}, db.settings.ai.training || {}, b.ai.training);
         delete b.ai.training;
+      }
+      /* ⭐РЕЖИМ ПУЛА НОМЕРОВ (запрос SFG 12.11): показывать ли менеджеру конкретные номера общего пула в пикере
+         отправителя. ТОЛЬКО это поле — массив waGray.numbers и warmup НЕ трогаем (иначе снесём номера/прогрев). */
+      if (b.waGray && typeof b.waGray === 'object' && !Array.isArray(b.waGray)) {
+        db.settings.waGray = db.settings.waGray || {};
+        if ('showPoolNumbers' in b.waGray) db.settings.waGray.showPoolNumbers = !!b.waGray.showPoolNumbers;
+        delete b.waGray;
       }
       /* ⚠️ ai.autoOff мержим ГЛУБОКО: частичный {onHumanReply} не должен стирать onHumanRequest/onEscalation */
       if (b.ai && b.ai.autoOff && typeof b.ai.autoOff === 'object' && !Array.isArray(b.ai.autoOff)) {

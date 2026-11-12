@@ -8007,6 +8007,28 @@ async function renderChat(id, rebuild) {
   if (_lastInChId && COMPOSER_CH_LASTIN[id] !== _lastInChId) { COMPOSER_CH[id] = _lastInChId; COMPOSER_CH_LASTIN[id] = _lastInChId; }
   let _selCh = COMPOSER_CH[id]; if (!_selCh || !_avail.includes(_selCh)) _selCh = (l.activeChannel && _avail.includes(l.activeChannel) ? l.activeChannel : (_rec || _avail[0]));
   COMPOSER_CH[id] = _selCh;
+
+  /* ⭐ПИКЕР НОМЕРА-ОТПРАВИТЕЛЯ (запрос SFG 12.11): менеджер выбирает, С КАКОГО номера уйдёт сообщение.
+     Анти-бан: ХОЛОДНОЕ первое касание (клиент ещё не отвечал) — только ОБЩИЙ ПУЛ, личный номер залочен до
+     первого ответа клиента. Два режима агентства (waGray.showPoolNumbers): скрытый пул (просто «Общий пул»)
+     или показанный (менеджер видит конкретные номера пула и выбирает). Показываем только для WhatsApp-канала. */
+  const _wg = (STATE.settings && STATE.settings.waGray) || {};
+  const _allNums = _wg.numbers || [];
+  const _hasInbound = (l.messages || []).some(m => m.dir === 'in' && !m.system);
+  const _showPool = !!_wg.showPoolNumbers;
+  const _poolNums = _allNums.filter(n => !n.brokerId);
+  const _brokerNm = (bid) => { const b = (STATE.brokers || []).find(x => x.id === bid); return b ? b.name : 'менеджер'; };
+  const _myBid = (STATE.me && STATE.me.role === 'broker') ? STATE.me.brokerId : null;
+  const _persNums = _allNums.filter(n => n.brokerId && (!_myBid || n.brokerId === _myBid));
+  const _senderOpts = [];
+  if (_showPool && _poolNums.length) { for (const n of _poolNums) _senderOpts.push({ v: n.phone, label: '📣 Пул · +' + (n.realPhone || n.phone) }); }
+  else _senderOpts.push({ v: '', label: '📣 Общий пул' });
+  for (const n of _persNums) _senderOpts.push({ v: n.phone, label: '👤 ' + _brokerNm(n.brokerId) + ' · +' + (n.realPhone || n.phone), locked: !_hasInbound });
+  let _senderSel = (l.grayPhone && _senderOpts.some(o => o.v === l.grayPhone)) ? l.grayPhone : (_senderOpts[0] ? _senderOpts[0].v : '');
+  const _senderPicker = (_selCh === 'wa' && _allNums.length && (_persNums.length || (_showPool && _poolNums.length > 1))) ? `<div class="composer-sender" title="С какого номера клиенту уйдёт это сообщение">
+      <span class="cs-lbl">${ic(I.phone)}С номера</span>
+      <select id="composerFrom" class="cs-sel">${_senderOpts.map(o => `<option value="${esc(o.v)}"${o.v === _senderSel ? ' selected' : ''}${o.locked ? ' disabled' : ''}>${esc(o.label)}${o.locked ? ' — после ответа клиента' : ''}</option>`).join('')}</select>
+    </div>` : '';
   const chn = _selCh;
   pane.className = 'glass chat chat--' + chn + (l.ai.enabled ? ' ai-live' : '');
   const chnMeta = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], viber: ['Viber', '#7360F2'], email: ['E-mail', '#8A90A0'] }[chn] || ['WhatsApp', '#25D366'];
@@ -8126,6 +8148,7 @@ async function renderChat(id, rebuild) {
       <button class="btn btn-sm chat-tool ${l.lastDir === 'out' ? 'hot' : ''}" id="followupBtn" title="Клиент замолчал? Сгенерирую follow-up со ссылкой на вашу переписку — новый угол, без упрёков. Текст подставлю в поле — отредактируете и отправите.">${ic(I.spark)}Подтолкнуть${l.lastDir === 'out' ? ' — клиент молчит' : ''}</button>
     </div>`;
     })()}
+    ${_senderPicker}
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
       <button class="btn composer-mic" id="voiceRecBtn" title="Записать голосовое">${ic(I.mic)}</button>
@@ -8230,8 +8253,10 @@ async function renderChat(id, rebuild) {
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
     if (!t) return;
+    const _from = $('#composerFrom') ? $('#composerFrom').value : '';   /* выбранный номер-отправитель (пусто = общий пул) */
     $('#composerText').value = '';
-    await api.post(`/leads/${id}/message`, { text: t, channel: COMPOSER_CH[id] || undefined });   /* ручной выбор канала касания */
+    try { await api.post(`/leads/${id}/message`, { text: t, channel: COMPOSER_CH[id] || undefined, fromPhone: _from || undefined }); }   /* ручной выбор канала + номера */
+    catch (err) { $('#composerText').value = t; toast('Не отправилось', err.message || 'ошибка'); return; }   /* напр. личный номер на холодном касании — вернём текст */
     renderChat(id, false);
   });
   $('#followupBtn')?.addEventListener('click', async (e) => {
@@ -17118,6 +17143,11 @@ PAGES.numbers = async (root) => {
     ${grayNums.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
       <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div>
       ${(STATE.leads || []).some(l => l.grayPhone && !(((STATE.settings.waGray || {}).numbers) || []).some(x => x.phone === l.grayPhone && x.roles && x.roles.outreach === false)) ? `<button class="btn btn-sm" data-graymigrateall title="Перенести ВСЕ активные диалоги со всех касательных номеров на чистые/брокерские — массово спасти разговоры (напр. после бана и покупки новых номеров)">${ic(I.chat)}Перенести все диалоги на чистый</button>` : ''}</div>
+    <label class="glass card pool-mode-row" style="display:flex;align-items:flex-start;gap:11px;margin:0 0 14px;padding:13px 15px;cursor:pointer">
+      <input type="checkbox" id="poolShowToggle" ${(STATE.settings.waGray || {}).showPoolNumbers ? 'checked' : ''} style="margin-top:2px;width:17px;height:17px;flex:0 0 auto">
+      <div><div style="font-weight:650;font-size:13.5px">Показывать менеджерам номера пула</div>
+      <div class="muted" style="font-size:12px;line-height:1.5;margin-top:3px">В окне диалога менеджер выбирает, с какого номера писать. <b>Выкл</b> — он видит просто «Общий пул» (система сама берёт свободный номер). <b>Вкл</b> — видит и выбирает конкретные номера пула. Первое касание в любом режиме идёт только с пула, личный номер открывается после ответа клиента.</div></div>
+    </label>
     <details class="glass card mb num-roles-help" style="margin-bottom:14px">
       <summary style="cursor:pointer;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:8px;list-style:none">${ic(I.shield || I.spark)}Как устроены номера и роли — чтобы не было банов<span class="muted" style="font-weight:400;font-size:12px;margin-left:auto">раскрыть</span></summary>
       <div style="margin-top:12px;font-size:13px;line-height:1.6;color:var(--text)">
@@ -17750,6 +17780,11 @@ PAGES.numbers = async (root) => {
     try { const r = await api.post('/wa/gray/migrate-bulk', { fromPhone: phone }); toast(r.moved ? ('Перенесено: ' + r.moved) : 'Не перенеслось', (r.failed ? ('не вышло: ' + r.failed) : '') + (r.error ? ' · ' + r.error : ''), !!r.moved); await loadState(); if (PAGES.numbers) PAGES.numbers(root); }
     catch (e) { toast('Не вышло', e.message); b.disabled = false; b.innerHTML = old; }
   }));
+  $('#poolShowToggle', root)?.addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    try { await api.patch('/settings', { waGray: { showPoolNumbers: on } }); if (STATE.settings.waGray) STATE.settings.waGray.showPoolNumbers = on; toast(on ? 'Менеджеры видят номера пула' : 'Пул скрыт — менеджеры видят «Общий пул»', on ? 'В окне диалога появится выбор конкретного номера' : 'Система сама подбирает свободный номер пула', true); }
+    catch (err) { toast('Не сохранилось', err.message); e.target.checked = !on; }
+  });
   $$('[data-graymigrateall]', root).forEach(b => b.addEventListener('click', async () => {
     let n = 0; try { const pre = await api.post('/wa/gray/migrate-bulk', { dryRun: true }); n = pre.count || 0; } catch (_) {}
     if (!n) { toast('Нет диалогов для переноса'); return; }
