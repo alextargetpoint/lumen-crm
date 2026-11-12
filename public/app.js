@@ -14056,9 +14056,25 @@ PAGES.ads = async (root) => {
   };
   $('#capiSave')?.addEventListener('click', async () => { await api.patch('/settings', { capi: capiPatch() }); toast('Meta CAPI сохранён', 'Настройки применены', true); await loadState(); render(); });
   $('#capiOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { capi: { enabled: e.target.checked } }); toast(e.target.checked ? 'CAPI включён' : 'CAPI выключен', e.target.checked ? 'События целевых стадий уходят в Meta' : null, true); await loadState(); });
-  $('#capiTestBtn')?.addEventListener('click', async () => {
-    try { const r = await api.post('/capi/test', {}); toast(r.ok ? 'Тест-событие ушло в Meta' : 'Meta вернула ошибку', r.ok ? `Lead · ${r.lead} — смотрите Events Manager` : (r.error || ''), r.ok); await loadState(); render(); }
-    catch (e) { toast('Не удалось', e.message); }
+  $('#capiTestBtn')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;   /* захват ДО await: после await e.currentTarget уже null */
+    const tc = ($('#capiTest')?.value || '').trim();
+    const saved = ((STATE.settings.capi || {}).testCode || '').trim();
+    /* ⚠️ ПРЕДУПРЕЖДЕНИЕ (запрос SFG): без Test event code событие уходит как БОЕВОЕ (в прод), а не во вкладку
+       Test Events — можно нечаянно залить реальному пикселю тестовую конверсию. Предупреждаем и даём отмену. */
+    if (!tc) {
+      if (!await uiConfirm('Отправить как БОЕВОЕ событие?', 'Поле «Test event code» пустое — событие уйдёт в <b>прод</b> как реальная конверсия, а не во вкладку <b>Test Events</b>. Чтобы проверить без влияния на данные: впишите Test event code (Events Manager → Test Events) и нажмите «Тест-событие» снова. Всё равно отправить боевое?', { ok: 'Отправить боевое', cancel: 'Отмена', danger: true })) return;
+    } else if (tc !== saved) {
+      /* код вписан, но не сохранён → сначала сохраняем CAPI-блок, иначе сервер возьмёт ПУСТОЙ сохранённый код и отправит в прод */
+      try { await api.patch('/settings', { capi: capiPatch() }); } catch (_) {}
+    }
+    const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.send) + 'Отправляю…';
+    try {
+      const r = await api.post('/capi/test', {});
+      toast(r.ok ? (tc ? 'Тест ушёл в Test Events' : 'Боевое событие ушло в Meta') : 'Meta вернула ошибку',
+        r.ok ? `Lead · ${r.lead} — ${tc ? 'ищите во вкладке Test Events (мгновенно)' : 'в Events Manager, с задержкой обработки Meta'}` : (r.error || ''), r.ok);
+      await loadState(); render();
+    } catch (err) { btn.disabled = false; btn.innerHTML = old; toast('Не удалось', err.message); }
   });
 };
 
