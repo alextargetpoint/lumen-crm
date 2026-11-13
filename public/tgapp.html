@@ -1169,6 +1169,15 @@ function renderLeads(){
   updateTabBadges();
 }
 
+/* ⭐DEEP-LINK (запрос SFG 13.11): кнопка «Открыть переписку» в уведомлении о новом лиде открывает мини-апп
+   с ?lead=<id> → сразу разворачиваем чат с этим лидом (openChat грузит переписку даже если его нет в списке). */
+function openDeepLinkLead(){
+  try{
+    let id = new URLSearchParams(location.search).get('lead') || '';
+    if(!id && TG && TG.initDataUnsafe && TG.initDataUnsafe.start_param){ const sp=String(TG.initDataUnsafe.start_param); if(/^lead[_-]/i.test(sp)) id=sp.replace(/^lead[_-]/i,''); }
+    if(id){ setTimeout(()=>{ try{ openChat(id); }catch(e){} }, 350); }
+  }catch(e){}
+}
 async function openChat(id){
   CUR=CHATS.find(c=>c.id===id)||{id};
   const a=$('#cAva'); if(CUR.avatar){a.style.backgroundImage=`url('${CUR.avatar}')`;a.textContent=''}else{a.style.backgroundImage='';a.style.background=avg(id);a.textContent=ini(CUR.name)}
@@ -1524,7 +1533,7 @@ if(TG&&TG.onEvent){TG.onEvent('homeScreenAdded',()=>{try{localStorage.setItem('l
 if(!INIT){$('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку «Чаты» в Telegram-боте.</div>';$('#sub').textContent='—'}
 else{
   fetch('/tgapp/api/prefs',{headers:H}).then(r=>r.json()).then(p=>{if(p&&(p.theme||p.accent)){PREFS=Object.assign(PREFS,p);try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme()}}).catch(()=>{});
-  applyRole().then(()=>{ loadChats();prefetchLeadsBadge();prefetchDayBadges(); });
+  applyRole().then(()=>{ loadChats();prefetchLeadsBadge();prefetchDayBadges(); openDeepLinkLead(); });
   setInterval(()=>{ if($('#conv').classList.contains('open')||SELMODE||window._kdrag)return; if(MODE==='analytics'){ loadAnalytics(); } else { loadChats();prefetchLeadsBadge();prefetchDayBadges(); } },6000);
   initA2HS();
 }

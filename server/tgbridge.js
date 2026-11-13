@@ -397,15 +397,55 @@ async function forwardAiReply(db, lead, m) {
   pruneMap(db);
 }
 
-/* передача лида брокеру → короткий бриф в его Telegram */
+/* ⭐СВОДКА ПО ЛИДУ для уведомления брокеру (запрос SFG 13.11): всё, что нужно знать перед первым контактом —
+   контакт, гео, язык, тепло (score), оси квалификации, источник/креатив, кол-во сообщений, ИИ-резюме. */
+const _tgEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const _TG_LANGS = { ru: 'Русский', en: 'Английский', de: 'Немецкий', tr: 'Турецкий', fr: 'Французский', es: 'Испанский', ar: 'Арабский', it: 'Итальянский', id: 'Индонезийский', zh: 'Китайский' };
+const _TG_SRC = { meta: 'Facebook/Instagram', facebook: 'Facebook', instagram: 'Instagram', fb_leadads: 'Facebook Lead Ads', wa: 'WhatsApp', tg: 'Telegram', site: 'Сайт', website: 'Сайт', manual: 'Вручную', albato: 'Лид-форма Meta' };
+function leadBriefHtml(db, lead) {
+  const v = x => (x && typeof x === 'object' ? x.value : x);
+  const geo = (db.settings.geoNames && db.settings.geoNames[lead.geo]) || lead.geo || '';
+  const lang = lead.lang ? (_TG_LANGS[String(lead.lang).slice(0, 2).toLowerCase()] || lead.lang) : '';
+  const q = lead.quals || {};
+  const score = typeof lead.score === 'number' ? lead.score : null;
+  const warm = score == null ? '' : (score >= 70 ? '🔥 Горячий' : score >= 40 ? '🌤 Тёплый' : '❄️ Холодный');
+  const inbound = (db.messages || []).filter(m => m.leadId === lead.id && m.dir === 'in' && !m.system).length;
+  const ads = lead.ads || {};
+  const adBits = [ads.campaignName, ads.adsetName, ads.adName].filter(Boolean);
+  const src = _TG_SRC[lead.source] || lead.source || '';
+  const L = [];
+  L.push(`${warm ? warm + ' · ' : ''}🤝 <b>${_tgEsc(lead.name || 'Без имени')}</b>`);
+  const l2 = [lead.phone ? '📞 ' + _tgEsc(lead.phone) : '', geo ? '🌍 ' + _tgEsc(geo) : '', lang ? '🗣 ' + _tgEsc(lang) : ''].filter(Boolean).join('  ·  ');
+  if (l2) L.push(l2);
+  const qa = [];
+  if (q.purpose) qa.push('• Цель: ' + _tgEsc(v(q.purpose)));
+  if (q.budget) qa.push('• Бюджет: ' + _tgEsc(v(q.budget)));
+  if (q.type) qa.push('• Формат: ' + _tgEsc(v(q.type)));
+  if (q.timeline) qa.push('• Срок: ' + _tgEsc(v(q.timeline)));
+  L.push(qa.length ? '\n<b>Квалификация</b>\n' + qa.join('\n') : '\n<i>Квалификация не завершена — уточните в разговоре</i>');
+  const srcLine = [src ? '📣 ' + _tgEsc(src) : '', adBits.length ? '«' + _tgEsc(adBits.join(' · ')) + '»' : ''].filter(Boolean).join('  ·  ');
+  if (srcLine) L.push('\n' + srcLine);
+  if (inbound) L.push('💬 Сообщений от клиента: ' + inbound);
+  if (lead.nextAction && lead.nextAction.text) L.push('\n⏱ <b>' + _tgEsc(lead.nextAction.text) + '</b>');
+  return L.join('\n');
+}
+/* inline-кнопка «Открыть переписку» — web_app мини-апп с deep-link на чат лида (tgapp читает ?lead=) */
+function leadOpenKb(db, lead) {
+  return { inline_keyboard: [[{ text: '💬 Открыть переписку', web_app: { url: absUrl('/tgapp?lead=' + encodeURIComponent(lead.id)) } }]] };
+}
+
+/* передача лида брокеру → СВОДНЫЙ бриф в его Telegram + кнопка «Открыть переписку» */
 async function forwardHandover(db, lead) {
   if (!ready(db) || !lead || !lead.broker) return;
+  if (lead._tgBriefAt && Date.now() - lead._tgBriefAt < 90000) return;   /* анти-дубль: не слать сводку повторно в пределах 90с (вход + квалификация рядом) */
+  lead._tgBriefAt = Date.now();
   const broker = db.brokers.find(b => b.id === lead.broker);
   const ids = brokerChatIds(broker);
   if (!broker || !ids.length) return;
-  const txt = `🤝 Новый лид вам: ${lead.name}\n\n${lead.summary || ''}\n\nОтвечайте reply на сообщения этого клиента — уйдёт клиенту в WhatsApp от вашего имени.`.trim();
+  const txt = `${leadBriefHtml(db, lead)}\n\n<i>Жмите «Открыть переписку» или ответьте reply на сообщение клиента — уйдёт ему в WhatsApp от вашего имени.</i>`;
+  const kb = leadOpenKb(db, lead);
   for (const chatId of ids) {
-    try { const sent = await api(db, 'sendMessage', { chat_id: chatId, text: txt }); if (sent.result) { rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId: lead.id, at: Date.now() }; } }
+    try { const sent = await api(db, 'sendMessage', { chat_id: chatId, text: txt, parse_mode: 'HTML', reply_markup: kb }); if (sent.result) { rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId: lead.id, at: Date.now() }; } }
     catch (e) { console.error('[tgbridge] forwardHandover', chatId, e.message); }
   }
   pruneMap(db);

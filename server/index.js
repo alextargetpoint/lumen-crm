@@ -6997,6 +6997,7 @@ const server = http.createServer(async (req, res) => {
         const routed = routeIntakeBroker(db, lead);
         if (routed) { lead.broker = routed; const rb = db.brokers.find(x => x.id === routed); if (rb) rb.load = (rb.load || 0) + 1; control.recordOwner(db, lead, routed, 'auto', 'маршрутизация входящих'); }
         db.leads.push(lead);
+        if (routed) tgbridge.forwardHandover(db, lead).catch(() => {});   /* ⭐новый лид назначен брокеру на входе → сводный бриф + кнопка «Открыть переписку» в его Telegram (запрос SFG 13.11) */
         entry.result = 'created';
         entry.leadId = lead.id;
         const adTxt = lead.ads && lead.ads.matched ? ` · объявление: ${lead.ads.adName}` : (adId ? ' · объявление не в базе' : '');
