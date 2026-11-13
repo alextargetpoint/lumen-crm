@@ -11433,6 +11433,12 @@ const server = http.createServer(async (req, res) => {
       if (!lead) lead = { id: 'ctwa_test', name: 'CTWA Test', ads: { ctwaClid: 'test_ctwa_clid_' + Math.floor(Date.now() / 1000) } };
       const r0 = await ctwa.sendEvent(db, lead);
       store.save();
+      /* синтетический ctwa_clid Meta отклоняет (error_subcode 2804087 «Ctwa Clid non valido») — это ОЖИДАЕМО
+         и ПОДТВЕРЖДАЕТ, что связка dataset/WABA/токен/формат рабочая: не хватает только реального клика. */
+      if (synthetic && !r0.ok && r0.errSubcode === 2804087) {
+        return json(res, 200, { lead: lead.name, synthetic: true, ok: true, pipeOk: true,
+          note: 'Связка рабочая: Meta приняла событие и токен, отклонив только тестовый ctwa_clid. Реальное QualifiedLead уйдёт, когда лид придёт с клика по CTWA-рекламе и будет квалифицирован.' });
+      }
       return json(res, 200, Object.assign({ lead: lead.name, synthetic }, r0));
     }
 

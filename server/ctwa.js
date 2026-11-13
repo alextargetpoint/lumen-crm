@@ -44,8 +44,9 @@ async function sendEvent(db, lead, opts = {}) {
     });
     const j = await r.json().catch(() => ({}));
     const ok = r.ok && !j.error;
+    const sub = j.error && j.error.error_subcode;
     logRow(ok, { err: j.error ? (j.error.message || 'ошибка') : null, received: j.events_received || 0, test: !!c.testCode });
-    return { ok, error: j.error ? (j.error.message || '') : null, received: j.events_received || 0 };
+    return { ok, error: j.error ? (j.error.error_user_title || j.error.message || '') : null, errSubcode: sub || null, received: j.events_received || 0 };
   } catch (e) {
     logRow(false, { err: e.message });
     return { ok: false, error: e.message };
