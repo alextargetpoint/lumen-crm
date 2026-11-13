@@ -13752,16 +13752,41 @@ PAGES.ads = async (root) => {
         </div>`; })()}
         ${(() => {
           const ct = STATE.settings.ctwa || {};
+          const _wa = (STATE.settings.wa || {});
+          const s1 = !!_wa.wabaId, s2 = !!ct.datasetId, s3 = !!ct.tokenSet, s4 = !!(ct.stats && ct.stats.sent);
           return `<div class="glass card mb">
           <div class="card-title" data-fold="1"><span class="setup-step">4</span>${ic(I.wa || I.chat)}CTWA · оптимизация на целевые переписки<span class="sub">WhatsApp → QualifiedLead в Meta</span>
             <label class="switch" style="margin-left:auto"><input type="checkbox" id="ctwaOn" ${ct.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Клик по рекламе → WhatsApp: Lumen ловит <code class="pill">ctwa_clid</code> из первого сообщения. Когда ИИ-скрининг признал переписку <b>целевой</b> (стадия «квалифицирован»), шлём событие <b>QualifiedLead</b> в dataset WABA (business_messaging). Meta учится гнать показы на людей, дающих КАЧЕСТВЕННУЮ переписку, а не просто начавших диалог.</div>
-          ${coll('📘 Как настроить (пошагово)', `<div class="capi-guide">
-              <div class="cg-step"><span class="cg-n">1</span><div>Номер на <b>Cloud API</b> (Meta-хостинг или BSP), вебхук <code class="pill">/wa/webhook</code> с подпиской на <b>messages</b> — Lumen уже ловит ctwa_clid входящих.</div></div>
-              <div class="cg-step"><span class="cg-n">2</span><div>Events Manager → создайте <b>dataset под WABA</b> (POST /{WABA_ID}/dataset). Его <b>Dataset ID</b> — в поле ниже. WABA ID — там же.</div></div>
-              <div class="cg-step"><span class="cg-n">3</span><div>Системный пользователь с правами <b>whatsapp_business_management</b> + <b>whatsapp_business_manage_events</b> (advanced access → заявка на ревью, пара дней). Токен — ниже.</div></div>
-              <div class="cg-step"><span class="cg-n">4</span><div>Проверьте «Тест-событие» (с Test event code → вкладка Test Events). В Ads Manager: CTWA-объявление на WhatsApp, оптимизация сперва на «начало переписки», а при ~50 QualifiedLead/нед на ад-сет — переключите на <b>QualifiedLead</b>.</div></div>
-            </div>`, { open: false, count: 0, icon: I.doc })}
+          <div class="ctwa-status">
+            <span class="ctwa-st ${s1 ? 'ok' : ''}">${s1 ? '✓' : '○'} Cloud API номер</span>
+            <span class="ctwa-st ${s2 ? 'ok' : ''}">${s2 ? '✓' : '○'} Dataset</span>
+            <span class="ctwa-st ${s3 ? 'ok' : ''}">${s3 ? '✓' : '○'} Токен</span>
+            <span class="ctwa-st ${ct.enabled ? 'ok' : ''}">${ct.enabled ? '✓' : '○'} Включено</span>
+            ${ct.stats ? `<span class="ctwa-st-cnt">отправлено ${ct.stats.sent || 0} · ошибок ${ct.stats.failed || 0}</span>` : ''}
+          </div>
+          <div class="lp-sec" style="margin-top:2px">Как это работает</div>
+          <div class="ctwa-flow">
+            <div class="ctwa-node"><span class="ctwa-ni">📣</span><b>CTWA-реклама</b><i>клиент жмёт</i></div>
+            <span class="ctwa-ar">→</span>
+            <div class="ctwa-node"><span class="ctwa-ni">💬</span><b>WhatsApp</b><i>пишет первым</i></div>
+            <span class="ctwa-ar">→</span>
+            <div class="ctwa-node hot"><span class="ctwa-ni">🎯</span><b>Lumen ловит ctwa_clid</b><i>авто, из 1-го сообщения</i></div>
+            <span class="ctwa-ar">→</span>
+            <div class="ctwa-node"><span class="ctwa-ni">🤖</span><b>ИИ квалифицирует</b><i>целевая переписка</i></div>
+            <span class="ctwa-ar">→</span>
+            <div class="ctwa-node acc"><span class="ctwa-ni">✅</span><b>QualifiedLead</b><i>в dataset WABA</i></div>
+            <span class="ctwa-ar">→</span>
+            <div class="ctwa-node acc"><span class="ctwa-ni">📈</span><b>Meta учится</b><i>на похожих</i></div>
+          </div>
+          <div class="muted" style="font-size:11px;line-height:1.5;margin:-8px 0 14px">Смысл: Meta оптимизирует показы на людей, дающих <b>качественную</b> переписку, а не просто начавших диалог. Приём клика (ctwa_clid) и отправка QualifiedLead — автоматические; настроить нужно лишь связку ниже.</div>
+          <div class="lp-sec">Настройка за 4 шага</div>
+          <div class="ctwa-steps">
+            <div class="ctwa-step ${s1 ? 'done' : ''}"><div class="ctwa-step-n">1</div><div class="ctwa-step-b"><b>Номер на Cloud API</b><span>Meta-хостинг или BSP. Вебхук Lumen уже ловит <code class="pill">ctwa_clid</code> входящих — от вас ничего.</span></div><span class="ctwa-step-ok">${s1 ? '✓' : '○'}</span></div>
+            <div class="ctwa-step ${s2 ? 'done' : ''}"><div class="ctwa-step-n">2</div><div class="ctwa-step-b"><b>Dataset под WABA</b><span>Events Manager → создать dataset под WhatsApp-аккаунт. <b>Dataset ID</b> и <b>WABA ID</b> — в поля ниже.</span></div><span class="ctwa-step-ok">${s2 ? '✓' : '○'}</span></div>
+            <div class="ctwa-step ${s3 ? 'done' : ''}"><div class="ctwa-step-n">3</div><div class="ctwa-step-b"><b>Токен системного пользователя</b><span>Права <code class="pill">whatsapp_business_management</code> + <code class="pill">whatsapp_business_manage_events</code>. Вставить в поле «токен» ниже.</span></div><span class="ctwa-step-ok">${s3 ? '✓' : '○'}</span></div>
+            <div class="ctwa-step ${s4 ? 'done' : ''}"><div class="ctwa-step-n">4</div><div class="ctwa-step-b"><b>Проверка и запуск</b><span>Кнопка «Тест-событие» проверяет связку. Затем CTWA-объявление в Ads Manager; при ~50 QualifiedLead/нед на ад-сет — оптимизация на <b>QualifiedLead</b>.</span></div><span class="ctwa-step-ok">${s4 ? '✓' : '○'}</span></div>
+          </div>
+          <div class="muted" style="font-size:11px;margin:-4px 0 12px">Полная статья по шагам — в <a href="/help/ctwa" target="_blank" class="link">Справочнике → CTWA</a>.</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>Dataset ID (под WABA)</label><input id="ctwaDataset" value="${esc(ct.datasetId || '')}" placeholder="напр. 1234567890"></div>
             <div class="form-row"><label>WABA ID</label><input id="ctwaWaba" value="${esc(ct.wabaId || '')}" placeholder="напр. 0987654321"></div>

@@ -47,7 +47,51 @@ const BRIDGE_DIAGRAM = `<div style="border:1px solid rgba(128,128,128,.22);borde
 </div>`;
 const BRIDGE_SHOT_CHAT = `<div class="tgph"><div class="tgph-hd"><div class="av">💬</div><div><b>Как видит клиент</b><small>перевод на чистый номер</small></div></div><div class="tgph-body" style="gap:7px"><div class="tg-day">со старого номера</div><div class="tg-bub in">Передаю вас менеджеру Алексею — он продолжит в этом чате с нового рабочего номера. 🙌</div><div class="tg-day">с нового номера</div><div class="tg-bub in">Здравствуйте! Это Алексей, Target Point. Подхватываю ваш вопрос.</div><div class="tg-bub in">Вы интересовались 2-к в Marina с рассрочкой — всё верно? Пришлю подборку.</div><div class="tg-bub in"><span style="display:inline-block;width:100%;height:46px;border-radius:8px;background:repeating-linear-gradient(135deg,rgba(128,128,128,.14) 0 8px,rgba(128,128,128,.06) 8px 16px);margin-bottom:4px"></span>📷 скрин вашей переписки — чтобы вы узнали, что это продолжение, а не чужой номер.</div></div></div>`;
 const BRIDGE_SHOT_SETUP = `<div class="tgph"><div class="tgph-hd"><div class="av">🛡</div><div><b>Готовность менеджеров</b><small>Автоматизации → Анти-бан → Мост</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a" style="background:#2fae60"></span><span class="m"><b>Илья Игнатик</b><i>+44 7441 42 94 29 · чистый ✓</i></span></div><div class="tgapp-row"><span class="a" style="background:#C9821A"></span><span class="m"><b>Дарья</b><i>есть номер — «Пометить чистым»</i></span></div><div class="tgapp-row"><span class="a" style="background:rgba(128,128,128,.4)"></span><span class="m"><b>Пётр</b><i>нет своего — выбрать номер из списка</i></span></div><div style="margin-top:4px;font-size:11px;opacity:.8;border-top:1px dashed rgba(128,128,128,.3);padding-top:7px">⭐ Основной чистый номер: <b>+971 50 123 45 67</b> — выбирается селектом прямо здесь</div></div></div>`;
+const CTWA_DIAGRAM = `<div style="border:1px solid rgba(128,128,128,.22);border-radius:14px;padding:15px;background:rgba(128,128,128,.05);margin:2px 0 4px">
+  <div style="display:flex;align-items:stretch;gap:8px;justify-content:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:116px;text-align:center;border:1px solid rgba(128,128,128,.22);border-radius:12px;padding:11px 9px;background:rgba(128,128,128,.04)"><div style="font-size:20px">📣</div><div style="font-weight:700;font-size:12.5px;margin-top:3px">CTWA-реклама</div><div style="opacity:.7;font-size:10.5px;margin-top:2px">клиент жмёт «написать в WhatsApp»</div></div>
+    <div style="align-self:center;opacity:.55;font-size:16px">→</div>
+    <div style="flex:1;min-width:116px;text-align:center;border:1px solid rgba(37,211,102,.4);border-radius:12px;padding:11px 9px;background:rgba(37,211,102,.06)"><div style="font-size:20px">🎯</div><div style="font-weight:700;font-size:12.5px;margin-top:3px">Lumen ловит ctwa_clid</div><div style="opacity:.7;font-size:10.5px;margin-top:2px">из первого сообщения, автоматически</div></div>
+    <div style="align-self:center;opacity:.55;font-size:16px">→</div>
+    <div style="flex:1;min-width:116px;text-align:center;border:1px solid rgba(128,128,128,.22);border-radius:12px;padding:11px 9px;background:rgba(128,128,128,.04)"><div style="font-size:20px">🤖</div><div style="font-weight:700;font-size:12.5px;margin-top:3px">ИИ квалифицирует</div><div style="opacity:.7;font-size:10.5px;margin-top:2px">переписка признана целевой</div></div>
+    <div style="align-self:center;opacity:.55;font-size:16px">→</div>
+    <div style="flex:1;min-width:116px;text-align:center;border:1px solid rgba(184,137,59,.45);border-radius:12px;padding:11px 9px;background:rgba(184,137,59,.08)"><div style="font-size:20px">📈</div><div style="font-weight:700;font-size:12.5px;margin-top:3px">QualifiedLead → Meta</div><div style="opacity:.7;font-size:10.5px;margin-top:2px">учится приводить похожих</div></div>
+  </div>
+</div>`;
 const GUIDES = {
+  ctwa: {
+    icon: 'chat', title: 'CTWA: оптимизация на целевые переписки', tagline: 'Чтобы Meta приводила не просто диалоги, а качественные',
+    intro: 'CTWA (Click-to-WhatsApp) — реклама, по которой клиент сразу пишет вам в WhatsApp. Обычно Meta оптимизирует её на <b>«начало переписки»</b> — но писать может кто угодно. Lumen даёт Meta сигнал качества: когда переписка доходит до <b>квалифицированного лида</b>, мы отправляем событие <b>QualifiedLead</b> в dataset вашего WhatsApp-аккаунта. С этого момента Meta учится приводить людей, похожих на тех, кто дал <b>качественную</b> переписку, а не просто кликнул. Приём клика и отправка события — автоматические; настроить нужно только связку с Meta.',
+    diagram: CTWA_DIAGRAM,
+    sections: [
+      { badge: '1 · Что нужно заранее', steps: [
+        ['Номер на Cloud API', 'Номер WhatsApp на <b>Cloud API</b> (хостинг Meta или через BSP), а не «серый» QR-номер. Вебхук Lumen уже подписан на входящие и ловит ctwa_clid сам.'],
+        ['Бизнес-портфолио Meta', 'Доступ к <b>business.facebook.com</b>, где живёт ваш WhatsApp Business Account (WABA).'],
+      ]},
+      { badge: '2 · Создайте dataset под WABA', steps: [
+        ['Создайте dataset', 'Events Manager → «Connect data» → создайте <b>dataset</b> и привяжите к WhatsApp Business Account (либо через API: <code>POST /{WABA_ID}/dataset</code>).'],
+        ['Скопируйте два ID', 'Понадобятся <b>Dataset ID</b> и <b>WABA ID</b> — оба впишете в Lumen.'],
+      ]},
+      { badge: '3 · Получите токен', steps: [
+        ['Системный пользователь', 'Business Settings → System Users → выберите пользователя (тот, которым подключён Cloud API) → назначьте ему WABA ассетом (Full control).'],
+        ['Сгенерируйте токен', 'Generate token → приложение Lumen → отметьте права <code>whatsapp_business_management</code> + <code>whatsapp_business_manage_events</code> → скопируйте (показывается один раз).'],
+        ['Если права нет', 'Права <code>manage_events</code> нет в списке — подайте приложение на App Review (Advanced Access), это пара дней ожидания.'],
+      ]},
+      { badge: '4 · Впишите в Lumen', steps: [
+        ['Откройте карточку', 'Реклама → Настройки рекламы → <b>«CTWA · оптимизация на целевые переписки»</b>.'],
+        ['Заполните и включите', 'Вставьте <b>Dataset ID</b>, <b>WABA ID</b> и <b>токен</b>, включите тумблер, «Сохранить». Статус-строка покажет зелёные галочки, когда всё на месте.'],
+      ]},
+      { badge: '5 · Проверьте связку', steps: [
+        ['Тест-событие', 'Кнопка <b>«Тест-событие»</b> шлёт пробное QualifiedLead. С Test event code (Events Manager → Test Events) — в тестовую вкладку, пустым — в прод.'],
+        ['Синтетика — это норма', 'Meta отклонит пробное событие по ctwa_clid — и это значит, что связка (dataset / токен / WABA / формат) рабочая. Реальное событие уйдёт с настоящего клика.'],
+        ['Боевая проверка', 'Кликните свою CTWA-рекламу → напишите в WhatsApp → доведите лид до «квалифицирован» → в журнале CTWA появится QualifiedLead ✓.'],
+      ]},
+      { badge: '6 · Переключите оптимизацию', steps: [
+        ['Запустите объявление', 'Ads Manager → CTWA-объявление (цель «Сообщения», назначение WhatsApp). Сначала оптимизация на «начало переписки».'],
+        ['Переключите на QualifiedLead', 'При ~<b>50 QualifiedLead в неделю</b> на ад-сет переключите оптимизацию на <b>QualifiedLead</b> — Meta начнёт гнать показы на похожих на качественных.'],
+      ]},
+    ],
+  },
   tgsetup: {
     icon: 'chat', title: 'Telegram-бот: подключение', tagline: 'Пошагово, с экранами — за 3 минуты',
     intro: 'Telegram-бот <b>@lumenmessengerbot</b> — это карманный пульт брокера: чаты клиентов, лиды, задачи и встречи прямо в телефоне. Ответ брокера из Telegram уходит клиенту в WhatsApp, а входящие клиента появляются у брокера в Telegram. Всё синхронно с десктопом.',
@@ -396,7 +440,7 @@ GUIDES.notetaker = {
 const CATEGORIES = [
   { key: 'broker',   icon: 'user',  title: 'Брокеру',                  desc: 'Полный гайд: от входа до сделки, на живых экранах', guides: ['broker'] },
   { key: 'start',    icon: 'spark', title: 'Начало работы',            desc: 'Подключите бота и мобильный пульт брокера',        guides: ['tgsetup', 'botpanel'] },
-  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, Instagram, Viber, телефония, нотетейкер и ИИ',  guides: ['wanumbers', 'bridge', 'wacloud', 'tgchannel', 'meta-inbound', 'viber', 'telephony', 'notetaker', 'waagent'] },
+  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, Instagram, Viber, телефония, нотетейкер и ИИ',  guides: ['wanumbers', 'bridge', 'wacloud', 'tgchannel', 'meta-inbound', 'viber', 'telephony', 'notetaker', 'waagent', 'ctwa'] },
   { key: 'leads',    icon: 'user',  title: 'Лиды и продажи',           desc: 'Воронка, карточка лида и автодожим касаниями',     guides: ['leads', 'chains'] },
   { key: 'ops',      icon: 'doc',   title: 'Планирование и документы', desc: 'Календарь, медиапланы, договоры и КП',             guides: ['calendar', 'mediaplan', 'docs'] },
 ];
