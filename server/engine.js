@@ -348,8 +348,12 @@ function pickBroker(db, lead) {
      Напр. Илья (вес 1, уже в потоке) и Алина (вес 3, входит в работу): из каждых ~4 лидов ~3 уйдут Алине, 1 — Илье.
      Вес — это ДОЛЯ, а не потолок (в отличие от capacity в режиме 'load'): новичку поднимают вес на разгон, потом возвращают к 1. */
   if (mode === 'weighted') {
-    const w = b => Math.max(1, +b.weight || 1);
-    return pool.sort((a, b) => ((a.load || 0) / w(a)) - ((b.load || 0) / w(b)))[0];
+    /* вес не задан → 1 (обычная доля); задан → используем как есть, включая 0.
+       ⭐ВЕС 0 (запрос SFG #913) = брокер НА ПАУЗЕ: лиды ему не идут, пока не вернут вес ≥1. */
+    const w = b => (b.weight == null ? 1 : Math.max(0, +b.weight || 0));
+    const active = pool.filter(b => w(b) > 0);
+    if (active.length) return active.sort((a, b) => ((a.load || 0) / w(a)) - ((b.load || 0) / w(b)))[0];
+    return pool.sort((a, b) => (a.load || 0) - (b.load || 0))[0];   /* все на паузе → лид не виснет, наименее загруженному */
   }
   return pool.sort((a, b) => (a.load / a.capacity) - (b.load / b.capacity))[0];
 }
