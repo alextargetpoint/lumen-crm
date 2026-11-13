@@ -128,6 +128,7 @@ const engine = require('./engine');
 const capi = require('./capi');
 const ctwa = require('./ctwa');
 const metaads = require('./metaads');
+const attribution = require('./attribution'); /* движок атрибуции: трекинговые DM-ссылки (Фаза 2, gated settings.attribution) */
 const control = require('./control');
 
 const PORT = process.env.PORT || 5077;
@@ -177,6 +178,7 @@ const wa = require('./wa');
 const comments = require('./comments');
 const igdm = require('./ig-dm'); /* Instagram Direct как канал диалога (аддитивно к WA/TG) */
 engine.setIgdmSender((db, lead, m) => igdm.sendDM(db, lead, m.text, m.media));   /* исходящий IG DM из engine.send */
+engine.setLinkWrapper((db, text, ctx) => attribution.wrapLinks(db, text, ctx));   /* трекинговые ссылки в исходящих (gated) */
 const inventory = require('./inventory');
 const tgbridge = require('./tgbridge'); /* двусторонний мост Telegram ⇄ WhatsApp (брокер отвечает с телефона) */
 const mailer = require('./email'); /* SaaS-почта: Atelier-шаблоны (RU/EN) + Resend + конструктор в админке */
@@ -466,7 +468,7 @@ function ensureTenantDefaults(db) {
   if (!s.inventorySources) s.inventorySources = { reelly: { enabled: false, key: '', baseUrl: '' } };
   if (!s.ownerTgCode) s.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex');   /* код привязки владельца к TG-боту (аналитика с телефона) — раньше был только у primary */
   /* все верхнеуровневые коллекции, которые код ждёт как массивы (seed даёт лишь часть) — чтобы новый тенант не падал ни на одной фиче */
-  for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates', 'debugReports']) if (!Array.isArray(db[k])) db[k] = [];
+  for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates', 'debugReports', 'trackedLinks', 'linkClicks', 'pixelEvents']) if (!Array.isArray(db[k])) db[k] = [];
   /* брокеры: массивы, которые рендер раздела «Брокеры» .map-ит без защиты (приглашённые создавались неполными → краш b.langs.map) */
   for (const b of db.brokers) { if (!Array.isArray(b.langs)) b.langs = []; if (!b.schedule || typeof b.schedule !== 'object') b.schedule = { days: [], perDay: {} }; if (!Array.isArray(b.busyBlocks)) b.busyBlocks = []; }
   /* БЭКФИЛЛ: уже провиженные брокеры (email+PIN+active) должны быть в reg.byEmail, иначе /auth/login не найдёт их тенанта.
@@ -1514,6 +1516,8 @@ function publicTenantFor(p) {
   if ((m = p.match(/^\/b\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().brokers || []).some(x => x.id === id || x.cardId === id)); }
   /* публичная презентация /pv/:token (опубликованный снимок конструктора v2) */
   if ((m = p.match(/^\/pv\/([a-f0-9]+)/))) { const tok = m[1]; return findTenant(() => (store.get().presentations || []).some(x => x.publicToken === tok)); }
+  /* трекинговая DM-ссылка атрибуции /l/:slug — резолвим тенанта-владельца ссылки (Фаза 2) */
+  if ((m = p.match(/^\/l\/([a-zA-Z0-9]+)$/))) { const slug = m[1]; return findTenant(() => (store.get().trackedLinks || []).some(x => x.slug === slug)); }
   /* страница воспроизведения медиа из письма /e/:id */
   if ((m = p.match(/^\/e\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => !!(store.get().emailMedia && store.get().emailMedia[id])); }
   /* отписка от рассылок /u/:token */
@@ -5886,6 +5890,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    /* трекинговая DM-ссылка атрибуции: клик → запись + 302 на назначение (Фаза 2; тенант уже резолвлен по slug) */
+    { const _lm = p.match(/^\/l\/([a-zA-Z0-9]+)$/); if (req.method === 'GET' && _lm) {
+      const dest = attribution.handleClick(db, _lm[1], { ua: req.headers['user-agent'], ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), ref: req.headers['referer'] || '' });
+      if (dest) { res.writeHead(302, { Location: dest }); res.end(); return; }
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Ссылка не найдена'); return;
+    } }
     /* ---------------- WhatsApp Cloud API webhook ---------------- */
     if (p === '/wa/webhook' && req.method === 'GET') {
       if (u.searchParams.get('hub.verify_token') === db.settings.wa.webhookVerifyToken) {

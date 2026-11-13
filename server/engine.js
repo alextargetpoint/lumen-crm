@@ -105,6 +105,9 @@ function setTgGraySender(fn) { tgGraySender = fn; }
 /* отправитель IG Direct (инъекция из index.js → ig-dm.sendDM), чтобы не было циклического require */
 let igdmSender = null;
 function setIgdmSender(fn) { igdmSender = fn; }
+/* переписчик исходящих ссылок на трекинговые (инъекция → attribution.wrapLinks). Gated+fail-safe внутри. */
+let linkWrapper = null;
+function setLinkWrapper(fn) { linkWrapper = fn; }
 
 function pickNumber(db, lead) {
   if (lead.numberId) {
@@ -153,6 +156,10 @@ function send(db, lead, text, via, opts = {}) {
     if (text) { try { const tn = control.toneScan(text); if (tn) { const br = db.brokers.find(b => b.id === lead.broker); if (br) { br.toneFlags = (br.toneFlags || 0) + 1; br.lastToneFlag = { at: Date.now(), reason: tn.reason, leadId: lead.id }; } ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `⚠️ Тон: ${(db.brokers.find(b => b.id === lead.broker) || {}).name || 'брокер'} — ${tn.reason} в сообщении клиенту ${lead.name}` }); } } catch (_) {} }
   }
   const channel = opts.channel || resolveChannel(db, lead);
+  /* ⭐ Атрибуция: подменяем наши публичные ссылки (подборка/презентация/встреча) на трекинговые /l/:slug,
+     привязанные к лиду+брокеру+объекту. Gated (settings.attribution.enabled) и fail-safe внутри wrapLinks —
+     выключено или ошибка → текст без изменений, отправка не рвётся. Делаем ДО анти-дубль ключа (slug стабилен). */
+  if (text && linkWrapper && lead) { try { text = linkWrapper(db, text, { leadId: lead.id, brokerId: lead.broker, source: via }); } catch (_) {} }
   /* 🛡️ ЗОЛОТОЕ ПРАВИЛО АНТИ-ДУБЛЬ (анти-бан): одно и то же содержимое (текст / видео / фото) НИКОГДА
      не уходит лиду повторно в ТОМ ЖЕ канале. Дубли = спам = мгновенный бан номера. Это защитная сетка
      поверх маршрутизации: даже при баге/повторном тике/двойном каскаде клиент не получит одно и то же дважды.
@@ -1810,4 +1817,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, setIgdmSender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue, guardCfg, declineMatch, lastOutFailed, creditNumberStat, numberHealth };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, setIgdmSender, setLinkWrapper, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue, guardCfg, declineMatch, lastOutFailed, creditNumberStat, numberHealth };
