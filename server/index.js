@@ -6020,6 +6020,20 @@ const server = http.createServer(async (req, res) => {
               media = { type: mt, url: saved.url, name: (part.filename || '').slice(0, 120) };
             } catch (e) { console.error('[wa-media]', e.message); text = text || '[медиа не удалось загрузить]'; }
           }
+          /* ⭐АТРИБУЦИЯ ИЗ PREFILL-ТЕКСТА (запрос SFG): wa.me-реклама или кнопка «Написать в WhatsApp» на посадке
+             НЕ несут Meta-referral. Если в ссылке wa.me?text=… зашит маркер «[ad:<id>]» (числовой ad_id) или
+             «[utm:<код>]», вытаскиваем атрибуцию, добираем имена по API и ЧИСТИМ маркер из видимого сообщения. */
+          if (text && !(lead.ads && lead.ads.adId)) {
+            const _mk = text.match(/\[(?:ad|utm)\s*:\s*([A-Za-z0-9._-]{3,64})\]/i);
+            if (_mk) {
+              const _v = _mk[1];
+              lead.ads = Object.assign({}, lead.ads || {}, /^\d{5,}$/.test(_v) ? { adId: _v } : { utmContent: _v });
+              if (lead.source === 'wa_inbound') lead.source = 'wa_ad';
+              matchAd(db, lead);
+              if (lead.ads.adId && !(lead.ads.campaignName && lead.ads.adName)) { try { await enrichAdNamesViaApi(db, lead); } catch (_) {} }
+              text = text.replace(_mk[0], '').replace(/\s{2,}/g, ' ').trim();
+            }
+          }
           if (text || media) engine.inbound(db, lead, text, media ? { media } : {});
         }
         } catch (e) { console.error('[webhook]', e); }
