@@ -5970,6 +5970,9 @@ const server = http.createServer(async (req, res) => {
         if (wam && (wam.type === 'text' || MEDIA_TYPES.includes(wam.type))) {
           const phone = '+' + wam.from.replace(/\D/g, '');
           let lead = db.leads.find(l => l.phone.replace(/\D/g, '') === wam.from.replace(/\D/g, ''));
+          /* ДЕДУП: лид с этим номером уже есть → используем его же карточку (новый не плодим). Запоминаем, молчал ли он,
+             чтобы отметить «повторно написал». */
+          const _existed = !!lead, _prevInboundAt = lead ? (lead.lastInboundAt || 0) : 0, _prevStage = lead ? lead.stage : null;
           if (!lead) {
             lead = { id: store.nextId('ld'), name: changes.contacts?.[0]?.profile?.name || phone, phone, geo: db.settings.agency.geos[0], lang: 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0, source: 'wa_inbound', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['входящий'], numberId: null, ads: null };
             /* CTWA: реферал несёт id объявления — атрибуция из коробки */
@@ -5990,6 +5993,17 @@ const server = http.createServer(async (req, res) => {
               lead.ads = Object.assign({}, lead.ads || {}, { adId: (lead.ads && lead.ads.adId) || ref.source_id || null, ctwaClid: ref.ctwa_clid, headline: ref.headline || (lead.ads && lead.ads.headline) || null });
               if (lead.source !== 'ctwa') lead.source = 'ctwa';
               matchAd(db, lead);
+            }
+          }
+          /* ⭐ДОБОР ИМЁН РЕКЛАМЫ по ad_id через Meta API (кампания/группа/объявление), если matchAd не нашёл
+             объявление в синканной базе — так CTWA-лид получает названия даже без синка кабинета. */
+          if (lead.ads && lead.ads.adId && !(lead.ads.campaignName && lead.ads.adName)) { try { await enrichAdNamesViaApi(db, lead); } catch (_) {} }
+          /* ⭐ПОВТОРНОЕ ОБРАЩЕНИЕ: тот же номер, лид молчал/спал/в «просрочке» и снова написал → явный сигнал
+             в ленту (брокеру видно «повторный интерес»). Активный живой диалог сигнал не триггерит. */
+          if (_existed) {
+            const _gap = _prevInboundAt ? (Date.now() - _prevInboundAt) : Infinity;
+            if (['sleeping', 'stalled', 'lost'].includes(_prevStage) || _gap > 48 * 3600e3) {
+              ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `🔄 ${lead.name} снова написал в WhatsApp — повторный интерес${lead.ads && lead.ads.matched ? ' · ' + lead.ads.adName : ''}` });
             }
           }
           let text = '', media = null;
