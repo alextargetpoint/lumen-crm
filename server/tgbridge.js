@@ -265,6 +265,19 @@ async function handleUpdate(db, update) {
     return { bound: r.ok };
   }
 
+  /* ⭐/test — образец уведомления о новом лиде (самопроверка формата + кнопки «Открыть переписку»).
+     Если у брокера есть реальный лид — показываем ЕГО сводку и кнопка ведёт в его чат; иначе демо-пример. */
+  if (/^\/(test|тест|testlead|тестлид)\b/i.test(text)) {
+    const brk = db.brokers.find(b => brokerChatIds(b).includes(chatId)) || null;
+    const sample = brk ? (db.leads || []).filter(l => l.broker === brk.id).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] : (db.leads || [])[0];
+    const demo = sample || { id: 'demo_' + chatId, name: 'Иван Петров (пример)', phone: '+66 81 234 5678', geo: (db.settings.agency.geos || [])[0] || '', lang: 'ru', source: 'ctwa', score: 78,
+      quals: { purpose: { value: 'для себя, переезд' }, budget: { value: 'до $450k' }, type: { value: '2-спальные апартаменты' }, timeline: { value: '2–3 месяца' } },
+      ads: { campaignName: 'Phuket Beachfront', adName: 'Laya Resort' }, nextAction: { text: 'Позвонить в течение 30 мин' } };
+    const txt = `🧪 <b>Тест — так приходит новый лид</b>\n\n${leadBriefHtml(db, demo)}\n\n<i>Кнопка ниже открывает переписку с лидом прямо в приложении.${sample ? '' : ' (это пример; у реального лида — его данные и его чат)'}</i>`;
+    await safeApi(db, 'sendMessage', { chat_id: chatId, text: txt, parse_mode: 'HTML', reply_markup: leadOpenKb(db, demo) });
+    return { test: true };
+  }
+
   /* owner-пульт: команды управления номерами с телефона (напр. /qr — новый QR).
      Владелец привязан по ownerTgChatId (НЕ в db.brokers), поэтому перехватываем ДО проверки брокера,
      иначе владельцу на любую команду отвечало бы «Вы не привязаны к CRM». */
