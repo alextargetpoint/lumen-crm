@@ -126,6 +126,7 @@ const { seed } = require('./seed');
 const ai = require('./ai');
 const engine = require('./engine');
 const capi = require('./capi');
+const ctwa = require('./ctwa');
 const metaads = require('./metaads');
 const control = require('./control');
 
@@ -1250,7 +1251,7 @@ engine.reportExtras = (db, period) => {
     return out.length ? '💡 Что улучшить:\n' + out.join('\n') : '';
   } catch (e) { console.error('[report-extras]', e.message); return ''; }
 };
-engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
+engine.onQualified = (db, lead) => { notifyOutbound(db, lead, 'lead.qualified'); ctwa.onQualified(db, lead); };   /* ⭐CTWA: целевая переписка → QualifiedLead в dataset WABA (если лид пришёл с клика по рекламе) */
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); if ((db.settings.waGray || {}).migrateOnHandover && lead.grayPhone) { migrateLeadToClean(db, lead).catch(() => {}); } };   /* авто-перевод на чистый/брокерский номер при передаче (если включено) */
 /* Отчёты/мгновенные уведомления ОСНОВАТЕЛЮ через центральный бот-мост. engine.sendReport умеет только
    легаси пер-тенантный бот отчётов (channels.tg.botToken) — в SaaS его нет, основатель привязан к общему
@@ -1942,6 +1943,7 @@ function publicSettings(db) {
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
+  if (s.ctwa) { if (s.ctwa.token) { s.ctwa.tokenSet = true; delete s.ctwa.token; } delete s.ctwa.fired; if (s.ctwa.log) s.ctwa.log = s.ctwa.log.slice(0, 12); }
   if (s.metaAds) { if (s.metaAds.token) { s.metaAds.tokenSet = true; delete s.metaAds.token; } delete s.metaAds.adNameCache; if (s.metaAds.log) s.metaAds.log = s.metaAds.log.slice(0, 12); }
   /* SEC: long-lived токен amoCRM — секрет, наружу только флаг tokenSet + статус connected */
   if (s.integrations && s.integrations.amo) { const a = s.integrations.amo; if (a.token) { a.tokenSet = true; delete a.token; } a.connected = !!a.lastOkAt; }
@@ -5979,6 +5981,16 @@ const server = http.createServer(async (req, res) => {
             }
             db.leads.push(lead);
             ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Входящий WhatsApp: ${lead.name}${lead.ads && lead.ads.matched ? ' · ' + lead.ads.adName : ''}` });
+          } else {
+            /* ⭐CTWA (step 7 robustness): ВОЗВРАЩАЮЩИЙСЯ контакт кликнул по новой рекламе → referral приходит
+               снова (один раз, в первом сообщении новой переписки). Ловим и у СУЩЕСТВУЮЩЕГО лида — иначе
+               «прозевали клик → связь с рекламой потеряна навсегда». */
+            const ref = wam.referral;
+            if (ref && ref.ctwa_clid && !(lead.ads && lead.ads.ctwaClid)) {
+              lead.ads = Object.assign({}, lead.ads || {}, { adId: (lead.ads && lead.ads.adId) || ref.source_id || null, ctwaClid: ref.ctwa_clid, headline: ref.headline || (lead.ads && lead.ads.headline) || null });
+              if (lead.source !== 'ctwa') lead.source = 'ctwa';
+              matchAd(db, lead);
+            }
           }
           let text = '', media = null;
           if (wam.type === 'text') {
@@ -10950,6 +10962,8 @@ const server = http.createServer(async (req, res) => {
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
       if (b.inventorySources && b.inventorySources.reelly) { const c = db.settings.inventorySources.reelly; const r = b.inventorySources.reelly; if (r.key) c.key = String(r.key); if (r.enabled != null) c.enabled = !!r.enabled; if (r.baseUrl != null) c.baseUrl = String(r.baseUrl); }
       if (b.capi) { const c = db.settings.capi = db.settings.capi || {}; const x = b.capi; if (x.pixelId != null) c.pixelId = String(x.pixelId).trim(); if (x.token) c.token = String(x.token).trim(); if (x.testCode != null) c.testCode = String(x.testCode).trim(); if (x.enabled != null) c.enabled = !!x.enabled; if (x.stageEvents && typeof x.stageEvents === 'object') c.stageEvents = x.stageEvents; delete b.capi; }
+      /* ⭐CTWA (Click-to-WhatsApp) — оптимизация на целевые переписки: dataset WABA + ctwa_clid (отдельно от пиксельного capi) */
+      if (b.ctwa) { const c = db.settings.ctwa = db.settings.ctwa || {}; const x = b.ctwa; if (x.datasetId != null) c.datasetId = String(x.datasetId).trim(); if (x.wabaId != null) c.wabaId = String(x.wabaId).trim(); if (x.token) c.token = String(x.token).trim(); if (x.testCode != null) c.testCode = String(x.testCode).trim(); if (x.eventName != null) c.eventName = String(x.eventName).trim() || 'QualifiedLead'; if (x.enabled != null) c.enabled = !!x.enabled; delete b.ctwa; }
       if (b.metaAds) { const c = db.settings.metaAds = db.settings.metaAds || {}; const x = b.metaAds; if (x.token) c.token = String(x.token).trim(); if (x.adAccountId != null) c.adAccountId = metaads.acctId(x.adAccountId); if (Array.isArray(x.accounts)) c.accounts = x.accounts.map(a => ({ id: metaads.acctId(a && a.id != null ? a.id : a), name: String((a && a.name) || '').slice(0, 60), currency: String((a && a.currency) || '').slice(0, 8) })).filter(a => a.id).slice(0, 20); if (x.enabled != null) c.enabled = !!x.enabled; if (x.mode != null && ['api', 'integrator', 'both'].includes(x.mode)) c.mode = x.mode; if (x.pullLeads != null) c.pullLeads = !!x.pullLeads; if (x.pullInsights != null) c.pullInsights = !!x.pullInsights; if (x.datePreset != null) c.datePreset = String(x.datePreset).trim(); if (x.displayCurrency != null) c.displayCurrency = String(x.displayCurrency).slice(0, 8); if (x.fxRate != null) c.fxRate = +x.fxRate || 0; if (x.sourceCurrency != null) c.sourceCurrency = String(x.sourceCurrency).slice(0, 8); if (x.taxOn != null) c.taxOn = !!x.taxOn; if (x.taxPct != null) c.taxPct = Math.max(0, Math.min(50, +x.taxPct || 0)); if (x.syncDays != null) c.syncDays = [30, 60, 90, 180].includes(+x.syncDays) ? +x.syncDays : 60; delete b.metaAds; }
       /* направления рекламы + сопоставление кампаний (для План/Факт по направлениям) */
       if (Array.isArray(b.adDirections)) db.settings.adDirections = b.adDirections.map(d => ({ key: String((d && d.key) || '').slice(0, 40) || ('dir_' + Math.random().toString(36).slice(2, 7)), name: String((d && d.name) || '').slice(0, 60), strategy: String((d && d.strategy) || '').slice(0, 400) })).filter(d => d.name).slice(0, 60);
@@ -11409,6 +11423,17 @@ const server = http.createServer(async (req, res) => {
       const r0 = await capi.sendEvent(db, lead, 'Lead');
       store.save();
       return json(res, 200, Object.assign({ lead: lead.name }, r0));
+    }
+    /* ⭐CTWA тест: шлём QualifiedLead в dataset WABA. Берём реального лида с ctwa_clid; если такого нет —
+       синтетический test-clid (проверка связки dataset/WABA/токен; реальное событие требует лида с клика). */
+    if (p === '/api/ctwa/test' && req.method === 'POST') {
+      if (!ctwa.ready(db)) return json(res, 400, { error: 'заполните Dataset ID + WABA ID + токен CTWA и включите интеграцию' });
+      let lead = db.leads.find(l => l.ads && l.ads.ctwaClid);
+      const synthetic = !lead;
+      if (!lead) lead = { id: 'ctwa_test', name: 'CTWA Test', ads: { ctwaClid: 'test_ctwa_clid_' + Math.floor(Date.now() / 1000) } };
+      const r0 = await ctwa.sendEvent(db, lead);
+      store.save();
+      return json(res, 200, Object.assign({ lead: lead.name, synthetic }, r0));
     }
 
     /* ---- Прямое подключение рекламного кабинета Meta (Marketing API) ---- */

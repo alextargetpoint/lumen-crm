@@ -13750,6 +13750,34 @@ PAGES.ads = async (root) => {
           </div>
           ${(cp.log || []).length ? coll('Журнал отправок в Meta', (cp.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} ${esc(e.event)} · ${esc(e.lead || '')}</div><div class="sd">${tmm(e.at)}${e.err ? ' · ' + esc(e.err) : e.received ? ' · принято Meta: ' + e.received : ''}</div></div></div>`).join(''), { open: false, count: (cp.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
+        ${(() => {
+          const ct = STATE.settings.ctwa || {};
+          return `<div class="glass card mb">
+          <div class="card-title" data-fold="1"><span class="setup-step">4</span>${ic(I.wa || I.chat)}CTWA · оптимизация на целевые переписки<span class="sub">WhatsApp → QualifiedLead в Meta</span>
+            <label class="switch" style="margin-left:auto"><input type="checkbox" id="ctwaOn" ${ct.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><button type="button" class="intake-chev" title="Свернуть/развернуть">${ic(I.chev, 2)}</button></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Клик по рекламе → WhatsApp: Lumen ловит <code class="pill">ctwa_clid</code> из первого сообщения. Когда ИИ-скрининг признал переписку <b>целевой</b> (стадия «квалифицирован»), шлём событие <b>QualifiedLead</b> в dataset WABA (business_messaging). Meta учится гнать показы на людей, дающих КАЧЕСТВЕННУЮ переписку, а не просто начавших диалог.</div>
+          ${coll('📘 Как настроить (пошагово)', `<div class="capi-guide">
+              <div class="cg-step"><span class="cg-n">1</span><div>Номер на <b>Cloud API</b> (Meta-хостинг или BSP), вебхук <code class="pill">/wa/webhook</code> с подпиской на <b>messages</b> — Lumen уже ловит ctwa_clid входящих.</div></div>
+              <div class="cg-step"><span class="cg-n">2</span><div>Events Manager → создайте <b>dataset под WABA</b> (POST /{WABA_ID}/dataset). Его <b>Dataset ID</b> — в поле ниже. WABA ID — там же.</div></div>
+              <div class="cg-step"><span class="cg-n">3</span><div>Системный пользователь с правами <b>whatsapp_business_management</b> + <b>whatsapp_business_manage_events</b> (advanced access → заявка на ревью, пара дней). Токен — ниже.</div></div>
+              <div class="cg-step"><span class="cg-n">4</span><div>Проверьте «Тест-событие» (с Test event code → вкладка Test Events). В Ads Manager: CTWA-объявление на WhatsApp, оптимизация сперва на «начало переписки», а при ~50 QualifiedLead/нед на ад-сет — переключите на <b>QualifiedLead</b>.</div></div>
+            </div>`, { open: false, count: 0, icon: I.doc })}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Dataset ID (под WABA)</label><input id="ctwaDataset" value="${esc(ct.datasetId || '')}" placeholder="напр. 1234567890"></div>
+            <div class="form-row"><label>WABA ID</label><input id="ctwaWaba" value="${esc(ct.wabaId || '')}" placeholder="напр. 0987654321"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Access token (manage_events)</label><input id="ctwaToken" type="password" placeholder="${ct.tokenSet ? '•••••• сохранён' : 'EAAB…'}"></div>
+            <div class="form-row"><label>Имя события</label><input id="ctwaEvent" value="${esc(ct.eventName || 'QualifiedLead')}" placeholder="QualifiedLead"></div>
+          </div>
+          <div class="form-row"><label>Test event code (Events Manager → Test events, необязательно)</label><input id="ctwaTest" value="${esc(ct.testCode || '')}" placeholder="TEST12345"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+            <button class="btn btn-accent btn-sm" id="ctwaSave">Сохранить</button>
+            <button class="btn btn-sm" id="ctwaTestBtn">${ic(I.send)}Тест-событие</button>
+            ${ct.stats ? `<span class="muted" style="font-size:11.5px">отправлено ${ct.stats.sent || 0} · ошибок ${ct.stats.failed || 0}</span>` : ''}
+          </div>
+          ${(ct.log || []).length ? coll('Журнал CTWA-отправок', (ct.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} ${esc(e.event)} · ${esc(e.lead || '')}${e.test ? ' · тест' : ''}</div><div class="sd">${tmm(e.at)}${e.err ? ' · ' + esc(e.err) : e.received ? ' · принято Meta: ' + e.received : ''}</div></div></div>`).join(''), { open: false, count: (ct.log || []).length, icon: I.doc }) : ''}
+        </div>`; })()}
         ${(() => { const ma = (STATE.settings && STATE.settings.metaAds) || {}; const mode = ma.mode || 'integrator';
           const accts = (ma.accounts && ma.accounts.length) ? ma.accounts : (ma.adAccountId ? [{ id: ma.adAccountId, name: '', currency: '' }] : [{ id: '', name: '', currency: '' }]);
           const okCount = accts.filter(a => a.id).length; const syncDays = ma.syncDays || 60;
@@ -14073,6 +14101,31 @@ PAGES.ads = async (root) => {
       const r = await api.post('/capi/test', {});
       toast(r.ok ? (tc ? 'Тест ушёл в Test Events' : 'Боевое событие ушло в Meta') : 'Meta вернула ошибку',
         r.ok ? `Lead · ${r.lead} — ${tc ? 'ищите во вкладке Test Events (мгновенно)' : 'в Events Manager, с задержкой обработки Meta'}` : (r.error || ''), r.ok);
+      await loadState(); render();
+    } catch (err) { btn.disabled = false; btn.innerHTML = old; toast('Не удалось', err.message); }
+  });
+  /* --- Meta CTWA (оптимизация на целевые переписки) --- */
+  const ctwaPatch = () => {
+    const p = { enabled: $('#ctwaOn')?.checked, datasetId: ($('#ctwaDataset')?.value || '').trim(), wabaId: ($('#ctwaWaba')?.value || '').trim(), testCode: ($('#ctwaTest')?.value || '').trim(), eventName: ($('#ctwaEvent')?.value || '').trim() || 'QualifiedLead' };
+    const tok = ($('#ctwaToken')?.value || '').trim(); if (tok) p.token = tok;
+    return p;
+  };
+  $('#ctwaSave')?.addEventListener('click', async () => { await api.patch('/settings', { ctwa: ctwaPatch() }); toast('CTWA сохранён', 'Настройки применены', true); await loadState(); render(); });
+  $('#ctwaOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { ctwa: { enabled: e.target.checked } }); toast(e.target.checked ? 'CTWA включён' : 'CTWA выключен', e.target.checked ? 'QualifiedLead пойдёт в dataset при целевой переписке' : null, true); await loadState(); });
+  $('#ctwaTestBtn')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const tc = ($('#ctwaTest')?.value || '').trim();
+    const saved = ((STATE.settings.ctwa || {}).testCode || '').trim();
+    if (!tc) {
+      if (!await uiConfirm('Отправить как БОЕВОЕ событие?', 'Поле «Test event code» пустое — QualifiedLead уйдёт в <b>прод</b> dataset как реальная конверсия, а не во вкладку <b>Test Events</b>. Впишите Test event code для проверки без влияния на данные. Всё равно отправить боевое?', { ok: 'Отправить боевое', cancel: 'Отмена', danger: true })) return;
+    } else if (tc !== saved) {
+      try { await api.patch('/settings', { ctwa: ctwaPatch() }); } catch (_) {}
+    }
+    const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.send) + 'Отправляю…';
+    try {
+      const r = await api.post('/ctwa/test', {});
+      toast(r.ok ? (r.synthetic ? 'Связка работает (синтетический тест)' : 'QualifiedLead ушёл') : 'Meta вернула ошибку',
+        r.ok ? (r.synthetic ? 'Dataset/WABA/токен валидны. Для реального события нужен лид с клика по рекламе.' : `${r.lead} — ${tc ? 'ищите во вкладке Test Events' : 'в Events Manager, с задержкой'}`) : (r.error || ''), r.ok);
       await loadState(); render();
     } catch (err) { btn.disabled = false; btn.innerHTML = old; toast('Не удалось', err.message); }
   });
