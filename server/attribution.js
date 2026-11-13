@@ -88,4 +88,65 @@ function handleClick(db, slug, meta = {}) {
   return rec.dest;
 }
 
-module.exports = { enabled, createLink, wrapLinks, handleClick, classifyDest };
+/* прозрачный 1×1 GIF для пиксель-бикона */
+const PX_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+
+/* бикон, встроенный в публичную страницу подборки/презентации: пишем просмотр с привязкой к объекту,
+   брокеру (из самой презентации по токену) и лиду (из slug трекинговой ссылки, по которой пришли, параметр lc).
+   Троттл 60с на пару (токен, лид), чтобы повторные хиты страницы не плодили события. Возвращает PX_GIF. */
+function handlePixel(db, q = {}, meta = {}) {
+  try {
+    if (!enabled(db)) return PX_GIF;
+    const tok = String(q.t || '').slice(0, 64);
+    const lc = String(q.lc || '').slice(0, 32);
+    if (!tok) return PX_GIF;
+    let brokerId = null, projectIds = [], presToken = null, collectionId = null;
+    const pres = (db.presentations || []).find(x => x.publicToken === tok);
+    if (pres) { presToken = tok; brokerId = pres.brokerId || null; projectIds = pres.projectIds || (pres.projectId ? [pres.projectId] : []); }
+    else { const col = (db.collections || []).find(x => x.id === tok); if (col) { collectionId = tok; brokerId = col.brokerId || null; projectIds = col.propertyIds || []; } }
+    const leadId = lc ? ((db.trackedLinks || []).find(l => l.slug === lc) || {}).leadId || null : null;
+    const evs = db.pixelEvents || (db.pixelEvents = []);
+    const now = Date.now();
+    const recent = evs.find(e => e.t === tok && e.leadId === leadId && (now - e.at) < 60000);
+    if (!recent) {
+      evs.push({ id: store().nextId('px'), kind: 'view', t: tok, presToken, collectionId, leadId, brokerId, projectIds, ua: String(meta.ua || '').slice(0, 200), ip: String(meta.ip || '').slice(0, 60), at: now });
+      if (leadId) { const lead = (db.leads || []).find(l => l.id === leadId); if (lead) { lead._attr = lead._attr || {}; lead._attr.lastViewAt = now; } }
+      try { store().save(); } catch (_) {}
+    }
+  } catch (_) {}
+  return PX_GIF;
+}
+
+/* HTML-бикон для вставки в публичную страницу (append к ответу /pv, /c). Пусто если атрибуция выключена. */
+function pixelTag(db, tok, leadSlug) {
+  if (!enabled(db) || !tok) return '';
+  const lc = leadSlug ? ('?lc=' + encodeURIComponent(leadSlug)) : '';
+  return `<img src="${base()}/px/${encodeURIComponent(tok)}.gif${lc}" alt="" width="1" height="1" style="position:absolute;left:-9999px" referrerpolicy="no-referrer">`;
+}
+
+/* агрегат для дашборда «Ссылки и атрибуция»: по брокерам и по объектам. Диапазон from..to (ms) опционально. */
+function summary(db, opts = {}) {
+  const from = opts.from || 0, to = opts.to || Date.now();
+  const inR = at => at >= from && at <= to;
+  const links = (db.trackedLinks || []);
+  const clicks = (db.linkClicks || []).filter(c => inR(c.at));
+  const views = (db.pixelEvents || []).filter(v => inR(v.at));
+  const leadsById = {}; (db.leads || []).forEach(l => leadsById[l.id] = l);
+  const brokerName = id => { const b = (db.brokers || []).find(x => x.id === id); return b ? b.name : (id || 'Без брокера'); };
+  const propName = id => { const p = (db.properties || []).find(x => x.id === id); return p ? (p.name || p.title || id) : id; };
+  const byBroker = {}, byObject = {};
+  const bump = (map, key, field) => { (map[key] = map[key] || { clicks: 0, views: 0, deals: 0, revenue: 0 })[field]++; };
+  clicks.forEach(c => { if (c.brokerId) bump(byBroker, c.brokerId, 'clicks'); });
+  views.forEach(v => { if (v.brokerId) bump(byBroker, v.brokerId, 'views'); (v.projectIds || []).forEach(pid => bump(byObject, pid, 'views')); });
+  clicks.forEach(c => { const l = links.find(x => x.slug === c.slug); const pid = l && l.propertyId; if (pid) bump(byObject, pid, 'clicks'); });
+  /* сделки/выручка по брокеру из лидов (канал-агностично, как в аналитике рекламы) */
+  (db.leads || []).forEach(l => { if (l.stage === 'deal' && l.broker && inR(l.dealAt || l.lastMsgAt || 0)) { const r = byBroker[l.broker] = byBroker[l.broker] || { clicks: 0, views: 0, deals: 0, revenue: 0 }; r.deals++; r.revenue += (+l.dealCommission || +l.dealValue || 0); } });
+  return {
+    totals: { links: links.length, clicks: clicks.length, views: views.length },
+    byBroker: Object.entries(byBroker).map(([id, v]) => Object.assign({ brokerId: id, broker: brokerName(id) }, v)).sort((a, b) => b.clicks - a.clicks),
+    byObject: Object.entries(byObject).map(([id, v]) => Object.assign({ propertyId: id, name: propName(id) }, v)).sort((a, b) => (b.clicks + b.views) - (a.clicks + a.views)),
+    recentClicks: clicks.slice(-50).reverse().map(c => ({ at: c.at, lead: (leadsById[c.leadId] || {}).name || c.leadId, broker: brokerName(c.brokerId) })),
+  };
+}
+
+module.exports = { enabled, createLink, wrapLinks, handleClick, classifyDest, handlePixel, pixelTag, summary, PX_GIF };

@@ -1518,6 +1518,8 @@ function publicTenantFor(p) {
   if ((m = p.match(/^\/pv\/([a-f0-9]+)/))) { const tok = m[1]; return findTenant(() => (store.get().presentations || []).some(x => x.publicToken === tok)); }
   /* трекинговая DM-ссылка атрибуции /l/:slug — резолвим тенанта-владельца ссылки (Фаза 2) */
   if ((m = p.match(/^\/l\/([a-zA-Z0-9]+)$/))) { const slug = m[1]; return findTenant(() => (store.get().trackedLinks || []).some(x => x.slug === slug)); }
+  /* пиксель-бикон атрибуции /px/:token.gif — тенант по токену презентации/подборки (Фаза 2) */
+  if ((m = p.match(/^\/px\/([a-zA-Z0-9_-]+)\.gif$/))) { const tok = m[1]; return findTenant(() => (store.get().presentations || []).some(x => x.publicToken === tok) || (store.get().collections || []).some(x => x.id === tok)); }
   /* страница воспроизведения медиа из письма /e/:id */
   if ((m = p.match(/^\/e\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => !!(store.get().emailMedia && store.get().emailMedia[id])); }
   /* отписка от рассылок /u/:token */
@@ -5893,8 +5895,13 @@ const server = http.createServer(async (req, res) => {
     /* трекинговая DM-ссылка атрибуции: клик → запись + 302 на назначение (Фаза 2; тенант уже резолвлен по slug) */
     { const _lm = p.match(/^\/l\/([a-zA-Z0-9]+)$/); if (req.method === 'GET' && _lm) {
       const dest = attribution.handleClick(db, _lm[1], { ua: req.headers['user-agent'], ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), ref: req.headers['referer'] || '' });
-      if (dest) { res.writeHead(302, { Location: dest }); res.end(); return; }
+      if (dest) { const _sep = dest.includes('?') ? '&' : '?'; res.writeHead(302, { Location: dest + _sep + 'lc=' + _lm[1] }); res.end(); return; }   /* lc=slug → пиксель на странице привяжет просмотр к лиду */
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Ссылка не найдена'); return;
+    } }
+    /* пиксель-бикон атрибуции: прозрачный 1×1, пишет просмотр подборки/презентации (Фаза 2; тенант по токену в пути) */
+    { const _pm = p.match(/^\/px\/([a-zA-Z0-9_-]+)\.gif$/); if (req.method === 'GET' && _pm) {
+      const gif = attribution.handlePixel(db, { t: _pm[1], lc: u.searchParams.get('lc') || '' }, { ua: req.headers['user-agent'], ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() });
+      res.writeHead(200, { 'Content-Type': 'image/gif', 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Content-Length': gif.length }); res.end(gif); return;
     } }
     /* ---------------- WhatsApp Cloud API webhook ---------------- */
     if (p === '/wa/webhook' && req.method === 'GET') {
@@ -6074,12 +6081,15 @@ const server = http.createServer(async (req, res) => {
            body.callback_query. Раньше роутер брал только message/edited_message и ронял клик (→ 200, тишина),
            поэтому кнопка приходила, а QR по клику НЕ приходил. Теперь роутим и callback_query по тому же индексу. */
         const cq = (body && body.callback_query) || null;
+        const wq = (body && (body.widget_query || body.shared_widget_query)) || null;   /* колбэк HTML-виджета (Bot API 10.4): нет message — chatId в widget_query.from.id */
         const msg = (body && (body.message || body.edited_message)) || (cq && cq.message) || null;
-        const chatId = cq
+        const chatId = wq
+          ? String((wq.from && wq.from.id) || '')
+          : cq
           ? String((cq.message && cq.message.chat && cq.message.chat.id) || (cq.from && cq.from.id) || '')
           : (msg && msg.chat ? String(msg.chat.id) : '');
         if (!chatId) return json(res, 200, { ok: true });
-        const text = cq ? '' : String(msg.text || msg.caption || '').trim();
+        const text = (cq || wq) ? '' : String(msg.text || msg.caption || '').trim();
         const reg = store.getRegistry(); reg.tgChatIndex = reg.tgChatIndex || {};
         let tid = null;
         if (text.startsWith('/start')) {
@@ -6106,7 +6116,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
         if (!tid) {
-          if (cq) return json(res, 200, { ok: true });   /* незнакомый чат нажал кнопку — тихо игнорируем (спиннер в TG сам погаснет) */
+          if (cq || wq) return json(res, 200, { ok: true });   /* незнакомый чат нажал кнопку/виджет — тихо игнорируем (спиннер в TG сам погаснет) */
           try { await tgbridge.notify({ settings: {} }, chatId, 'Здравствуйте! Отправьте свой ключ агентства: /start &lt;ключ&gt;\nКлюч — в CRM → Настройки → Мост Telegram.'); } catch (_) {}
           return json(res, 200, { ok: true });
         }
@@ -16778,6 +16788,9 @@ ${SCR}
     }
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, (IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})) : db.events).slice(0, 60));
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db, (IS_BROKER && LF && (LF.contractors || []).length) ? { onlyVendors: LF.contractors } : (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}));
+    /* ⭐ Атрибуция (Фаза 2): сводка по брокерам/объектам + тумблер включения движка */
+    if (p === '/api/attribution/summary' && req.method === 'GET') return json(res, 200, Object.assign({ enabled: attribution.enabled(db) }, attribution.summary(db, { from: +u.searchParams.get('from') || 0, to: +u.searchParams.get('to') || Date.now() })));
+    if (p === '/api/attribution/toggle' && req.method === 'POST') { if (ROLE && ROLE.role === 'broker') return json(res, 403, { error: 'только владелец' }); const _b = await readBody(req).catch(() => ({})); db.settings.attribution = db.settings.attribution || {}; db.settings.attribution.enabled = !!_b.enabled; store.save(); return json(res, 200, { ok: true, enabled: db.settings.attribution.enabled }); }
     if (p === '/api/demo/reset' && req.method === 'POST') {
       if (!getSession(req) || (ROLE && ROLE.role === 'broker')) return json(res, 403, { error: 'только владелец' });
       /* НЕ теряем доступ и деньги: сохраняем вход/секреты/биллинг/бренд/betaAll, наполняем демо-данными остальное */
@@ -19356,7 +19369,9 @@ ${items.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Пок
         if (!snap) { res.writeHead(404); res.end('Снимок не найден'); return; }
         if (!pres._pubViews || Date.now() - (pres._lastPubView || 0) > 60e3) { pres._pubViews = (pres._pubViews || 0) + 1; pres._lastPubView = Date.now(); store.save(); }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-        res.end(presentation.documentFromSnapshot(snap, { title: presentation.titleOf(db, pres) }));
+        const _pvHtml = presentation.documentFromSnapshot(snap, { title: presentation.titleOf(db, pres) });
+        const _pvPx = attribution.pixelTag(db, pres.publicToken, u.searchParams.get('lc') || '');   /* бикон атрибуции (gated; пусто → вывод как прежде) */
+        res.end(_pvPx ? (_pvHtml.includes('</body>') ? _pvHtml.replace('</body>', _pvPx + '</body>') : _pvHtml + _pvPx) : _pvHtml);
         return;
       }
     }

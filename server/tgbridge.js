@@ -208,6 +208,12 @@ function tgSenderKeyboard(db, lead, broker) {
 
 /* ---------- ВХОДЯЩИЙ апдейт из Telegram (брокер → WhatsApp) ---------- */
 async function handleUpdate(db, update) {
+  /* ⭐ЗАПРОС ИЗ ВИДЖЕТА (Bot API 10.4): кнопка внутри HTML-карточки вызвала TelegramWidget.request(data)
+     → апдейт update.widget_query. Выполняем действие (take/ai) и отвечаем виджету. */
+  if (update && (update.widget_query || update.shared_widget_query)) {
+    try { return await handleWidgetQuery(db, update.widget_query || update.shared_widget_query); }
+    catch (e) { console.error('[tgbridge] widget_query', e.message); return { skip: 'widget_err' }; }
+  }
   /* ⭐inline-кнопка «Показать QR-код» (callback_data «qr:<phone>») — номер отвалился, клиент жмёт кнопку
      прямо в боте → подтягиваем свежий QR тем же потоком, что и /qr. Решает «QR живёт минуту, не успел». */
   if (update && update.callback_query) {
@@ -259,7 +265,7 @@ async function handleUpdate(db, update) {
       text: r.ok
         ? (r.already
           ? `✅ Этот аккаунт уже привязан: ${r.broker.name}. Всё работает.`
-          : `✅ Привязано: ${r.broker.name}.${r.count > 1 ? `\n(Ваших Telegram-аккаунтов подключено: ${r.count} — сообщения клиентов приходят на все.)` : ''}\nТеперь отвечайте reply на сообщения клиентов — они уйдут клиенту в WhatsApp от вашего имени.`)
+          : `✅ Привязано: ${r.broker.name}.${r.count > 1 ? `\n(Ваших Telegram-аккаунтов подключено: ${r.count} — сообщения клиентов приходят на все.)` : ''}\nТеперь отвечайте reply на сообщения клиентов — они уйдут клиенту в WhatsApp от вашего имени.\n\n📲 Команды: /digest — сводка дня, /leads — мои лиды, /widget — пример карточки лида.`)
         : '❌ Код не найден. Возьмите свой код в CRM → Подключения → Мост Telegram.',
     });
     return { bound: r.ok };
@@ -276,6 +282,52 @@ async function handleUpdate(db, update) {
     const txt = `🧪 <b>Тест — так приходит новый лид</b>\n\n${leadBriefHtml(db, demo)}\n\n<i>Кнопка ниже открывает переписку с лидом прямо в приложении.${sample ? '' : ' (это пример; у реального лида — его данные и его чат)'}</i>`;
     await safeApi(db, 'sendMessage', { chat_id: chatId, text: txt, parse_mode: 'HTML', reply_markup: leadOpenKb(db, demo) });
     return { test: true };
+  }
+
+  /* ⭐/widget — та же карточка нового лида, но ЖИВЫМ HTML-ВИДЖЕТОМ (Bot API 10.4): интерактивные кнопки
+     внутри сообщения (открыть переписку / копировать номер / взять в работу / ИИ вкл-выкл). Фолбэк — как /test. */
+  if (/^\/(widget|виджет)\b/i.test(text)) {
+    const brk0 = db.brokers.find(b => brokerChatIds(b).includes(chatId)) || null;
+    const isOwner0 = !brk0 && String((db.settings || {}).ownerTgChatId || '') === chatId;
+    if (!brk0 && !isOwner0) { await safeApi(db, 'sendMessage', { chat_id: chatId, text: 'Сначала привяжитесь: /start <код> (код в CRM → Подключения → Мост Telegram).' }); return { skip: 'unbound' }; }
+    const sample = brk0 ? (db.leads || []).filter(l => l.broker === brk0.id).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] : (db.leads || [])[0];
+    const demo = sample || { id: 'demo_' + chatId, name: 'Иван Петров (пример)', phone: '+66 81 234 5678', geo: (db.settings.agency.geos || [])[0] || '', lang: 'ru', source: 'ctwa', score: 78,
+      quals: { purpose: { value: 'для себя, переезд' }, budget: { value: 'до $450k' }, type: { value: '2-спальные апартаменты' }, timeline: { value: '2–3 месяца' } },
+      ads: { campaignName: 'Phuket Beachfront', adName: 'Laya Resort' }, nextAction: { text: 'Позвонить в течение 30 мин' }, ai: { enabled: true } };
+    const botUser = await botUsername(db);
+    const html = leadWidgetHtml(db, demo, sample ? 'new' : 'demo', botUser);
+    const fb = `🧪 <b>Карточка лида</b>\n\n${leadBriefHtml(db, demo)}\n\n<i>Если карточка-виджет не отобразилась — обновите Telegram (функция появилась в ноябре 2026).</i>`;
+    await sendWidgetOrFallback(db, chatId, { html, fallbackText: fb, fallbackKb: leadOpenKb(db, demo), leadId: sample ? demo.id : undefined });
+    return { widgetDemo: true };
+  }
+
+  /* ⭐/digest (сводка) — живой KPI-виджет: новых сегодня / ждут ответа / горячих / за 7 дней + спарклайн */
+  if (/^\/(digest|сводка|dashboard)\b/i.test(text)) {
+    const brk0 = db.brokers.find(b => brokerChatIds(b).includes(chatId)) || null;
+    const isOwner0 = !brk0 && String((db.settings || {}).ownerTgChatId || '') === chatId;
+    if (!brk0 && !isOwner0) { await safeApi(db, 'sendMessage', { chat_id: chatId, text: 'Сначала привяжитесь: /start <код>.' }); return { skip: 'unbound' }; }
+    const scope = brk0 ? { brokerId: brk0.id } : { all: true };
+    const botUser = await botUsername(db);
+    const html = digestWidgetHtml(db, scope, botUser);
+    const d = digestData(db, scope);
+    const fb = `📊 <b>${scope.all ? 'Сводка агентства' : 'Моя сводка'} · сегодня</b>\n\n🆕 Новых сегодня: <b>${d.newToday}</b>\n⏳ Ждут ответа: <b>${d.waiting}</b>\n🔥 Горячих: <b>${d.hot}</b>\n📈 Новых за 7 дней: <b>${d.week}</b>`;
+    await sendWidgetOrFallback(db, chatId, { html, fallbackText: fb });
+    return { digest: true };
+  }
+
+  /* ⭐/leads (мои лиды) — виджет-инбокс: открытые лиды, тап по строке открывает чат */
+  if (/^\/(leads|лиды|инбокс|inbox)\b/i.test(text)) {
+    const brk0 = db.brokers.find(b => brokerChatIds(b).includes(chatId)) || null;
+    const isOwner0 = !brk0 && String((db.settings || {}).ownerTgChatId || '') === chatId;
+    if (!brk0 && !isOwner0) { await safeApi(db, 'sendMessage', { chat_id: chatId, text: 'Сначала привяжитесь: /start <код>.' }); return { skip: 'unbound' }; }
+    const scope = brk0 ? { brokerId: brk0.id } : { all: true };
+    const botUser = await botUsername(db);
+    const html = leadsListWidgetHtml(db, scope, botUser);
+    const open = (db.leads || []).filter(l => (scope.all || l.broker === scope.brokerId) && !['lost', 'won', 'archived', 'closed'].includes(String(l.stage || '')))
+      .sort((a, b) => (b.lastActivityAt || b.createdAt || 0) - (a.lastActivityAt || a.createdAt || 0)).slice(0, 7);
+    const fb = open.length ? `💬 <b>${scope.all ? 'Лиды агентства' : 'Мои лиды'}</b>\n\n${open.map((l, i) => `${i + 1}. ${_tgEsc(l.name || 'Без имени')}${l.phone ? ' · ' + _tgEsc(l.phone) : ''}${typeof l.score === 'number' ? ' · ' + l.score : ''}`).join('\n')}\n\n<i>Откройте мини-приложение (кнопка «💬 Чаты»), чтобы перейти в переписку.</i>` : 'Открытых лидов нет.';
+    await sendWidgetOrFallback(db, chatId, { html, fallbackText: fb });
+    return { leadsWidget: true };
   }
 
   /* owner-пульт: команды управления номерами с телефона (напр. /qr — новый QR).
@@ -447,6 +499,242 @@ function leadOpenKb(db, lead) {
   return { inline_keyboard: [[{ text: '💬 Открыть переписку', web_app: { url: absUrl('/tgapp?lead=' + encodeURIComponent(lead.id)) } }]] };
 }
 
+/* ======================= TELEGRAM WIDGETS (Bot API 10.4, sendWidget) =======================
+   Вместо «текст + кнопка Открыть» шлём ЖИВУЮ HTML-карточку прямо в сообщение (мини-HTML: инлайн CSS/JS,
+   картинки только data:, ≤4 КБ сжатого / ≤32 КБ сырого, ТОЛЬКО приватные чаты). Интерактив — через
+   window.TelegramWidget: openTelegramLink (открыть мини-апп по startapp), openLink, copyText, HapticFeedback,
+   request(data) → колбэк боту (update.widget_query → answerWidgetQuery). Фича новая (11.2026) → на любой сбой
+   sendWidget тихо откатываемся на классическое сообщение (sendWidgetOrFallback). Флаг: tgBridge.widgets!==false. */
+function widgetsEnabled(db) { return cfg(db).widgets !== false; }
+
+let _botUser = null, _botUserAt = 0;
+async function botUsername(db) {
+  if (_botUser && Date.now() - _botUserAt < 3600000) return _botUser;
+  try { const t = token(db); const me = await tgApiRaw(t, 'getMe'); _botUser = (me && me.result && me.result.username) || null; _botUserAt = Date.now(); } catch (_) {}
+  return _botUser;
+}
+/* URL «открыть мини-апп на лиде»: при известном юзернейме бота — t.me deep-link (startapp=lead_<id>,
+   tgapp читает start_param), иначе прямой https на /tgapp (openLink). */
+function leadOpenAction(botUser, leadId) {
+  if (botUser) return { fn: 'openTelegramLink', url: 'https://t.me/' + botUser + '?startapp=lead_' + encodeURIComponent(leadId) };
+  return { fn: 'openLink', url: absUrl('/tgapp?lead=' + encodeURIComponent(leadId)) };
+}
+/* безопасная строка-литерал для inline-JS ВНУТРИ HTML-атрибута onclick="…": JSON-кавычки (") закрыли бы
+   двойные кавычки атрибута раньше времени и ломали обработчик → экранируем в HTML-сущности (браузер вернёт их
+   обратно при парсинге атрибута, JS получит валидную строку). */
+const _js = s => JSON.stringify(String(s == null ? '' : s)).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+
+/* общий каркас мини-HTML виджета: самодостаточный документ, свой фон (не зависит от темы Telegram),
+   адаптив под тёмную системную тему, glue-функции TelegramWidget. body/script — содержимое карточки. */
+function widgetDoc(body, script) {
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:transparent}
+.c{background:#fff;border:1px solid #e7e9f0;border-radius:16px;padding:14px;position:relative;overflow:hidden}
+.c:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(#6366f1,#8b5cf6)}
+.hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.nm{font-weight:700;font-size:16px;letter-spacing:-.2px}
+.badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#4f46e5}
+.badge.hot{background:#fef2f2;color:#dc2626}.badge.warm{background:#fff7ed;color:#ea580c}.badge.cold{background:#eff6ff;color:#2563eb}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{font-size:12px;color:#475569;background:#f4f5fb;border-radius:8px;padding:4px 8px;white-space:nowrap}
+.sec{margin-top:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8}
+.ql{margin-top:4px}.ql .r{display:flex;gap:6px;font-size:13px;padding:2px 0}.ql .r b{color:#64748b;font-weight:600;min-width:64px}
+.src{margin-top:8px;font-size:12px;color:#64748b}
+.na{margin-top:8px;font-size:13px;font-weight:700;color:#0f172a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.b{flex:1 1 auto;min-width:88px;border:1px solid #e2e8f0;background:#f8fafc;color:#0f172a;font-weight:600;font-size:13px;padding:9px 10px;border-radius:10px;cursor:pointer;transition:.15s}
+.b:active{transform:scale(.97)}.b.prim{background:#6366f1;border-color:#6366f1;color:#fff}.b.good{background:#16a34a;border-color:#16a34a;color:#fff}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
+.kpi{background:#f6f7fc;border-radius:12px;padding:10px}.kpi .n{font-size:22px;font-weight:800;letter-spacing:-.5px;color:#4f46e5}.kpi .l{font-size:11px;color:#64748b;margin-top:2px}
+.lst{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef0f6;border-radius:10px;padding:9px 10px;cursor:pointer}
+.row:active{background:#eef2ff}.row .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}.row .t{flex:1;min-width:0}.row .t b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .t span{font-size:11px;color:#94a3b8}
+canvas{display:block;width:100%;height:42px;margin-top:6px}
+.toast{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:#0f172a;color:#fff;font-size:12px;font-weight:600;padding:7px 12px;border-radius:999px;opacity:0;pointer-events:none;transition:.2s;white-space:nowrap}
+@media(prefers-color-scheme:dark){
+ body{color:#e5e7eb}.c{background:#111827;border-color:#1f2937}
+ .chip{background:#1f2937;color:#cbd5e1}.kpi{background:#1b2436}.na{background:#0d2a1c;border-color:#14532d;color:#d1fae5}
+ .b{background:#1f2937;border-color:#334155;color:#e5e7eb}.row{background:#1b2436;border-color:#273449}.row:active{background:#24304a}
+ .sec{color:#64748b}.ql .r b{color:#94a3b8}.src{color:#94a3b8}
+}
+</style>
+${body}
+<script>
+var W=window.TelegramWidget||{};
+function _h(s){try{W.HapticFeedback&&W.HapticFeedback.impactOccurred(s||'light')}catch(e){}}
+function _open(fn,u){try{_h();if(typeof W[fn]==="function"){W[fn](u)}else if(W.openLink){W.openLink(u)}}catch(e){}}
+function _copy(t){try{_h('light');W.copyText&&W.copyText(t);_toast('📋 Скопировано')}catch(e){}}
+function _req(d){_h();if(!W.request){_toast('Обновите Telegram');return}W.request(d).then(function(r){_toast((r&&r.result)||'Готово')}).catch(function(){_toast('Не получилось')})}
+function _toast(t){var e=document.getElementById('t');if(e){e.textContent=t;e.style.opacity=1;clearTimeout(e._x);e._x=setTimeout(function(){e.style.opacity=0},2200)}}
+${script || ''}
+</script>`;
+}
+
+/* HTML-содержимое карточки лида (новый лид / повторный интерес) */
+function leadWidgetBody(db, lead, kind, botUser) {
+  const v = x => (x && typeof x === 'object' ? x.value : x);
+  const geo = (db.settings.geoNames && db.settings.geoNames[lead.geo]) || lead.geo || '';
+  const lang = lead.lang ? (_TG_LANGS[String(lead.lang).slice(0, 2).toLowerCase()] || lead.lang) : '';
+  const q = lead.quals || {};
+  const score = typeof lead.score === 'number' ? lead.score : null;
+  const warm = score == null ? null : (score >= 70 ? { c: 'hot', t: '🔥 Горячий' } : score >= 40 ? { c: 'warm', t: '🌤 Тёплый' } : { c: 'cold', t: '❄️ Холодный' });
+  const ads = lead.ads || {};
+  const adBits = [ads.campaignName, ads.adsetName, ads.adName].filter(Boolean);
+  const src = _TG_SRC[lead.source] || lead.source || '';
+  const aiOn = !!(lead.ai && lead.ai.enabled);
+  const chips = [lead.phone ? '📞 ' + _tgEsc(lead.phone) : '', geo ? '🌍 ' + _tgEsc(geo) : '', lang ? '🗣 ' + _tgEsc(lang) : ''].filter(Boolean);
+  const qrows = [];
+  if (q.purpose) qrows.push(['Цель', v(q.purpose)]);
+  if (q.budget) qrows.push(['Бюджет', v(q.budget)]);
+  if (q.type) qrows.push(['Формат', v(q.type)]);
+  if (q.timeline) qrows.push(['Срок', v(q.timeline)]);
+  const title = kind === 'reengage' ? '🔄 Снова написал' : kind === 'demo' ? '🧪 Пример карточки' : '🆕 Новый лид';
+  let h = '<div class="c">';
+  h += '<div class="hd">' + (warm ? '<span class="badge ' + warm.c + '">' + warm.t + '</span>' : '') + '<span class="badge">' + title + '</span></div>';
+  h += '<div class="hd"><span class="nm">' + _tgEsc(lead.name || 'Без имени') + '</span>' + (score != null ? '<span class="chip">' + score + '/100</span>' : '') + '</div>';
+  if (chips.length) h += '<div class="chips">' + chips.map(c => '<span class="chip">' + c + '</span>').join('') + '</div>';
+  if (qrows.length) { h += '<div class="sec">Квалификация</div><div class="ql">' + qrows.map(r => '<div class="r"><b>' + _tgEsc(r[0]) + '</b><span>' + _tgEsc(r[1]) + '</span></div>').join('') + '</div>'; }
+  else h += '<div class="src"><i>Квалификация не завершена — уточните в разговоре</i></div>';
+  const srcLine = [src ? '📣 ' + _tgEsc(src) : '', adBits.length ? '«' + _tgEsc(adBits.join(' · ')) + '»' : ''].filter(Boolean).join('  ·  ');
+  if (srcLine) h += '<div class="src">' + srcLine + '</div>';
+  if (lead.nextAction && lead.nextAction.text) h += '<div class="na">⏱ ' + _tgEsc(lead.nextAction.text) + '</div>';
+  const act = leadOpenAction(botUser, lead.id);
+  h += '<div class="btns">';
+  h += '<button class="b prim" onclick="_open(' + _js(act.fn) + ',' + _js(act.url) + ')">💬 Переписка</button>';
+  if (lead.phone) h += '<button class="b" onclick="_copy(' + _js(lead.phone) + ')">📞 Номер</button>';
+  h += '<button class="b good" onclick="_req(' + _js('take:' + lead.id) + ')">✅ В работу</button>';
+  h += '<button class="b" onclick="_req(' + _js('ai:' + lead.id) + ')">' + (aiOn ? '🤖 ИИ: выкл' : '▶️ ИИ: вкл') + '</button>';
+  h += '</div><div class="toast" id="t"></div></div>';
+  return h;
+}
+function leadWidgetHtml(db, lead, kind, botUser) { return widgetDoc(leadWidgetBody(db, lead, kind, botUser)); }
+
+/* данные дайджеста: охват — лиды брокера (scope.brokerId) или всё агентство (scope.all) */
+function digestData(db, scope) {
+  const leads = (db.leads || []).filter(l => scope.all || l.broker === scope.brokerId);
+  const msgs = db.messages || [];
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0); const todayStart = d0.getTime();
+  const dayMs = 86400000;
+  const lastNonSys = {};
+  for (const m of msgs) { if (m.system) continue; const p = lastNonSys[m.leadId]; if (!p || (m.ts || m.at || 0) > (p.ts || p.at || 0)) lastNonSys[m.leadId] = m; }
+  const inScope = new Set(leads.map(l => l.id));
+  let newToday = 0, hot = 0, waiting = 0;
+  const spark = new Array(7).fill(0);
+  for (const l of leads) {
+    const c = l.createdAt || 0;
+    if (c >= todayStart) newToday++;
+    if (typeof l.score === 'number' && l.score >= 70) hot++;
+    const lm = lastNonSys[l.id];
+    if (lm && lm.dir === 'in') waiting++;
+    for (let i = 0; i < 7; i++) { const s = todayStart - (6 - i) * dayMs; if (c >= s && c < s + dayMs) spark[i]++; }
+  }
+  const week = spark.reduce((a, b) => a + b, 0);
+  return { newToday, hot, waiting, week, spark, total: leads.length };
+}
+function digestWidgetHtml(db, scope, botUser) {
+  const d = digestData(db, scope);
+  const max = Math.max(1, ...d.spark);
+  const bars = d.spark.map(n => Math.round((n / max) * 34)).join(',');
+  const title = scope.all ? '📊 Сводка агентства' : '📊 Моя сводка';
+  let h = '<div class="c">';
+  h += '<div class="hd"><span class="nm">' + title + '</span><span class="chip">сегодня</span></div>';
+  h += '<div class="kpis">';
+  h += '<div class="kpi"><div class="n">' + d.newToday + '</div><div class="l">новых сегодня</div></div>';
+  h += '<div class="kpi"><div class="n">' + d.waiting + '</div><div class="l">ждут ответа</div></div>';
+  h += '<div class="kpi"><div class="n">' + d.hot + '</div><div class="l">🔥 горячих</div></div>';
+  h += '<div class="kpi"><div class="n">' + d.week + '</div><div class="l">новых за 7 дней</div></div>';
+  h += '</div>';
+  h += '<div class="sec">Новые лиды · 7 дней</div><canvas id="sp" width="300" height="42"></canvas>';
+  const openUrl = botUser ? 'https://t.me/' + botUser + '?startapp=home' : absUrl('/tgapp');
+  const openFn = botUser ? 'openTelegramLink' : 'openLink';
+  h += '<div class="btns"><button class="b prim" onclick="_open(' + _js(openFn) + ',' + _js(openUrl) + ')">Открыть CRM</button></div>';
+  h += '<div class="toast" id="t"></div></div>';
+  const script = 'var D=[' + bars + '];(function(){var c=document.getElementById("sp");if(!c)return;var x=c.getContext("2d"),W=c.width,H=c.height,n=D.length,bw=W/n*0.6,gap=W/n;x.fillStyle="#6366f1";for(var i=0;i<n;i++){var h=Math.max(2,D[i]),px=i*gap+(gap-bw)/2;x.globalAlpha=i===n-1?1:0.55;x.beginPath();var y=H-h,r=Math.min(3,bw/2);x.moveTo(px,H);x.lineTo(px,y+r);x.quadraticCurveTo(px,y,px+r,y);x.lineTo(px+bw-r,y);x.quadraticCurveTo(px+bw,y,px+bw,y+r);x.lineTo(px+bw,H);x.closePath();x.fill();}})();';
+  return widgetDoc(h, script);
+}
+
+/* список открытых лидов брокера/агентства — мини-инбокс: каждая строка открывает чат лида */
+function leadsListWidgetHtml(db, scope, botUser) {
+  const leads = (db.leads || []).filter(l => scope.all || l.broker === scope.brokerId)
+    .filter(l => !['lost', 'won', 'archived', 'closed'].includes(String(l.stage || '')))
+    .sort((a, b) => (b.lastActivityAt || b.createdAt || 0) - (a.lastActivityAt || a.createdAt || 0)).slice(0, 7);
+  let h = '<div class="c"><div class="hd"><span class="nm">💬 ' + (scope.all ? 'Лиды агентства' : 'Мои лиды') + '</span><span class="chip">' + leads.length + '</span></div>';
+  if (!leads.length) h += '<div class="src">Открытых лидов нет.</div>';
+  else {
+    h += '<div class="lst">';
+    for (const l of leads) {
+      const sc = typeof l.score === 'number' ? l.score : null;
+      const dot = sc == null ? '#94a3b8' : sc >= 70 ? '#dc2626' : sc >= 40 ? '#ea580c' : '#2563eb';
+      const sub = [l.phone || '', (db.settings.geoNames && db.settings.geoNames[l.geo]) || l.geo || ''].filter(Boolean).join(' · ');
+      const act = leadOpenAction(botUser, l.id);
+      h += '<button class="row" onclick="_open(' + _js(act.fn) + ',' + _js(act.url) + ')"><span class="dot" style="background:' + dot + '"></span><span class="t"><b>' + _tgEsc(l.name || 'Без имени') + '</b><span>' + _tgEsc(sub) + '</span></span><span class="chip">' + (sc != null ? sc : '—') + '</span></button>';
+    }
+    h += '</div>';
+  }
+  h += '<div class="toast" id="t"></div></div>';
+  return widgetDoc(h);
+}
+
+/* ОТПРАВКА виджета с фолбэком: пробуем sendWidget (Bot API 10.4); на любой сбой (старый клиент, не
+   приватный чат, метод недоступен) — обычное сообщение. Возвращает {widget:true|false} или null. */
+async function sendWidgetOrFallback(db, chatId, opts) {
+  const { html, width, fallbackText, fallbackKb, leadId } = opts || {};
+  if (html && widgetsEnabled(db)) {
+    try {
+      const body = { chat_id: chatId, html };
+      if (width) body.width = width;
+      const sent = await api(db, 'sendWidget', body);
+      if (sent && sent.result && leadId) rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId, at: Date.now() };
+      return { sent, widget: true };
+    } catch (e) { console.error('[tgwidget] sendWidget→fallback:', e.message); }
+  }
+  if (fallbackText == null) return null;
+  const body = { chat_id: chatId, text: fallbackText, parse_mode: 'HTML' };
+  if (fallbackKb) body.reply_markup = fallbackKb;
+  try { const sent = await api(db, 'sendMessage', body); if (sent && sent.result && leadId) rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId, at: Date.now() }; return { sent, widget: false }; }
+  catch (e) { console.error('[tgwidget] fallback sendMessage:', e.message); return null; }
+}
+
+/* ответ на запрос виджета (update.widget_query → answerWidgetQuery). Параметр text/result пробуем оба
+   (точная сигнатура метода свежая) — что-нибудь из них Telegram примет, действие уже выполнено на сервере. */
+async function answerWidget(db, qid, text) {
+  const t = String(text == null ? '' : text).slice(0, 1000);
+  try { return await api(db, 'answerWidgetQuery', { widget_query_id: qid, text: t }); }
+  catch (e) { try { return await api(db, 'answerWidgetQuery', { widget_query_id: qid, result: t }); } catch (_) { return null; } }
+}
+
+/* обработка колбэка из виджета: data вида «take:<leadId>» / «ai:<leadId>». Выполняем действие от имени
+   того, кто нажал (брокер по chatIds / владелец по ownerTgChatId), затем отвечаем виджету тостом. */
+async function handleWidgetQuery(db, wq) {
+  const data = String((wq.query && (wq.query.data != null ? wq.query.data : wq.query)) || wq.data || '');
+  const fromId = String((wq.from && wq.from.id) || '');
+  const broker = db.brokers.find(b => brokerChatIds(b).includes(fromId)) || null;
+  const isOwner = !broker && String((db.settings || {}).ownerTgChatId || '') === fromId;
+  if (!broker && !isOwner) { await answerWidget(db, wq.id, 'Этот Telegram не привязан к CRM'); return { skip: 'unbound' }; }
+  const ci = data.indexOf(':'); const kind = ci < 0 ? data : data.slice(0, ci); const leadId = ci < 0 ? '' : data.slice(ci + 1);
+  const lead = db.leads.find(l => l.id === leadId);
+  if (!lead) { await answerWidget(db, wq.id, 'Лид не найден'); return { skip: 'no lead' }; }
+  let toast = 'Готово';
+  if (kind === 'take') {
+    if (broker) { lead.broker = broker.id; broker.tgActiveLeadId = lead.id; } else db.settings.ownerTgActiveLeadId = lead.id;
+    if (!db.settings.ai || !db.settings.ai.autoOff || db.settings.ai.autoOff.onHumanReply !== false) {
+      lead.ai = lead.ai || {}; lead.ai.enabled = false; lead.ai.pausedBy = broker ? 'broker' : 'owner';
+      lead.tags = [...new Set([...(lead.tags || []), 'ведёт брокер'])];
+    }
+    ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${broker ? broker.name : 'Основатель'} взял лида в работу из Telegram-виджета` });
+    store.save(); toast = '✅ Взято в работу — ИИ на паузе';
+  } else if (kind === 'ai') {
+    lead.ai = lead.ai || {}; lead.ai.enabled = !lead.ai.enabled;
+    if (!lead.ai.enabled) lead.ai.pausedBy = broker ? 'broker' : 'owner';
+    ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `ИИ-ассистент ${lead.ai.enabled ? 'включён' : 'выключен'} из Telegram-виджета` });
+    store.save(); toast = lead.ai.enabled ? '▶️ ИИ включён' : '🤖 ИИ выключен';
+  } else { toast = 'Неизвестное действие'; }
+  await answerWidget(db, wq.id, toast);
+  return { widgetAction: kind, leadId };
+}
+
 /* передача лида брокеру → СВОДНЫЙ бриф в его Telegram + кнопка «Открыть переписку» */
 async function forwardHandover(db, lead) {
   if (!ready(db) || !lead || !lead.broker) return;
@@ -457,9 +745,11 @@ async function forwardHandover(db, lead) {
   if (!broker || !ids.length) return;
   const txt = `${leadBriefHtml(db, lead)}\n\n<i>Жмите «Открыть переписку» или ответьте reply на сообщение клиента — уйдёт ему в WhatsApp от вашего имени.</i>`;
   const kb = leadOpenKb(db, lead);
+  const botUser = await botUsername(db);                                /* для deep-link startapp в виджете */
+  const html = widgetsEnabled(db) ? leadWidgetHtml(db, lead, 'new', botUser) : null;
   for (const chatId of ids) {
-    try { const sent = await api(db, 'sendMessage', { chat_id: chatId, text: txt, parse_mode: 'HTML', reply_markup: kb }); if (sent.result) { rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId: lead.id, at: Date.now() }; } }
-    catch (e) { console.error('[tgbridge] forwardHandover', chatId, e.message); }
+    /* живая карточка-виджет (Bot API 10.4) с фолбэком на классическое «бриф + кнопка» */
+    await sendWidgetOrFallback(db, chatId, { html, fallbackText: txt, fallbackKb: kb, leadId: lead.id });
   }
   pruneMap(db);
   broker.tgActiveLeadId = lead.id;
@@ -511,7 +801,7 @@ async function setupWebhook(db, baseUrl) {
   return api(db, 'setWebhook', {
     url,
     secret_token: cfg(db).secret,
-    allowed_updates: ['message', 'edited_message', 'callback_query'],   /* callback_query — для inline-кнопок (напр. «Показать QR-код») */
+    allowed_updates: ['message', 'edited_message', 'callback_query', 'widget_query', 'shared_widget_query'],   /* callback_query — inline-кнопки; widget_query — колбэки HTML-виджетов (Bot API 10.4) */
     drop_pending_updates: true,
   });
 }
@@ -525,7 +815,7 @@ async function setupPlatformWebhook(baseUrl) {
   const tok = platformToken();
   if (!tok) return { ok: false, error: 'нет токена центрального бота' };
   const base = baseUrl.replace(/\/$/, '');
-  const r = await tgApiRaw(tok, 'setWebhook', { url: base + '/tg/webhook', secret_token: platformSecret(), allowed_updates: ['message', 'edited_message', 'callback_query'], drop_pending_updates: true });
+  const r = await tgApiRaw(tok, 'setWebhook', { url: base + '/tg/webhook', secret_token: platformSecret(), allowed_updates: ['message', 'edited_message', 'callback_query', 'widget_query', 'shared_widget_query'], drop_pending_updates: true });
   /* сохраняем мини-апп: кнопка-меню бота открывает мессенджер брокера (/tgapp) — иначе при переносе
      существующего бота (напр. Lumen Messenger) в мост пропала бы его кнопка «Чаты» */
   try { await tgApiRaw(tok, 'setChatMenuButton', { menu_button: { type: 'web_app', text: '💬 Чаты', web_app: { url: base + '/tgapp' } } }); } catch (_) {}
@@ -565,4 +855,6 @@ module.exports = {
   central, platformSecret, setupPlatformWebhook, platformBotUsername, webhookInfo,
   brokerChatIds, addBrokerChat, removeBrokerChat,
   setWaQr, sendDataUrlPhoto, qrButton,
+  /* виджеты (Bot API 10.4) — экспортируем билдеры для самопроверки/переиспользования */
+  leadWidgetHtml, digestWidgetHtml, leadsListWidgetHtml, digestData, widgetsEnabled, sendWidgetOrFallback, handleWidgetQuery,
 };
