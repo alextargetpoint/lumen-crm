@@ -296,8 +296,8 @@ async function handleUpdate(db, update) {
       ads: { campaignName: 'Phuket Beachfront', adName: 'Laya Resort' }, nextAction: { text: 'Позвонить в течение 30 мин' }, ai: { enabled: true } };
     const botUser = await botUsername(db);
     const html = leadWidgetHtml(db, demo, sample ? 'new' : 'demo', botUser);
-    const fb = `🧪 <b>Карточка лида</b>\n\n${leadBriefHtml(db, demo)}\n\n<i>Если карточка-виджет не отобразилась — обновите Telegram (функция появилась в ноябре 2026).</i>`;
-    await sendWidgetOrFallback(db, chatId, { html, fallbackText: fb, fallbackKb: leadOpenKb(db, demo), leadId: sample ? demo.id : undefined });
+    const fb = `🧪 <b>Карточка лида</b>\n\n${leadBriefHtml(db, demo)}\n\n<i>Виджет не отобразился: бот @lumenmessengerbot пока не в вайтлисте Telegram для HTML-виджетов (фича вышла 09.11.2026, в ограниченном бете). Как только одобрят — карточка станет живым виджетом автоматически. Пока работает обычный формат.</i>`;
+    await sendWidgetOrFallback(db, chatId, { html, fallbackText: fb, fallbackKb: leadOpenKb(db, demo), leadId: sample ? demo.id : undefined, force: true });
     return { widgetDemo: true };
   }
 
@@ -677,18 +677,32 @@ function leadsListWidgetHtml(db, scope, botUser) {
   return widgetDoc(h);
 }
 
-/* ОТПРАВКА виджета с фолбэком: пробуем sendWidget (Bot API 10.4); на любой сбой (старый клиент, не
-   приватный чат, метод недоступен) — обычное сообщение. Возвращает {widget:true|false} или null. */
+/* ВАЙТЛИСТ TELEGRAM: отправка виджетов в бете — только для одобренных ботов. Неодобрённый бот (наш случай
+   @lumenmessengerbot на 13.11.2026) получает «INPUT_MEDIA_WIDGET_NOT_ALLOWED». Чтобы не делать обречённый
+   sendWidget + лог на КАЖДОМ уведомлении, запоминаем блок и шлём сразу фолбэк; раз в 6ч пробуем снова —
+   в день вайтлиста виджеты зажгутся сами. force:true (команда /widget) всегда пробует — для ручного теста. */
+let _widgetBlockedAt = 0, _widgetBlockLogged = false;
+const WIDGET_REPROBE_MS = 6 * 3600 * 1000;
+
+/* ОТПРАВКА виджета с фолбэком: пробуем sendWidget (Bot API 10.4); на любой сбой (не в вайтлисте, старый
+   клиент, не приватный чат, метод недоступен) — обычное сообщение. Возвращает {widget:true|false} или null. */
 async function sendWidgetOrFallback(db, chatId, opts) {
-  const { html, width, fallbackText, fallbackKb, leadId } = opts || {};
-  if (html && widgetsEnabled(db)) {
+  const { html, width, fallbackText, fallbackKb, leadId, force } = opts || {};
+  const blocked = !force && _widgetBlockedAt && (Date.now() - _widgetBlockedAt < WIDGET_REPROBE_MS);
+  if (html && widgetsEnabled(db) && !blocked) {
     try {
       const body = { chat_id: chatId, html };
       if (width) body.width = width;
       const sent = await api(db, 'sendWidget', body);
+      if (_widgetBlockedAt) { _widgetBlockedAt = 0; _widgetBlockLogged = false; console.log('[tgwidget] sendWidget снова работает — виджеты включены для бота'); }
       if (sent && sent.result && leadId) rt(db).replyMap[`${chatId}:${sent.result.message_id}`] = { leadId, at: Date.now() };
       return { sent, widget: true };
-    } catch (e) { console.error('[tgwidget] sendWidget→fallback:', e.message); }
+    } catch (e) {
+      if (/WIDGET_NOT_ALLOWED|not allowed/i.test(e.message || '')) {
+        _widgetBlockedAt = Date.now();
+        if (!_widgetBlockLogged) { _widgetBlockLogged = true; console.error('[tgwidget] бот НЕ в вайтлисте Telegram для виджетов (INPUT_MEDIA_WIDGET_NOT_ALLOWED) → шлём обычные сообщения; авто-повтор через 6ч'); }
+      } else console.error('[tgwidget] sendWidget→fallback:', e.message);
+    }
   }
   if (fallbackText == null) return null;
   const body = { chat_id: chatId, text: fallbackText, parse_mode: 'HTML' };
