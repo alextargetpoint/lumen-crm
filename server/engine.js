@@ -54,10 +54,18 @@ function channelsFor(db, lead) {
     const enabled = ch === 'wa' ? (en.wa !== false) : !!en[ch];
     out[ch] = { avail, enabled, confirmed };
   }
+  /* IG Direct — отдельный канал диалога, если у лида есть igsid и IG подключён (аддитивно, вне цикла wa/tg/email/viber) */
+  if (lead && lead.igsid) {
+    const so = ((db.settings || {}).social || {}).ig || {};
+    out.ig_dm = { avail: true, enabled: !!so.enabled, confirmed: true };
+  }
   out[resolveChannel(db, lead)] = Object.assign(out[resolveChannel(db, lead)] || {}, { recommended: true });
   return out;
 }
 function resolveChannel(db, lead) {
+  /* IG-лид (пришёл в Direct, есть igsid) и IG-канал включён → отвечаем в Instagram, а не в WA (нет телефона).
+     Аддитивно: не влияет на WA/TG/email/viber. */
+  if (lead && lead.igsid && lead.activeChannel === 'ig_dm' && (((db.settings || {}).social || {}).ig || {}).enabled) return 'ig_dm';
   const cfg = db.settings.channels || { priority: ['wa'], enabled: { wa: true } };
   const pr = (cfg.priority || ['wa']).filter(ch => cfg.enabled[ch] && channelHas(db, lead, ch, cfg));
   const want = lead.activeChannel || 'wa';
@@ -78,7 +86,7 @@ function nextChannel(db, lead) {
   return null;
 }
 
-const CH_NAMES = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' };
+const CH_NAMES = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail', ig_dm: 'Instagram' };
 
 /* Политика касаний по каналам. Мессенджеры (wa/tg) — полная цепочка касаний.
    Viber/email — фолбэк-каналы с ОДНИМ касанием: в Viber цепочка выглядит навязчиво и бьёт по consent
@@ -94,6 +102,9 @@ function setGraySender(fn) { graySender = fn; }
 /* Серый TELEGRAM-транспорт: холодное касание с прогретого TG-аккаунта (через tg-воркер). Внедряется из index.js. */
 let tgGraySender = null;
 function setTgGraySender(fn) { tgGraySender = fn; }
+/* отправитель IG Direct (инъекция из index.js → ig-dm.sendDM), чтобы не было циклического require */
+let igdmSender = null;
+function setIgdmSender(fn) { igdmSender = fn; }
 
 function pickNumber(db, lead) {
   if (lead.numberId) {
@@ -223,6 +234,11 @@ function send(db, lead, text, via, opts = {}) {
             const jv = await rv.json().catch(() => ({}));
             if (jv.status && jv.status !== 0) throw new Error('viber ' + (jv.status_message || jv.status));
           }
+        }
+        if (channel === 'ig_dm') {
+          /* исходящий Instagram Direct через инъектированный igdmSender (ig-dm.sendDM) */
+          if (igdmSender) await igdmSender(db, lead, m0);
+          else throw new Error('IG-канал не подключён');
         }
         m0.status = 'delivered';
       } catch (err) {
@@ -1415,7 +1431,7 @@ function inbound(db, lead, text, opts = {}) {
   /* ⚠️ КАНАЛ ВХОДЯЩЕГО: тегируем сообщение и делаем его каналом ДИАЛОГА (activeChannel). Клиент написал в
      Telegram → переписка переключается на Telegram (и в UI плашка, и для ответов ИИ/менеджера), а не висит
      на WhatsApp. Раньше входящие шли без канала → интерфейс всегда показывал WhatsApp. */
-  if (opts.channel && ['wa', 'tg', 'viber', 'email'].includes(opts.channel)) { m.channel = opts.channel; lead.activeChannel = opts.channel; }
+  if (opts.channel && ['wa', 'tg', 'viber', 'email', 'ig_dm'].includes(opts.channel)) { m.channel = opts.channel; lead.activeChannel = opts.channel; }
   db.messages.push(m);
   /* ЗОЛОТОЕ ПРАВИЛО: ответ «стоп/отписаться/stop/unsubscribe» → отписка от рассылок (любой канал) */
   if (/^\s*(стоп|stop|отпис|unsub|не пиш|не писать)/i.test(String(text || '')) && !lead.marketingOptOut) {
@@ -1794,4 +1810,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue, guardCfg, declineMatch, lastOutFailed, creditNumberStat, numberHealth };
+module.exports = { send, handover, handoverPreview, inbound, aiRespondNow, rescheduleDueReplies, channelsFor, resolveChannel, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, setTgGraySender, setIgdmSender, seqFilters, seqMatchesLead, seqSpecificity, fmtLeadDT, nextTouchInfo, nextTouchDraft, tickReengage, reengageDue, guardCfg, declineMatch, lastOutFailed, creditNumberStat, numberHealth };

@@ -175,6 +175,8 @@ const assistant = require('./assistant');     /* «Помощник брокер
 const amoSyncing = new Set();                 /* блокировка параллельного синка по тенанту (ручной + авто-тик): ключи tid / tid:bx */
 const wa = require('./wa');
 const comments = require('./comments');
+const igdm = require('./ig-dm'); /* Instagram Direct как канал диалога (аддитивно к WA/TG) */
+engine.setIgdmSender((db, lead, m) => igdm.sendDM(db, lead, m.text, m.media));   /* исходящий IG DM из engine.send */
 const inventory = require('./inventory');
 const tgbridge = require('./tgbridge'); /* двусторонний мост Telegram ⇄ WhatsApp (брокер отвечает с телефона) */
 const mailer = require('./email'); /* SaaS-почта: Atelier-шаблоны (RU/EN) + Resend + конструктор в админке */
@@ -5932,11 +5934,15 @@ const server = http.createServer(async (req, res) => {
                 db.leads.push(lead);
                 ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: 'Входящий Instagram Direct: ' + lead.name });
               }
-              const text = String(msg.text || (Array.isArray(msg.attachments) && msg.attachments.length ? '[вложение]' : '')).slice(0, 1000);
-              if (text) {
-                db.messages.push({ id: store.nextId('m'), leadId: lead.id, dir: 'in', via: 'ig', text, at: Date.now(), status: 'received' });
-                lead.unread = (lead.unread || 0) + 1; lead.lastInboundAt = Date.now(); lead.lastMsgAt = Date.now(); lead.lastDir = 'in';
-                if (lead.stage === 'sleeping') lead.stage = 'dialog';
+              let media = null;
+              const att = Array.isArray(msg.attachments) ? msg.attachments[0] : null;
+              if (att && att.payload && att.payload.url) media = { type: (att.type === 'video' ? 'video' : att.type === 'image' ? 'image' : 'file'), url: String(att.payload.url).slice(0, 500) };
+              const text = String(msg.text || (media ? '[вложение]' : '')).slice(0, 1000);
+              if (text || media) {
+                /* единый путь приёма (как WA/TG): тег канала ig_dm, зеркало брокеру, квалификация, opt-out.
+                   ai.enabled=false у IG-лида по умолчанию → engine.inbound НЕ шлёт авто-ответ, только обогащает. */
+                engine.inbound(db, lead, text, { channel: 'ig_dm', media });
+                lead.lastMsgAt = Date.now(); lead.lastDir = 'in';
               }
             }
             store.save();
@@ -9738,7 +9744,7 @@ const server = http.createServer(async (req, res) => {
         /* первое касание вручную: если в панели показан креатив (загруженный ИЛИ атрибуция объявления,
            l.adCreative), он уходит первым сообщением — как это делает автопилот на chainStep 0. */
         const cu = b.creativeUrl ? String(b.creativeUrl).slice(0, 500) : '';
-        const _ch = ['wa', 'tg', 'viber', 'email'].includes(b.channel) ? b.channel : undefined;   /* явный выбор канала касания */
+        const _ch = ['wa', 'tg', 'viber', 'email', 'ig_dm'].includes(b.channel) ? b.channel : undefined;   /* явный выбор канала касания */
         /* ⭐ВЫБОР НОМЕРА-ОТПРАВИТЕЛЯ (пикер в диалоге, запрос SFG 12.11): пусто → авто-выбор общего пула
            (pickGrayNumber); конкретный номер → форс. GUARD анти-бан: ЛИЧНЫЙ (закреплённый за брокером) номер
            на ХОЛОДНОМ первом касании запрещён — только после ответа клиента. */

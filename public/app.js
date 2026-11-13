@@ -7963,7 +7963,7 @@ async function renderChat(id, rebuild) {
   const _taFocused = !!(_ta0 && document.activeElement === _ta0);
   const _taSelS = _ta0 ? _ta0.selectionStart : null, _taSelE = _ta0 ? _ta0.selectionEnd : null;
   const viaName = { ai: 'Lumen AI', chain: 'Цепочка', wake: 'Реанимация', human: 'Менеджер', template: 'Шаблон' };
-  const chName = { wa: 'WA', tg: 'TG', viber: 'VB', email: '@' };
+  const chName = { wa: 'WA', tg: 'TG', viber: 'VB', email: '@', ig_dm: 'IG' };
   let lastDay = '';
   const lastMsg = (l.messages || []).slice(-1)[0];
   const isNewMsg = lastMsg && PAGE_STATE['lm_' + l.id] && PAGE_STATE['lm_' + l.id] !== lastMsg.id;
@@ -7995,7 +7995,7 @@ async function renderChat(id, rebuild) {
 
   /* выбор канала касания — вычисляем ДО скина, чтобы фон/тема чата шли по выбранному в пикере каналу (переживает поллинг) */
   const _chans = l.chans || { wa: { avail: true, enabled: true } };
-  const _avail = ['wa', 'tg', 'email', 'viber'].filter(c => _chans[c] && _chans[c].avail && _chans[c].enabled);
+  const _avail = ['wa', 'tg', 'email', 'viber', 'ig_dm'].filter(c => _chans[c] && _chans[c].avail && _chans[c].enabled);
   if (!_avail.length) _avail.push('wa');
   const _rec = _avail.find(c => _chans[c] && _chans[c].recommended);
   /* ⚠️ АВТО-ДЕТЕКТ МЕССЕНДЖЕРА: клиент написал в Telegram → плашка/композер сами переключаются на Telegram.
@@ -8031,7 +8031,7 @@ async function renderChat(id, rebuild) {
     </div>` : '';
   const chn = _selCh;
   pane.className = 'glass chat chat--' + chn + (l.ai.enabled ? ' ai-live' : '');
-  const chnMeta = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], viber: ['Viber', '#7360F2'], email: ['E-mail', '#8A90A0'] }[chn] || ['WhatsApp', '#25D366'];
+  const chnMeta = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], viber: ['Viber', '#7360F2'], email: ['E-mail', '#8A90A0'], ig_dm: ['Instagram', '#E1306C'] }[chn] || ['WhatsApp', '#25D366'];
   /* ⚠️ БЛОК «ЗАПЛАНИРОВАН СОЗВОН»: ближайшая назначенная встреча лида — время (в поясе клиента), платформа
      (Zoom/Meet по ссылке), кнопка подключения, копирование ссылки и страница встречи (клиентская визитка /m/:id). */
   const _mNow = Date.now();
