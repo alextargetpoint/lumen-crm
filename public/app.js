@@ -8021,13 +8021,18 @@ async function renderChat(id, rebuild) {
   const _myBid = (STATE.me && STATE.me.role === 'broker') ? STATE.me.brokerId : null;
   const _persNums = _allNums.filter(n => n.brokerId && (!_myBid || n.brokerId === _myBid));
   const _senderOpts = [];
-  if (_showPool && _poolNums.length) { for (const n of _poolNums) _senderOpts.push({ v: n.phone, label: '📣 Пул · +' + (n.realPhone || n.phone) }); }
-  else _senderOpts.push({ v: '', label: '📣 Общий пул' });
-  for (const n of _persNums) _senderOpts.push({ v: n.phone, label: '👤 ' + _brokerNm(n.brokerId) + ' · +' + (n.realPhone || n.phone), locked: !_hasInbound });
+  if (_showPool && _poolNums.length) { for (const n of _poolNums) _senderOpts.push({ v: n.phone, pers: false, name: 'Номер пула', num: (n.realPhone || n.phone) }); }
+  else _senderOpts.push({ v: '', pers: false, name: 'Общий пул', num: '' });
+  for (const n of _persNums) _senderOpts.push({ v: n.phone, pers: true, name: _brokerNm(n.brokerId), num: (n.realPhone || n.phone), locked: !_hasInbound });
   let _senderSel = (l.grayPhone && _senderOpts.some(o => o.v === l.grayPhone)) ? l.grayPhone : (_senderOpts[0] ? _senderOpts[0].v : '');
+  /* кастомный .cs-дропдаун (как все селекты Lumen) со своими SVG-иконками (пул/личный/замок) — вместо нативного
+     select и эмодзи-рупора. Значение держит скрытый #composerFrom (его читает обработчик отправки). */
   const _senderPicker = (_selCh === 'wa' && _allNums.length && (_persNums.length || (_showPool && _poolNums.length > 1))) ? `<div class="composer-sender" title="С какого номера клиенту уйдёт это сообщение">
       <span class="cs-lbl">${ic(I.phone)}С номера</span>
-      <select id="composerFrom" class="cs-sel">${_senderOpts.map(o => `<option value="${esc(o.v)}"${o.v === _senderSel ? ' selected' : ''}${o.locked ? ' disabled' : ''}>${esc(o.label)}${o.locked ? ' — после ответа клиента' : ''}</option>`).join('')}</select>
+      <div class="cs cs-sender" id="composerSenderWrap">
+        <input type="hidden" id="composerFrom" value="${esc(_senderSel)}">
+        <button type="button" class="cs-btn cs-sender-btn"><span class="cs-val"></span><span class="cs-chev">${ic(I.chev, 2)}</span></button>
+      </div>
     </div>` : '';
   const chn = _selCh;
   pane.className = 'glass chat chat--' + chn + (l.ai.enabled ? ' ai-live' : '');
@@ -8259,6 +8264,39 @@ async function renderChat(id, rebuild) {
     catch (err) { $('#composerText').value = t; toast('Не отправилось', err.message || 'ошибка'); return; }   /* напр. личный номер на холодном касании — вернём текст */
     renderChat(id, false);
   });
+  /* ⭐КАСТОМНЫЙ ПИКЕР НОМЕРА-ОТПРАВИТЕЛЯ: .cs-дропдаун с SVG-иконками (пул/личный/замок) поверх openPop (как
+     остальные селекты). Значение держит скрытый #composerFrom. Залоченные (личный до ответа клиента) — не кликабельны. */
+  (() => {
+    const csWrap = $('#composerSenderWrap', pane); if (!csWrap) return;
+    const btn = csWrap.querySelector('.cs-btn'), hidden = csWrap.querySelector('#composerFrom');
+    const _optIc = o => o.pers ? I.user : I.users;
+    const updateBtn = () => {
+      const o = _senderOpts.find(x => x.v === hidden.value) || _senderOpts[0]; if (!o) return;
+      btn.querySelector('.cs-val').innerHTML = `<span class="csv-ic">${ic(_optIc(o))}</span><span class="csv-tx">${esc(o.name)}${o.num ? ` <span class="csv-num">+${esc(o.num)}</span>` : ''}</span>`;
+    };
+    const buildList = () => {
+      const list = el('<div class="cs-list cs-sender-list"></div>');
+      list.innerHTML = _senderOpts.map(o => {
+        const sel = o.v === hidden.value;
+        return `<div class="cs-opt cs-sender-opt ${sel ? 'sel' : ''} ${o.locked ? 'dis' : ''}" data-v="${esc(o.v)}"${o.locked ? ' title="Откроется после ответа клиента"' : ''}>
+          <span class="cso-ic">${ic(_optIc(o))}</span>
+          <span class="cso-tx">${esc(o.name)}${o.num ? `<span class="cso-num">+${esc(o.num)}</span>` : ''}</span>
+          ${o.locked ? `<span class="cso-lock">${ic(I.lock)}</span>` : (sel ? ic(I.check) : '')}
+        </div>`;
+      }).join('');
+      $$('.cs-opt', list).forEach(x => x.addEventListener('mousedown', e => {
+        e.preventDefault();
+        if (x.classList.contains('dis')) return;
+        hidden.value = x.dataset.v; updateBtn(); closePop();
+      }));
+      return list;
+    };
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      if (csWrap.classList.contains('open')) closePop(); else openPop(csWrap, btn, buildList());
+    });
+    updateBtn();
+  })();
   $('#followupBtn')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget; const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Анализирую чат…';
     let r; try { r = await api.post(`/leads/${id}/followup/variants`, {}); } catch (err) { r = { ok: false, error: err.message }; }

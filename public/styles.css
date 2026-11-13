@@ -9607,8 +9607,24 @@ body.client-view [data-team]{ display:none !important; }
 .composer-sender { display:flex; align-items:center; gap:8px; padding:8px 12px 2px; }
 .composer-sender .cs-lbl { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--muted); font-weight:650; white-space:nowrap; }
 .composer-sender .cs-lbl svg { width:13px; height:13px; }
-.composer-sender .cs-sel { flex:1 1 auto; min-width:0; max-width:340px; font-size:12.5px; padding:5px 10px; border:1px solid var(--stroke); border-radius:9px; background:var(--card); color:var(--text); cursor:pointer; }
-.composer-sender .cs-sel:focus { outline:none; border-color:color-mix(in srgb, var(--accent) 55%, var(--stroke)); }
+/* кастомный пикер номера-отправителя (.cs-дропдаун вместо нативного select) */
+.composer-sender .cs-sender { flex:1 1 auto; min-width:0; max-width:340px; }
+.cs-sender-btn { padding:6px 10px; font-size:12.5px; }
+.cs-sender-btn .cs-val { display:flex; align-items:center; gap:7px; min-width:0; }
+.cs-sender-btn .csv-ic { display:inline-flex; flex:0 0 auto; }
+.cs-sender-btn .csv-ic svg { width:14px; height:14px; color:var(--ink-3); }
+.cs-sender-btn .csv-tx { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cs-sender-btn .csv-num { color:var(--muted); font-size:11.5px; }
+.cs-sender-list { min-width:238px; }
+.cs-sender-opt { gap:9px; }
+.cs-sender-opt .cso-ic { display:inline-flex; flex:0 0 auto; }
+.cs-sender-opt .cso-ic svg { width:15px; height:15px; color:var(--ink-3); margin-left:0; }
+.cs-sender-opt.sel .cso-ic svg { color:var(--accent); }
+.cs-sender-opt .cso-tx { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cs-sender-opt .cso-num { color:var(--muted); margin-left:6px; font-size:12px; }
+.cs-sender-opt > svg, .cs-sender-opt .cso-lock { margin-left:auto; flex:0 0 auto; display:inline-flex; }
+.cs-sender-opt > svg { width:13px; height:13px; }
+.cs-sender-opt .cso-lock svg { width:13px; height:13px; color:var(--muted); margin-left:0; }
 /* ── CTWA: визуальная схема настройки (запрос SFG 13.11) ── */
 .ctwa-status{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:2px 0 14px}
 .ctwa-st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;background:color-mix(in srgb,var(--muted) 12%,transparent);color:var(--muted);border:1px solid var(--stroke);white-space:nowrap}
